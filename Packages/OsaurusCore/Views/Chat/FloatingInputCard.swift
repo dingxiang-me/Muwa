@@ -569,6 +569,17 @@ struct FloatingInputCard: View {
                     pauseTimerCancellable = nil
                 }
             }
+            .onChange(of: appConfig.chatConfig.showChatBarToolsChip) { _, newValue in
+                // Fix #1: if the user hides the Tools chip from Settings
+                // while a per-window override is active, clear the override
+                // so it doesn't silently re-apply the next time they
+                // re-enable the chip. Without this, a stale `.forceOff`
+                // survives in ChatWindowState.toolsDisabledOverride and
+                // confuses users who expected hiding the chip to "reset".
+                if !newValue {
+                    toolsDisabledOverride = nil
+                }
+            }
             .modifier(VoiceDebugObservers())
             .task {
                 // log full voice state once the view has settled (deferred to avoid type-checker load in body)

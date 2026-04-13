@@ -818,16 +818,27 @@ struct ConfigurationView: View {
 
     /// Surface a save failure to the user as a red toast via ToastManager.
     /// Logs the error as well so it shows up in Console.app for post-mortem.
-    /// Called from `saveConfiguration` when any of the throwing store
-    /// writes fail (disk full, permissions, lock conflicts, etc.).
-    /// See `05-CONFIGURABILITY-AUDIT.md` Issue 10 — silently swallowing
-    /// these errors lets users believe their settings saved when they
-    /// didn't.
-    private func showSaveError(_ message: String, error: Error) {
+    ///
+    /// `alreadyPersisted` lists the store groups (e.g. ["server"]) that
+    /// saved successfully before the failure. On partial failure the toast
+    /// names them explicitly so users aren't left wondering what state
+    /// their settings are in. See `05-CONFIGURABILITY-AUDIT.md` Issue 10.
+    private func showSaveError(
+        _ message: String,
+        error: Error,
+        alreadyPersisted: [String] = []
+    ) {
         print("[Osaurus] \(message): \(error)")
+        let detail: String
+        if alreadyPersisted.isEmpty {
+            detail = error.localizedDescription
+        } else {
+            let saved = alreadyPersisted.joined(separator: ", ")
+            detail = "\(error.localizedDescription)\n\(saved) settings were saved."
+        }
         ToastManager.shared.error(
             message,
-            message: error.localizedDescription
+            message: detail
         )
     }
 
@@ -1087,10 +1098,17 @@ struct ConfigurationView: View {
             previousServerCfg.genTopP != configuration.genTopP
             || previousServerCfg.genMaxKVSize != configuration.genMaxKVSize
 
+        // Track which store groups have successfully persisted so that if
+        // a later save in the sequence fails, we can tell the user exactly
+        // what is and isn't on disk. Order matches the save sequence
+        // below: server → chat → memory.
+        var alreadySaved: [String] = []
+
         do {
             try ServerConfigurationStore.saveThrowing(configuration)
+            alreadySaved.append("Server")
         } catch {
-            showSaveError("Failed to save server settings", error: error)
+            showSaveError("Failed to save server settings", error: error, alreadyPersisted: alreadySaved)
             return
         }
 
@@ -1177,8 +1195,9 @@ struct ConfigurationView: View {
         // toast. See 05-CONFIGURABILITY-AUDIT.md Issue 10 for why we care.
         do {
             try ChatConfigurationStore.saveThrowing(chatCfg)
+            alreadySaved.append("Chat")
         } catch {
-            showSaveError("Failed to save chat settings", error: error)
+            showSaveError("Failed to save chat settings", error: error, alreadyPersisted: alreadySaved)
             return
         }
 
@@ -1202,8 +1221,9 @@ struct ConfigurationView: View {
             memoryCfg.enabled = tempMemoryEnabled
             do {
                 try MemoryConfigurationStore.saveThrowing(memoryCfg)
+                alreadySaved.append("Memory")
             } catch {
-                showSaveError("Failed to save memory settings", error: error)
+                showSaveError("Failed to save memory settings", error: error, alreadyPersisted: alreadySaved)
                 return
             }
             // Drop the 10-second TTL cache so the next prompt reflects the new
@@ -1255,6 +1275,10 @@ struct ConfigurationView: View {
     @ViewBuilder
     private var cacheEngineSubsection: some View {
         SettingsSubsection(label: "Cache Engine") {
+            // Fix #4: constrain width so the ~12 vertical controls don't
+            // stretch edge-to-edge on ultrawide displays. 600pt matches the
+            // natural reading width of the other settings subsections and
+            // keeps the picker segments a reasonable size.
             VStack(alignment: .leading, spacing: 14) {
                 Text(
                     "Tune the 6-stack KV cache engine. Every control defaults to Auto — osaurus ships with TurboQuant enabled and sensible RAM-scaled defaults. Stacks 1 and 5 take effect on next generation; stacks 2, 3, 4, 6 take effect on next model load.",
@@ -1465,6 +1489,7 @@ struct ConfigurationView: View {
                     )
                 }
             }
+            .frame(maxWidth: 600, alignment: .leading)
         }
     }
 
