@@ -1388,4 +1388,70 @@ handling (Issue 10), migration-compat tests, and final audit entries.
 
 ---
 
+## Branch housekeeping — rebase onto latest main
+
+The branch has been rebased onto `origin/main` at `1327e479` (Update
+appcast for 0.16.10 release). Prior base was `82faed57`; main had
+moved ahead by 5 commits while Phase D was being audited:
+
+```
+1327e479 Update appcast for 0.16.10 (release)
+90ec7825 fix build
+c2a82fe1 set standard size
+d53aa961 use public repo
+ef96d8cf fix dep resolution
+```
+
+The rebase applied **cleanly with zero conflicts** — none of the
+upstream commits touched any file in our change surface
+(`ConfigurationView.swift`, `FloatingInputCard.swift`, `ChatView.swift`,
+`SystemPromptComposer.swift`, memory/chat config models, `Agent` model,
+or `AgentsView.swift`). Build verified clean on top of the new base.
+
+Post-rebase commit hashes (original → rebased):
+
+| Phase | Original | Rebased |
+|-------|----------|---------|
+| Review package | `e6972788` | `8abd4e9d` |
+| Second-pass wiring revision | `9bab8716` | `4736057a` |
+| A — tool safety nets | `6af27be9` | `7416dd5d` |
+| B — memory safety nets | `0a6c1e29` | `956465ed` |
+| C — chat-bar Tools chip | `012a03ad` | `ba860b96` |
+| D — default flip + save invalidation | `66eeb7fe` | `dab594f7` |
+| Configurability audit doc | `28a51623` | `93a84f2c` |
+| Configuration knobs user guide | `edb5a755` | `499993a6` |
+
+All subsequent phase work should be based on the rebased commits.
+
+---
+
+## Progress status — as of rebase
+
+| Phase | Status | Commit |
+|-------|--------|--------|
+| Pre-work: verification + plan | ✅ done | `8abd4e9d`, `4736057a` |
+| A — tool safety nets (M-01..M-03) | ✅ done, committed, built clean | `7416dd5d` |
+| B — memory safety nets (M-04..M-08) | ✅ done, committed, built clean | `956465ed` |
+| C — chat-bar Tools chip (M-09..M-13) | ✅ done, committed, built clean | `ba860b96` |
+| D — default flip + runtime invalidation (M-14..M-16) | ✅ done, committed, built clean | `dab594f7` |
+| E — cleanup, error handling, tests, audit closure (M-18..M-21) | ⏳ not started | — |
+| Configurability audit (team review) | ✅ done | `93a84f2c` |
+| CONFIGURATION_KNOBS user guide | ✅ done | `499993a6` |
+| Rebase onto latest main | ✅ done | — |
+| Cache-settings audit + close gaps | ⏳ in progress | — |
+| Push to remote | ⏳ not done | — |
+
+**Confirmed hard gaps still open** (from
+`05-CONFIGURABILITY-AUDIT.md`):
+- Gap 1.1 — `Agent.memoryEnabled` editor UI toggle (recommended to
+  close on this branch; blocks the Phase D escape hatch design goal)
+- Gaps 1.2, 1.3, 1.4, 1.5, 1.6, 1.7 — deferred to follow-up PRs per
+  audit recommendation
+
+**New scope added on rebase**: Cache-related settings surface must
+be verified configurable end-to-end. Audit in flight — entries will
+be added below as gaps are found and closed.
+
+---
+
 
