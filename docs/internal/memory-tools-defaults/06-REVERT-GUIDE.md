@@ -52,14 +52,20 @@ Want the preflight cache invalidation hooks?
 | `93a84f2c` | Configurability audit doc | No | No | Docs only — drop or keep |
 | `499993a6` | CONFIGURATION_KNOBS user doc | No | No | Docs only — drop or keep |
 | `74ecfb54` | Audit doc progress update | No | No | Docs only — drop or keep |
-| `80baca9a` | **Phase E.1** — cache engine settings UI | Minor (Settings section) | **Yes** | **Yes, keep** — this is the cache work |
+| `80baca9a` | **Phase E.1** — cache engine settings UI (4/6 stacks) | Minor (Settings section) | **Yes** | **Yes, keep** — foundation of the cache work |
 | `49e9b9ca` | **Phase E.2** — Tools chip opt-out toggle | Minor (Settings toggle + chip gate) | No | Optional |
+| `f0d7fb56` | **Phase E.3** — full 6-stack cache surface + TurboQuant as default | Minor (adds stack 1/5 controls to the existing Cache Engine section) | **Yes** | **Yes, keep** — finishes the cache work |
 
-**Minimum "cache engine only" cherry-pick**: `7416dd5d` + `956465ed` + `80baca9a`
-(Phase A + B + E.1). Those three give you:
+**Minimum "cache engine only" cherry-pick**: `7416dd5d` + `956465ed` +
+`80baca9a` + `f0d7fb56` (Phase A + B + E.1 + E.3). Those four give you:
 - The `resolveTools` hard-short-circuit fix (Phase A bug fix)
 - The per-agent memory override field (Phase B, dormant without UI)
-- The 6-stack cache engine settings surface (Phase E.1)
+- The 4-stack cache engine settings surface (Phase E.1)
+- Full 6-stack coverage + TurboQuant-as-default (Phase E.3)
+
+Phase E.3 depends textually on E.1 (it extends the same struct and the
+same Settings subsection), so skipping E.1 and picking only E.3 will
+not apply cleanly. Always take E.1 first.
 
 Everything else is optional.
 
@@ -72,7 +78,8 @@ If the team wants to land **only** the cache/vmlx work, cherry-pick:
 ```bash
 git cherry-pick 7416dd5d     # Phase A — tool safety nets (pre-existing bug fix)
 git cherry-pick 956465ed     # Phase B — memory safety nets (dormant without UI)
-git cherry-pick 80baca9a     # Phase E.1 — cache engine settings UI
+git cherry-pick 80baca9a     # Phase E.1 — cache engine settings UI (4/6 stacks)
+git cherry-pick f0d7fb56     # Phase E.3 — full 6-stack surface + TurboQuant default
 ```
 
 Skip: `ba860b96` (chip), `dab594f7` (default flip), `49e9b9ca` (chip opt-out),
@@ -297,13 +304,35 @@ Not recommended — see above.
 
 ---
 
-## 6. Options for Phase E.1 (cache engine settings UI)
+## 6. Options for Phase E.1 + E.3 (cache engine settings UI)
 
-This is the **main deliverable** the team cares about. It adds:
-- `ServerCacheConfig` with 6 optional knobs (nil = auto-tune)
-- Wiring through `ModelRuntime.buildCacheCoordinatorConfig`
-- New "Cache Engine" subsection in Settings → Local Inference
-- Disk cache usage readout + Clear button
+This is the **main deliverable** the team cares about. Phase E.1 laid
+the foundation; Phase E.3 finished it. Together they add:
+
+- `ServerCacheConfig` with optional knobs for **all 6 cache stacks**
+  (Phase E.1 shipped 4 — stacks 2/3/4/6 — under the false footnote
+  that stacks 1 and 5 were "managed automatically by the vmlx
+  engine"; Phase E.3 re-audited that claim and exposed the missing
+  two as 7 new fields: `prefillStepSize`, `kvQuantMode`,
+  `affineKVBits`, `affineKVGroupSize`, `turboKeyBits`,
+  `turboValueBits`, `quantizedKVStart`).
+- Wiring through `ModelRuntime.buildCacheCoordinatorConfig` (stacks
+  2/3/4/6) and `ModelRuntime.makeGenerateParameters` (stacks 1 and 5).
+- **TurboQuant (keyBits 3, valueBits 3) as the osaurus default** when
+  `kvQuantMode == nil`. This diverges from the vmlx package default of
+  `.none` and is osaurus-specific — the substitution lives in
+  `makeGenerateParameters` around line 607. Users who want raw
+  full-precision KV must set `kvQuantMode: "none"` explicitly.
+- New "Cache Engine" subsection in Settings → Local Inference with
+  controls for all 6 stacks, including a segmented "Auto (TurboQuant)
+  / Off / Affine / TurboQuant" picker and conditional bit steppers.
+- Disk cache usage readout + Clear button.
+
+**Hot-reload split** (important for anyone rewiring the Settings save
+path): stacks 1 and 5 flow through `GenerateParameters` per request
+and take effect on the next generation with no model reload; stacks
+2, 3, 4, 6 flow through the immutable `CacheCoordinatorConfig` and
+still require a model reload.
 
 ### 6.1 Keep as-is
 
@@ -350,11 +379,13 @@ Keep `ServerCacheConfig` on the model side so JSON editing still works.
 ### 6.4 Remove everything including the config model
 
 ```bash
-git revert 80baca9a
+git revert f0d7fb56 80baca9a
 ```
 
-Drops the cache knob surface entirely. **Not recommended** — this is
-the main reason the branch exists.
+Revert order matters — E.3 extends E.1, so revert E.3 first. Drops
+the cache knob surface entirely (all 6 stacks, the TurboQuant default
+substitution, and the Settings subsection). **Not recommended** —
+this is the main reason the branch exists.
 
 ---
 
@@ -374,8 +405,13 @@ the main reason the branch exists.
 | Memory default flip (Phase D M-14) | off | `MemoryConfiguration.enabled` init default | Settings → Chat → Memory toggle | no memory section when off |
 | Tools default flip (Phase D M-15) | disabled | `ChatConfiguration.disableTools` init default | Settings → Chat → Tools toggle **and** chip | no tool specs when disabled |
 | Settings-save preflight invalidation (Phase D M-16) | on | n/a | n/a | preflight caches wiped when flag flips |
-| Cache engine 6-stack UI (Phase E.1) | visible, all auto | `cacheEngineSubsection` render | Settings → Local Inference → Cache Engine | all fields nil = vmlx auto-tune |
+| Cache engine stacks 2/3/4/6 UI (Phase E.1) | visible, all auto | `cacheEngineSubsection` render | Settings → Local Inference → Cache Engine | all fields nil = vmlx auto-tune; **model reload required** |
 | Tools chip opt-out (Phase E.2) | opt-in | `showChatBarToolsChip` init default | Settings → Chat → Tools → "Show Tools chip in chat bar" | chip visibility |
+| Prefill step size — stack 1 (Phase E.3) | nil = 512 | `ServerCacheConfig.prefillStepSize` | Settings → Local Inference → Cache Engine → "Prefill Step Size" | per-request via `GenerateParameters`; **next generation** |
+| KV quantization mode — stack 5 (Phase E.3) | **nil = TurboQuant (3/3)** (osaurus default, diverges from vmlx package `.none`) | `ServerCacheConfig.kvQuantMode` + `ModelRuntime.makeGenerateParameters` substitution | Settings → Local Inference → Cache Engine → "KV Quantization Mode" (Auto / Off / Affine / TurboQuant) | per-request via `GenerateParameters`; **next generation** |
+| Affine KV bits + group size (Phase E.3) | nil = 4 / 64 (when mode == affine) | `ServerCacheConfig.affineKVBits`, `affineKVGroupSize` | conditional steppers when mode == affine | per-request; **next generation** |
+| TurboQuant key/value bits (Phase E.3) | nil = 3 / 3 (when mode == turboQuant or auto) | `ServerCacheConfig.turboKeyBits`, `turboValueBits` | conditional steppers when mode == turboQuant or auto | per-request; **next generation** |
+| Quantize after N tokens (Phase E.3) | nil = 0 | `ServerCacheConfig.quantizedKVStart` | conditional stepper when mode != off | per-request; **next generation** |
 
 ---
 
@@ -432,12 +468,13 @@ These stay on the branch regardless of which commits you drop:
    after merge.
 
 5. **Should `docs/CONFIGURATION_KNOBS.md` ship publicly?** It's written
-   for end users and is accurate as of `80baca9a`. It needs a
-   post-Phase-E.1 update to document the new Cache Engine knobs before
-   it's publishable.
+   for end users and is accurate as of `f0d7fb56` — the "Cache Engine
+   (6-stack)" section under `server.json` documents every field
+   introduced by Phase E.1 and E.3, including the TurboQuant-as-default
+   behavior.
 
 ---
 
 **Document status**: ready for team review alongside
 `05-CONFIGURABILITY-AUDIT.md`.
-**Branch**: `feat/memory-tools-defaults` at commit `49e9b9ca` (Phase E.2).
+**Branch**: `feat/memory-tools-defaults` at commit `f0d7fb56` (Phase E.3).

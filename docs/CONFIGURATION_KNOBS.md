@@ -303,6 +303,128 @@ Osaurus manages these automatically. Editing them will break things.
 - `numberOfThreads` — auto-set from `ProcessInfo.activeProcessorCount`
 - `backlog` — system constant (256)
 
+### Cache Engine (6-stack)
+
+Osaurus exposes the full vmlx-swift-lm KV caching system as six
+independently tunable "stacks". All fields live under a single
+`cacheConfig` object in `server.json`, and **every field is optional
+(`null` = auto-tune)**. You can leave `cacheConfig` out entirely
+and get sensible defaults.
+
+The six stacks, and which configuration path they use:
+
+| # | Stack | Fields | Plumbing | Hot-reload? |
+|---|-------|--------|----------|-------------|
+| 1 | Continuous batching (prefill) | `prefillStepSize` | `GenerateParameters` (per request) | **Yes — next generation** |
+| 2 | Prefix caching (L1) | `usePagedCache`, `maxCacheBlocks` | `CacheCoordinatorConfig` | No — model reload |
+| 3 | Paged blocks | `pagedBlockSize` (shares budget with stack 2) | `CacheCoordinatorConfig` | No — model reload |
+| 4 | L2 disk cache | `enableDiskCache`, `diskCacheMaxGB` | `CacheCoordinatorConfig` | No — model reload |
+| 5 | KV quantization | `kvQuantMode`, `affineKVBits`, `affineKVGroupSize`, `turboKeyBits`, `turboValueBits`, `quantizedKVStart` | `GenerateParameters` (per request) | **Yes — next generation** |
+| 6 | Hybrid SSM companion cache | `ssmMaxEntries` | `CacheCoordinatorConfig` | No — model reload |
+
+Stacks 1 and 5 flow through `GenerateParameters` on every request, so
+edits take effect on the **next message** without reloading the model.
+Stacks 2, 3, 4, and 6 flow through `CacheCoordinatorConfig`, which is
+immutable once a model is loaded — edits to those fields require a
+**model reload** (unload and reload from the model picker, or restart
+Osaurus).
+
+#### Fields
+
+| Field | Type | Default (null means…) | Range / valid values | Stack |
+|-------|------|----------------------|----------------------|-------|
+| `prefillStepSize` | int\|null | 512 | 64 – 4096 | 1 |
+| `usePagedCache` | bool\|null | vmlx auto (on for most models) | `true` / `false` | 2 |
+| `maxCacheBlocks` | int\|null | vmlx auto (sized from RAM) | positive int | 2, 3 |
+| `pagedBlockSize` | int\|null | vmlx auto | `32`, `64`, `128` | 3 |
+| `enableDiskCache` | bool\|null | vmlx auto (on) | `true` / `false` | 4 |
+| `diskCacheMaxGB` | float\|null | vmlx auto | positive float | 4 |
+| `kvQuantMode` | string\|null | **osaurus substitutes `"turboQuant"`** (see below) | `"none"`, `"affine"`, `"turboQuant"` | 5 |
+| `affineKVBits` | int\|null | 4 (when mode == `"affine"`) | 2, 4, 8 | 5 |
+| `affineKVGroupSize` | int\|null | 64 (when mode == `"affine"`) | positive int | 5 |
+| `turboKeyBits` | int\|null | 3 (when mode == `"turboQuant"`) | 1 – 8 | 5 |
+| `turboValueBits` | int\|null | 3 (when mode == `"turboQuant"`) | 1 – 8 | 5 |
+| `quantizedKVStart` | int\|null | 0 (quantize from the first token) | 0 – context length | 5 |
+| `ssmMaxEntries` | int\|null | vmlx auto | positive int | 6 |
+
+#### TurboQuant is osaurus's default
+
+This is the one place osaurus's defaults diverge from the underlying
+vmlx package. The package default for KV quantization is `none` (raw
+full-precision KV). **Osaurus substitutes TurboQuant with 3-bit keys
+and 3-bit values whenever `kvQuantMode` is `null`** — the substitution
+lives in `ModelRuntime.makeGenerateParameters`. TurboQuant gives a
+roughly 8× smaller KV cache for the same context length with minimal
+quality loss, and it's the primary reason the 6-stack cache surface
+exists, so we ship it on.
+
+**If you want raw full-precision KV**, don't leave `kvQuantMode` out —
+set it explicitly:
+
+```json
+{
+  "cacheConfig": {
+    "kvQuantMode": "none"
+  }
+}
+```
+
+Setting `kvQuantMode` to `"none"` is respected as a deliberate user
+choice; `null` (or omitting the field) is the trigger for the
+TurboQuant substitution.
+
+The Settings UI labels the picker option **"Auto (TurboQuant)"** so
+that users who glance at the segmented control understand what the
+default actually does.
+
+#### Example: small-RAM machine (16 GB), no disk cache
+
+Useful when you're on a MacBook Air and want to keep the working set
+tiny — disable the L2 disk cache, use affine 4-bit quantization
+(slightly smaller than TurboQuant for some models), and cap the
+paged block pool.
+
+```json
+{
+  "cacheConfig": {
+    "enableDiskCache": false,
+    "maxCacheBlocks": 32,
+    "pagedBlockSize": 64,
+    "kvQuantMode": "affine",
+    "affineKVBits": 4,
+    "affineKVGroupSize": 64,
+    "quantizedKVStart": 256
+  }
+}
+```
+
+This configuration:
+- Turns off the L2 disk cache entirely (stack 4).
+- Limits the L1 prefix cache to 32 blocks of 64 KV pairs each (stacks 2–3).
+- Uses affine 4-bit KV quantization, kicking in after the first 256
+  tokens so short prompts stay full-precision (stack 5).
+- Leaves continuous batching (stack 1) and the SSM companion cache
+  (stack 6) at package defaults.
+
+#### Example: large-RAM workstation, maximum throughput
+
+```json
+{
+  "cacheConfig": {
+    "prefillStepSize": 1024,
+    "maxCacheBlocks": 512,
+    "pagedBlockSize": 128,
+    "diskCacheMaxGB": 32,
+    "turboKeyBits": 3,
+    "turboValueBits": 3
+  }
+}
+```
+
+Leaves `kvQuantMode` unset (so osaurus's TurboQuant default kicks in),
+bumps prefill chunk size for fewer round trips, and gives the paged
+cache room to breathe.
+
 ---
 
 ## Autonomous exec config
@@ -417,6 +539,13 @@ the Osaurus log for the parse error, fix the JSON, restart.
 | Less aggressive dedup in memory | `memory.json` | Raise `verificationSemanticDedupThreshold` toward `0.95` |
 | Prioritize recent entries heavily | `memory.json` | Lower `temporalDecayHalfLifeDays` to ~7 |
 | Cap an autonomous agent to 3 commands/turn | `agents/<uuid>.json` | `autonomousExec.maxCommandsPerTurn: 3` |
+| Turn off KV quantization (raw full-precision KV) | `server.json` | `cacheConfig.kvQuantMode: "none"` |
+| Use affine KV quant instead of TurboQuant | `server.json` | `cacheConfig.kvQuantMode: "affine"` + `affineKVBits` |
+| Tune TurboQuant key/value bits | `server.json` | `cacheConfig.turboKeyBits` / `turboValueBits` |
+| Quantize KV only after N tokens | `server.json` | `cacheConfig.quantizedKVStart: 256` |
+| Disable the L2 disk cache | `server.json` | `cacheConfig.enableDiskCache: false` |
+| Cap the L1 paged cache blocks | `server.json` | `cacheConfig.maxCacheBlocks: 32` |
+| Bigger prefill chunks (fewer round trips) | `server.json` | `cacheConfig.prefillStepSize: 1024` |
 
 ---
 
