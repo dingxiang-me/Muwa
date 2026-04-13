@@ -1,5 +1,64 @@
 import SwiftUI
 
+// MARK: - Cache Settings UI Helpers
+
+/// Three-state Bool picker used for optional cache-engine toggles.
+/// Auto = fall back to vmlx-swift-lm default, Enabled/Disabled = explicit override.
+enum CacheTriState: String, CaseIterable, Identifiable {
+    case auto = "Auto"
+    case enabled = "Enabled"
+    case disabled = "Disabled"
+
+    var id: String { rawValue }
+
+    /// Convert to `Bool?` for `ServerCacheConfig` storage.
+    var optionalBool: Bool? {
+        switch self {
+        case .auto: return nil
+        case .enabled: return true
+        case .disabled: return false
+        }
+    }
+
+    /// Hydrate from `Bool?` on view load.
+    static func from(_ value: Bool?) -> CacheTriState {
+        switch value {
+        case .none: return .auto
+        case .some(true): return .enabled
+        case .some(false): return .disabled
+        }
+    }
+}
+
+/// Paged block size choice. Valid values are 32/64/128 tokens per block;
+/// `.auto` defers to the vmlx default (64).
+enum CachePagedBlockSizeChoice: String, CaseIterable, Identifiable {
+    case auto = "Auto"
+    case size32 = "32"
+    case size64 = "64"
+    case size128 = "128"
+
+    var id: String { rawValue }
+
+    var optionalInt: Int? {
+        switch self {
+        case .auto: return nil
+        case .size32: return 32
+        case .size64: return 64
+        case .size128: return 128
+        }
+    }
+
+    static func from(_ value: Int?) -> CachePagedBlockSizeChoice {
+        switch value {
+        case 32: return .size32
+        case 64: return .size64
+        case 128: return .size128
+        default: return .auto
+        }
+    }
+}
+
 // MARK: - Configuration View
 struct ConfigurationView: View {
     @ObservedObject private var themeManager = ThemeManager.shared
@@ -47,6 +106,16 @@ struct ConfigurationView: View {
     @State private var tempTopP: String = ""
     @State private var tempMaxKV: String = ""
     @State private var tempEvictionPolicy: ModelEvictionPolicy = .strictSingleModel
+
+    // Cache engine overrides — all three-state (nil/true/false for Bools, "" = Auto for numeric).
+    // See ServerCacheConfig for the 6-stack breakdown. Empty / .auto means "let vmlx auto-tune".
+    @State private var tempCacheUsePaged: CacheTriState = .auto
+    @State private var tempCacheMaxBlocks: String = ""
+    @State private var tempCachePagedBlockSize: CachePagedBlockSizeChoice = .auto
+    @State private var tempCacheEnableDisk: CacheTriState = .auto
+    @State private var tempCacheDiskMaxGB: String = ""
+    @State private var tempCacheSSMMaxEntries: String = ""
+    @State private var diskCacheUsageBytes: Int = 0
 
     // Toast settings state
     @State private var tempToastPosition: ToastPosition = .topRight
@@ -506,6 +575,10 @@ struct ConfigurationView: View {
                                                 .foregroundColor(theme.tertiaryText)
                                         }
                                     }
+
+                                    SettingsDivider()
+
+                                    cacheEngineSubsection
                                 }
                             }
                         }
@@ -739,6 +812,20 @@ struct ConfigurationView: View {
         tempAllowedOrigins = configuration.allowedOrigins.joined(separator: ", ")
         tempEvictionPolicy = configuration.modelEvictionPolicy
 
+        // Hydrate cache engine overrides. Empty-string and .auto both mean
+        // "fall back to vmlx-swift-lm auto-tune" — the UI never shows a
+        // computed default in the field; it shows blank so the user knows
+        // they're on Auto. This matches the pattern used for tempTopP and
+        // tempMaxKV above.
+        let cache = configuration.cacheConfig
+        tempCacheUsePaged = CacheTriState.from(cache.usePagedCache)
+        tempCacheMaxBlocks = cache.maxCacheBlocks.map(String.init) ?? ""
+        tempCachePagedBlockSize = CachePagedBlockSizeChoice.from(cache.pagedBlockSize)
+        tempCacheEnableDisk = CacheTriState.from(cache.enableDiskCache)
+        tempCacheDiskMaxGB = cache.diskCacheMaxGB.map { String(format: "%.1f", $0) } ?? ""
+        tempCacheSSMMaxEntries = cache.ssmMaxEntries.map(String.init) ?? ""
+        diskCacheUsageBytes = OsaurusPaths.diskKVCacheUsageBytes()
+
         // Load toast configuration
         let toastConfig = ToastConfigurationStore.load()
         tempToastPosition = toastConfig.position
@@ -788,6 +875,14 @@ struct ConfigurationView: View {
         tempTopP = ""
         tempMaxKV = ""
         tempEvictionPolicy = serverDefaults.modelEvictionPolicy
+
+        // Cache engine: back to pure auto-tune (all fields nil).
+        tempCacheUsePaged = .auto
+        tempCacheMaxBlocks = ""
+        tempCachePagedBlockSize = .auto
+        tempCacheEnableDisk = .auto
+        tempCacheDiskMaxGB = ""
+        tempCacheSSMMaxEntries = ""
 
         showSuccess("Settings restored to defaults")
     }
@@ -842,6 +937,21 @@ struct ConfigurationView: View {
         configuration.genMaxKVSize = trimmedMaxKV.isEmpty ? nil : Int(trimmedMaxKV)
 
         configuration.modelEvictionPolicy = tempEvictionPolicy
+
+        // Cache engine overrides — empty / .auto → nil (auto-tune).
+        // Changes require a model reload to take effect; the UI warns the
+        // user about this via the "Changes apply on next model load" text.
+        let trimmedMaxBlocks = tempCacheMaxBlocks.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedDiskGB = tempCacheDiskMaxGB.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSSM = tempCacheSSMMaxEntries.trimmingCharacters(in: .whitespacesAndNewlines)
+        configuration.cacheConfig = ServerCacheConfig(
+            usePagedCache: tempCacheUsePaged.optionalBool,
+            maxCacheBlocks: trimmedMaxBlocks.isEmpty ? nil : Int(trimmedMaxBlocks),
+            pagedBlockSize: tempCachePagedBlockSize.optionalInt,
+            enableDiskCache: tempCacheEnableDisk.optionalBool,
+            diskCacheMaxGB: trimmedDiskGB.isEmpty ? nil : Float(trimmedDiskGB),
+            ssmMaxEntries: trimmedSSM.isEmpty ? nil : Int(trimmedSSM)
+        )
 
         let parsedOrigins: [String] =
             tempAllowedOrigins
@@ -945,6 +1055,13 @@ struct ConfigurationView: View {
             disableTools: tempDisableTools,
             enableClipboardMonitoring: tempEnableClipboardMonitoring
         )
+        // ChatConfigurationStore.save() delegates to
+        // AppConfiguration.shared.updateChatConfig() which updates the
+        // @Published chatConfig AND posts .appConfigurationChanged in a
+        // single step. That means every view observing
+        // `@ObservedObject appConfig = AppConfiguration.shared` re-renders
+        // immediately — including the chat-bar Tools chip. No extra reload
+        // call needed here; verified on rebased main.
         ChatConfigurationStore.save(chatCfg)
 
         // If disableTools actually changed, every open session's preflight
@@ -995,6 +1112,165 @@ struct ConfigurationView: View {
         }
 
         showSuccess("Settings saved successfully")
+    }
+
+    // MARK: - Cache Engine Subsection
+
+    /// The 6-stack cache engine settings subsection. Every control defaults
+    /// to "Auto" — empty field or .auto option — which forwards `nil` into
+    /// `ServerCacheConfig` and lets vmlx-swift-lm choose a value based on
+    /// RAM and model characteristics.
+    ///
+    /// Changes here require a **model reload** to take effect because
+    /// `CacheCoordinator` is immutable after construction. The help text
+    /// at the top of the subsection tells the user this.
+    @ViewBuilder
+    private var cacheEngineSubsection: some View {
+        SettingsSubsection(label: "Cache Engine") {
+            VStack(alignment: .leading, spacing: 14) {
+                Text(
+                    "Tune the 6-stack KV cache engine. Every control defaults to Auto — the package picks sensible values based on your RAM and the loaded model. Explicit overrides take effect on the next model load.",
+                    bundle: .module
+                )
+                .font(.system(size: 11))
+                .foregroundColor(theme.tertiaryText)
+
+                // Disk cache usage readout + clear button (Stack 4 status)
+                HStack(spacing: 8) {
+                    Image(systemName: "externaldrive")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.tertiaryText)
+                    Text("Disk cache: \(formatBytes(diskCacheUsageBytes))")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(theme.secondaryText)
+                    Spacer()
+                    Button {
+                        _ = OsaurusPaths.clearDiskKVCache()
+                        diskCacheUsageBytes = OsaurusPaths.diskKVCacheUsageBytes()
+                        showSuccess("Disk cache cleared")
+                    } label: {
+                        Text("Clear", bundle: .module)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .buttonStyle(.bordered)
+                    .controlSize(.small)
+                    .disabled(diskCacheUsageBytes == 0)
+                }
+
+                SettingsDivider()
+
+                // Stack 2: Prefix caching toggle
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Prefix Caching (L1)", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                    Picker("", selection: $tempCacheUsePaged) {
+                        ForEach(CacheTriState.allCases) { state in
+                            Text(state.rawValue).tag(state)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(
+                        "Paged L1 cache for prompt prefix reuse. Disabling is rarely useful — this is the main TTFT win.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.tertiaryText)
+                }
+
+                // Stack 2+3: Max cache blocks
+                SettingsStepperField(
+                    label: "Cache Block Pool",
+                    help: "Max number of paged blocks in the L1 pool. Leave blank for Auto (RAM-scaled: 500 / 1000 / 2000 for <16GB / 16–48GB / >48GB).",
+                    text: $tempCacheMaxBlocks,
+                    range: 100 ... 4000,
+                    step: 100,
+                    defaultValue: 1000
+                )
+
+                // Stack 3: Paged block size picker
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Block Size (tokens)", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                    Picker("", selection: $tempCachePagedBlockSize) {
+                        ForEach(CachePagedBlockSizeChoice.allCases) { size in
+                            Text(size.rawValue).tag(size)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(
+                        "Tokens per block. Smaller = finer reuse + more metadata; larger = coarser reuse. Auto = 64.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.tertiaryText)
+                }
+
+                SettingsDivider()
+
+                // Stack 4: Disk cache toggle
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Disk KV Cache (L2)", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                    Picker("", selection: $tempCacheEnableDisk) {
+                        ForEach(CacheTriState.allCases) { state in
+                            Text(state.rawValue).tag(state)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(
+                        "Persist cached KV state to local SSD for cross-session reuse. Auto = enabled when the cache dir is writable.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.tertiaryText)
+                }
+
+                // Stack 4: Disk cache max size
+                SettingsSliderField(
+                    label: "Disk Cache Budget (GB)",
+                    help: "Max disk cache size. Leave blank for Auto (4.0 GB).",
+                    text: $tempCacheDiskMaxGB,
+                    range: 1 ... 50,
+                    step: 0.5,
+                    defaultValue: 4.0,
+                    formatString: "%.1f"
+                )
+
+                SettingsDivider()
+
+                // Stack 6: SSM companion cache
+                SettingsStepperField(
+                    label: "SSM Companion Cache",
+                    help: "Max entries in the state-space model companion cache (only active on hybrid models like Mamba). Leave blank for Auto (50).",
+                    text: $tempCacheSSMMaxEntries,
+                    range: 10 ... 500,
+                    step: 10,
+                    defaultValue: 50
+                )
+
+                // Stacks 1 + 5: explanation-only
+                Text(
+                    "Stacks 1 (continuous batching) and 5 (KV quantization) are managed automatically by the vmlx engine. Batching is internal to the generation loop; quantization bits are baked into model weights.",
+                    bundle: .module
+                )
+                .font(.system(size: 10))
+                .foregroundColor(theme.tertiaryText)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    /// Format a byte count for the disk cache readout. Keeps the label
+    /// short (e.g. "1.2 GB", "340 MB") rather than spelling out full
+    /// decimal figures.
+    private func formatBytes(_ bytes: Int) -> String {
+        let formatter = ByteCountFormatter()
+        formatter.allowedUnits = [.useKB, .useMB, .useGB]
+        formatter.countStyle = .file
+        return formatter.string(fromByteCount: Int64(bytes))
     }
 
     // MARK: - Core Model Picker

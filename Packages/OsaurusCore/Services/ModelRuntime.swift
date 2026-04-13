@@ -238,20 +238,24 @@ actor ModelRuntime {
 
     // MARK: - Cache coordinator plumbing
 
-    /// Builds a `CacheCoordinatorConfig` with osaurus-internal defaults.
+    /// Builds a `CacheCoordinatorConfig` with osaurus-internal defaults
+    /// and applies any user overrides from `ServerConfiguration.cacheConfig`.
     ///
-    /// **KV caching is package-owned** — osaurus does not expose any cache
-    /// knobs to users. This helper exists only to:
-    /// - Point the disk cache at osaurus's paths (`OsaurusPaths.diskKVCache()`)
-    /// - Provide a sensible `modelKey` for per-model isolation
-    /// - Pick a max-blocks default based on RAM
-    /// - Fall back to memory-only when the disk cache dir is not writable
+    /// **Layering**:
+    /// 1. Start from package defaults (`CacheCoordinatorConfig()`)
+    /// 2. Apply osaurus-internal heuristics (RAM-scaled `maxCacheBlocks`,
+    ///    disk cache directory, disk-writability fallback, `modelKey`)
+    /// 3. Apply user overrides from `ServerConfiguration.cacheConfig` —
+    ///    every field is optional, so nil means "keep the value from
+    ///    step 1 or 2 above"
     ///
-    /// Defaults chosen to be invisible and sensible. If the package's defaults
-    /// ever drift in a way that matters to osaurus, this is the single place
-    /// to override.
+    /// Existing users who never touch Settings → Cache see the exact same
+    /// behavior as before: `cacheConfig` defaults to `.default`, which has
+    /// every field nil. Power users get explicit control over the 6-stack
+    /// engine via Settings. See `ServerCacheConfig` for the full knob list.
     private nonisolated static func buildCacheCoordinatorConfig(
-        modelName: String
+        modelName: String,
+        overrides: ServerCacheConfig
     ) -> CacheCoordinatorConfig {
         let diskCacheDir = OsaurusPaths.diskKVCache()
         OsaurusPaths.ensureExistsSilent(diskCacheDir)
@@ -263,19 +267,38 @@ actor ModelRuntime {
         }
 
         let ramGB = ProcessInfo.processInfo.physicalMemory / (1024 * 1024 * 1024)
-        let maxBlocks: Int
+        let autoMaxBlocks: Int
         switch ramGB {
-        case 0 ..< 16: maxBlocks = 500  // 32k tokens at 64 per block
-        case 16 ..< 48: maxBlocks = 1000  // 64k tokens
-        default: maxBlocks = 2000  // 128k tokens
+        case 0 ..< 16: autoMaxBlocks = 500  // 32k tokens at 64 per block
+        case 16 ..< 48: autoMaxBlocks = 1000  // 64k tokens
+        default: autoMaxBlocks = 2000  // 128k tokens
         }
 
         var cacheConfig = CacheCoordinatorConfig()
-        cacheConfig.enableDiskCache = diskDirUsable
+        // Stack 4: L2 disk cache — honor user opt-in/out, but always
+        // respect disk writability as a hard floor (can't enable disk
+        // cache if the directory isn't writable).
+        cacheConfig.enableDiskCache = (overrides.enableDiskCache ?? true) && diskDirUsable
         cacheConfig.diskCacheDir = diskCacheDir
-        cacheConfig.diskCacheMaxGB = 4.0
+        cacheConfig.diskCacheMaxGB = overrides.diskCacheMaxGB ?? 4.0
         cacheConfig.modelKey = modelName
-        cacheConfig.maxCacheBlocks = maxBlocks
+        // Stack 2+3: Prefix caching / paged blocks
+        cacheConfig.maxCacheBlocks = overrides.maxCacheBlocks ?? autoMaxBlocks
+        if let pagedBlockSize = overrides.pagedBlockSize {
+            cacheConfig.pagedBlockSize = pagedBlockSize
+        }
+        if let usePagedCache = overrides.usePagedCache {
+            cacheConfig.usePagedCache = usePagedCache
+        }
+        // Stacks 1 (continuous batching) and 5 (KV quantization) are
+        // package-owned — BatchEngine is internal to the generation
+        // loop, quant bits are baked into model weights. No user knobs
+        // surface through CacheCoordinatorConfig for those layers.
+
+        // Stack 6: Hybrid SSM companion cache
+        if let ssmMaxEntries = overrides.ssmMaxEntries {
+            cacheConfig.ssmMaxEntries = ssmMaxEntries
+        }
         return cacheConfig
     }
 
@@ -299,7 +322,16 @@ actor ModelRuntime {
     /// actor-isolated — no other `generateEventStream` call can run until we
     /// return.
     private func installCacheCoordinator(on holder: SessionHolder) async {
-        let cacheConfig = Self.buildCacheCoordinatorConfig(modelName: holder.name)
+        // Read user overrides from ServerConfiguration. Every field is
+        // optional — nil means "auto-tune", which is the historic default
+        // behavior. Users see zero change until they explicitly tune.
+        // ServerConfigurationStore is @MainActor so we hop across the
+        // actor boundary here, matching the pattern at line 175.
+        let serverCfg = await ServerConfigurationStore.load() ?? .default
+        let cacheConfig = Self.buildCacheCoordinatorConfig(
+            modelName: holder.name,
+            overrides: serverCfg.cacheConfig
+        )
         holder.container.enableCaching(config: cacheConfig)
 
         // Auto-detect hybrid models (SSM layers) and set the flag on the
