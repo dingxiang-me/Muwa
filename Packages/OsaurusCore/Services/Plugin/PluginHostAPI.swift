@@ -589,6 +589,33 @@ final class PluginHostContext: @unchecked Sendable {
         _ = preflightCacheLock.withLock { preflightCache.removeValue(forKey: sessionId) }
     }
 
+    /// Bulk variant — invalidates the cached preflight result for every
+    /// session ID in `sessionIds`. Acquires the lock once and drops all
+    /// matching entries in a single critical section so Settings save can
+    /// flush cache for every open window without thrashing the lock.
+    ///
+    /// Used by `ConfigurationView.saveConfiguration()` when
+    /// `ChatConfiguration.disableTools` changes — otherwise sessions with
+    /// cached tool specs from before the toggle keep injecting them into
+    /// the next request. See `docs/internal/memory-tools-defaults/02-VERIFIED-ISSUES.md`
+    /// Issue 8 for the reasoning.
+    static func invalidatePreflightCaches(sessionIds: [String]) {
+        guard !sessionIds.isEmpty else { return }
+        preflightCacheLock.withLock {
+            for sid in sessionIds {
+                preflightCache.removeValue(forKey: sid)
+            }
+        }
+    }
+
+    /// Drop every cached preflight result regardless of session. Used when
+    /// tool-affecting configuration changes globally (e.g., tool policies,
+    /// plugin install/uninstall) and we can't enumerate every affected
+    /// session ID cheaply.
+    static func invalidateAllPreflightCaches() {
+        preflightCacheLock.withLock { preflightCache.removeAll() }
+    }
+
     private static func extractPreflightQuery(from messages: [ChatMessage]) -> String {
         messages.last(where: { $0.role == "user" })?.content ?? ""
     }

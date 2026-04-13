@@ -272,6 +272,20 @@ public final class ChatWindowManager: NSObject, ObservableObject {
         )
     }
 
+    /// Returns every active chat session ID across all open windows.
+    ///
+    /// Used by `ConfigurationView.saveConfiguration` to bulk-invalidate the
+    /// per-session preflight cache when `ChatConfiguration.disableTools`
+    /// changes — otherwise sessions keep serving stale tool specs from
+    /// before the toggle. See `docs/internal/memory-tools-defaults/02-VERIFIED-ISSUES.md`
+    /// Issue 8 for the reasoning.
+    ///
+    /// Compacts out windows that don't have a session yet (fresh window,
+    /// model not selected, etc.) — those have nothing to invalidate.
+    public func allActiveSessionIds() -> [UUID] {
+        windows.values.compactMap { $0.sessionId }
+    }
+
     /// Set a callback to be invoked when window is about to close (for session saving)
     public func setCloseCallback(for windowId: UUID, callback: @escaping () -> Void) {
         sessionCallbacks[windowId] = callback

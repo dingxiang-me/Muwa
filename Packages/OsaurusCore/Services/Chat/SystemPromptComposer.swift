@@ -158,6 +158,16 @@ public struct SystemPromptComposer: Sendable {
     }
 
     /// Resolve the full tool set for a request: built-in + preflight/manual, deduped.
+    ///
+    /// Semantics of `toolsDisabled`:
+    /// - `false` (default) — normal path: always-loaded built-in tools +
+    ///   preflight-selected auto tools or per-agent manual tools
+    /// - `true` — auto-discovery and built-in capability tools are blocked,
+    ///   but per-agent **explicit manual tools** still run. This means an
+    ///   agent that was configured with `toolSelectionMode: .manual` and
+    ///   an explicit `manualToolNames` list keeps working even when the
+    ///   global tools toggle is off. Use-case: user wants "no tools by
+    ///   default" but has a handful of agents that need specific tools.
     @MainActor
     static func resolveTools(
         agentId: UUID,
@@ -165,15 +175,26 @@ public struct SystemPromptComposer: Sendable {
         toolsDisabled: Bool = false,
         preflight: PreflightResult = .empty
     ) -> [Tool] {
-        guard !toolsDisabled else { return [] }
-
         let toolMode = AgentManager.shared.effectiveToolSelectionMode(for: agentId)
         let isManual = toolMode == .manual
 
-        var tools = ToolRegistry.shared.alwaysLoadedSpecs(
-            mode: executionMode,
-            excludeCapabilityTools: isManual
-        )
+        // When global tools are disabled and the agent isn't in manual mode,
+        // return empty. Auto-discovery and preflight are blocked.
+        if toolsDisabled && !isManual {
+            return []
+        }
+
+        // Always-loaded built-in tools (capability search etc.) are only
+        // injected when the global toggle is on. Manual-mode agents running
+        // under a global disable skip them too — the user explicitly
+        // configured their specific tool list.
+        var tools: [Tool] = []
+        if !toolsDisabled {
+            tools = ToolRegistry.shared.alwaysLoadedSpecs(
+                mode: executionMode,
+                excludeCapabilityTools: isManual
+            )
+        }
         var seen = Set(tools.map { $0.function.name })
 
         if isManual {
