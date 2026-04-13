@@ -1112,6 +1112,30 @@ struct ConfigurationView: View {
             return
         }
 
+        // Hazard 3: if the user lowered `diskCacheMaxGB` and the on-disk
+        // cache currently exceeds the new limit, vmlx's DiskCache won't
+        // prune until the next generation triggers a write (and even then
+        // only after the coordinator is rebuilt on the next model load).
+        // That means the user can lower the limit, not generate for a
+        // while, and keep paying the old disk footprint silently. Detect
+        // the downsize here and force-clear the cache so the displayed
+        // budget matches reality. See `08-INTERACTION-AUDIT.md` Q3.
+        let oldDiskCap = previousServerCfg.cacheConfig.diskCacheMaxGB ?? 4.0
+        let newDiskCap = configuration.cacheConfig.diskCacheMaxGB ?? 4.0
+        if newDiskCap < oldDiskCap {
+            let currentBytes = OsaurusPaths.diskKVCacheUsageBytes()
+            let newLimitBytes = Int(newDiskCap * 1024 * 1024 * 1024)
+            if currentBytes > newLimitBytes {
+                _ = OsaurusPaths.clearDiskKVCache()
+                diskCacheUsageBytes = OsaurusPaths.diskKVCacheUsageBytes()
+                ToastManager.shared.info(
+                    "Disk cache cleared",
+                    message:
+                        "Lowered budget to \(String(format: "%.1f", newDiskCap)) GB; cleared existing cache to match."
+                )
+            }
+        }
+
         let trimmedTemp = tempChatTemperature.trimmingCharacters(in: .whitespacesAndNewlines)
         let parsedTemp: Float? = {
             guard !trimmedTemp.isEmpty, let v = Float(trimmedTemp) else { return nil }

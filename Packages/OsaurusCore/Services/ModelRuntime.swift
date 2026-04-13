@@ -603,6 +603,20 @@ actor ModelRuntime {
         maxKV: Int?,
         cacheOverrides: ServerCacheConfig = .default
     ) -> MLXLMCommon.GenerateParameters {
+        // Defensive clamping for values that could come from hand-edited
+        // JSON rather than the validated Settings UI. The UI already
+        // enforces ranges via SettingsStepperField, but `server.json` is
+        // user-editable and a value like `"turboKeyBits": 99` would flow
+        // straight through without these guards — potentially crashing
+        // vmlx-swift-lm's quant pipeline or producing garbage output.
+        // Match the UI ranges 1:1 so hand-editing sees the same envelope.
+        let affineBits = clampOrDefault(cacheOverrides.affineKVBits, 2 ... 8, default: 4)
+        let affineGroup = clampOrDefault(cacheOverrides.affineKVGroupSize, 16 ... 256, default: 64)
+        let turboKeyBits = clampOrDefault(cacheOverrides.turboKeyBits, 2 ... 8, default: 3)
+        let turboValueBits = clampOrDefault(cacheOverrides.turboValueBits, 2 ... 8, default: 3)
+        let quantStart = clampOrDefault(cacheOverrides.quantizedKVStart, 0 ... 1_000_000, default: 0)
+        let prefillStep = clampOrDefault(cacheOverrides.prefillStepSize, 64 ... 4096, default: 512)
+
         // Switch on the Optional<CacheQuantMode> explicitly. `.none` here
         // matches the Optional case, not `CacheQuantMode.none` — so we
         // need `.some(...)` wrappers to disambiguate.
@@ -612,16 +626,10 @@ actor ModelRuntime {
             // User explicitly disabled quant — respect that.
             kvMode = .none
         case .some(.affine):
-            kvMode = .affine(
-                bits: cacheOverrides.affineKVBits ?? 4,
-                groupSize: cacheOverrides.affineKVGroupSize ?? 64
-            )
+            kvMode = .affine(bits: affineBits, groupSize: affineGroup)
         case .some(.turboQuant):
-            kvMode = .turboQuant(
-                keyBits: cacheOverrides.turboKeyBits ?? 3,
-                valueBits: cacheOverrides.turboValueBits ?? 3
-            )
-        case .none:
+            kvMode = .turboQuant(keyBits: turboKeyBits, valueBits: turboValueBits)
+        case nil:
             // Osaurus default — TurboQuant with package defaults.
             // This is where osaurus's preferred behavior diverges from
             // vmlx's package default of .none.
@@ -633,14 +641,29 @@ actor ModelRuntime {
             maxKVSize: maxKV,
             kvBits: nil,  // legacy affine path; kvMode above takes precedence
             kvGroupSize: 64,
-            quantizedKVStart: cacheOverrides.quantizedKVStart ?? 0,
+            quantizedKVStart: quantStart,
             kvMode: kvMode,
             temperature: temperature,
             topP: topP,
             repetitionPenalty: repetitionPenalty,
             repetitionContextSize: 20,
-            prefillStepSize: cacheOverrides.prefillStepSize ?? 512
+            prefillStepSize: prefillStep
         )
+    }
+
+    /// Clamp an optional Int into a valid range, or fall back to `default`
+    /// when nil. Used to defend `makeGenerateParameters` against out-of-
+    /// range values coming from hand-edited JSON config. `nil` input is
+    /// the Auto case (substitute the default); a value outside `range`
+    /// gets clamped to the nearest valid endpoint rather than propagating
+    /// into vmlx where the consequence is unknown.
+    nonisolated private static func clampOrDefault(
+        _ value: Int?,
+        _ range: ClosedRange<Int>,
+        default defaultValue: Int
+    ) -> Int {
+        guard let value = value else { return defaultValue }
+        return min(max(value, range.lowerBound), range.upperBound)
     }
 
     nonisolated static func makeTokenizerTools(

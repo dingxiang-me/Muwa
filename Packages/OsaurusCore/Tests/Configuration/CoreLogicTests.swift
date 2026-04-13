@@ -283,6 +283,151 @@ struct MakeGenerateParametersTests {
         )
         #expect(params.quantizedKVStart == 256, "custom quantizedKVStart should flow through")
     }
+
+    // MARK: - Defensive clamping (Hazard 2 from interaction audit)
+
+    /// Hand-edited server.json can set values outside the UI range.
+    /// `makeGenerateParameters` should clamp rather than forward
+    /// potentially crash-worthy values into vmlx.
+
+    @Test("turboKeyBits=99 (hand-edit) clamps to 8 (range max)")
+    func turboKeyBitsClampedHigh() {
+        var overrides = ServerCacheConfig()
+        overrides.kvQuantMode = .turboQuant
+        overrides.turboKeyBits = 99
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0.7, maxTokens: 256, topP: 1.0,
+            repetitionPenalty: nil, maxKV: nil, cacheOverrides: overrides
+        )
+        if case .turboQuant(let keyBits, _) = params.kvMode {
+            #expect(keyBits == 8, "key bits above 8 should clamp to 8, not forward 99")
+        } else {
+            Issue.record("expected .turboQuant")
+        }
+    }
+
+    @Test("turboValueBits=0 clamps to 2 (range min)")
+    func turboValueBitsClampedLow() {
+        var overrides = ServerCacheConfig()
+        overrides.kvQuantMode = .turboQuant
+        overrides.turboValueBits = 0
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0.7, maxTokens: 256, topP: 1.0,
+            repetitionPenalty: nil, maxKV: nil, cacheOverrides: overrides
+        )
+        if case .turboQuant(_, let valueBits) = params.kvMode {
+            #expect(valueBits == 2, "value bits below 2 should clamp to 2, not forward 0")
+        } else {
+            Issue.record("expected .turboQuant")
+        }
+    }
+
+    @Test("affineKVBits=16 clamps to 8")
+    func affineKVBitsClamped() {
+        var overrides = ServerCacheConfig()
+        overrides.kvQuantMode = .affine
+        overrides.affineKVBits = 16
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0.7, maxTokens: 256, topP: 1.0,
+            repetitionPenalty: nil, maxKV: nil, cacheOverrides: overrides
+        )
+        if case .affine(let bits, _) = params.kvMode {
+            #expect(bits == 8, "affine bits should clamp to 8")
+        } else {
+            Issue.record("expected .affine")
+        }
+    }
+
+    @Test("prefillStepSize=-500 clamps to 64 (range min)")
+    func prefillStepSizeClamped() {
+        var overrides = ServerCacheConfig()
+        overrides.prefillStepSize = -500
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0.7, maxTokens: 256, topP: 1.0,
+            repetitionPenalty: nil, maxKV: nil, cacheOverrides: overrides
+        )
+        #expect(params.prefillStepSize == 64, "negative prefillStepSize should clamp to 64")
+    }
+
+    @Test("prefillStepSize=999999 clamps to 4096 (range max)")
+    func prefillStepSizeClampedHigh() {
+        var overrides = ServerCacheConfig()
+        overrides.prefillStepSize = 999_999
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0.7, maxTokens: 256, topP: 1.0,
+            repetitionPenalty: nil, maxKV: nil, cacheOverrides: overrides
+        )
+        #expect(params.prefillStepSize == 4096, "huge prefillStepSize should clamp to 4096")
+    }
+}
+
+// MARK: - ServerConfiguration decoder isolation (Hazard 1)
+
+@Suite("ServerConfiguration decoder isolation")
+struct ServerConfigurationDecoderIsolationTests {
+
+    /// Hazard 1: a typo in `cacheConfig` should NOT take down the entire
+    /// ServerConfiguration decode. User still keeps port, hotkey, CORS, etc.
+
+    @Test("Typo in cacheConfig.kvQuantMode falls back to cache default, rest is preserved")
+    func cacheConfigTypoDoesNotBrickServerConfig() throws {
+        // Note the invalid "TurboQuant" (capital T) — CacheQuantMode's raw
+        // value is the lowercase "turboQuant", so this would throw.
+        let json = """
+        {
+            "port": 4242,
+            "exposeToNetwork": true,
+            "startAtLogin": false,
+            "hideDockIcon": false,
+            "appearanceMode": "dark",
+            "numberOfThreads": 8,
+            "backlog": 256,
+            "genTopP": 0.95,
+            "allowedOrigins": ["https://foo.example.com"],
+            "modelEvictionPolicy": "Strict (One Model)",
+            "cacheConfig": {
+                "kvQuantMode": "TurboQuant"
+            }
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(ServerConfiguration.self, from: data)
+        // Port, CORS, and appearance should all be preserved from the JSON
+        #expect(decoded.port == 4242)
+        #expect(decoded.exposeToNetwork == true)
+        #expect(decoded.genTopP == 0.95)
+        #expect(decoded.allowedOrigins == ["https://foo.example.com"])
+        #expect(decoded.appearanceMode == .dark)
+        // cacheConfig falls back to defaults (isFullyAuto) because the
+        // decoder isolation caught the typo
+        #expect(decoded.cacheConfig.isFullyAuto)
+    }
+
+    @Test("Valid cacheConfig still decodes correctly alongside the isolation")
+    func validCacheConfigStillDecodes() throws {
+        let json = """
+        {
+            "port": 1337,
+            "exposeToNetwork": false,
+            "startAtLogin": false,
+            "hideDockIcon": false,
+            "appearanceMode": "system",
+            "numberOfThreads": 8,
+            "backlog": 256,
+            "genTopP": 1.0,
+            "allowedOrigins": [],
+            "modelEvictionPolicy": "Strict (One Model)",
+            "cacheConfig": {
+                "kvQuantMode": "turboQuant",
+                "turboKeyBits": 4
+            }
+        }
+        """
+        let data = json.data(using: .utf8)!
+        let decoded = try JSONDecoder().decode(ServerConfiguration.self, from: data)
+        #expect(decoded.cacheConfig.kvQuantMode == .turboQuant)
+        #expect(decoded.cacheConfig.turboKeyBits == 4)
+    }
 }
 
 // MARK: - AgentManager.effectiveMemoryEnabled precedence (Phase B M-05)

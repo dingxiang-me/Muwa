@@ -266,8 +266,21 @@ public struct ServerConfiguration: Codable, Equatable, Sendable {
         self.backlog = try container.decodeIfPresent(Int32.self, forKey: .backlog) ?? defaults.backlog
         self.genTopP = try container.decodeIfPresent(Float.self, forKey: .genTopP) ?? defaults.genTopP
         self.genMaxKVSize = try container.decodeIfPresent(Int.self, forKey: .genMaxKVSize)
-        self.cacheConfig =
-            try container.decodeIfPresent(ServerCacheConfig.self, forKey: .cacheConfig) ?? defaults.cacheConfig
+        // Decoder isolation: a typo in hand-edited `cacheConfig` JSON
+        // (e.g. `"kvQuantMode": "TurboQuant"` with wrong case) would
+        // otherwise throw and take the entire ServerConfiguration decode
+        // down with it — losing port, hotkey, allowedOrigins, eviction
+        // policy, all of it back to defaults. Catch the cacheConfig error
+        // specifically, log it, and fall back to the default cache config.
+        // User keeps the rest of their server settings. See
+        // `07-DEFERRED-FIXES.md` hazard audit and `08-INTERACTION-AUDIT.md`.
+        do {
+            self.cacheConfig =
+                try container.decodeIfPresent(ServerCacheConfig.self, forKey: .cacheConfig) ?? defaults.cacheConfig
+        } catch {
+            print("[Osaurus] ServerConfiguration.cacheConfig decode failed, falling back to defaults: \(error)")
+            self.cacheConfig = defaults.cacheConfig
+        }
         self.allowedOrigins =
             try container.decodeIfPresent([String].self, forKey: .allowedOrigins)
             ?? defaults.allowedOrigins
