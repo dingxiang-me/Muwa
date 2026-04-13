@@ -954,6 +954,9 @@ struct ConfigurationView: View {
         if memoryCfg.enabled != tempMemoryEnabled {
             memoryCfg.enabled = tempMemoryEnabled
             MemoryConfigurationStore.save(memoryCfg)
+            // Drop the 10-second TTL cache so the next prompt reflects the new
+            // enabled state immediately instead of waiting for entries to expire.
+            Task { await MemoryContextAssembler.invalidateAll() }
         }
 
         let hotkeyChanged = previousChatCfg.hotkey != chatCfg.hotkey

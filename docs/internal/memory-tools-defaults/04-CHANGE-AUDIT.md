@@ -359,4 +359,435 @@ static func invalidateAllPreflightCaches() {
 
 ---
 
+### M-04 — Add `Agent.memoryEnabled: Bool?` field
+
+- **Phase**: B
+- **File**: `Packages/OsaurusCore/Models/Agent/Agent.swift` (+ one
+  companion edit in `Views/Agent/AgentsView.swift`)
+- **Kind**: `edit` — new optional field on the `Agent` struct
+- **Severity**: P1
+- **Depends on**: None
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 5
+- **Why**: Phase D flips the global memory default from `true` to `false`.
+  Power users who built up memory-using agents (trained agents with
+  working-memory context, profile, summaries, etc.) would silently lose
+  that context the moment the default flip lands, with no UI signal.
+  Adding a per-agent override that wins over the global setting gives
+  those users an escape hatch without forcing everyone back to global-on.
+
+**New field** (inserted after `manualSkillNames`):
+
+```swift
+/// Per-agent override for persistent memory injection.
+///
+/// - `nil` (default) — follow the global `MemoryConfiguration.enabled` setting
+/// - `true`  — force memory injection for this agent, even when the global toggle is off
+/// - `false` — suppress memory injection for this agent, even when the global toggle is on
+public var memoryEnabled: Bool?
+```
+
+Also threaded through:
+- `init(...)` parameter list — defaults to `nil` so every existing
+  call site keeps working without changes
+- `init(from decoder:)` custom decoder — uses `decodeIfPresent(Bool.self)`
+  so old JSON files on disk decode cleanly with `memoryEnabled = nil`
+- `ExportData` builder — preserves the field across export/import
+
+**Migration guarantee**: `memoryEnabled` is `Bool?`, not `Bool`. Existing
+`Agent.json` files written before this change do not contain the key,
+and `decodeIfPresent` returns `nil` for missing keys — so loading an
+old agent file produces an `Agent` with `memoryEnabled == nil`, which
+the Phase B resolver interprets as "fall back to global". No migration
+step needed.
+
+**Companion edit — `AgentsView.swift`**:
+
+The agent editor view reconstructs an `Agent` value from its editing
+state on save. That rebuild must include the new field or round-tripping
+through the editor would clobber it to `nil`. Added
+`memoryEnabled: current.memoryEnabled` to the init call at line ~2869.
+
+The editor does not yet expose a UI toggle for `memoryEnabled` — that
+is deferred until the defaults flip actually lands in Phase D, at
+which point a toggle becomes user-relevant. Until then, power users
+can set the field directly in `Agent.json`.
+
+**Blast radius**:
+- Every call to the `Agent` initializer is unchanged — `memoryEnabled`
+  defaults to `nil` in the init param list.
+- Codable autosynthesis continues to work because the custom decoder
+  explicitly handles the new key.
+- `Equatable` autosynthesis picks up the new field and stays correct.
+- Export/import round-trip preserves the field end-to-end.
+- No behavior change on its own: the field is not read anywhere until
+  M-05 introduces the resolver.
+
+**Audit focus**:
+- Verify `decodeIfPresent` is used (not `decode`) so old files load.
+- Verify the init param list matches field order for readability.
+- Verify `ExportData` inclusion — otherwise exporting then re-importing
+  an agent would drop the override.
+- Verify `AgentsView.swift` rebuilds the agent with the field preserved.
+- Grep for any other place that constructs `Agent(...)` without the new
+  field — all existing sites pass positional or named args, Swift accepts
+  either since the new param has a default.
+
+---
+
+### M-05 — Add `AgentManager.effectiveMemoryEnabled(for:)` resolver
+
+- **Phase**: B
+- **File**: `Packages/OsaurusCore/Managers/AgentManager.swift`
+- **Kind**: `add` — new method in the existing
+  "Agent Configuration Helpers" extension
+- **Severity**: P1
+- **Depends on**: M-04
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 5
+- **Why**: M-04 added the field; this is the read-side resolver that
+  every memory-aware call site should go through. Centralizes the
+  "per-agent override wins over global" rule so callers don't reach
+  directly into `Agent.memoryEnabled` and `MemoryConfigurationStore`.
+
+**New method** (inserted after `effectiveManualSkillNames`):
+
+```swift
+/// Resolves whether persistent memory injection should run for an agent.
+///
+/// Precedence:
+/// 1. `Agent.memoryEnabled` if set — per-agent override wins over global
+/// 2. Global `MemoryConfiguration.enabled` otherwise
+///
+/// The default agent (`Agent.defaultId`) always follows the global setting
+/// because it represents "use the global chat settings". Custom agents
+/// can override with their own `memoryEnabled` value.
+public func effectiveMemoryEnabled(for agentId: UUID) -> Bool {
+    let globalEnabled = MemoryConfigurationStore.load().enabled
+    guard let agent = agent(for: agentId) else { return globalEnabled }
+    if agent.id == Agent.defaultId { return globalEnabled }
+    return agent.memoryEnabled ?? globalEnabled
+}
+```
+
+**Design choices**:
+
+1. **Default agent always uses global**. The default agent has no
+   independent "agent record" conceptually — it represents "whatever
+   the global chat settings say". Making it ignore an attempted
+   per-agent override keeps the semantics consistent with the other
+   `effective*` resolvers in the same extension (`effectiveSystemPrompt`,
+   `effectiveModel`, `effectiveTemperature`), all of which short-circuit
+   on `Agent.defaultId`.
+
+2. **Unknown-agent fallback is the global value**, not `false`. If a
+   malformed request somehow passes an unknown agent UUID, we'd rather
+   the user's global preference be honored than silently disable memory.
+
+3. **Returns `Bool`, not `Bool?`**. Callers need a definitive answer;
+   the three-state nil/true/false model lives on `Agent.memoryEnabled`
+   where it represents "unset/force-on/force-off". The resolver collapses
+   that to a clear yes/no.
+
+**Blast radius**:
+- Purely additive. New method, no existing caller changes.
+- Called only by M-06 (`SystemPromptComposer.appendMemory`) on this branch.
+
+**Audit focus**:
+- Verify the precedence order matches the doc comment: override → global.
+- Verify the default-agent short-circuit matches the pattern used by
+  `effectiveSystemPrompt` / `effectiveModel` / `effectiveTemperature`.
+- Verify `MemoryConfigurationStore.load()` is the right source of truth
+  for the global flag. (Cross-checked: it's the only store that owns
+  `MemoryConfiguration.enabled`; `AppConfiguration.shared` caches
+  `ChatConfiguration`, not memory config.)
+- Grep for other call sites that read `MemoryConfiguration.enabled`
+  directly and consider whether they should switch to the resolver too.
+  (Deferred: `MemoryContextAssembler.assembleContextCached` still gates
+  on `config.enabled` directly, which is correct — it's the "follow
+  whatever config was handed to me" layer and doesn't know about agents.)
+
+---
+
+### M-06 — Wire `effectiveMemoryEnabled` into `SystemPromptComposer.appendMemory`
+
+- **Phase**: B
+- **File**: `Packages/OsaurusCore/Services/Chat/SystemPromptComposer.swift`
+- **Kind**: `edit` — rewrite `appendMemory` to gate on the resolver
+- **Severity**: P1
+- **Depends on**: M-05
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 5
+- **Why**: `appendMemory` is the single call site that composes the
+  memory section into the system prompt for both chat and work contexts
+  (via `finalizeContext`). Without this wiring, M-04/M-05 would be
+  dead weight — the per-agent override would exist on disk and in the
+  resolver but never actually affect any prompt.
+
+**Before** (original body):
+
+```swift
+public mutating func appendMemory(agentId: String, query: String? = nil) async {
+    let config = MemoryConfigurationStore.load()
+    let context: String
+    if let query, !query.isEmpty {
+        context = await MemoryContextAssembler.assembleContext(
+            agentId: agentId, config: config, query: query)
+    } else {
+        context = await MemoryContextAssembler.assembleContext(
+            agentId: agentId, config: config)
+    }
+    append(.dynamic(id: "memory", label: "Memory", content: context))
+}
+```
+
+**After**:
+
+```swift
+public mutating func appendMemory(agentId: String, query: String? = nil) async {
+    // Resolve effective memory-enabled state — per-agent override wins.
+    let agentUUID = UUID(uuidString: agentId)
+    let memoryEnabled: Bool
+    if let agentUUID {
+        memoryEnabled = await AgentManager.shared.effectiveMemoryEnabled(for: agentUUID)
+    } else {
+        // Malformed ID — fall back to global so we never silently disable.
+        memoryEnabled = MemoryConfigurationStore.load().enabled
+    }
+
+    guard memoryEnabled else {
+        append(.dynamic(id: "memory", label: "Memory", content: ""))
+        return
+    }
+
+    // ... existing assemble logic unchanged ...
+}
+```
+
+**Design choices**:
+
+1. **UUID parse outside the `await`**. `UUID(uuidString:)` is cheap and
+   synchronous; keeping the parse outside the actor hop means we don't
+   pay for a main-actor bounce just to discover the ID was malformed.
+
+2. **Fall-through to global on parse failure**. The function signature
+   takes a `String`, not a `UUID`, and some call sites have already lost
+   type info by the time they reach this layer. Silently disabling
+   memory for those cases would be a correctness regression; falling
+   back to the global flag preserves existing behavior.
+
+3. **Still append an empty "memory" section** when gated off. The
+   `PromptSection.dynamic` contract is that the section exists but is
+   empty — the renderer's `filter { !$0.isEmpty }` collapses it away
+   in the output, and the manifest still records the section for
+   prefix-cache hashing. This keeps the manifest shape stable whether
+   memory is on or off, which matters for prefix cache hit rates.
+
+4. **`await AgentManager.shared...`** is already safe — the call site
+   runs inside `composeChatContext` / `composeWorkContext`, both of
+   which are `@MainActor`. The `await` is a formality.
+
+**Blast radius**:
+- Every caller of `appendMemory` (`composeChatContext`, `composeWorkContext`,
+  `injectAgentContext`) gets the new gating automatically.
+- No signature change — existing callers compile unchanged.
+- Before Phase D flips the default, this is a no-op for users who
+  haven't set a per-agent override: global is `true`, `memoryEnabled`
+  is `nil`, resolver returns `true`, code proceeds exactly as before.
+
+**Audit focus**:
+- Verify `UUID(uuidString:)` returns `nil` for malformed IDs, not
+  throws. (Confirmed: Foundation returns `Optional<UUID>`.)
+- Verify the guard still appends an empty section so the manifest
+  stays stable — otherwise prefix-cache hits across on/off toggles
+  regress.
+- Verify no double assemble: early return on `guard memoryEnabled`
+  prevents the assembler from running when gated off.
+- Confirm `AgentManager.shared.effectiveMemoryEnabled` is `@MainActor`
+  and this call is inside a `@MainActor` composer path.
+
+---
+
+### M-07 — `MemoryConfigurationStore.save()` posts `.memoryConfigurationChanged`
+
+- **Phase**: B
+- **File**: `Packages/OsaurusCore/Models/Memory/MemoryConfiguration.swift`
+- **Kind**: `edit` — add Notification.Name + post in save()
+- **Severity**: P2
+- **Depends on**: None
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 6
+- **Why**: Memory configuration writes currently have no observable
+  signal. Anything that caches derived memory state has no way to know
+  when to invalidate, so a user flipping the global memory toggle in
+  Settings sees stale memory context in prompts for up to 10 seconds
+  (the `MemoryContextAssembler` TTL window).
+
+**New Notification.Name** (module-level, above the struct):
+
+```swift
+extension Notification.Name {
+    public static let memoryConfigurationChanged =
+        Notification.Name("memoryConfigurationChanged")
+}
+```
+
+**Edit to `save(_:)`**:
+
+```swift
+public static func save(_ config: MemoryConfiguration) {
+    let validated = config.validated()
+    let url = OsaurusPaths.memoryConfigFile()
+    OsaurusPaths.ensureExistsSilent(url.deletingLastPathComponent())
+    do {
+        let data = try encoder.encode(validated)
+        try data.write(to: url, options: .atomic)
+        lock.withLock { $0 = validated }
+        NotificationCenter.default.post(
+            name: .memoryConfigurationChanged, object: nil)
+    } catch {
+        MemoryLogger.config.error("Failed to save config: \(error)")
+    }
+}
+```
+
+**Design choices**:
+
+1. **Post inside the `do` block, after the cache update**. Posting
+   only on successful save means observers never see "updated"
+   notifications for a write that actually threw — they can trust that
+   by the time they see the notification, `load()` will return the
+   new config from the cache.
+
+2. **Post after the in-memory cache is updated** (`lock.withLock { $0 = validated }`),
+   so any observer that immediately calls `MemoryConfigurationStore.load()`
+   gets the new value, not the pre-save one.
+
+3. **Match the existing `appConfigurationChanged` pattern** in
+   `AppConfiguration.swift:12`. Same naming convention
+   (`<scope>ConfigurationChanged`), same placement (extension above
+   the struct/enum), same posting pattern.
+
+**Blast radius**:
+- Purely additive. Nothing observes the notification on main today, so
+  this is a no-op until M-08 installs an observer.
+- No behavior change on the write side — `load()` already returns the
+  cached validated value after save; the notification is a signal,
+  not a side-channel.
+
+**Audit focus**:
+- Verify the notification is posted from `save()`, not `invalidateCache()`.
+  (`invalidateCache()` is a no-side-effect reset used internally — it
+  doesn't mean the on-disk config changed, so notifying would be wrong.)
+- Verify the Name string matches exactly so the observer in M-08 links
+  to the same notification.
+
+---
+
+### M-08 — `MemoryContextAssembler.invalidateAll()` + Settings save wiring
+
+- **Phase**: B
+- **File**: `Packages/OsaurusCore/Services/Memory/MemoryContextAssembler.swift`
+  (add) + `Packages/OsaurusCore/Views/Settings/ConfigurationView.swift`
+  (call site)
+- **Kind**: `add` method + `edit` caller
+- **Severity**: P2
+- **Depends on**: M-07
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 7
+- **Why**: `MemoryContextAssembler` already has a private
+  `invalidateCache(agentId:)` actor method that handles both single-agent
+  and full-wipe invalidation. The gap was an external caller: the
+  Settings save handler that flips `MemoryConfiguration.enabled` needs
+  to drop the 10-second TTL cache so the next request reflects the new
+  state immediately instead of waiting for entries to expire naturally.
+
+**New method on `MemoryContextAssembler`** (inserted after the cache fields):
+
+```swift
+/// Clear the per-agent context cache for every agent. Used by Settings save
+/// after `MemoryConfiguration` changes so the next prompt reflects the new
+/// config within the same request rather than waiting for the 10-second TTL
+/// to expire.
+public static func invalidateAll() async {
+    await shared.invalidateCache()
+}
+```
+
+**Edit in `ConfigurationView.saveConfiguration()`**:
+
+```swift
+var memoryCfg = MemoryConfigurationStore.load()
+if memoryCfg.enabled != tempMemoryEnabled {
+    memoryCfg.enabled = tempMemoryEnabled
+    MemoryConfigurationStore.save(memoryCfg)
+    // Drop the 10-second TTL cache so the next prompt reflects the new
+    // enabled state immediately instead of waiting for entries to expire.
+    Task { await MemoryContextAssembler.invalidateAll() }
+}
+```
+
+**Design choices**:
+
+1. **Static convenience wraps the existing actor method** rather than
+   adding a second cache-wipe implementation. `invalidateCache(agentId: nil)`
+   already hits `cache.removeAll()` in the actor body — M-08 just
+   surfaces a zero-argument entry point so callers don't need to know
+   about the shared instance.
+
+2. **Direct call from `saveConfiguration` rather than a
+   NotificationCenter observer**. M-07 established the notification
+   infrastructure, but M-08's only real caller today is the Settings
+   save handler — and that handler already owns the "enabled changed"
+   decision directly. Wiring through a notification would mean
+   installing an observer in an actor-isolated context (fiddly) for
+   exactly one hop. Direct call is simpler. The notification from M-07
+   remains useful for future observers that don't control the save site.
+
+3. **Fire-and-forget `Task { ... }`**. The cache invalidation is
+   best-effort and doesn't need to block the Settings save flow — if
+   it races a concurrent request, that request will either use the
+   old-now-wiped cache (miss → recompute, correct) or the new
+   soon-to-be-wiped cache (hit → stale for one request, self-heals
+   on next). Either way the system converges.
+
+4. **Guard on `memoryCfg.enabled != tempMemoryEnabled`** — only
+   invalidate when the enabled flag actually changed. Other memory
+   config fields aren't user-editable from this view, so "no change
+   to enabled" means "no change that affects the cache".
+
+**Blast radius**:
+- New `invalidateAll()` method is purely additive.
+- Settings save wiring only fires when the user actually flips the
+  toggle. On the common path (user saves settings without touching
+  memory), nothing changes.
+- `MemoryContextAssembler.shared` is actor-isolated; the `await` in
+  `invalidateAll()` goes through the normal actor queue, so the wipe
+  is serialized with any in-flight assembles.
+
+**Audit focus**:
+- Verify `shared` is accessible from the new static method (yes —
+  `static let shared` is internal by default, same module).
+- Verify `invalidateCache(agentId: nil)` is the correct call — check
+  the default param value. (Confirmed: `agentId: String? = nil` on
+  line 79; nil branch hits `cache.removeAll()`.)
+- Verify the `Task { ... }` in `ConfigurationView` doesn't leak — it
+  captures no `self`-owned state and self-completes, so no retain issue.
+- Verify no existing test or call site relies on `saveConfiguration`
+  being fully synchronous (it already has other async side effects
+  like `Task { await ... }` for server restart).
+
+---
+
+### Phase B wrap-up
+
+All five Phase B changes (M-04 through M-08) are code-complete and
+build clean. Together they give the memory system:
+1. A per-agent override field on `Agent` (M-04)
+2. A centralized resolver that honors the override (M-05)
+3. Wiring into the single prompt composer call site (M-06)
+4. An observable signal when memory config changes (M-07)
+5. A live cache invalidator driven by Settings save (M-08)
+
+Phase B is a pure no-op until Phase D flips the global default,
+because every resolver/fallback path still lands on the existing
+`enabled: true` default. It lands the safety nets first, on purpose.
+
+---
+
 

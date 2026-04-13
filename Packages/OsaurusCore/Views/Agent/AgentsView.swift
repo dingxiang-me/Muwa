@@ -2866,7 +2866,8 @@ struct AgentDetailView: View {
             pluginInstructions: effectivePluginInstructions,
             toolSelectionMode: toolSelectionMode,
             manualToolNames: toolSelectionMode == .manual ? Array(manualToolNames) : nil,
-            manualSkillNames: toolSelectionMode == .manual ? Array(manualSkillNames) : nil
+            manualSkillNames: toolSelectionMode == .manual ? Array(manualSkillNames) : nil,
+            memoryEnabled: current.memoryEnabled
         )
 
         agentManager.update(updated)

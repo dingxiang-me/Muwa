@@ -48,6 +48,30 @@ public struct SystemPromptComposer: Sendable {
     }
 
     public mutating func appendMemory(agentId: String, query: String? = nil) async {
+        // Resolve the effective memory-enabled state for this agent. The
+        // per-agent override (Agent.memoryEnabled) wins over the global
+        // MemoryConfiguration.enabled setting. This lets power users keep
+        // memory flowing on specific agents after the global default was
+        // flipped to off — see 02-VERIFIED-ISSUES.md Issue 5.
+        //
+        // `AgentManager.effectiveMemoryEnabled(for:)` is @MainActor and
+        // we're already on the main actor via composeChatContext, so the
+        // call is safe.
+        let agentUUID = UUID(uuidString: agentId)
+        let memoryEnabled: Bool
+        if let agentUUID {
+            memoryEnabled = await AgentManager.shared.effectiveMemoryEnabled(for: agentUUID)
+        } else {
+            // Agent ID failed to parse — fall back to the global setting
+            // so malformed IDs don't silently disable memory for everyone.
+            memoryEnabled = MemoryConfigurationStore.load().enabled
+        }
+
+        guard memoryEnabled else {
+            append(.dynamic(id: "memory", label: "Memory", content: ""))
+            return
+        }
+
         let config = MemoryConfigurationStore.load()
         let context: String
         if let query, !query.isEmpty {

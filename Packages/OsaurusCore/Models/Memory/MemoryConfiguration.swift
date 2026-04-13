@@ -8,6 +8,17 @@
 import Foundation
 import os
 
+extension Notification.Name {
+    /// Posted after `MemoryConfigurationStore.save()` successfully persists a new
+    /// configuration. Observers (e.g. `MemoryContextAssembler`) use this to
+    /// invalidate cached state that depends on the previous config — most
+    /// notably the 10-second TTL cache in `MemoryContextAssembler` which would
+    /// otherwise keep serving stale context for up to 10s after the user
+    /// flips the `enabled` toggle in Settings. See
+    /// `docs/internal/memory-tools-defaults/02-VERIFIED-ISSUES.md` Issues 6/7.
+    public static let memoryConfigurationChanged = Notification.Name("memoryConfigurationChanged")
+}
+
 public struct MemoryConfiguration: Codable, Equatable, Sendable {
     /// Embedding backend ("mlx" or "none")
     public var embeddingBackend: String
@@ -221,6 +232,7 @@ public enum MemoryConfigurationStore: Sendable {
             let data = try encoder.encode(validated)
             try data.write(to: url, options: .atomic)
             lock.withLock { $0 = validated }
+            NotificationCenter.default.post(name: .memoryConfigurationChanged, object: nil)
         } catch {
             MemoryLogger.config.error("Failed to save config: \(error)")
         }

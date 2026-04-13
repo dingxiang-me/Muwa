@@ -21,6 +21,15 @@ public actor MemoryContextAssembler {
     private var cache: [String: CacheEntry] = [:]
     private static let cacheTTL: TimeInterval = 10
 
+    /// Clear the per-agent context cache for every agent. Used by Settings save
+    /// after `MemoryConfiguration` changes so the next prompt reflects the new
+    /// config within the same request rather than waiting for the 10-second TTL
+    /// to expire. See `docs/internal/memory-tools-defaults/02-VERIFIED-ISSUES.md`
+    /// Issue 7.
+    public static func invalidateAll() async {
+        await shared.invalidateCache()
+    }
+
     /// Assemble the full memory context string for injection before the system prompt.
     /// User edits and profile are never trimmed. Working memory, summaries, and key
     /// relationships are budget-trimmed. Results are cached for 10 seconds per agent.

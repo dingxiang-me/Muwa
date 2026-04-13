@@ -366,6 +366,28 @@ extension AgentManager {
         return agent.manualSkillNames
     }
 
+    /// Resolves whether persistent memory injection should run for an agent.
+    ///
+    /// Precedence:
+    /// 1. `Agent.memoryEnabled` if set — per-agent override wins over global
+    /// 2. Global `MemoryConfiguration.enabled` otherwise
+    ///
+    /// The default agent (`Agent.defaultId`) always follows the global setting
+    /// because it represents "use the global chat settings". Custom agents
+    /// can override with their own `memoryEnabled` value.
+    ///
+    /// Use-case: after flipping the global memory default to `false`, power
+    /// users with memory-using agents can set `memoryEnabled = true` on those
+    /// specific agents to keep memory flowing, without turning memory on
+    /// globally. See `docs/internal/memory-tools-defaults/02-VERIFIED-ISSUES.md`
+    /// Issue 5.
+    public func effectiveMemoryEnabled(for agentId: UUID) -> Bool {
+        let globalEnabled = MemoryConfigurationStore.load().enabled
+        guard let agent = agent(for: agentId) else { return globalEnabled }
+        if agent.id == Agent.defaultId { return globalEnabled }
+        return agent.memoryEnabled ?? globalEnabled
+    }
+
     /// Get the theme ID for an agent (nil if agent uses global theme)
     public func themeId(for agentId: UUID) -> UUID? {
         guard let agent = agent(for: agentId) else {

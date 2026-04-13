@@ -93,6 +93,17 @@ public struct Agent: Codable, Identifiable, Sendable, Equatable {
     public var manualToolNames: [String]?
     /// Skill names explicitly selected by the user when toolSelectionMode is .manual
     public var manualSkillNames: [String]?
+    /// Per-agent override for persistent memory injection.
+    ///
+    /// - `nil` (default) — follow the global `MemoryConfiguration.enabled` setting
+    /// - `true`  — force memory injection for this agent, even when the global toggle is off
+    /// - `false` — suppress memory injection for this agent, even when the global toggle is on
+    ///
+    /// Introduced alongside the memory default flip so power users who built
+    /// up memory-using agents can keep them working without re-enabling memory
+    /// globally. See `docs/internal/memory-tools-defaults/02-VERIFIED-ISSUES.md`
+    /// Issue 5.
+    public var memoryEnabled: Bool?
 
     public init(
         id: UUID = UUID(),
@@ -116,7 +127,8 @@ public struct Agent: Codable, Identifiable, Sendable, Equatable {
         bonjourEnabled: Bool = false,
         toolSelectionMode: ToolSelectionMode? = nil,
         manualToolNames: [String]? = nil,
-        manualSkillNames: [String]? = nil
+        manualSkillNames: [String]? = nil,
+        memoryEnabled: Bool? = nil
     ) {
         self.id = id
         self.name = name
@@ -140,6 +152,7 @@ public struct Agent: Codable, Identifiable, Sendable, Equatable {
         self.toolSelectionMode = toolSelectionMode
         self.manualToolNames = manualToolNames
         self.manualSkillNames = manualSkillNames
+        self.memoryEnabled = memoryEnabled
     }
 
     // MARK: - Built-in Agents
@@ -205,6 +218,7 @@ extension Agent {
         toolSelectionMode = try c.decodeIfPresent(ToolSelectionMode.self, forKey: .toolSelectionMode)
         manualToolNames = try c.decodeIfPresent([String].self, forKey: .manualToolNames)
         manualSkillNames = try c.decodeIfPresent([String].self, forKey: .manualSkillNames)
+        memoryEnabled = try c.decodeIfPresent(Bool.self, forKey: .memoryEnabled)
     }
 }
 
@@ -272,7 +286,8 @@ extension Agent {
                 autonomousExec: exportedAgent.autonomousExec,
                 toolSelectionMode: exportedAgent.toolSelectionMode,
                 manualToolNames: exportedAgent.manualToolNames,
-                manualSkillNames: exportedAgent.manualSkillNames
+                manualSkillNames: exportedAgent.manualSkillNames,
+                memoryEnabled: exportedAgent.memoryEnabled
             )
         }
     }
