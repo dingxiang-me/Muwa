@@ -3,8 +3,9 @@
 //  osaurus
 //
 //  Captures a snapshot of server-side generation configuration used by MLX.
-//  KV cache quantization, TurboQuant, and prefill step sizing are now owned
-//  by the vmlx-swift-lm package and are no longer user-configurable.
+//  KV cache quantization, TurboQuant, and prefill step sizing flow through
+//  `cacheOverrides` and take effect on the next generation — see
+//  `ServerCacheConfig` for the 6-stack breakdown.
 //
 
 import Foundation
@@ -12,13 +13,19 @@ import Foundation
 struct RuntimeConfig: Sendable {
     let topP: Float
     let maxKV: Int?
+    /// Per-request cache engine overrides. Fields are all optional; nil
+    /// means "auto-tune". `ModelRuntime.makeGenerateParameters` substitutes
+    /// osaurus's preferred defaults (e.g. TurboQuant for `kvQuantMode`)
+    /// when these are nil. See `ServerCacheConfig` docs.
+    let cacheOverrides: ServerCacheConfig
 
     /// Captures a generation config snapshot from ServerConfiguration.
     static func snapshot() async -> RuntimeConfig {
         let cfg = await ServerController.sharedConfiguration()
         return RuntimeConfig(
             topP: cfg?.genTopP ?? 1.0,
-            maxKV: cfg?.genMaxKVSize ?? Self.defaultMaxKV()
+            maxKV: cfg?.genMaxKVSize ?? Self.defaultMaxKV(),
+            cacheOverrides: cfg?.cacheConfig ?? .default
         )
     }
 

@@ -581,20 +581,65 @@ actor ModelRuntime {
         return digest.prefix(16).map { String(format: "%02x", $0) }.joined()
     }
 
+    /// Build `GenerateParameters` for a single generation request.
+    ///
+    /// Stacks 1 and 5 of the cache engine flow through this function
+    /// per request (batching prefill and KV quantization are per-request
+    /// knobs in vmlx). The `cacheOverrides` argument lets osaurus
+    /// forward user-tuned values from `ServerConfiguration.cacheConfig`.
+    ///
+    /// **TurboQuant is the osaurus default.** When `cacheOverrides.kvQuantMode`
+    /// is `nil`, we substitute `.turboQuant(keyBits: 3, valueBits: 3)`
+    /// — the package default is `.none`, but osaurus ships with
+    /// TurboQuant on because it's the highest-value KV compression
+    /// scheme in vmlx and the primary reason for the cache engine
+    /// rework. Users who want raw full-precision KV can explicitly
+    /// set `kvQuantMode: .none` in Settings → Cache Engine.
     nonisolated static func makeGenerateParameters(
         temperature: Float,
         maxTokens: Int,
         topP: Float,
         repetitionPenalty: Float?,
-        maxKV: Int?
+        maxKV: Int?,
+        cacheOverrides: ServerCacheConfig = .default
     ) -> MLXLMCommon.GenerateParameters {
-        MLXLMCommon.GenerateParameters(
+        // Switch on the Optional<CacheQuantMode> explicitly. `.none` here
+        // matches the Optional case, not `CacheQuantMode.none` — so we
+        // need `.some(...)` wrappers to disambiguate.
+        let kvMode: MLXLMCommon.KVQuantizationMode
+        switch cacheOverrides.kvQuantMode {
+        case .some(.none):
+            // User explicitly disabled quant — respect that.
+            kvMode = .none
+        case .some(.affine):
+            kvMode = .affine(
+                bits: cacheOverrides.affineKVBits ?? 4,
+                groupSize: cacheOverrides.affineKVGroupSize ?? 64
+            )
+        case .some(.turboQuant):
+            kvMode = .turboQuant(
+                keyBits: cacheOverrides.turboKeyBits ?? 3,
+                valueBits: cacheOverrides.turboValueBits ?? 3
+            )
+        case .none:
+            // Osaurus default — TurboQuant with package defaults.
+            // This is where osaurus's preferred behavior diverges from
+            // vmlx's package default of .none.
+            kvMode = .turboQuant(keyBits: 3, valueBits: 3)
+        }
+
+        return MLXLMCommon.GenerateParameters(
             maxTokens: maxTokens,
             maxKVSize: maxKV,
+            kvBits: nil,  // legacy affine path; kvMode above takes precedence
+            kvGroupSize: 64,
+            quantizedKVStart: cacheOverrides.quantizedKVStart ?? 0,
+            kvMode: kvMode,
             temperature: temperature,
             topP: topP,
             repetitionPenalty: repetitionPenalty,
-            repetitionContextSize: 20
+            repetitionContextSize: 20,
+            prefillStepSize: cacheOverrides.prefillStepSize ?? 512
         )
     }
 

@@ -30,6 +30,43 @@ enum CacheTriState: String, CaseIterable, Identifiable {
     }
 }
 
+/// KV quantization mode picker for the Cache Engine settings section.
+///
+/// `.auto` maps to `ServerCacheConfig.kvQuantMode = nil`, which osaurus
+/// interprets as "use the osaurus default of TurboQuant(3,3)". The UI
+/// label makes this explicit so users know what Auto does — otherwise
+/// users might assume Auto means "no quant" (the vmlx package default).
+enum CacheQuantModeChoice: String, CaseIterable, Identifiable {
+    /// Maps to nil → osaurus substitutes `.turboQuant(3, 3)` in makeGenerateParameters.
+    case auto = "Auto (TurboQuant)"
+    /// Full-precision KV cache. No quantization.
+    case off = "Off"
+    /// Legacy affine quantization. Tunable via bits + groupSize.
+    case affine = "Affine"
+    /// TurboQuant with explicit key/value bit settings.
+    case turboQuant = "TurboQuant"
+
+    var id: String { rawValue }
+
+    var optionalMode: CacheQuantMode? {
+        switch self {
+        case .auto: return nil
+        case .off: return CacheQuantMode.none
+        case .affine: return .affine
+        case .turboQuant: return .turboQuant
+        }
+    }
+
+    static func from(_ value: CacheQuantMode?) -> CacheQuantModeChoice {
+        switch value {
+        case nil: return .auto
+        case .some(CacheQuantMode.none): return .off
+        case .some(.affine): return .affine
+        case .some(.turboQuant): return .turboQuant
+        }
+    }
+}
+
 /// Paged block size choice. Valid values are 32/64/128 tokens per block;
 /// `.auto` defers to the vmlx default (64).
 enum CachePagedBlockSizeChoice: String, CaseIterable, Identifiable {
@@ -110,12 +147,25 @@ struct ConfigurationView: View {
 
     // Cache engine overrides — all three-state (nil/true/false for Bools, "" = Auto for numeric).
     // See ServerCacheConfig for the 6-stack breakdown. Empty / .auto means "let vmlx auto-tune".
+    // Stack 1
+    @State private var tempCachePrefillStepSize: String = ""
+    // Stacks 2 + 3
     @State private var tempCacheUsePaged: CacheTriState = .auto
     @State private var tempCacheMaxBlocks: String = ""
     @State private var tempCachePagedBlockSize: CachePagedBlockSizeChoice = .auto
+    // Stack 4
     @State private var tempCacheEnableDisk: CacheTriState = .auto
     @State private var tempCacheDiskMaxGB: String = ""
+    // Stack 5
+    @State private var tempCacheQuantMode: CacheQuantModeChoice = .auto
+    @State private var tempCacheAffineBits: String = ""
+    @State private var tempCacheAffineGroupSize: String = ""
+    @State private var tempCacheTurboKeyBits: String = ""
+    @State private var tempCacheTurboValueBits: String = ""
+    @State private var tempCacheQuantStart: String = ""
+    // Stack 6
     @State private var tempCacheSSMMaxEntries: String = ""
+    // Derived / display
     @State private var diskCacheUsageBytes: Int = 0
 
     // Toast settings state
@@ -831,11 +881,18 @@ struct ConfigurationView: View {
         // they're on Auto. This matches the pattern used for tempTopP and
         // tempMaxKV above.
         let cache = configuration.cacheConfig
+        tempCachePrefillStepSize = cache.prefillStepSize.map(String.init) ?? ""
         tempCacheUsePaged = CacheTriState.from(cache.usePagedCache)
         tempCacheMaxBlocks = cache.maxCacheBlocks.map(String.init) ?? ""
         tempCachePagedBlockSize = CachePagedBlockSizeChoice.from(cache.pagedBlockSize)
         tempCacheEnableDisk = CacheTriState.from(cache.enableDiskCache)
         tempCacheDiskMaxGB = cache.diskCacheMaxGB.map { String(format: "%.1f", $0) } ?? ""
+        tempCacheQuantMode = CacheQuantModeChoice.from(cache.kvQuantMode)
+        tempCacheAffineBits = cache.affineKVBits.map(String.init) ?? ""
+        tempCacheAffineGroupSize = cache.affineKVGroupSize.map(String.init) ?? ""
+        tempCacheTurboKeyBits = cache.turboKeyBits.map(String.init) ?? ""
+        tempCacheTurboValueBits = cache.turboValueBits.map(String.init) ?? ""
+        tempCacheQuantStart = cache.quantizedKVStart.map(String.init) ?? ""
         tempCacheSSMMaxEntries = cache.ssmMaxEntries.map(String.init) ?? ""
         diskCacheUsageBytes = OsaurusPaths.diskKVCacheUsageBytes()
 
@@ -890,12 +947,20 @@ struct ConfigurationView: View {
         tempMaxKV = ""
         tempEvictionPolicy = serverDefaults.modelEvictionPolicy
 
-        // Cache engine: back to pure auto-tune (all fields nil).
+        // Cache engine: back to pure auto-tune (all fields nil). Auto
+        // means TurboQuant(3,3) for stack 5 — see makeGenerateParameters.
+        tempCachePrefillStepSize = ""
         tempCacheUsePaged = .auto
         tempCacheMaxBlocks = ""
         tempCachePagedBlockSize = .auto
         tempCacheEnableDisk = .auto
         tempCacheDiskMaxGB = ""
+        tempCacheQuantMode = .auto
+        tempCacheAffineBits = ""
+        tempCacheAffineGroupSize = ""
+        tempCacheTurboKeyBits = ""
+        tempCacheTurboValueBits = ""
+        tempCacheQuantStart = ""
         tempCacheSSMMaxEntries = ""
 
         showSuccess("Settings restored to defaults")
@@ -953,17 +1018,31 @@ struct ConfigurationView: View {
         configuration.modelEvictionPolicy = tempEvictionPolicy
 
         // Cache engine overrides — empty / .auto → nil (auto-tune).
-        // Changes require a model reload to take effect; the UI warns the
-        // user about this via the "Changes apply on next model load" text.
+        // Stacks 2, 3, 4, 6 require a model reload to take effect.
+        // Stacks 1 and 5 flow through GenerateParameters per-request and
+        // take effect on the next generation — no reload needed.
+        let trimmedPrefill = tempCachePrefillStepSize.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedMaxBlocks = tempCacheMaxBlocks.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedDiskGB = tempCacheDiskMaxGB.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAffineBits = tempCacheAffineBits.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedAffineGroup = tempCacheAffineGroupSize.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTurboKey = tempCacheTurboKeyBits.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedTurboValue = tempCacheTurboValueBits.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedQuantStart = tempCacheQuantStart.trimmingCharacters(in: .whitespacesAndNewlines)
         let trimmedSSM = tempCacheSSMMaxEntries.trimmingCharacters(in: .whitespacesAndNewlines)
         configuration.cacheConfig = ServerCacheConfig(
+            prefillStepSize: trimmedPrefill.isEmpty ? nil : Int(trimmedPrefill),
             usePagedCache: tempCacheUsePaged.optionalBool,
             maxCacheBlocks: trimmedMaxBlocks.isEmpty ? nil : Int(trimmedMaxBlocks),
             pagedBlockSize: tempCachePagedBlockSize.optionalInt,
             enableDiskCache: tempCacheEnableDisk.optionalBool,
             diskCacheMaxGB: trimmedDiskGB.isEmpty ? nil : Float(trimmedDiskGB),
+            kvQuantMode: tempCacheQuantMode.optionalMode,
+            affineKVBits: trimmedAffineBits.isEmpty ? nil : Int(trimmedAffineBits),
+            affineKVGroupSize: trimmedAffineGroup.isEmpty ? nil : Int(trimmedAffineGroup),
+            turboKeyBits: trimmedTurboKey.isEmpty ? nil : Int(trimmedTurboKey),
+            turboValueBits: trimmedTurboValue.isEmpty ? nil : Int(trimmedTurboValue),
+            quantizedKVStart: trimmedQuantStart.isEmpty ? nil : Int(trimmedQuantStart),
             ssmMaxEntries: trimmedSSM.isEmpty ? nil : Int(trimmedSSM)
         )
 
@@ -1131,20 +1210,25 @@ struct ConfigurationView: View {
 
     // MARK: - Cache Engine Subsection
 
-    /// The 6-stack cache engine settings subsection. Every control defaults
-    /// to "Auto" — empty field or .auto option — which forwards `nil` into
-    /// `ServerCacheConfig` and lets vmlx-swift-lm choose a value based on
-    /// RAM and model characteristics.
+    /// The 6-stack cache engine settings subsection. Every control
+    /// defaults to "Auto" which forwards `nil` into `ServerCacheConfig`.
+    /// Where vmlx's package default differs from osaurus's preferred
+    /// default (notably the KV quant mode, where vmlx defaults to `.none`
+    /// but osaurus ships with TurboQuant), `ModelRuntime.makeGenerateParameters`
+    /// substitutes the osaurus preference on the nil case.
     ///
-    /// Changes here require a **model reload** to take effect because
-    /// `CacheCoordinator` is immutable after construction. The help text
-    /// at the top of the subsection tells the user this.
+    /// **Hot-reload behavior differs by stack**:
+    /// - Stacks 1 (prefill) and 5 (quantization) flow through
+    ///   `GenerateParameters` per-request — take effect on the next
+    ///   generation with no model reload.
+    /// - Stacks 2, 3, 4, 6 flow through `CacheCoordinatorConfig` which
+    ///   is immutable after construction — require a model reload.
     @ViewBuilder
     private var cacheEngineSubsection: some View {
         SettingsSubsection(label: "Cache Engine") {
             VStack(alignment: .leading, spacing: 14) {
                 Text(
-                    "Tune the 6-stack KV cache engine. Every control defaults to Auto — the package picks sensible values based on your RAM and the loaded model. Explicit overrides take effect on the next model load.",
+                    "Tune the 6-stack KV cache engine. Every control defaults to Auto — osaurus ships with TurboQuant enabled and sensible RAM-scaled defaults. Stacks 1 and 5 take effect on next generation; stacks 2, 3, 4, 6 take effect on next model load.",
                     bundle: .module
                 )
                 .font(.system(size: 11))
@@ -1266,14 +1350,91 @@ struct ConfigurationView: View {
                     defaultValue: 50
                 )
 
-                // Stacks 1 + 5: explanation-only
-                Text(
-                    "Stacks 1 (continuous batching) and 5 (KV quantization) are managed automatically by the vmlx engine. Batching is internal to the generation loop; quantization bits are baked into model weights.",
-                    bundle: .module
+                SettingsDivider()
+
+                // Stack 1: Continuous batching prefill step
+                SettingsStepperField(
+                    label: "Prefill Step Size (tokens)",
+                    help: "Number of tokens per prefill chunk during prompt processing. Smaller = lower peak memory on small machines, slightly slower prefill. Larger = faster prefill on high-RAM machines. Leave blank for Auto (512).",
+                    text: $tempCachePrefillStepSize,
+                    range: 64 ... 4096,
+                    step: 64,
+                    defaultValue: 512
                 )
-                .font(.system(size: 10))
-                .foregroundColor(theme.tertiaryText)
-                .padding(.top, 4)
+
+                SettingsDivider()
+
+                // Stack 5: KV quantization mode picker
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("KV Quantization Mode", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                    Picker("", selection: $tempCacheQuantMode) {
+                        ForEach(CacheQuantModeChoice.allCases) { mode in
+                            Text(mode.rawValue).tag(mode)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+                    .labelsHidden()
+                    Text(
+                        "Auto uses TurboQuant(3,3) — osaurus's preferred default for ~26× KV compression with minimal quality loss. Off disables quantization entirely. Affine and TurboQuant expose their tuning knobs below.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.tertiaryText)
+                }
+
+                // Affine mode knobs — only meaningful when mode == .affine
+                if tempCacheQuantMode == .affine {
+                    SettingsStepperField(
+                        label: "Affine Bits",
+                        help: "Bits per element for affine quantization. Lower = more compression, more quality loss. Typical: 2, 4, 8. Leave blank for Auto (4).",
+                        text: $tempCacheAffineBits,
+                        range: 2 ... 8,
+                        step: 1,
+                        defaultValue: 4
+                    )
+                    SettingsStepperField(
+                        label: "Affine Group Size",
+                        help: "Group size for affine quantization. Leave blank for Auto (64).",
+                        text: $tempCacheAffineGroupSize,
+                        range: 16 ... 256,
+                        step: 16,
+                        defaultValue: 64
+                    )
+                }
+
+                // TurboQuant mode knobs — meaningful when mode == .turboQuant
+                // OR when mode == .auto (since Auto is TurboQuant).
+                if tempCacheQuantMode == .turboQuant || tempCacheQuantMode == .auto {
+                    SettingsStepperField(
+                        label: "TurboQuant Key Bits",
+                        help: "Bits per key element. Lower = more compression, more quality loss. Leave blank for Auto (3).",
+                        text: $tempCacheTurboKeyBits,
+                        range: 2 ... 8,
+                        step: 1,
+                        defaultValue: 3
+                    )
+                    SettingsStepperField(
+                        label: "TurboQuant Value Bits",
+                        help: "Bits per value element. Leave blank for Auto (3).",
+                        text: $tempCacheTurboValueBits,
+                        range: 2 ... 8,
+                        step: 1,
+                        defaultValue: 3
+                    )
+                }
+
+                // Quantized start threshold — meaningful for all non-.off modes
+                if tempCacheQuantMode != .off {
+                    SettingsStepperField(
+                        label: "Quantize After N Tokens",
+                        help: "Tokens before this offset stay full-precision. Use a non-zero value to preserve short prompts while quantizing long contexts. Leave blank for Auto (0 — quantize immediately).",
+                        text: $tempCacheQuantStart,
+                        range: 0 ... 8192,
+                        step: 64,
+                        defaultValue: 0
+                    )
+                }
             }
         }
     }

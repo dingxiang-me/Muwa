@@ -7,39 +7,54 @@
 
 import Foundation
 
-/// User-facing overrides for the vmlx-swift-lm `CacheCoordinatorConfig`.
+/// KV cache quantization mode — shadow of `MLXLMCommon.KVQuantizationMode`
+/// that's Codable-friendly. The associated-value cases in the package
+/// enum aren't Codable out of the box, so osaurus stores the mode as a
+/// string and the quant bits as separate fields. `ModelRuntime` rebuilds
+/// the package enum from these fields on request.
+public enum CacheQuantMode: String, Codable, Sendable, CaseIterable {
+    case none
+    case affine
+    case turboQuant
+}
+
+/// User-facing overrides for the vmlx-swift-lm cache engine.
 ///
-/// The KV caching system in osaurus is a 6-stack engine:
-///   1. **Continuous batching** (BatchEngine) — internal to the vmlx
-///      generation loop, not user-tunable from this surface. Osaurus
-///      does not instantiate BatchEngine directly.
+/// The KV caching system in osaurus is a **6-stack engine**, all of
+/// which are now user-tunable from this struct:
+///   1. **Continuous batching** (BatchEngine prefill) — `prefillStepSize`
+///      (per-request, flows through `GenerateParameters`)
 ///   2. **Prefix caching** (PagedCacheManager L1) — `usePagedCache`,
 ///      `maxCacheBlocks`
 ///   3. **Paged blocks** (PagedCacheManager block pool) — `pagedBlockSize`
 ///      (shares budget with stack 2 via `maxCacheBlocks`)
 ///   4. **L2 disk cache** (DiskCache) — `enableDiskCache`, `diskCacheMaxGB`
-///   5. **KV cache quantization** (TurboQuantKVCache) — quant bits are
-///      baked into the model weights; no per-session override mechanism
-///      exists. Managed automatically by the package.
+///   5. **KV cache quantization** (affine or TurboQuant) — `kvQuantMode`,
+///      `affineKVBits`, `affineKVGroupSize`, `turboKeyBits`, `turboValueBits`,
+///      `quantizedKVStart` (per-request, flows through `GenerateParameters`)
 ///   6. **Hybrid SSM handler/watcher** (SSMStateCache) — `ssmMaxEntries`
 ///
-/// Six knobs across four configurable stacks. Stacks 1 and 5 are owned
-/// by the package because they're either internal to the generation
-/// loop (batching) or weight-baked (quantization).
+/// **Stacks 2, 3, 4, 6** are `CacheCoordinatorConfig` fields and require
+/// a **model reload** to take effect (coordinator is immutable).
+///
+/// **Stacks 1 and 5** flow through `GenerateParameters` on every request
+/// and take effect on the **next generation** — no reload needed.
 ///
 /// **Every field is optional.** `nil` means "let vmlx-swift-lm auto-tune
 /// based on available RAM and model characteristics" — the historic
 /// osaurus default. Users who never touch Settings → Cache get the same
-/// behavior they had before this struct existed. Users who set explicit
-/// values get those exact values forwarded into `CacheCoordinatorConfig`
-/// on the next model load.
-///
-/// **Changes require a model reload** to take effect. The
-/// `CacheCoordinator` type in vmlx-swift-lm is immutable after
-/// construction; osaurus rebuilds it per model load in
-/// `ModelRuntime.installCacheCoordinator`. Settings UI should warn the
-/// user that cache changes don't apply to already-loaded models.
+/// behavior they had before this struct existed.
 public struct ServerCacheConfig: Codable, Equatable, Sendable {
+
+    // MARK: - Stack 1: Continuous batching
+
+    /// Number of tokens per prefill chunk during prompt processing.
+    /// Smaller = lower peak memory during prefill (helps on 8GB
+    /// machines) at the cost of slightly slower prefill. Larger =
+    /// faster prefill on high-memory machines. Per-request via
+    /// `GenerateParameters.prefillStepSize`.
+    /// `nil` = package default (512).
+    public var prefillStepSize: Int?
 
     // MARK: - Stack 2+3: Prefix caching / paged blocks
 
@@ -71,6 +86,39 @@ public struct ServerCacheConfig: Codable, Equatable, Sendable {
     /// Type is `Float` to match `CacheCoordinatorConfig.diskCacheMaxGB`.
     public var diskCacheMaxGB: Float?
 
+    // MARK: - Stack 5: KV cache quantization
+
+    /// Quantization mode for the KV cache during generation. Per-request
+    /// via `GenerateParameters.kvMode`.
+    /// - `.none` (or nil) — no quantization, full-precision KV cache
+    /// - `.affine` — legacy affine quantization, tunable via
+    ///   `affineKVBits` + `affineKVGroupSize`
+    /// - `.turboQuant` — TurboQuant (the vmlx-native scheme), tunable
+    ///   via `turboKeyBits` + `turboValueBits`
+    public var kvQuantMode: CacheQuantMode?
+
+    /// Bits per element for affine quantization. Common values: 2, 4, 8.
+    /// Only used when `kvQuantMode == .affine`. `nil` = package default.
+    public var affineKVBits: Int?
+
+    /// Group size for affine quantization. Only used when
+    /// `kvQuantMode == .affine`. `nil` = package default (64).
+    public var affineKVGroupSize: Int?
+
+    /// Key-side bits per element for TurboQuant. Only used when
+    /// `kvQuantMode == .turboQuant`. `nil` = package default (3).
+    public var turboKeyBits: Int?
+
+    /// Value-side bits per element for TurboQuant. Only used when
+    /// `kvQuantMode == .turboQuant`. `nil` = package default (3).
+    public var turboValueBits: Int?
+
+    /// Token count threshold at which quantization begins. Tokens before
+    /// this offset stay full-precision regardless of mode. Useful for
+    /// preserving short prompts while quantizing long contexts.
+    /// `nil` = package default (0 — quantize immediately).
+    public var quantizedKVStart: Int?
+
     // MARK: - Stack 6: Hybrid SSM handler
 
     /// Max entries in the SSM companion cache for hybrid models (models
@@ -79,18 +127,32 @@ public struct ServerCacheConfig: Codable, Equatable, Sendable {
     public var ssmMaxEntries: Int?
 
     public init(
+        prefillStepSize: Int? = nil,
         usePagedCache: Bool? = nil,
         maxCacheBlocks: Int? = nil,
         pagedBlockSize: Int? = nil,
         enableDiskCache: Bool? = nil,
         diskCacheMaxGB: Float? = nil,
+        kvQuantMode: CacheQuantMode? = nil,
+        affineKVBits: Int? = nil,
+        affineKVGroupSize: Int? = nil,
+        turboKeyBits: Int? = nil,
+        turboValueBits: Int? = nil,
+        quantizedKVStart: Int? = nil,
         ssmMaxEntries: Int? = nil
     ) {
+        self.prefillStepSize = prefillStepSize
         self.usePagedCache = usePagedCache
         self.maxCacheBlocks = maxCacheBlocks
         self.pagedBlockSize = pagedBlockSize
         self.enableDiskCache = enableDiskCache
         self.diskCacheMaxGB = diskCacheMaxGB
+        self.kvQuantMode = kvQuantMode
+        self.affineKVBits = affineKVBits
+        self.affineKVGroupSize = affineKVGroupSize
+        self.turboKeyBits = turboKeyBits
+        self.turboValueBits = turboValueBits
+        self.quantizedKVStart = quantizedKVStart
         self.ssmMaxEntries = ssmMaxEntries
     }
 
@@ -99,9 +161,14 @@ public struct ServerCacheConfig: Codable, Equatable, Sendable {
     /// True when every field is nil (pure auto-tune mode). UI uses this
     /// to show an "Auto" badge instead of a mixed state.
     public var isFullyAuto: Bool {
-        usePagedCache == nil && maxCacheBlocks == nil
+        prefillStepSize == nil
+            && usePagedCache == nil && maxCacheBlocks == nil
             && pagedBlockSize == nil && enableDiskCache == nil
-            && diskCacheMaxGB == nil && ssmMaxEntries == nil
+            && diskCacheMaxGB == nil
+            && kvQuantMode == nil && affineKVBits == nil
+            && affineKVGroupSize == nil && turboKeyBits == nil
+            && turboValueBits == nil && quantizedKVStart == nil
+            && ssmMaxEntries == nil
     }
 }
 

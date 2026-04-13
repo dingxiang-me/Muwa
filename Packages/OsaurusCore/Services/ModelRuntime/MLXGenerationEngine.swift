@@ -94,7 +94,8 @@ struct MLXGenerationEngine {
                 maxTokens: generation.maxTokens,
                 topP: generation.topPOverride ?? runtime.topP,
                 repetitionPenalty: generation.repetitionPenalty,
-                maxKV: runtime.maxKV
+                maxKV: runtime.maxKV,
+                cacheOverrides: runtime.cacheOverrides
             )
             let additionalContext: [String: any Sendable]? =
                 generation.modelOptions["disableThinking"]?.boolValue == true
