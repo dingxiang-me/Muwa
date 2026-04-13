@@ -1435,10 +1435,13 @@ All subsequent phase work should be based on the rebased commits.
 | C — chat-bar Tools chip (M-09..M-13) | ✅ done, committed, built clean | `ba860b96` |
 | D — default flip + runtime invalidation (M-14..M-16) | ✅ done, committed, built clean | `dab594f7` |
 | E — cleanup, error handling, tests, audit closure (M-18..M-21) | ⏳ not started | — |
+| E.1 — cache engine settings UI (6-stack, 4 reachable stacks) | ✅ done, committed, built clean | `80baca9a` |
+| E.2 — Tools chip opt-out toggle | ✅ done, committed, built clean | `49e9b9ca` |
+| E.3 — full 6-stack surface + TurboQuant default (M-22) | ✅ done, committed, built clean | `f0d7fb56` |
 | Configurability audit (team review) | ✅ done | `93a84f2c` |
 | CONFIGURATION_KNOBS user guide | ✅ done | `499993a6` |
 | Rebase onto latest main | ✅ done | — |
-| Cache-settings audit + close gaps | ⏳ in progress | — |
+| Cache-settings audit + close gaps | ✅ done (M-22 closed stack 1/5 gap) | `f0d7fb56` |
 | Push to remote | ⏳ not done | — |
 
 **Confirmed hard gaps still open** (from
@@ -1451,6 +1454,162 @@ All subsequent phase work should be based on the rebased commits.
 **New scope added on rebase**: Cache-related settings surface must
 be verified configurable end-to-end. Audit in flight — entries will
 be added below as gaps are found and closed.
+
+---
+
+### M-22 — Full 6-stack cache engine surface + TurboQuant as osaurus default
+
+- **Phase**: E.3
+- **File**: `Packages/OsaurusCore/Models/Configuration/ServerConfiguration.swift`,
+  `Packages/OsaurusCore/Services/ModelRuntime.swift`,
+  `Packages/OsaurusCore/Views/Settings/ConfigurationView.swift`
+- **Kind**: `edit` — extend `ServerCacheConfig` with 7 new fields,
+  add substitution logic in `makeGenerateParameters`, extend the
+  Cache Engine Settings subsection with the new controls
+- **Severity**: P1 — user-visible cache tuning surface + behavior change
+  (TurboQuant now always on unless user explicitly opts out)
+- **Depends on**: Phase E.1 (`80baca9a`) which introduced
+  `ServerCacheConfig` and the Cache Engine Settings subsection
+- **Doc ref**: re-audit of Phase E.1 against vmlx `GenerateParameters`
+  / `CacheCoordinatorConfig` surface
+- **Why**: Phase E.1 (`80baca9a`) shipped 4 of the 6 cache stacks and
+  footnoted stacks 1 (continuous batching) and 5 (KV quantization) as
+  "managed automatically by the vmlx engine". That footnote was wrong.
+  Both stacks are user-reachable, but not through
+  `CacheCoordinatorConfig` — they flow through `GenerateParameters` on
+  every request:
+  - **Stack 1** is `GenerateParameters.prefillStepSize` (default 512)
+  - **Stack 5** is `GenerateParameters.kvMode` (`KVQuantizationMode`
+    enum with `.none` / `.affine(bits, groupSize)` /
+    `.turboQuant(keyBits, valueBits)`)
+
+  The re-audit also surfaced a UX question that Phase E.1 punted on:
+  if we expose KV quantization at all, what should the default be?
+  vmlx's package default is `.none` (raw full-precision KV). Osaurus
+  ships TurboQuant as the flagship cache feature, so leaving the
+  default at `.none` would mean new users don't get the memory win
+  until they discover the picker. Decision: osaurus substitutes
+  `.turboQuant(keyBits: 3, valueBits: 3)` whenever
+  `ServerCacheConfig.kvQuantMode` is `nil`. Users who want raw KV set
+  `kvQuantMode: "none"` explicitly.
+
+**Edit 1 — 7 new fields on `ServerCacheConfig`**:
+
+```swift
+public var prefillStepSize: Int?         // stack 1
+public var kvQuantMode: CacheQuantMode?  // stack 5 mode selector
+public var affineKVBits: Int?            // stack 5, affine tuning
+public var affineKVGroupSize: Int?       // stack 5, affine tuning
+public var turboKeyBits: Int?            // stack 5, turbo tuning
+public var turboValueBits: Int?          // stack 5, turbo tuning
+public var quantizedKVStart: Int?        // stack 5, token threshold
+```
+
+`CacheQuantMode` is a Codable shadow enum with cases `.none`,
+`.affine`, `.turboQuant` — it exists only so `ServerCacheConfig` can
+be serialized to `server.json` without importing the vmlx enum into
+the Codable surface. Translation to `MLXLMCommon.KVQuantizationMode`
+happens in `ModelRuntime.makeGenerateParameters`.
+
+**Edit 2 — TurboQuant-as-default substitution** in
+`ModelRuntime.makeGenerateParameters` (around line 607):
+
+```swift
+switch cacheOverrides.kvQuantMode {
+case .some(.none):    kvMode = .none                      // user opt-out
+case .some(.affine):  kvMode = .affine(bits: …, groupSize: …)
+case .some(.turboQuant):
+    kvMode = .turboQuant(keyBits: …, valueBits: …)
+case .none:
+    // Osaurus default — diverges from the vmlx package default.
+    kvMode = .turboQuant(keyBits: 3, valueBits: 3)
+}
+```
+
+`prefillStepSize` is threaded through the same function via
+`cacheOverrides.prefillStepSize ?? 512`.
+
+**Edit 3 — Settings UI controls** added to the Cache Engine
+subsection under Settings → Local Inference:
+
+- Prefill Step Size stepper (64–4096, default 512)
+- KV Quantization Mode segmented picker: **Auto (TurboQuant)** / Off /
+  Affine / TurboQuant. The "Auto" label is spelled out as
+  "Auto (TurboQuant)" so users who glance at it understand the osaurus
+  default instead of assuming "Auto" means off.
+- Conditional bit steppers: affine bits + group size when the mode is
+  `.affine`; turbo key/value bits when the mode is `.turboQuant` or
+  `.auto`.
+- Quantize After N Tokens stepper, shown whenever the mode is not
+  `.off` (maps to `quantizedKVStart`).
+
+**Design choices**:
+
+1. **Shadow enum for the Codable surface.** `CacheQuantMode` lives on
+   the osaurus side, not imported from vmlx. This keeps
+   `server.json` decodable even if vmlx's internal enum shape
+   changes, and keeps the package boundary clean.
+
+2. **Hot-reload split, now documented.** Phase E.1's "everything
+   requires model reload" assumption is no longer true. Stacks 1
+   and 5 flow through `GenerateParameters` per request, so they take
+   effect on the **next generation** — no reload needed. Stacks 2,
+   3, 4, 6 still flow through `CacheCoordinatorConfig` (which is
+   immutable after construction) and **still** require a model
+   reload. Settings changes for stacks 2/3/4/6 show a "reload to
+   apply" affordance; changes to stacks 1/5 apply silently.
+
+3. **TurboQuant substitution only when `kvQuantMode == nil`.** The
+   `.some(.none)` branch is explicit — if the user types
+   `"kvQuantMode": "none"` into `server.json`, we respect it and
+   pass `.none` through. The substitution is osaurus's *default*,
+   not an override of user intent.
+
+4. **"Auto (TurboQuant)" label on the picker.** We could have left
+   it as "Auto" but that hides the behavior change. Spelling it
+   out in the Settings UI is the only place new users will see
+   this; the JSON encodes it as `null` (the absence of the field)
+   so on-disk files don't need to know about the substitution.
+
+**Blast radius**:
+- Every new chat from a fresh install now uses TurboQuant KV
+  (keyBits 3, valueBits 3). This is ~8× smaller KV cache for the
+  same context length vs full-precision KV — the memory savings
+  are the whole point.
+- Users upgrading from a branch with Phase E.1 but before E.3: their
+  `server.json` already has `cacheConfig` but without
+  `kvQuantMode` (nil by decode), so the substitution kicks in on
+  next launch. No migration needed.
+- Users who had `kvQuantMode: "none"` in a hand-edited
+  `server.json` on Phase E.1 (impossible — the field didn't exist
+  yet): not a concern.
+- `GenerateParameters` is per-request, so in-flight generations
+  aren't affected. First new request after a settings change
+  picks up the new mode.
+- Stacks 2, 3, 4, 6 behavior unchanged from Phase E.1.
+
+**Audit focus**:
+- Verify the shadow enum cases match the vmlx enum cases 1:1
+  (`none`, `affine`, `turboQuant`) — if vmlx adds a new mode, this
+  switch becomes non-exhaustive and the build breaks loudly.
+  That's the desired behavior.
+- Verify the `.some(.none)` vs `.none` disambiguation in
+  `makeGenerateParameters` — the Optional wrapper case is easy to
+  confuse with the `CacheQuantMode.none` case; the switch arms have
+  to be written with explicit `.some(...)` wrappers or Swift
+  matches the wrong case.
+- Verify `prefillStepSize` default (`?? 512`) matches the vmlx
+  package default. As of this writing it does; if vmlx changes it
+  upstream we need to follow.
+- Verify the conditional UI controls hide/show correctly when the
+  picker mode changes — no stale `@State` values leaking into the
+  saved config.
+- Verify the hot-reload split is honored in `saveConfiguration`:
+  changes to stacks 1/5 should NOT trigger the model reload path,
+  and changes to stacks 2/3/4/6 should.
+- Grep for `kvQuantMode` reads — they should only exist in
+  `ModelRuntime.makeGenerateParameters` and the Settings view.
+  Anywhere else reading it is a bug.
 
 ---
 

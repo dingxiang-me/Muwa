@@ -623,6 +623,51 @@ private enum DetailTab: String, CaseIterable {
     }
 }
 
+/// Three-state picker for `Agent.memoryEnabled`. `.followGlobal` maps to
+/// nil (follow `MemoryConfiguration.enabled`); `.forceOn`/`.forceOff`
+/// map to explicit Bool values that win over the global setting.
+///
+/// See `AgentManager.effectiveMemoryEnabled(for:)` for the resolution
+/// logic and `05-CONFIGURABILITY-AUDIT.md` gap 1.1 for why this toggle
+/// is the primary in-UI escape hatch for the Phase D default flip.
+enum AgentMemoryOverride: String, CaseIterable, Identifiable {
+    case followGlobal = "Follow Global"
+    case forceOn = "Force On"
+    case forceOff = "Force Off"
+
+    var id: String { rawValue }
+
+    /// Convert to `Bool?` for `Agent.memoryEnabled` storage.
+    var optionalBool: Bool? {
+        switch self {
+        case .followGlobal: return nil
+        case .forceOn: return true
+        case .forceOff: return false
+        }
+    }
+
+    /// Hydrate from `Bool?` on view load.
+    static func from(_ value: Bool?) -> AgentMemoryOverride {
+        switch value {
+        case .none: return .followGlobal
+        case .some(true): return .forceOn
+        case .some(false): return .forceOff
+        }
+    }
+
+    /// Short explanation shown under the picker.
+    var helpText: String {
+        switch self {
+        case .followGlobal:
+            return "Memory follows the global Settings → Chat → Memory toggle. If global is off, this agent gets no memory injection."
+        case .forceOn:
+            return "Memory is always injected for this agent, even when the global toggle is off."
+        case .forceOff:
+            return "Memory is never injected for this agent, even when the global toggle is on."
+        }
+    }
+}
+
 private enum AgentTab: Hashable {
     case builtIn(DetailTab)
     case plugin(String)
@@ -675,6 +720,12 @@ struct AgentDetailView: View {
     @State private var toolSelectionMode: ToolSelectionMode = .auto
     @State private var manualToolNames: Set<String> = []
     @State private var manualSkillNames: Set<String> = []
+    /// Per-agent memory override. Three-state: follow global / force on / force off.
+    /// Maps to `Agent.memoryEnabled: Bool?` — `.followGlobal` = nil, `.forceOn` = true,
+    /// `.forceOff` = false. See `05-CONFIGURABILITY-AUDIT.md` gap 1.1 for the
+    /// design rationale — this is the in-UI escape hatch for the Phase D
+    /// default flip where global memory is off by default.
+    @State private var memoryOverride: AgentMemoryOverride = .followGlobal
     @State private var toolSearchText: String = ""
     @State private var cachedTools: [ToolRegistry.ToolEntry] = []
     @State private var cachedSkills: [Skill] = []
@@ -1084,9 +1135,49 @@ struct AgentDetailView: View {
     @ViewBuilder
     private var memoryTabContent: some View {
         tabHelperText(DetailTab.memory.helperText)
+        memorySettingsSection
         historySection
         workingMemorySection
         conversationSummariesSection
+    }
+
+    /// Per-agent memory override picker. Lives at the top of the Memory
+    /// tab so users who expect their memory-using agent to keep working
+    /// after the Phase D global default flip find it first. Three-state:
+    /// Follow Global / Force On / Force Off. See `AgentMemoryOverride`
+    /// and `05-CONFIGURABILITY-AUDIT.md` gap 1.1.
+    private var memorySettingsSection: some View {
+        AgentDetailSection(
+            title: L("Memory Settings"),
+            icon: "brain.head.profile",
+            subtitle: memoryOverride == .followGlobal ? nil : memoryOverride.rawValue
+        ) {
+            VStack(alignment: .leading, spacing: 10) {
+                Text(
+                    "Override the global memory setting for this agent. Most users should leave this on Follow Global — use Force On only if you want this specific agent to keep memory when the global toggle is off, or Force Off to exclude memory for a specific agent even when global memory is on.",
+                    bundle: .module
+                )
+                .font(.system(size: 11))
+                .foregroundColor(theme.secondaryText)
+                .fixedSize(horizontal: false, vertical: true)
+
+                Picker("", selection: $memoryOverride) {
+                    ForEach(AgentMemoryOverride.allCases) { override in
+                        Text(override.rawValue).tag(override)
+                    }
+                }
+                .pickerStyle(.segmented)
+                .labelsHidden()
+                .onChange(of: memoryOverride) { _, _ in
+                    debouncedSave()
+                }
+
+                Text(memoryOverride.helpText)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.tertiaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
     }
 
     // MARK: - Configure Tab Sections
@@ -2798,6 +2889,7 @@ struct AgentDetailView: View {
         toolSelectionMode = agent.toolSelectionMode ?? .auto
         manualToolNames = Set(agent.manualToolNames ?? [])
         manualSkillNames = Set(agent.manualSkillNames ?? [])
+        memoryOverride = AgentMemoryOverride.from(agent.memoryEnabled)
 
         var instrMap: [String: String] = [:]
         let overrides = agent.pluginInstructions ?? [:]
@@ -2867,7 +2959,7 @@ struct AgentDetailView: View {
             toolSelectionMode: toolSelectionMode,
             manualToolNames: toolSelectionMode == .manual ? Array(manualToolNames) : nil,
             manualSkillNames: toolSelectionMode == .manual ? Array(manualSkillNames) : nil,
-            memoryEnabled: current.memoryEnabled
+            memoryEnabled: memoryOverride.optionalBool
         )
 
         agentManager.update(updated)
