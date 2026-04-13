@@ -1131,4 +1131,261 @@ exist.
 
 ---
 
+### M-14 — Flip `MemoryConfiguration.enabled` default to `false`
+
+- **Phase**: D
+- **File**: `Packages/OsaurusCore/Models/Memory/MemoryConfiguration.swift`
+- **Kind**: `edit` — one character change in the init default
+- **Severity**: P1 — user-visible behavior change
+- **Depends on**: Phase B (per-agent override + invalidation hooks)
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 1
+- **Why**: The central default flip. Main's UI help text says memory
+  is off by default, but the code default was `true`. This aligns the
+  code with the UI promise. New users get memory off; existing users
+  who never explicitly set the flag also get memory off; users who
+  set `"enabled": true` in their `memory.json` keep memory on.
+
+**Before** (line 94):
+
+```swift
+enabled: Bool = true,
+```
+
+**After**:
+
+```swift
+enabled: Bool = false,
+```
+
+**Decoder fallback cascades automatically**: The custom `init(from decoder:)`
+uses `defaults.enabled` (line 170) where `defaults = MemoryConfiguration()`.
+Changing the init default propagates through to the decoder fallback
+without a second edit. Users on old `memory.json` files missing the
+`enabled` key read the new default (false) on next launch.
+
+**Migration behavior**:
+- New install: `MemoryConfigurationStore.load()` writes a fresh file
+  with `enabled: false`.
+- Upgrade, explicit `"enabled": true` in file: preserved (true).
+- Upgrade, explicit `"enabled": false` in file: preserved (false).
+- Upgrade, key missing from file: reads the new default (false).
+
+The third case is the one user-visible regression path — users who
+relied on the implicit default-true. For those users, the per-agent
+`memoryEnabled` override from M-04 is the escape hatch: they can set
+`memoryEnabled: true` on specific agents that need memory without
+re-flipping the global.
+
+**Blast radius**:
+- First request after upgrade on an affected user's agent: no memory
+  context injected. Prompt is shorter, TTFT improves, but context
+  the user was relying on is gone.
+- Second and subsequent requests: same as first, until user opts back in.
+- Power users affected by this regression have Phase B as the escape.
+
+**Audit focus**:
+- Verify only the init default changed, not any other reference to
+  `enabled`. Grep confirms: one hit in the init, one in the decoder
+  (which reads from `defaults.enabled`), one in the `validated()`
+  branch (untouched because `enabled` has no clamp).
+- Verify the migration is backwards-compatible — reading an old file
+  with `"enabled": true` preserves it. Decoder uses `decodeIfPresent`
+  which returns the value if present; only falls through to the
+  default when the key is absent.
+- Verify `MemoryConfigurationStore.load()`'s fresh-file branch writes
+  the new default. It does: `let defaults = MemoryConfiguration()` at
+  line 201 (before our edit, now `MemoryConfiguration()` is
+  `enabled: false`).
+
+---
+
+### M-15 — Flip `ChatConfiguration.disableTools` default to `true`
+
+- **Phase**: D
+- **File**: `Packages/OsaurusCore/Models/Chat/ChatConfiguration.swift`
+- **Kind**: `edit` — init default + decoder fallback
+- **Severity**: P1 — user-visible behavior change
+- **Depends on**: Phase A (resolveTools fix + preflight invalidation),
+  Phase C (Tools chip)
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 2
+- **Why**: The second half of the default flip. Like memory, main's
+  UI copy said tools were off by default but the code default was
+  `false` (tools on). This aligns code with UI. Users who had tools
+  enabled and want to keep them use the new Tools chip from Phase C
+  to re-enable per conversation, or flip the global flag back in
+  Settings.
+
+**Edit 1 — init default** (line 102):
+
+```swift
+disableTools: Bool = false,  →  disableTools: Bool = true,
+```
+
+**Edit 2 — decoder fallback** (line 149, now with explanatory comment):
+
+```swift
+// Decoder fallback updated to match the new init default. Existing
+// on-disk ChatConfiguration.json files written before the Phase D
+// flip do not contain this key → they now decode with `true` (tools
+// off by default), matching the new behavior. Users who explicitly
+// set `"disableTools": false` in their config keep tools on.
+disableTools = try container.decodeIfPresent(Bool.self, forKey: .disableTools) ?? true
+```
+
+**Unlike `MemoryConfiguration`**, the `ChatConfiguration` decoder
+does NOT read from a `defaults` instance — it has hardcoded fallback
+literals. So both edits are required: init default for new
+instances, decoder fallback for on-disk files missing the key.
+
+**Migration behavior**: mirrors M-14 exactly.
+- New install: fresh `chat.json` with `disableTools: true`.
+- Upgrade, explicit `"disableTools": false`: preserved.
+- Upgrade, explicit `"disableTools": true`: preserved.
+- Upgrade, key missing: reads new default (true = tools off).
+
+**Safety nets in place from earlier phases**:
+- M-01 (Phase A): agents with `toolSelectionMode: .manual` and a
+  `manualToolNames` list still get their manual tools even under
+  `disableTools: true`. No silent regression for configured agents.
+- M-16 (Phase D, below): Settings save now invalidates all active
+  session preflight caches when the flag changes, so flipping the
+  toggle back to `false` in Settings takes effect immediately.
+- Phase C Tools chip: per-conversation override.
+
+**Blast radius**:
+- First request after upgrade: no tool specs in the prompt, unless
+  the agent is in manual mode. Prompt is dramatically shorter, TTFT
+  improves, tool-calling stops until re-enabled.
+- Users who depended on auto-discovered tools must either tap the
+  new Tools chip per conversation or flip the global back in
+  Settings. The chip gives them a low-friction path; the regression
+  is mitigated but not zero.
+
+**Audit focus**:
+- Verify both the init default AND the decoder fallback changed. One
+  without the other would produce a subtle bug: new windows read one
+  default, on-disk config reads another.
+- Verify `ChatConfiguration.default` doesn't pass an explicit
+  `disableTools:` arg (it doesn't — relies on the init default, so
+  our edit flows through).
+- Verify the preflight cache invalidation hook (M-16) fires when this
+  flag changes at runtime, not just at launch.
+- Grep for other `disableTools` references outside the model — they
+  should all read from `ChatConfiguration` instances, never hardcode.
+  (Confirmed: `ChatView.sendMessage`, `SystemPromptComposer`,
+  `ConfigurationView` all read from `chatCfg` or the
+  `@State tempDisableTools`.)
+
+---
+
+### M-16 — Settings save invalidates preflight caches on `disableTools` change
+
+- **Phase**: D
+- **File**: `Packages/OsaurusCore/Views/Settings/ConfigurationView.swift`
+- **Kind**: `edit` — new invalidation block after `ChatConfigurationStore.save`
+- **Severity**: P1 — correctness for runtime toggles
+- **Depends on**: M-02 (`allActiveSessionIds`), M-03 (batch invalidation)
+- **Doc ref**: `02-VERIFIED-ISSUES.md` Issue 8
+- **Why**: Without this, a user flipping `disableTools` in Settings
+  finds that open chat windows keep using the old tool-spec cache
+  indefinitely — the next request in each session still injects the
+  old tool list. The first user-visible symptom would be "I turned
+  tools off but they're still being called". Settings save is the
+  central choke point for the global flag change, so this is where
+  the bulk invalidation belongs.
+
+**Edit** (inserted immediately after `ChatConfigurationStore.save(chatCfg)`):
+
+```swift
+// If disableTools actually changed, every open session's preflight
+// cache is holding tool specs computed under the old flag. Bulk-
+// invalidate them so the next request in each session recomputes
+// with the new state.
+if previousChatCfg.disableTools != chatCfg.disableTools {
+    let allSessionIds = ChatWindowManager.shared.allActiveSessionIds()
+    PluginHostContext.invalidatePreflightCaches(
+        sessionIds: allSessionIds.map { $0.uuidString }
+    )
+}
+```
+
+**Design choices**:
+
+1. **Gated on "actually changed"**. `previousChatCfg.disableTools !=
+   chatCfg.disableTools` — no-op on every save that didn't touch the
+   flag. Avoids thrashing the preflight cache on unrelated setting
+   changes (temperature, hotkey, etc.).
+
+2. **Uses the batch variant from M-03**, not a loop of single-session
+   invalidations. One lock acquisition for all N sessions.
+
+3. **Fires before server restart**. The existing async block at line
+   971 handles server restart / runtime reconfig; the preflight
+   invalidation runs synchronously and returns before that block is
+   scheduled. This ordering matters because the batch invalidation is
+   cheap and doesn't need to be deferred.
+
+4. **Called from the main actor**. `saveConfiguration()` is a SwiftUI
+   view method, main-actor-isolated. `ChatWindowManager.shared` is
+   also `@MainActor`; `allActiveSessionIds()` (M-02) is safe to call
+   directly.
+
+**Blast radius**:
+- Only fires when `disableTools` flag flipped. No passive impact.
+- Invalidation scope is "every open chat window" — intended, because
+  the global flag affects every session.
+- Fresh windows opened after the save will compute their own
+  preflight on first send, so there's no race.
+
+**Audit focus**:
+- Verify the `previousChatCfg.disableTools != chatCfg.disableTools`
+  guard. Without it, every save hits the batch hook.
+- Verify `allActiveSessionIds()` returns `[UUID]` and we convert to
+  `[String]` for the `sessionIds:` param (PluginHostContext uses
+  String keys).
+- Verify the invalidation happens AFTER `ChatConfigurationStore.save`
+  so if another thread races into a preflight between our save and
+  invalidate, the new computation reads the fresh config.
+- Verify it doesn't double-invalidate alongside the existing
+  `Task { await MemoryContextAssembler.invalidateAll() }` from M-08
+  — they're independent caches (tool specs vs memory context), both
+  need their own path.
+
+---
+
+### M-17 — (merged into M-16)
+
+M-17 in the original plan was "memory assembler invalidation from
+Settings save". That wiring already landed as part of M-08 in Phase B,
+so there's nothing for M-17 to do here. Kept the ID in the plan for
+traceability; no code entry.
+
+---
+
+### Phase D wrap-up
+
+The two default flips + the runtime invalidation hook land as a
+single atomic commit, on top of the full Phase A/B/C safety nets.
+Verification matrix:
+
+| Scenario | Old behavior | New behavior (Phase D) |
+|----------|-------------|------------------------|
+| New user, fresh install | memory on, tools on | memory off, tools off |
+| Upgrade, explicit `enabled:true` / `disableTools:false` | same | same (preserved) |
+| Upgrade, keys missing | memory on, tools on | memory off, tools off |
+| Upgrade, configured manual-tools agent | broken under toolsDisabled=true | works (M-01 safety net) |
+| Upgrade, power user with memory-trained agent | broken under memory=false | works if user sets `memoryEnabled: true` on agent (M-04/M-05) |
+| User flips tools in Settings after upgrade | stale preflight cache (bug) | caches invalidated (M-16) |
+| User flips memory in Settings after upgrade | stale TTL cache (bug) | cache cleared (M-08) |
+| User wants tools just for one conversation | no option | Tools chip (Phase C) |
+
+Phases A + B + C were all no-ops on their own. Phase D is where the
+actual behavior change lands, and it lands on top of a net that
+catches every regression path we identified.
+
+Phase E is cleanup: cosmetic @State fixes, saveConfiguration error
+handling (Issue 10), migration-compat tests, and final audit entries.
+
+---
+
 

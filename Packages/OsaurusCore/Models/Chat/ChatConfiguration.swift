@@ -99,7 +99,7 @@ public struct ChatConfiguration: Codable, Equatable, Sendable {
         workMaxIterations: Int? = nil,
         defaultAutonomousExec: AutonomousExecConfig? = nil,
         preflightSearchMode: PreflightSearchMode? = nil,
-        disableTools: Bool = false,
+        disableTools: Bool = true,
         enableClipboardMonitoring: Bool = true
     ) {
         self.hotkey = hotkey
@@ -146,7 +146,12 @@ public struct ChatConfiguration: Codable, Equatable, Sendable {
             PreflightSearchMode.self,
             forKey: .preflightSearchMode
         )
-        disableTools = try container.decodeIfPresent(Bool.self, forKey: .disableTools) ?? false
+        // Decoder fallback updated to match the new init default. Existing
+        // on-disk ChatConfiguration.json files written before the Phase D
+        // flip do not contain this key → they now decode with `true` (tools
+        // off by default), matching the new behavior. Users who explicitly
+        // set `"disableTools": false` in their config keep tools on.
+        disableTools = try container.decodeIfPresent(Bool.self, forKey: .disableTools) ?? true
         enableClipboardMonitoring = try container.decodeIfPresent(Bool.self, forKey: .enableClipboardMonitoring) ?? true
     }
 

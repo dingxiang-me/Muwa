@@ -947,6 +947,18 @@ struct ConfigurationView: View {
         )
         ChatConfigurationStore.save(chatCfg)
 
+        // If disableTools actually changed, every open session's preflight
+        // cache is holding tool specs computed under the old flag. Bulk-
+        // invalidate them so the next request in each session recomputes
+        // with the new state. Uses the batch helper added in Phase A (M-03)
+        // + the session enumerator from M-02.
+        if previousChatCfg.disableTools != chatCfg.disableTools {
+            let allSessionIds = ChatWindowManager.shared.allActiveSessionIds()
+            PluginHostContext.invalidatePreflightCaches(
+                sessionIds: allSessionIds.map { $0.uuidString }
+            )
+        }
+
         // Persist memory enable toggle. Budgets are not user-adjustable in
         // this UI — users can edit MemoryConfiguration.json directly for
         // advanced tuning.
