@@ -513,19 +513,6 @@ extension MessageTableRepresentable {
             let newLookup = Dictionary(blocks.map { ($0.id, $0) }, uniquingKeysWith: { _, new in new })
             let newStreamingBlockId = Self.detectStreamingBlockId(in: blocks, isStreaming: isStreaming)
 
-            // Seed expanded state for newly-inserted thinking blocks in the
-            // actively streaming turn so the panel opens by default without
-            // hard-coding `isExpanded = true` anywhere downstream. Once the
-            // id lives in `expandedIds`, the user's collapse tap removes it
-            // and stays removed — fixing the bug where the thinking panel
-            // refused to collapse while streaming.
-            seedExpandedIdsForNewThinkingBlocks(
-                newLookup: newLookup,
-                oldLookup: blockLookup,
-                isStreaming: isStreaming,
-                streamingTurnId: lastAssistantTurnId
-            )
-
             // Detect streaming-ended transition before any state mutations.
             let streamingJustEnded = streamingBlockId != nil && newStreamingBlockId == nil
             let previousStreamingBlockId = streamingBlockId
@@ -928,10 +915,8 @@ extension MessageTableRepresentable {
             // return cached height if we have it
             if let cached = heightCache[block.id] { return cached }
 
-            // new thinking blocks are seeded into
-            // `expandedIds` on insertion (see `seedExpandedIdsForNewThinkingBlocks`)
-            // so the auto expand no longer needs to be forced here and the
-            // user's collapse tap is honored even mid stream
+            // `expandedIds` is the sole source of truth and the thinking blocks
+            // start collapsed by default and open only when the user taps
             let isExpanded = expandedIds.contains(block.id)
             let h = NativeCellHeightEstimator.estimatedHeight(
                 for: block,
@@ -967,28 +952,6 @@ extension MessageTableRepresentable {
         }
 
         // MARK: - Helpers
-
-        /// Auto-expand newly inserted thinking blocks by recording their id in
-        /// `expandedIds` (and the session store). A block counts as "new" if
-        /// its id isn't in `oldLookup`. We only seed during the owning turn's
-        /// streaming phase so restored session thinking blocks stay collapsed
-        private func seedExpandedIdsForNewThinkingBlocks(
-            newLookup: [String: ContentBlock],
-            oldLookup: [String: ContentBlock],
-            isStreaming: Bool,
-            streamingTurnId: UUID?
-        ) {
-            guard isStreaming, let streamingTurnId else { return }
-            for (id, block) in newLookup {
-                guard case .thinking = block.kind,
-                    block.turnId == streamingTurnId,
-                    oldLookup[id] == nil,
-                    !expandedIds.contains(id)
-                else { continue }
-                expandedIds.insert(id)
-                sessionExpandedStore?.expand(id)
-            }
-        }
 
         private static func detectStreamingBlockId(in blocks: [ContentBlock], isStreaming: Bool) -> String? {
             guard isStreaming else { return nil }
