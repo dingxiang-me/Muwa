@@ -73,6 +73,14 @@ enum LocalGenerationDefaults {
         guard let dir = localDirectory(forModelId: modelId) else {
             return .empty
         }
+        return load(fromDirectory: dir)
+    }
+
+    /// Read `generation_config.json` from an on-disk model directory. Exposed
+    /// so integration tests can exercise the full filesystem path without
+    /// needing `ModelManager.findInstalledModel` to resolve a real install.
+    /// Returns `.empty` if the file is missing, unreadable, or malformed.
+    static func load(fromDirectory dir: URL) -> Defaults {
         let url = dir.appendingPathComponent("generation_config.json")
         guard FileManager.default.fileExists(atPath: url.path),
             let data = try? Data(contentsOf: url)

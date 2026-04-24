@@ -142,4 +142,122 @@ struct LocalGenerationDefaultsTests {
         let d = Self.defaults(fromJSON: #"{}"#)
         #expect(d == .empty)
     }
+
+    // MARK: - Filesystem round-trip (integration)
+
+    /// Write a `generation_config.json` to a scratch directory and verify
+    /// the `load(fromDirectory:)` entry point hits the full filesystem path.
+    /// This protects against silent breakage of the file-lookup side of the
+    /// feature (e.g. mis-named filename, wrong subpath assumption, etc.).
+    @Test("Filesystem round-trip: writes and reads generation_config.json")
+    func filesystemRoundTrip() throws {
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("osaurus-gencfg-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let cfg = tmp.appendingPathComponent("generation_config.json")
+        try #"""
+            {"temperature": 0.6, "top_p": 0.9, "top_k": 32}
+            """#.write(to: cfg, atomically: true, encoding: .utf8)
+
+        let d = LocalGenerationDefaults.load(fromDirectory: tmp)
+        #expect(d.temperature == 0.6)
+        #expect(d.topP == 0.9)
+        #expect(d.topK == 32)
+    }
+
+    @Test("Missing generation_config.json returns empty, does not throw")
+    func missingFile() throws {
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("osaurus-gencfg-test-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        let d = LocalGenerationDefaults.load(fromDirectory: tmp)
+        #expect(d == .empty)
+    }
+
+    // MARK: - Edge cases for the overlay precedence ladder
+
+    /// Verify the `?? modelDefaults ?? fallback` ladder pattern used in
+    /// `MLXBatchAdapter.generate`. Client-supplied values MUST win over
+    /// model defaults; model defaults win over the hardcoded fallback.
+    ///
+    /// This test documents the exact semantics the adapter relies on — if
+    /// this test fails, the adapter's precedence contract is broken.
+    @Test("Precedence: client wins over model defaults")
+    func clientWinsOverModel() {
+        let modelDefaults = LocalGenerationDefaults.Defaults(
+            temperature: 0.6, topP: 0.95, topK: 20, repetitionPenalty: nil)
+        let clientTemp: Float? = 0.2
+        let clientTopP: Float? = 0.5
+        let serverFallbackTopP: Float = 1.0
+
+        let temp = clientTemp ?? modelDefaults.temperature ?? 0.7
+        let topP = clientTopP ?? modelDefaults.topP ?? serverFallbackTopP
+        let topK = modelDefaults.topK ?? 0
+
+        #expect(temp == 0.2)
+        #expect(topP == 0.5)
+        #expect(topK == 20)
+    }
+
+    @Test("Precedence: model defaults fill omitted client fields")
+    func modelDefaultsFillGaps() {
+        let modelDefaults = LocalGenerationDefaults.Defaults(
+            temperature: 0.6, topP: 0.95, topK: 20, repetitionPenalty: nil)
+        let clientTemp: Float? = nil
+        let clientTopP: Float? = nil
+        let serverFallbackTopP: Float = 1.0
+
+        let temp = clientTemp ?? modelDefaults.temperature ?? 0.7
+        let topP = clientTopP ?? modelDefaults.topP ?? serverFallbackTopP
+        let topK = modelDefaults.topK ?? 0
+
+        #expect(temp == 0.6)
+        #expect(topP == 0.95)
+        #expect(topK == 20)
+    }
+
+    @Test("Precedence: hardcoded fallback when neither client nor model set fields")
+    func hardcodedFallbackWhenBothAbsent() {
+        let modelDefaults = LocalGenerationDefaults.Defaults.empty
+        let clientTemp: Float? = nil
+        let clientTopP: Float? = nil
+        let serverFallbackTopP: Float = 1.0
+
+        let temp = clientTemp ?? modelDefaults.temperature ?? 0.7
+        let topP = clientTopP ?? modelDefaults.topP ?? serverFallbackTopP
+        let topK = modelDefaults.topK ?? 0
+
+        #expect(temp == 0.7)
+        #expect(topP == 1.0)
+        #expect(topK == 0)
+    }
+
+    @Test("Precedence: temperature=0 (greedy) from client is honored, NOT replaced")
+    func greedyDecodingHonored() {
+        // OpenAI clients send `temperature: 0` to request deterministic
+        // greedy decoding. Our overlay uses `??` which treats 0 as a
+        // valid non-nil value — so the model's default should NOT replace it.
+        // This test documents the invariant.
+        let modelDefaults = LocalGenerationDefaults.Defaults(
+            temperature: 0.6, topP: nil, topK: nil, repetitionPenalty: nil)
+        let clientTemp: Float? = 0.0
+
+        let temp = clientTemp ?? modelDefaults.temperature ?? 0.7
+
+        #expect(temp == 0.0)
+    }
+
+    @Test("Cache: defaults(forModelId:) returns empty for unknown model")
+    func unknownModelReturnsEmpty() {
+        // `findInstalledModel` returns nil for a name we definitely didn't
+        // install; the load path must short-circuit to `.empty` without
+        // crashing or reaching the filesystem.
+        let d = LocalGenerationDefaults.defaults(
+            forModelId: "definitely-not-a-real-model-\(UUID().uuidString)")
+        #expect(d == .empty)
+    }
 }
