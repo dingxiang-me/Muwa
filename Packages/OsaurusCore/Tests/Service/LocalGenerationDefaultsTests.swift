@@ -260,4 +260,165 @@ struct LocalGenerationDefaultsTests {
             forModelId: "definitely-not-a-real-model-\(UUID().uuidString)")
         #expect(d == .empty)
     }
+
+    // MARK: - jang_config.json chat.sampling_defaults
+
+    /// DSV4-Flash-JANGTQ4: upstream HF config says temp=1.0 but DeepSeek's
+    /// own `inference/generate.py` uses 0.6. The JANG converter stamps the
+    /// latter into `jang_config.json > chat > sampling_defaults`, and
+    /// osaurus should prefer it when present.
+    @Test("jang_config: DSV4 chat.sampling_defaults (temp=0.6)")
+    func jangConfigDSV4() {
+        let d = LocalGenerationDefaults.parseJangConfig(data: Data(#"""
+            {
+              "model_family": "deepseek_v4",
+              "chat": {
+                "encoder": "encoding_dsv4",
+                "reasoning": {"supported": true, "modes": ["chat", "thinking"]},
+                "tool_calling": {"parser": "dsml"},
+                "sampling_defaults": {
+                  "temperature": 0.6,
+                  "top_p": 0.95,
+                  "max_new_tokens": 300
+                }
+              },
+              "quantization": {"profile": "JANGTQ4"}
+            }
+            """#.utf8))
+        #expect(d.temperature == 0.6)
+        #expect(d.topP == 0.95)
+        #expect(d.topK == nil)
+        #expect(d.repetitionPenalty == nil)
+    }
+
+    @Test("jang_config: all sampling fields populate when present")
+    func jangConfigAllFields() {
+        let d = LocalGenerationDefaults.parseJangConfig(data: Data(#"""
+            {
+              "chat": {
+                "sampling_defaults": {
+                  "temperature": 0.8,
+                  "top_p": 0.9,
+                  "top_k": 50,
+                  "repetition_penalty": 1.05
+                }
+              }
+            }
+            """#.utf8))
+        #expect(d.temperature == 0.8)
+        #expect(d.topP == 0.9)
+        #expect(d.topK == 50)
+        #expect(d.repetitionPenalty == 1.05)
+    }
+
+    @Test("jang_config: missing chat subtree returns empty")
+    func jangConfigNoChatSubtree() {
+        // Older JANG bundles without chat-metadata — quantization /
+        // source_model / crack_surgery only. Should return empty, not throw.
+        let d = LocalGenerationDefaults.parseJangConfig(data: Data(#"""
+            {
+              "quantization": {"profile": "JANG_2S", "actual_bits": 2.11},
+              "source_model": {"name": "Qwen3.5-122B-A10B"},
+              "format": "jang"
+            }
+            """#.utf8))
+        #expect(d == .empty)
+    }
+
+    @Test("jang_config: sampling_defaults absent but chat present")
+    func jangConfigChatWithoutSampling() {
+        let d = LocalGenerationDefaults.parseJangConfig(data: Data(#"""
+            {"chat": {"reasoning": {"supported": true}}}
+            """#.utf8))
+        #expect(d == .empty)
+    }
+
+    @Test("jang_config: malformed JSON returns empty")
+    func jangConfigMalformed() {
+        let d = LocalGenerationDefaults.parseJangConfig(data: Data("not json".utf8))
+        #expect(d == .empty)
+    }
+
+    // MARK: - merge(primary:fallback:) — overlay semantics
+
+    @Test("merge: primary fills first, fallback fills gaps")
+    func mergePrimaryWinsFallbackFills() {
+        let jang = LocalGenerationDefaults.Defaults(
+            temperature: 0.6, topP: nil, topK: nil, repetitionPenalty: nil)
+        let hf = LocalGenerationDefaults.Defaults(
+            temperature: 1.0, topP: 0.95, topK: 64, repetitionPenalty: nil)
+        let merged = LocalGenerationDefaults.merge(primary: jang, fallback: hf)
+        #expect(merged.temperature == 0.6)
+        #expect(merged.topP == 0.95)
+        #expect(merged.topK == 64)
+    }
+
+    @Test("merge: primary-only fields preserved")
+    func mergePrimaryOnly() {
+        let jang = LocalGenerationDefaults.Defaults(
+            temperature: 0.6, topP: 0.9, topK: 32, repetitionPenalty: 1.05)
+        let merged = LocalGenerationDefaults.merge(
+            primary: jang, fallback: LocalGenerationDefaults.Defaults.empty)
+        #expect(merged.temperature == 0.6)
+        #expect(merged.topP == 0.9)
+        #expect(merged.topK == 32)
+        #expect(merged.repetitionPenalty == 1.05)
+    }
+
+    @Test("merge: fallback-only fields preserved when primary empty")
+    func mergeFallbackOnly() {
+        let hf = LocalGenerationDefaults.Defaults(
+            temperature: 1.0, topP: 0.95, topK: 64, repetitionPenalty: nil)
+        let merged = LocalGenerationDefaults.merge(
+            primary: LocalGenerationDefaults.Defaults.empty, fallback: hf)
+        #expect(merged.temperature == 1.0)
+        #expect(merged.topP == 0.95)
+        #expect(merged.topK == 64)
+    }
+
+    // MARK: - Integration: bundle that ships BOTH files
+
+    @Test("Filesystem: bundle with BOTH jang_config and generation_config merges correctly")
+    func bothFilesMerge() throws {
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("osaurus-gencfg-both-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        try #"""
+            {"temperature": 1.0, "top_p": 0.95, "top_k": 64}
+            """#.write(
+                to: tmp.appendingPathComponent("generation_config.json"),
+                atomically: true, encoding: .utf8)
+        try #"""
+            {"chat": {"sampling_defaults": {"temperature": 0.6}}}
+            """#.write(
+                to: tmp.appendingPathComponent("jang_config.json"),
+                atomically: true, encoding: .utf8)
+
+        let d = LocalGenerationDefaults.load(fromDirectory: tmp)
+        // JANG overrides the one field it sets…
+        #expect(d.temperature == 0.6)
+        // …HF fills the rest.
+        #expect(d.topP == 0.95)
+        #expect(d.topK == 64)
+    }
+
+    @Test("Filesystem: jang_config alone is enough (HF file absent)")
+    func jangOnlyLoad() throws {
+        let tmp = URL(fileURLWithPath: NSTemporaryDirectory())
+            .appendingPathComponent("osaurus-gencfg-jang-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+
+        try #"""
+            {"chat": {"sampling_defaults": {"temperature": 0.6, "top_p": 0.95}}}
+            """#.write(
+                to: tmp.appendingPathComponent("jang_config.json"),
+                atomically: true, encoding: .utf8)
+
+        let d = LocalGenerationDefaults.load(fromDirectory: tmp)
+        #expect(d.temperature == 0.6)
+        #expect(d.topP == 0.95)
+    }
 }

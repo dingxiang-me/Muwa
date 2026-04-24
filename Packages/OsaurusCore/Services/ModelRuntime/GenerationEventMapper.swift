@@ -30,8 +30,27 @@ enum GenerationEventMapper {
 
     /// Map a `Generation` stream into the typed `ModelRuntimeEvent` stream
     /// callers (HTTP handlers, ChatView, plugin runners) consume.
+    ///
+    /// `supportsThinking`: when `false`, any `.reasoning(text)` emitted by
+    /// vmlx is re-classified as visible `.tokens(text)` instead of a hidden
+    /// CoT delta. This closes the "non-thinking model's response appears in
+    /// the thinking block" UI bug caused by vmlx's `LLMModelFactory`
+    /// reasoning-parser heuristic: any model_type that doesn't match the
+    /// `gemma4` / `mistral` / `gemma` prefixes falls through to
+    /// `think_xml`, including `lfm2*`, `lfm2_moe*`, and other families that
+    /// don't actually emit `<think>` tags. With `startInReasoning: true`
+    /// baked into `think_xml`, the model's FIRST output byte is labelled
+    /// reasoning by vmlx's `ReasoningParser`, which then shows up as a
+    /// thinking block in the osaurus UI even though the model never
+    /// produced one. Coercing to `.tokens` preserves the content (the
+    /// reasoning text IS the user-facing answer in this case) and moves it
+    /// to the correct UI affordance.
+    ///
+    /// When `supportsThinking` is `true` (default), events flow through
+    /// unchanged — `.reasoning` stays `.reasoning`.
     static func map(
-        events: AsyncStream<Generation>
+        events: AsyncStream<Generation>,
+        supportsThinking: Bool = true
     ) -> AsyncThrowingStream<ModelRuntimeEvent, Error> {
         AsyncThrowingStream<ModelRuntimeEvent, Error> { continuation in
             let task = Task {
@@ -56,7 +75,20 @@ enum GenerationEventMapper {
 
                     case .reasoning(let text):
                         guard !text.isEmpty else { continue }
-                        continuation.yield(.reasoning(text))
+                        if supportsThinking {
+                            continuation.yield(.reasoning(text))
+                        } else {
+                            // Model doesn't actually emit CoT — vmlx's
+                            // heuristic mis-classified the output. Route
+                            // it through as visible tokens so the UI
+                            // renders it as the response, not a think
+                            // pane.
+                            if firstChunk {
+                                firstChunk = false
+                                InferenceProgressManager.shared.prefillDidFinishAsync()
+                            }
+                            continuation.yield(.tokens(text))
+                        }
 
                     case .toolCall(let call):
                         let argsJSON = serializeArguments(

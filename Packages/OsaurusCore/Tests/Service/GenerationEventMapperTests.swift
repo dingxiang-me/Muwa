@@ -24,9 +24,15 @@ struct GenerationEventMapperTests {
         }
     }
 
-    private func collect(events: [Generation]) async throws -> [ModelRuntimeEvent] {
+    private func collect(
+        events: [Generation],
+        supportsThinking: Bool = true
+    ) async throws -> [ModelRuntimeEvent] {
         let stream = makeStream(events)
-        let mapped = GenerationEventMapper.map(events: stream)
+        let mapped = GenerationEventMapper.map(
+            events: stream,
+            supportsThinking: supportsThinking
+        )
         var out: [ModelRuntimeEvent] = []
         for try await ev in mapped { out.append(ev) }
         return out
@@ -136,6 +142,79 @@ struct GenerationEventMapperTests {
             if case .reasoning(let s) = $0 { return s } else { return nil }
         }
         #expect(reasoning == ["kept"])
+    }
+
+    // MARK: - supportsThinking: false coercion (LFM false-thinking-block fix)
+
+    /// When the caller asserts the model does NOT emit CoT (e.g. LFM2,
+    /// LFM2-MoE, classic Llama instruct), vmlx's reasoning-parser heuristic
+    /// may still route the model's first bytes through `.reasoning` events
+    /// because `think_xml` with `startInReasoning: true` is the fallback
+    /// branch. The mapper must re-label those as `.tokens` so the osaurus UI
+    /// renders them in the response block, not the think pane.
+    @Test func nonThinking_reasoning_coerces_to_tokens() async throws {
+        let events: [Generation] = [
+            .reasoning("The capital of France is Paris."),
+        ]
+        let out = try await collect(events: events, supportsThinking: false)
+
+        // No `.reasoning` events should leak out — every reasoning delta
+        // gets re-classified as visible tokens.
+        let reasoningPieces: [String] = out.compactMap {
+            if case .reasoning(let s) = $0 { return s } else { return nil }
+        }
+        #expect(reasoningPieces.isEmpty)
+
+        let tokenPieces: [String] = out.compactMap {
+            if case .tokens(let s) = $0 { return s } else { return nil }
+        }
+        #expect(tokenPieces == ["The capital of France is Paris."])
+    }
+
+    @Test func nonThinking_mixed_chunks_and_reasoning_interleave_as_tokens() async throws {
+        // In practice vmlx rarely emits a mix of `.chunk` and `.reasoning`
+        // for a non-thinking model — but if it does (e.g. a template that
+        // briefly enters / exits the reasoning parser's state), the
+        // coerced output must preserve the ORIGINAL delivery order so the
+        // answer reads coherently.
+        let events: [Generation] = [
+            .reasoning("Let me think. "),
+            .chunk("The answer is 42."),
+            .reasoning(" Done."),
+        ]
+        let out = try await collect(events: events, supportsThinking: false)
+
+        let tokenPieces: [String] = out.compactMap {
+            if case .tokens(let s) = $0 { return s } else { return nil }
+        }
+        // Order preserved: reasoning → chunk → reasoning, all coerced to tokens.
+        #expect(tokenPieces == ["Let me think. ", "The answer is 42.", " Done."])
+    }
+
+    @Test func nonThinking_still_skips_empty_reasoning_deltas() async throws {
+        let events: [Generation] = [
+            .reasoning(""),
+            .reasoning("kept"),
+            .reasoning(""),
+        ]
+        let out = try await collect(events: events, supportsThinking: false)
+        let tokenPieces: [String] = out.compactMap {
+            if case .tokens(let s) = $0 { return s } else { return nil }
+        }
+        // Empty reasoning deltas are filtered BEFORE the coercion branch,
+        // matching `.chunk` behaviour for empty strings.
+        #expect(tokenPieces == ["kept"])
+    }
+
+    @Test func supportsThinking_true_is_default_and_forwards_reasoning_unchanged() async throws {
+        // Guard against a future caller that flips the default accidentally —
+        // the public overload must keep `supportsThinking: true` as its default.
+        let events: [Generation] = [.reasoning("think-text")]
+        let out = try await collect(events: events)  // uses default
+        let reasoning: [String] = out.compactMap {
+            if case .reasoning(let s) = $0 { return s } else { return nil }
+        }
+        #expect(reasoning == ["think-text"])
     }
 
     @Test func toolCall_serialization_failure_emits_error_envelope() async throws {

@@ -500,7 +500,27 @@ actor ModelRuntime {
             await ModelLease.shared.release(modelName)
         }
 
-        return GenerationEventMapper.map(events: prepared.stream)
+        // vmlx's reasoning-parser heuristic routes ANY model_type that
+        // doesn't match `gemma4` / `mistral` / `gemma` prefixes to
+        // `think_xml` with `startInReasoning: true`. For families that
+        // genuinely don't emit `<think>` tags (LFM2 / LFM2-MoE, classic
+        // Llama instruct checkpoints, etc.), that mis-classification
+        // surfaces the model's first bytes as `.reasoning` events and
+        // the osaurus UI renders them in the think pane. Passing
+        // `supportsThinking: false` makes the event mapper re-route
+        // `.reasoning` → `.tokens` for those models so the content
+        // lands in the response block where it belongs.
+        //
+        // Detection relies on `LocalReasoningCapability.analyze`, which
+        // reads the model's chat template text for `<think>` / `<|think|>`
+        // / `enable_thinking` signals. Templates with none of those
+        // markers flip `supportsThinking` to false here.
+        let supportsThinking = LocalReasoningCapability
+            .capability(forModelId: modelId).supportsThinking
+        return GenerationEventMapper.map(
+            events: prepared.stream,
+            supportsThinking: supportsThinking
+        )
     }
 
     // MARK: - New message-based (OpenAI ChatMessage) APIs
