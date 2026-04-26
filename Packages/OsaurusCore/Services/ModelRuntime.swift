@@ -636,11 +636,12 @@ public actor ModelRuntime {
                         pendingTools.append(
                             ServiceToolInvocation(toolName: name, jsonArguments: argsJSON)
                         )
-                    case .completionInfo(let tokenCount, let tokensPerSecond):
+                    case .completionInfo(let tokenCount, let tokensPerSecond, let unclosedReasoning):
                         continuation.yield(
                             StreamingStatsHint.encode(
                                 tokenCount: tokenCount,
-                                tokensPerSecond: tokensPerSecond
+                                tokensPerSecond: tokensPerSecond,
+                                unclosedReasoning: unclosedReasoning
                             )
                         )
                     }
