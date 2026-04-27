@@ -50,6 +50,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         /// subsequent `.body` / `.end` parts are dropped without further
         /// allocation or routing.
         var rejectedTooLarge: Bool = false
+        /// Set when the inbound request advertised HPKE encryption and
+        /// the body was successfully opened. Drives response-side
+        /// re-encryption in `sendResponse` and the SSE writers.
+        var encryptionContext: HPKEServerContext?
     }
     let stateRef: NIOLoopBound<RequestState>
 
@@ -156,6 +160,57 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             let startTime = stateRef.value.requestStartTime
             let method = head.method.rawValue
             let userAgent = head.headers.first(name: "User-Agent")
+
+            // HPKE decrypt: if the client signaled encryption, open the
+            // body now and replace the buffered request body with
+            // plaintext so all downstream handlers stay encryption-blind.
+            // Failures here short-circuit the request with 400.
+            if head.headers.contains(name: HPKEHeader.encryption) {
+                let bodyData: Data = stateRef.value.requestBodyBuffer.flatMap {
+                    var b = $0
+                    return b.readData(length: b.readableBytes)
+                } ?? Data()
+                do {
+                    if let decrypted = try HPKEServerDecoder.decodeIfNeeded(
+                        headerLookup: { head.headers.first(name: $0) },
+                        method: method,
+                        path: path,
+                        rawBody: bodyData
+                    ) {
+                        var plaintextBuffer = context.channel.allocator.buffer(
+                            capacity: decrypted.plaintextBody.count
+                        )
+                        plaintextBuffer.writeBytes(decrypted.plaintextBody)
+                        stateRef.value.requestBodyBuffer = plaintextBuffer
+                        stateRef.value.encryptionContext = decrypted.context
+                    }
+                } catch {
+                    var headers = [("Content-Type", "application/json; charset=utf-8")]
+                    headers.append(contentsOf: stateRef.value.corsHeaders)
+                    let msg = (error as? LocalizedError)?.errorDescription ?? "Encryption error"
+                    let body = #"{"error":{"message":"\#(msg)","type":"encryption_error"}}"#
+                    sendResponse(
+                        context: context,
+                        version: head.version,
+                        status: .badRequest,
+                        headers: headers,
+                        body: body
+                    )
+                    logRequest(
+                        method: method,
+                        path: path,
+                        userAgent: userAgent,
+                        requestBody: nil,
+                        responseBody: body,
+                        responseStatus: 400,
+                        startTime: startTime
+                    )
+                    stateRef.value.requestHead = nil
+                    stateRef.value.requestBodyBuffer = nil
+                    stateRef.value.encryptionContext = nil
+                    return
+                }
+            }
 
             // Handle CORS preflight (OPTIONS)
             if head.method == .OPTIONS {
@@ -1284,6 +1339,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     ) {
         let loop = context.eventLoop
         let ctx = NIOLoopBound(context, eventLoop: loop)
+        // Snapshot the encryption context now (on the event loop): the
+        // request handler may have already cleared per-request state by
+        // the time the executeOnLoop closure runs.
+        let encryption = stateRef.value.encryptionContext
         let bodyCopy = body
         let headersCopy = headers
         executeOnLoop(loop) {
@@ -1291,14 +1350,28 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             // Create response head
             var responseHead = HTTPResponseHead(version: version, status: status)
 
-            // Create body buffer
+            // Build body — encrypted (binary, base64 on the wire) or
+            // plain text. Filter Content-Type out when encrypting since
+            // the original payload type is hidden inside the ciphertext.
             var buffer = context.channel.allocator.buffer(capacity: bodyCopy.utf8.count)
-            buffer.writeString(bodyCopy)
-
-            // Build headers
             var nioHeaders = HTTPHeaders()
-            for (name, value) in headersCopy {
-                nioHeaders.add(name: name, value: value)
+            if let enc = encryption {
+                let plaintext = Data(bodyCopy.utf8)
+                let sealed = (try? enc.sealNonStreaming(plaintext)) ?? Data()
+                let encoded = sealed.base64urlEncoded
+                buffer.writeString(encoded)
+
+                for (name, value) in headersCopy where name.lowercased() != "content-type" {
+                    nioHeaders.add(name: name, value: value)
+                }
+                nioHeaders.add(name: "Content-Type", value: "application/octet-stream")
+                nioHeaders.add(name: HPKEHeader.encryption, value: HPKEHeader.baseValue)
+                nioHeaders.add(name: HPKEHeader.bodyEncoding, value: "base64")
+            } else {
+                buffer.writeString(bodyCopy)
+                for (name, value) in headersCopy {
+                    nioHeaders.add(name: name, value: value)
+                }
             }
             nioHeaders.add(name: "Content-Length", value: String(buffer.readableBytes))
             nioHeaders.add(name: "Connection", value: "close")
@@ -2276,6 +2349,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         let cors = stateRef.value.corsHeaders
         let loop = context.eventLoop
         let writer = SSEResponseWriter()
+        writer.encryption = stateRef.value.encryptionContext
         let writerBound = NIOLoopBound(writer, eventLoop: loop)
         let ctx = NIOLoopBound(context, eventLoop: loop)
         let hop = Self.makeHop(channel: context.channel, loop: loop)
@@ -3149,6 +3223,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         if wantsSSE {
             let writer = SSEResponseWriter()
+            writer.encryption = stateRef.value.encryptionContext
             let cors = stateRef.value.corsHeaders
             let loop = context.eventLoop
             let writerBound = NIOLoopBound(writer, eventLoop: loop)
@@ -3582,6 +3657,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         let writer = NDJSONResponseWriter()
+        writer.encryption = stateRef.value.encryptionContext
         let cors = stateRef.value.corsHeaders
         let loop = context.eventLoop
         let writerBound = NIOLoopBound(writer, eventLoop: loop)
@@ -4579,6 +4655,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         requestBodyString: String?
     ) {
         let writer = AnthropicSSEResponseWriter()
+        writer.encryption = stateRef.value.encryptionContext
         let cors = stateRef.value.corsHeaders
         let loop = context.eventLoop
         let writerBound = NIOLoopBound(writer, eventLoop: loop)
@@ -5191,6 +5268,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         requestBodyString: String?
     ) {
         let writer = OpenResponsesSSEWriter()
+        writer.encryption = stateRef.value.encryptionContext
         let cors = stateRef.value.corsHeaders
         let loop = context.eventLoop
         let writerBound = NIOLoopBound(writer, eventLoop: loop)
