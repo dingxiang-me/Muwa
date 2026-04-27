@@ -18,13 +18,28 @@ let package = Package(
         // under us between identical osaurus source revisions. Bump
         // intentionally when validating a new upstream commit.
         //
-        // c992df9 is the first commit with `GenerateCompletionInfo.unclosedReasoning`,
+        // a7db6e5 closes the deterministic Metal-assertion crash class
+        // `notifyExternalReferencesNonZeroOnDealloc` inside
+        // `BatchEngine.stepPrefill` after `Cache disk hit`. Two upstream
+        // commits land that fix together:
+        //   - 98289d9 forces `MLX.asyncEval(slot.cache)` after disk
+        //     restore so lazy-restore graph ops don't extend into the
+        //     next request's command buffer.
+        //   - a7db6e5 sets `continuation.onTermination` on
+        //     `BatchEngine.generate`'s outStream so orphan slots get
+        //     reaped via `engine.cancel(requestId)` whenever a consumer
+        //     breaks early.
+        // Net effect: the `Task.isCancelled` break in MLXBatchAdapter
+        // line 209-222 is safe, and no `enableDiskCache: false` workaround
+        // is needed.
+        //
+        // Also includes c992df9's `GenerateCompletionInfo.unclosedReasoning`,
         // which the chat UI consumes to surface a "thinking didn't close"
         // chip when reasoning-trained models trap themselves on validation
-        // prompts. Earlier pins compile but the chip stays dark.
+        // prompts.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "c992df936879229251e9e06e2446c427c6f4cee7"
+            revision: "a7db6e5fdde525c43f72ba48df8ba12a07451ee9"
         ),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.0"),
