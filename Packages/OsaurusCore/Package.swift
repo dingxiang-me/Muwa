@@ -17,9 +17,14 @@ let package = Package(
         // Pinned by commit (was `branch: "main"`) so the runtime can't change
         // under us between identical osaurus source revisions. Bump
         // intentionally when validating a new upstream commit.
+        //
+        // c992df9 is the first commit with `GenerateCompletionInfo.unclosedReasoning`,
+        // which the chat UI consumes to surface a "thinking didn't close"
+        // chip when reasoning-trained models trap themselves on validation
+        // prompts. Earlier pins compile but the chip stays dark.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "070dc5b8c9829dc69b6e4831dd201537200a9c36"
+            revision: "c992df936879229251e9e06e2446c427c6f4cee7"
         ),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.0"),
