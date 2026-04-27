@@ -87,15 +87,16 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
                 Text(footer, bundle: .module)
                     .font(theme.font(size: OnboardingMetrics.captionSize))
                     .foregroundColor(theme.tertiaryText)
-                    .multilineTextAlignment(.center)
+                    .multilineTextAlignment(.leading)
                     .lineSpacing(3)
                     .fixedSize(horizontal: false, vertical: true)
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
                     .padding(.bottom, hasCTA ? OnboardingMetrics.footerToCTA : 0)
             }
 
             if hasCTA {
                 cta
+                    .frame(maxWidth: .infinity, alignment: .center)
             }
 
             Spacer().frame(height: OnboardingMetrics.bottomInset)
@@ -110,14 +111,14 @@ struct OnboardingScaffold<Content: View, CTA: View>: View {
             .font(
                 theme.font(
                     size: isPrimary ? OnboardingMetrics.titleSize : OnboardingMetrics.subtitleSize,
-                    weight: isPrimary ? .semibold : .regular
+                    weight: isPrimary ? .bold : .regular
                 )
             )
             .foregroundColor(isPrimary ? theme.primaryText : theme.secondaryText)
-            .multilineTextAlignment(.center)
+            .multilineTextAlignment(.leading)
             .lineSpacing(isPrimary ? 0 : 4)
             .fixedSize(horizontal: false, vertical: true)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     @ViewBuilder

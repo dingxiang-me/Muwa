@@ -26,12 +26,12 @@ private enum WalkthroughStepType: Int, CaseIterable {
 
     var title: String {
         switch self {
-        case .modes: return L("Chat that runs anywhere")
-        case .tools: return L("Tools, skills, and plugins")
-        case .sandbox: return L("Safe, isolated execution")
-        case .personalization: return L("Agents, voice, and themes")
-        case .memory: return L("Gets smarter over time")
-        case .privacy: return L("Private by default")
+        case .modes: return L("Two modes, one chat")
+        case .tools: return L("Tools for everything")
+        case .sandbox: return L("Safe code execution")
+        case .personalization: return L("Built around you")
+        case .memory: return L("Remembers what matters")
+        case .privacy: return L("Your data stays yours")
         }
     }
 
@@ -39,26 +39,28 @@ private enum WalkthroughStepType: Int, CaseIterable {
         switch self {
         case .modes:
             return L(
-                "Chat back and forth, or hand off long tasks. Schedules, webhooks, and plugins can dispatch a chat session that runs in the background while you keep working."
+                "Go back and forth in conversation, or hand off a long task and walk away. Background sessions run while you work — triggered by schedules, webhooks, or plugins."
             )
         case .tools:
             return L(
-                "20+ built-in plugins for Mail, Calendar, Browser, Files, and more. Import skills from GitHub. Connect MCP servers. All with your permission."
+                "20+ built-in plugins for Mail, Calendar, Browser, Files, and more. Import custom skills from GitHub. Connect any MCP server. Every action requires your permission."
             )
         case .sandbox:
             return L(
-                "The Sandbox runs code in a Linux container on your Mac. Agents can execute commands, install packages, and work with files — fully isolated from your system."
+                "The Sandbox runs code inside a Linux container on your Mac. Agents can install packages, run scripts, and work with files — completely isolated from your system."
             )
         case .personalization:
             return L(
-                "Create different agents for different tasks. Talk hands-free with voice. Customize how everything looks."
+                "Create specialized agents for different tasks. Use voice hands-free. Dial in your theme, fonts, and layout so everything feels like yours."
             )
         case .memory:
             return L(
-                "Osaurus distills each conversation into your identity, salience-scored facts, and per-session episodes. Agents pull only what your next question needs. Your memory stays with you, not a provider."
+                "Every conversation is distilled into facts and context that belong to you — not a provider. Agents surface only what your next question needs."
             )
         case .privacy:
-            return L("Conversations stay on your Mac. Switch providers anytime — your history comes with you.")
+            return L(
+                "Conversations live on your Mac. Switch models or providers any time without losing your history. Nothing is shared unless you say so."
+            )
         }
     }
 
@@ -324,16 +326,17 @@ struct OnboardingWalkthroughView: View {
     private var navigationButton: some View {
         Group {
             if isLastStep {
-                OnboardingShimmerButton(title: "Start using Osaurus") {
+                OnboardingBrandButton(title: "Start using Osaurus") {
                     onComplete()
                 }
+                .frame(width: OnboardingMetrics.ctaWidthCompact)
             } else {
                 OnboardingPrimaryButton(title: "Next") {
                     navigateTo(currentStep + 1)
                 }
+                .frame(width: OnboardingMetrics.ctaWidth)
             }
         }
-        .frame(width: OnboardingMetrics.ctaWidth)
     }
 
     // MARK: - Navigation

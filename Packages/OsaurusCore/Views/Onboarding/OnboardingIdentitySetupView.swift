@@ -48,8 +48,8 @@ struct OnboardingIdentitySetupView: View {
 
     private var promptScaffold: some View {
         OnboardingScaffold(
-            title: "Create Your Identity",
-            subtitle: "Generate a cryptographic identity for you and your agents. Stored securely in iCloud Keychain.",
+            title: "Your cryptographic identity",
+            subtitle: "A private key that identifies you and your agents. Stored securely in iCloud Keychain.",
             onBack: onBack,
             content: {
                 VStack(spacing: 0) {
@@ -60,12 +60,12 @@ struct OnboardingIdentitySetupView: View {
                             .frame(width: 80, height: 80)
                             .opacity(hasAppeared ? 0.35 : 0)
 
-                        Image(systemName: "person.badge.key.fill")
-                            .font(.system(size: 44, weight: .light))
-                            .foregroundStyle(theme.accentColor)
-                            .opacity(hasAppeared ? 1 : 0)
-                            .scaleEffect(hasAppeared ? 1 : 0.7)
-                            .animation(theme.springAnimation(), value: hasAppeared)
+                    Image(systemName: "key.fill")
+                        .font(.system(size: 40, weight: .medium))
+                        .foregroundStyle(theme.accentColor)
+                        .opacity(hasAppeared ? 1 : 0)
+                        .scaleEffect(hasAppeared ? 1 : 0.7)
+                        .animation(theme.springAnimation(), value: hasAppeared)
                     }
                     .padding(.bottom, 8)
 
@@ -84,9 +84,9 @@ struct OnboardingIdentitySetupView: View {
                 }
             },
             cta: {
-                VStack(spacing: 14) {
-                    OnboardingPrimaryButton(title: "Generate Identity", action: generateIdentity)
-                        .frame(width: OnboardingMetrics.ctaWidth)
+                VStack(alignment: .leading, spacing: 12) {
+                    OnboardingBrandButton(title: "Create Identity", action: generateIdentity)
+                        .frame(width: OnboardingMetrics.ctaWidthCompact)
                         .opacity(hasAppeared ? 1 : 0)
                         .scaleEffect(hasAppeared ? 1 : 0.95)
                         .animation(theme.springAnimation().delay(0.35), value: hasAppeared)
@@ -122,16 +122,24 @@ struct OnboardingIdentitySetupView: View {
 
     private func recoveryScaffold(info: IdentityInfo) -> some View {
         OnboardingScaffold(
+            title: "Save your recovery code",
+            subtitle: "This is the only time it will be shown. Keep it somewhere safe.",
             content: {
                 VStack(spacing: 0) {
                     HStack(spacing: 8) {
                         Image(systemName: "exclamationmark.triangle.fill")
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                             .foregroundColor(theme.warningColor)
-                        Text("Save this recovery code. It won't be shown again.", bundle: .module)
-                            .font(theme.font(size: 13, weight: .semibold))
+                        Text("Lost codes cannot be recovered — not even by Osaurus.", bundle: .module)
+                            .font(theme.font(size: 12, weight: .medium))
                             .foregroundColor(theme.warningColor)
                     }
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.warningColor.opacity(0.08))
+                    )
                     .padding(.bottom, 16)
 
                     OnboardingGlassCard {
@@ -162,8 +170,7 @@ struct OnboardingIdentitySetupView: View {
 
                             VStack(alignment: .leading, spacing: 3) {
                                 recoveryBullet(L("Single-use — consumed on recovery"))
-                                recoveryBullet(L("Store in a safe place"))
-                                recoveryBullet(L("Cannot be retrieved by Osaurus"))
+                                recoveryBullet(L("Store offline or in a password manager"))
                             }
                             .padding(.top, 2)
                         }

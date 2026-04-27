@@ -16,25 +16,25 @@ enum OnboardingSetupPath: String, CaseIterable {
 
     var title: String {
         switch self {
-        case .appleFoundation: return L("Use Apple Intelligence")
-        case .local: return L("Download a Local Model")
-        case .apiProvider: return L("Connect an AI Provider")
+        case .appleFoundation: return L("Apple Intelligence")
+        case .local: return L("Local model")
+        case .apiProvider: return L("AI provider")
         }
     }
 
     var description: String {
         switch self {
-        case .appleFoundation: return L("Built into macOS. Private, fast, and ready to use.")
-        case .local: return L("Runs entirely on your Mac. No account needed.")
-        case .apiProvider: return L("Use OpenAI, Anthropic, xAI, or another provider you trust. Requires an API key.")
+        case .appleFoundation: return L("Already on your Mac. Private, instant, no setup.")
+        case .local: return L("Download once, runs forever on-device. No account needed.")
+        case .apiProvider: return L("ChatGPT, Claude, Gemini, and more. Requires an API key.")
         }
     }
 
     var icon: String {
         switch self {
         case .appleFoundation: return "apple.logo"
-        case .local: return "desktopcomputer"
-        case .apiProvider: return "cloud"
+        case .local: return "internaldrive"
+        case .apiProvider: return "network"
         }
     }
 }
@@ -60,15 +60,15 @@ struct OnboardingChoosePathView: View {
 
     private var footerCaption: LocalizedStringKey {
         if foundationAvailable {
-            return "Apple Intelligence runs on-device · Local models stay on your Mac · Providers use the cloud"
+            return "You can add more providers any time in Settings."
         } else {
-            return "Local models stay on your Mac · Providers use the cloud"
+            return "You can add more providers any time in Settings."
         }
     }
 
     var body: some View {
         OnboardingScaffold(
-            title: "How do you want to power Osaurus?",
+            title: "How do you want to run Osaurus?",
             footer: footerCaption,
             content: {
                 VStack(spacing: OnboardingMetrics.cardSpacing) {
@@ -94,12 +94,12 @@ struct OnboardingChoosePathView: View {
                 }
             },
             cta: {
-                OnboardingPrimaryButton(
+                OnboardingBrandButton(
                     title: "Continue",
                     action: continueAction,
                     isEnabled: selectedPath != nil
                 )
-                .frame(width: OnboardingMetrics.ctaWidth)
+                .frame(width: OnboardingMetrics.ctaWidthCompact)
                 .opacity(hasAppeared ? 1 : 0)
                 .offset(y: hasAppeared ? 0 : 15)
                 .animation(theme.springAnimation().delay(foundationAvailable ? 0.45 : 0.38), value: hasAppeared)

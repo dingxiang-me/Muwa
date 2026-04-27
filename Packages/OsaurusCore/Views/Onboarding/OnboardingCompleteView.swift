@@ -2,7 +2,7 @@
 //  OnboardingCompleteView.swift
 //  osaurus
 //
-//  Setup complete view with AnimatedOrb celebration and walkthrough options.
+//  Setup complete view: branded success mark + next-step options.
 //
 
 import SwiftUI
@@ -17,64 +17,64 @@ struct OnboardingCompleteView: View {
 
     var body: some View {
         OnboardingScaffold(
-            title: "Ready to go",
+            title: "You're all set",
+            subtitle: "Osaurus is ready. What would you like to do next?",
             content: {
                 VStack(spacing: 0) {
+                    // Success mark
                     ZStack {
                         Circle()
-                            .fill(theme.successColor)
-                            .blur(radius: 50)
-                            .frame(width: 100, height: 100)
-                            .opacity(hasAppeared ? 0.4 : 0)
+                            .fill(theme.successColor.opacity(0.15))
+                            .frame(width: 76, height: 76)
+                            .blur(radius: 18)
 
-                        AnimatedOrb(
-                            color: theme.successColor,
-                            size: .custom(80),
-                            seed: "onboarding-complete",
-                            showGlow: true,
-                            showFloat: true,
-                            isInteractive: false
-                        )
-                        .frame(width: 80, height: 80)
+                        Circle()
+                            .fill(theme.successColor.opacity(0.1))
+                            .frame(width: 60, height: 60)
+
+                        Image(systemName: "checkmark")
+                            .font(.system(size: 28, weight: .bold))
+                            .foregroundColor(theme.successColor)
                     }
                     .opacity(hasAppeared ? 1 : 0)
-                    .scaleEffect(hasAppeared ? 1 : 0.6)
-                    .animation(theme.springAnimation(), value: hasAppeared)
+                    .scaleEffect(hasAppeared ? 1 : 0.5)
+                    .animation(theme.springAnimation().delay(0.05), value: hasAppeared)
 
                     Spacer().frame(height: 24)
 
                     VStack(spacing: OnboardingMetrics.cardSpacing) {
                         OnboardingRowCard(
-                            icon: .symbol("play.circle"),
-                            title: "Quick walkthrough",
-                            subtitle: "See what Osaurus can do",
+                            icon: .symbol("sparkles"),
+                            title: "Take a quick tour",
+                            subtitle: "See what Osaurus can do in 2 minutes",
                             accessory: .chevron,
                             action: onWalkthrough
                         )
                         .opacity(hasAppeared ? 1 : 0)
                         .offset(y: hasAppeared ? 0 : 15)
-                        .animation(theme.springAnimation().delay(0.2), value: hasAppeared)
+                        .animation(theme.springAnimation().delay(0.18), value: hasAppeared)
 
                         OnboardingRowCard(
-                            icon: .symbol("gearshape"),
-                            title: "Customize",
-                            subtitle: "Permissions, providers, appearance",
+                            icon: .symbol("slider.horizontal.3"),
+                            title: "Set up Osaurus",
+                            subtitle: "Providers, permissions, and appearance",
                             accessory: .chevron,
                             action: onSettings
                         )
                         .opacity(hasAppeared ? 1 : 0)
                         .offset(y: hasAppeared ? 0 : 15)
-                        .animation(theme.springAnimation().delay(0.25), value: hasAppeared)
+                        .animation(theme.springAnimation().delay(0.23), value: hasAppeared)
 
                         OnboardingRowCard(
-                            icon: .symbol("arrow.right.circle"),
-                            title: "Jump in",
+                            icon: .symbol("bubble.left.and.bubble.right"),
+                            title: "Start chatting",
+                            subtitle: "Jump straight in",
                             accessory: .chevron,
                             action: onSkip
                         )
                         .opacity(hasAppeared ? 1 : 0)
                         .offset(y: hasAppeared ? 0 : 15)
-                        .animation(theme.springAnimation().delay(0.3), value: hasAppeared)
+                        .animation(theme.springAnimation().delay(0.28), value: hasAppeared)
                     }
                 }
             }

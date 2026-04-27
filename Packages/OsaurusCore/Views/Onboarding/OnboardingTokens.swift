@@ -36,7 +36,7 @@ enum OnboardingMetrics {
     static let titleToSubtitle: CGFloat = 8
 
     // Typography
-    static let titleSize: CGFloat = 22
+    static let titleSize: CGFloat = 24
     static let subtitleSize: CGFloat = 13
     static let captionSize: CGFloat = 12
     static let heroTitleSize: CGFloat = 28
@@ -91,6 +91,15 @@ enum OnboardingStyle {
 
 // MARK: - Per-Step Preferred Height
 
+/// Preferred window width for a given onboarding step.
+/// The welcome screen is wider to accommodate its two-column layout.
+func onboardingPreferredWidth(for step: OnboardingStep) -> CGFloat {
+    switch step {
+    case .welcome: return 740
+    default: return OnboardingMetrics.windowWidth
+    }
+}
+
 /// Preferred window height for a given onboarding step, clamped to
 /// `[OnboardingMetrics.minHeight, OnboardingMetrics.maxHeight]`. Heights are
 /// tuned so the scaffold's flexible spacer leaves a natural amount of breathing
@@ -98,7 +107,7 @@ enum OnboardingStyle {
 func onboardingPreferredHeight(for step: OnboardingStep) -> CGFloat {
     let raw: CGFloat = {
         switch step {
-        case .welcome: return 540
+        case .welcome: return 480
         case .choosePath: return 560
         case .localDownload: return 640
         case .apiSetup: return 660

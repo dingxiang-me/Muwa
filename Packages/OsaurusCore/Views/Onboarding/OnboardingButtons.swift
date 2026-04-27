@@ -152,7 +152,9 @@ struct OnboardingPrimaryButton: View {
 
 // MARK: - Stateful Button
 
-/// Stateful button that reflects the result of an in-flight connection test.
+/// Brand-styled button that reflects the result of an in-flight connection test.
+/// Idle/loading use `theme.buttonBackground` (cream/navy); success/error switch to
+/// their semantic colors. Capsule-shaped to match `OnboardingBrandButton`.
 struct OnboardingStatefulButton: View {
     let state: OnboardingButtonState
     let idleTitle: LocalizedStringKey
@@ -164,6 +166,7 @@ struct OnboardingStatefulButton: View {
 
     @Environment(\.theme) private var theme
     @State private var isHovered = false
+    @State private var shimmerPhase: CGFloat = -0.4
 
     private var currentTitle: LocalizedStringKey {
         switch state {
@@ -176,17 +179,25 @@ struct OnboardingStatefulButton: View {
 
     private var iconName: String? {
         switch state {
-        case .idle, .loading: return nil
+        case .idle: return "arrow.right"
+        case .loading: return nil
         case .success: return "checkmark"
         case .error: return "arrow.clockwise"
         }
     }
 
-    private var stateColor: Color {
+    private var fillColor: Color {
         switch state {
-        case .idle, .loading: return theme.accentColor
+        case .idle, .loading: return shouldDisable ? theme.tertiaryText : theme.buttonBackground
         case .success: return theme.successColor
         case .error: return theme.errorColor
+        }
+    }
+
+    private var labelColor: Color {
+        switch state {
+        case .idle, .loading: return theme.isDark ? Color(hex: "#0e1120") : .white
+        case .success, .error: return .white
         }
     }
 
@@ -195,37 +206,93 @@ struct OnboardingStatefulButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                FilledOnboardingButtonBackground(
-                    color: shouldDisable ? theme.tertiaryText : stateColor,
-                    isEnabled: !shouldDisable,
-                    isHovered: isHovered
-                )
+                // Outer glow
+                Capsule()
+                    .fill(fillColor)
+                    .blur(radius: isHovered ? 18 : 12)
+                    .opacity(shouldDisable ? 0 : (isHovered ? 0.55 : 0.35))
+                    .scaleEffect(isHovered ? 1.04 : 1.0)
 
+                // Main fill
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [fillColor.opacity(1.0), fillColor.opacity(0.9)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Sweep shimmer (idle only)
+                if state == .idle {
+                    GeometryReader { geo in
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0),
+                                Color.white.opacity(0.28),
+                                Color.white.opacity(0),
+                            ],
+                            startPoint: .leading,
+                            endPoint: .trailing
+                        )
+                        .frame(width: 50)
+                        .offset(x: shimmerPhase * geo.size.width)
+                        .blur(radius: 1.5)
+                    }
+                    .clipShape(Capsule())
+                }
+
+                // Top-edge highlight
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.22), Color.clear],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+
+                // Border
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.4), Color.white.opacity(0.1)],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+
+                // Label
                 HStack(spacing: 8) {
                     if state == .loading {
                         ProgressView()
-                            .progressViewStyle(
-                                CircularProgressViewStyle(tint: theme.isDark ? theme.primaryText : .white)
-                            )
+                            .progressViewStyle(CircularProgressViewStyle(tint: labelColor))
                             .scaleEffect(0.8)
                     } else if let icon = iconName {
                         Image(systemName: icon)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .bold))
+                            .offset(x: state == .idle && isHovered ? 2 : 0)
                     }
 
                     Text(currentTitle)
                         .font(theme.font(size: 15, weight: .semibold))
                 }
-                .foregroundColor(theme.isDark ? theme.primaryText : .white)
+                .foregroundColor(labelColor)
             }
             .frame(maxWidth: .infinity)
             .frame(height: OnboardingMetrics.buttonHeight)
-            .scaleEffect(isHovered && !shouldDisable ? 1.02 : 1.0)
+            .scaleEffect(isHovered && !shouldDisable ? 1.03 : 1.0)
         }
         .buttonStyle(.plain)
         .disabled(shouldDisable)
         .onHover { hovering in
-            withAnimation(theme.animationQuick()) { isHovered = hovering }
+            withAnimation(theme.springAnimation()) { isHovered = hovering && !shouldDisable }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: false)) {
+                shimmerPhase = 1.4
+            }
         }
         .animation(theme.springAnimation(), value: state)
     }
@@ -295,6 +362,115 @@ struct OnboardingShimmerButton: View {
             .blur(radius: 1)
         }
         .clipped()
+    }
+}
+
+// MARK: - Brand CTA Button
+
+/// Hero welcome button — capsule-shaped, filled with `theme.buttonBackground`
+/// (cream on dark, navy on light) so it uses the brand palette rather than
+/// the generic accent colour. Includes a sweep-shimmer and lift-on-hover.
+struct OnboardingBrandButton: View {
+    let title: String
+    let action: () -> Void
+    var isEnabled: Bool = true
+
+    @Environment(\.theme) private var theme
+    @State private var isHovered = false
+    @State private var shimmerPhase: CGFloat = -0.4
+
+    private var fillColor: Color { isEnabled ? theme.buttonBackground : theme.tertiaryText }
+    private var labelColor: Color { theme.isDark ? Color(hex: "#0e1120") : Color.white }
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                // Outer glow
+                Capsule()
+                    .fill(fillColor)
+                    .blur(radius: isHovered ? 18 : 12)
+                    .opacity(isHovered ? 0.55 : 0.35)
+                    .scaleEffect(isHovered ? 1.04 : 1.0)
+
+                // Main fill
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                fillColor.opacity(1.0),
+                                fillColor.opacity(0.9),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        )
+                    )
+
+                // Sweep shimmer
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [
+                            Color.white.opacity(0),
+                            Color.white.opacity(0.28),
+                            Color.white.opacity(0),
+                        ],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: 50)
+                    .offset(x: shimmerPhase * geo.size.width)
+                    .blur(radius: 1.5)
+                }
+                .clipShape(Capsule())
+
+                // Top-edge inner highlight
+                Capsule()
+                    .fill(
+                        LinearGradient(
+                            colors: [Color.white.opacity(0.22), Color.clear],
+                            startPoint: .top,
+                            endPoint: .center
+                        )
+                    )
+
+                // Border
+                Capsule()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(0.4),
+                                Color.white.opacity(0.1),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+
+                // Label + arrow
+                HStack(spacing: 8) {
+                    Text(LocalizedStringKey(title), bundle: .module)
+                        .font(theme.font(size: 15, weight: .semibold))
+
+                    Image(systemName: "arrow.right")
+                        .font(.system(size: 12, weight: .bold))
+                        .offset(x: isHovered ? 2 : 0)
+                }
+                .foregroundColor(labelColor)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: OnboardingMetrics.buttonHeight)
+            .scaleEffect(isHovered ? 1.03 : 1.0)
+        }
+        .buttonStyle(.plain)
+        .disabled(!isEnabled)
+        .onHover { hovering in
+            withAnimation(theme.springAnimation()) { isHovered = hovering && isEnabled }
+        }
+        .onAppear {
+            withAnimation(.easeInOut(duration: 2.2).repeatForever(autoreverses: false)) {
+                shimmerPhase = 1.4
+            }
+        }
     }
 }
 

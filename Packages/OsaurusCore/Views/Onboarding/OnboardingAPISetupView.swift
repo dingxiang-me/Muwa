@@ -150,7 +150,8 @@ struct OnboardingAPISetupView: View {
     private var providerSelectionView: some View {
         OnboardingScaffold(
             title: "Connect a provider",
-            footer: "Secrets are stored securely in Keychain.",
+            subtitle: "Pick one to start. You can add more later in Settings.",
+            footer: "API keys are stored securely in Keychain.",
             onBack: onBack,
             content: {
                 ScrollView(.vertical, showsIndicators: false) {
@@ -169,10 +170,10 @@ struct OnboardingAPISetupView: View {
             icon: .custom {
                 ProviderIcon(preset: preset, size: 18, color: theme.secondaryText)
             },
-            title: preset == .custom ? L("Any OpenAI-compatible API") : preset.name,
+            title: preset == .custom ? L("Custom / OpenAI-compatible") : preset.name,
             subtitle: preset == .custom
-                ? L("OpenRouter, MiniMax, etc.")
-                : (preset == .openai ? L("ChatGPT/Codex or Platform API") : preset.description),
+                ? L("OpenRouter, Together AI, LM Studio, and more")
+                : (preset == .openai ? L("ChatGPT, Codex, or Platform API") : preset.description),
             badges: preset.badge.map { [OnboardingRowBadge($0)] } ?? [],
             accessory: .chevron
         ) {
@@ -373,14 +374,14 @@ struct OnboardingAPISetupView: View {
         OnboardingStatefulButton(
             state: buttonState,
             idleTitle: selectedProvider == .openai && openAIAuthMode == .chatGPTSubscription
-                ? "Sign in with ChatGPT" : "Test Connection",
+                ? "Sign in with ChatGPT" : "Connect",
             loadingTitle: loadingTitle,
             successTitle: "Continue",
             errorTitle: "Try Again",
             action: { isSuccess ? saveProviderAndContinue() : testConnection() },
             isEnabled: canTest
         )
-        .frame(width: OnboardingMetrics.ctaWidth)
+        .frame(width: OnboardingMetrics.ctaWidthCompact)
     }
 
     private var endpointPreview: some View {

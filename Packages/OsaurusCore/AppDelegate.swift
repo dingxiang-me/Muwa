@@ -1100,8 +1100,8 @@ extension AppDelegate {
             let themeManager = ThemeManager.shared
             let contentView = OnboardingView(
                 forceShowIdentity: forceShowIdentity,
-                onPreferredHeightChange: { [weak self] newHeight in
-                    self?.resizeOnboardingWindow(toHeight: newHeight)
+                onPreferredSizeChange: { [weak self] newSize in
+                    self?.resizeOnboardingWindow(to: newSize)
                 },
                 onComplete: { [weak self] in
                     // Close the onboarding window when complete
@@ -1119,7 +1119,7 @@ extension AppDelegate {
             // Use NSHostingView directly in an NSView container to avoid auto-sizing issues.
             // Start the window at the welcome step's preferred height so the first frame
             // doesn't visibly snap into place from a different size.
-            let windowWidth: CGFloat = OnboardingMetrics.windowWidth
+            let windowWidth: CGFloat = onboardingPreferredWidth(for: .welcome)
             let windowHeight: CGFloat = onboardingPreferredHeight(for: .welcome)
 
             let hostingView = NSHostingView(rootView: contentView)
@@ -1173,25 +1173,26 @@ extension AppDelegate {
     /// anchoring the window at its current top edge so the title bar stays put
     /// and growth happens downward.
     @MainActor
-    fileprivate func resizeOnboardingWindow(toHeight newHeight: CGFloat) {
+    fileprivate func resizeOnboardingWindow(to newSize: CGSize) {
         guard let window = Self.onboardingWindow else { return }
-        let clamped = min(max(newHeight, OnboardingMetrics.minHeight), OnboardingMetrics.maxHeight)
+        let clampedHeight = min(max(newSize.height, OnboardingMetrics.minHeight), OnboardingMetrics.maxHeight)
+        let newWidth = newSize.width
         let currentFrame = window.frame
         // Skip changes smaller than a couple of points to avoid jitter from
         // SwiftUI re-publishing the same preference during transitions.
-        guard abs(currentFrame.height - clamped) > 2 else { return }
+        guard abs(currentFrame.height - clampedHeight) > 2 || abs(currentFrame.width - newWidth) > 2 else { return }
 
-        // Anchor by top edge (NSWindow origin is bottom-left, so subtract delta from y).
-        let delta = clamped - currentFrame.height
+        // Anchor the window by its top-centre so the resize feels natural.
+        let deltaH = clampedHeight - currentFrame.height
+        let deltaW = newWidth - currentFrame.width
         let newFrame = NSRect(
-            x: currentFrame.origin.x,
-            y: currentFrame.origin.y - delta,
-            width: OnboardingMetrics.windowWidth,
-            height: clamped
+            x: currentFrame.origin.x - deltaW / 2,
+            y: currentFrame.origin.y - deltaH,
+            width: newWidth,
+            height: clampedHeight
         )
 
-        // Animate the resize alongside the SwiftUI slide transition. A short
-        // ease-in-out feels in sync with the spring used for step navigation.
+        // Animate alongside the SwiftUI slide transition.
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.32
             context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)

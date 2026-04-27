@@ -164,7 +164,7 @@ struct OnboardingLocalDownloadView: View {
     private var selectionView: some View {
         OnboardingScaffold(
             title: "Choose a local model",
-            footer: "Runs entirely on your Mac. No data leaves your computer.",
+            subtitle: "Runs entirely on your Mac. No account. No cloud.",
             onBack: onBack,
             content: {
                 VStack(spacing: OnboardingMetrics.cardSpacing) {
@@ -191,12 +191,12 @@ struct OnboardingLocalDownloadView: View {
                 }
             },
             cta: {
-                OnboardingShimmerButton(
-                    title: selectedModel?.isDownloaded == true ? "Continue" : "Start Download",
+                OnboardingBrandButton(
+                    title: selectedModel?.isDownloaded == true ? "Continue" : "Download & Install",
                     action: startDownloadOrContinue,
                     isEnabled: selectedModel != nil
                 )
-                .frame(width: OnboardingMetrics.ctaWidth)
+                .frame(width: OnboardingMetrics.ctaWidthCompact)
                 .opacity(hasAppeared ? 1 : 0)
                 .animation(theme.springAnimation().delay(0.4), value: hasAppeared)
             }
@@ -229,9 +229,8 @@ struct OnboardingLocalDownloadView: View {
 
     private var downloadView: some View {
         OnboardingScaffold(
-            title: "Almost ready...",
-            subtitle:
-                "Once this finishes, you'll have an AI running entirely on your Mac — no account, no cloud, no data leaving your machine.",
+            title: "Downloading...",
+            subtitle: "Your model runs entirely on this Mac — no account, no cloud, no data sent anywhere.",
             content: {
                 VStack(spacing: 18) {
                     OnboardingShimmerBar(
@@ -250,7 +249,7 @@ struct OnboardingLocalDownloadView: View {
                 .animation(theme.springAnimation().delay(0.1), value: downloadViewAppeared)
             },
             cta: {
-                OnboardingTextButton(title: isDownloading ? "Continue" : "Download later") {
+                OnboardingTextButton(title: isDownloading ? "Continue in background" : "Download later") {
                     onSkip()
                 }
                 .opacity(downloadViewAppeared ? 1 : 0)

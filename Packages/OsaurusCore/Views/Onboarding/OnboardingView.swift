@@ -32,9 +32,9 @@ private enum NavigationDirection {
 public struct OnboardingView: View {
     /// Callback when onboarding is complete
     let onComplete: () -> Void
-    /// Optional callback fired when the preferred window height for the current step changes.
+    /// Optional callback fired when the preferred window size for the current step changes.
     /// The host (AppDelegate) uses this to animate `NSWindow.setFrame`.
-    let onPreferredHeightChange: ((CGFloat) -> Void)?
+    let onPreferredSizeChange: ((CGSize) -> Void)?
     let forceShowIdentity: Bool
 
     @Environment(\.theme) private var theme
@@ -45,11 +45,11 @@ public struct OnboardingView: View {
 
     public init(
         forceShowIdentity: Bool = false,
-        onPreferredHeightChange: ((CGFloat) -> Void)? = nil,
+        onPreferredSizeChange: ((CGSize) -> Void)? = nil,
         onComplete: @escaping () -> Void
     ) {
         self.forceShowIdentity = forceShowIdentity
-        self.onPreferredHeightChange = onPreferredHeightChange
+        self.onPreferredSizeChange = onPreferredSizeChange
         self.onComplete = onComplete
     }
 
@@ -76,15 +76,20 @@ public struct OnboardingView: View {
             .ignoresSafeArea()
         }
         .frame(
-            width: OnboardingMetrics.windowWidth,
+            width: onboardingPreferredWidth(for: currentStep),
             height: onboardingPreferredHeight(for: currentStep)
         )
-        .preference(
-            key: OnboardingHeightPreferenceKey.self,
-            value: onboardingPreferredHeight(for: currentStep)
-        )
-        .onPreferenceChange(OnboardingHeightPreferenceKey.self) { newHeight in
-            onPreferredHeightChange?(newHeight)
+        .onAppear {
+            onPreferredSizeChange?(CGSize(
+                width: onboardingPreferredWidth(for: currentStep),
+                height: onboardingPreferredHeight(for: currentStep)
+            ))
+        }
+        .onChange(of: currentStep) { _, step in
+            onPreferredSizeChange?(CGSize(
+                width: onboardingPreferredWidth(for: step),
+                height: onboardingPreferredHeight(for: step)
+            ))
         }
     }
 
