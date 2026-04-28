@@ -639,6 +639,66 @@ extension ModelManager {
             releasedAt: date("2026-04-17")
         ),
 
+        // MARK: Nemotron-3 Nano Omni Reasoning (hybrid Mamba-2 SSM + Attn + MoE)
+        //
+        // 30B total / ~3B active. 52-layer hybrid: 23 Mamba-2 SSM layers,
+        // 23 MoE layers (128 routed × 6 active + 1 shared, ReLU² activation),
+        // 6 attention layers (GQA 32q × 2kv, NO RoPE — position info from
+        // Mamba). 262K native context. Reasoning ON by default — chat
+        // template emits `<think>...</think>` segments parsed by vmlx's
+        // think_xml stamp (auto-resolved from `model_type=nemotron_h`).
+        //
+        // Tool format: `nemotron` (NeMo-style) — auto-resolved by vmlx via
+        // jang_config.capabilities or model-type heuristic.
+        // Cache: hybrid — `MambaCache(size=2)` for the 23 M layers,
+        // `KVCacheSimple` for the 6 * layers, nil for E layers. vmlx's
+        // `CacheCoordinator.isHybrid` auto-flips on first slot admission;
+        // osaurus does NOT call `setHybrid` manually (per
+        // OSAURUS-INTEGRATION.md).
+        // Sampling recipe per `research/NEMOTRON-OMNI-RUNTIME-2026-04-28.md`:
+        // T=0.6 top_p=0.95 (DeepSeek-style). Bundles ship those defaults
+        // in `generation_config.json`; `LocalGenerationDefaults` reads them.
+
+        MLXModel(
+            id: "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
+            name: ModelMetadataParser.friendlyName(
+                from: "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4"),
+            description:
+                "NVIDIA Nemotron-3 30B Reasoning hybrid (Mamba-2 + MoE). MXFP4 quantization — fastest decode path. 262K context.",
+            downloadURL:
+                "https://huggingface.co/OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
+            isTopSuggestion: true,
+            downloadSizeBytes: 18_002_117_870,
+            modelType: "nemotron_h",
+            releasedAt: date("2026-04-28")
+        ),
+
+        MLXModel(
+            id: "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4",
+            name: ModelMetadataParser.friendlyName(
+                from: "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4"),
+            description:
+                "Nemotron-3 30B Reasoning hybrid, 4-bit TurboQuant routed experts. Near-bf16 quality at ~16 GB. 262K context.",
+            downloadURL:
+                "https://huggingface.co/OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4",
+            downloadSizeBytes: 16_009_341_440,
+            modelType: "nemotron_h",
+            releasedAt: date("2026-04-28")
+        ),
+
+        MLXModel(
+            id: "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ",
+            name: ModelMetadataParser.friendlyName(
+                from: "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ"),
+            description:
+                "Nemotron-3 30B Reasoning hybrid, 2-bit TurboQuant routed experts. Smallest footprint (~9 GB). 262K context.",
+            downloadURL:
+                "https://huggingface.co/OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ",
+            downloadSizeBytes: 9_136_488_448,
+            modelType: "nemotron_h",
+            releasedAt: date("2026-04-28")
+        ),
+
         // MARK: Large Models
 
         MLXModel(

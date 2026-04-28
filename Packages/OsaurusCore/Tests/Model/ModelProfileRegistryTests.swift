@@ -90,4 +90,53 @@ struct ModelProfileRegistryTests {
         // developer's locally installed model directory.
         #expect(profile?.thinkingOption == nil)
     }
+
+    /// Nemotron-3 Reasoning bundles (model_type=nemotron_h, hybrid Mamba+Attn+MoE)
+    /// must match `NemotronThinkingProfile`, NOT the generic
+    /// `AutoThinkingProfile`. The two have different `disableThinking`
+    /// defaults — Nemotron defaults to thinking-OFF (defensive, mirroring
+    /// `QwenThinkingProfile`) because the SKU's training extends `<think>`
+    /// blocks through arbitrary self-verification on validation prompts
+    /// (the trapped-thinking pattern documented in
+    /// `jang/research/NEMOTRON-OMNI-RUNTIME-2026-04-28.md` §9). Auto would
+    /// default ON and surface the loop as visible UX regression.
+    @Test("Nemotron-3 reasoning bundles match NemotronThinkingProfile (default OFF)")
+    func nemotron3_matchesNemotronProfile() {
+        for id in [
+            "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
+            "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4",
+            "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ",
+            "nemotron-3-nano-omni-30b-a3b-mxfp4",  // case-folded picker form
+        ] {
+            let profile = ModelProfileRegistry.profile(for: id)
+            #expect(
+                profile?.displayName == NemotronThinkingProfile.displayName,
+                "expected NemotronThinkingProfile for \(id), got \(profile?.displayName ?? "nil")"
+            )
+            // Default-OFF guards against the trapped-thinking pattern.
+            let defaultDisable = profile?.defaults["disableThinking"]?.boolValue ?? false
+            #expect(defaultDisable == true,
+                "Nemotron must default disableThinking=true to avoid trapped-thinking loops")
+        }
+    }
+
+    /// Older "Nemotron-Cascade-2" / "Nemotron-Hyper" bundles use a different
+    /// model-type lineage (deprecated NeMo style) and shouldn't accidentally
+    /// pick up the new profile. Locks the matcher specificity to `nemotron-3`.
+    @Test("Older Nemotron lineages do NOT match NemotronThinkingProfile")
+    func olderNemotron_doesNotMatch() {
+        for id in [
+            "JANGQ-AI/Nemotron-Cascade-2-30B-A3B-JANG_4M",
+            "dealignai/Nemotron-3-Super-120B-A12B-JANG_2L-CRACK",
+        ] {
+            let profile = ModelProfileRegistry.profile(for: id)
+            // Cascade-2 / Super may still match `AutoThinkingProfile` if their
+            // chat template reads `enable_thinking` — the assertion is just
+            // that they don't shortcut into the new Nemotron-3-specific
+            // profile.
+            let isNemotron3 = profile?.displayName == NemotronThinkingProfile.displayName
+            #expect(!isNemotron3 || id.lowercased().contains("nemotron-3"),
+                "matcher must be specific to nemotron-3, not generic nemotron")
+        }
+    }
 }

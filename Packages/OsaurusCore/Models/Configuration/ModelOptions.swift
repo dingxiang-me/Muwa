@@ -78,6 +78,7 @@ enum ModelProfileRegistry {
         VeniceModelProfile.self,
         OpenAIReasoningProfile.self,
         QwenThinkingProfile.self,
+        NemotronThinkingProfile.self,
         Gemini31FlashImageProfile.self,
         GeminiProImageProfile.self,
         GeminiFlashImageProfile.self,
@@ -141,6 +142,45 @@ struct QwenThinkingProfile: ModelProfile {
     static func matches(modelId: String) -> Bool {
         let lower = modelId.lowercased()
         return lower.contains("qwen3") && !lower.contains("coder")
+    }
+
+    static let options: [ModelOptionDefinition] = [
+        ModelOptionDefinition(
+            id: "disableThinking",
+            label: "Disable Thinking",
+            icon: "brain.head.profile",
+            kind: .toggle(default: true)
+        )
+    ]
+
+    static let defaults: [String: ModelOptionValue] = [
+        "disableThinking": .bool(true)
+    ]
+
+    static let thinkingOption: (id: String, inverted: Bool)? = ("disableThinking", true)
+}
+
+// MARK: - Nemotron-3 Thinking Profile
+
+/// Nemotron-3-Nano-Omni Reasoning models — `model_type=nemotron_h` hybrid
+/// Mamba+Attn+MoE bundles whose chat template reads an `enable_thinking`
+/// kwarg. Defaults `disableThinking: true` for the same reason
+/// `QwenThinkingProfile` does: per
+/// `jang/research/NEMOTRON-OMNI-RUNTIME-2026-04-28.md` §9, the SKU is
+/// "Reasoning V3" and its training extends `<think>` blocks through
+/// arbitrary self-verification on validation-style prompts (the same
+/// pattern that surfaced as trapped-thinking on Qwen3.6-A3B). Forcing
+/// thinking off for chat workloads is the recommended operating point;
+/// users who want CoT can toggle the chip on per turn.
+///
+/// Match excludes `coder` variants (none ship today, but mirroring
+/// `QwenThinkingProfile`'s shape for consistency if NVIDIA publishes one).
+struct NemotronThinkingProfile: ModelProfile {
+    static let displayName = "Nemotron Thinking"
+
+    static func matches(modelId: String) -> Bool {
+        let lower = modelId.lowercased()
+        return lower.contains("nemotron-3") && !lower.contains("coder")
     }
 
     static let options: [ModelOptionDefinition] = [
