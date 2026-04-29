@@ -183,19 +183,28 @@ public final class HPKEServerContext: @unchecked Sendable {
 
     /// Derive the AEAD nonce for response chunk index `i`. Lower 64 bits
     /// of the 12-byte exported nonce base are XOR'd with `i` (little-endian).
-    private func nonce(for counter: UInt64) -> ChaChaPoly.Nonce {
+    /// Wraps the CryptoKit-only `ChaChaPoly.Nonce(data:)` throw as
+    /// `HPKEError.sealFailed` since reaching it would mean the exporter
+    /// returned the wrong size — a CryptoKit invariant, not a runtime
+    /// condition the caller can act on differently.
+    private func nonce(for counter: UInt64) throws -> ChaChaPoly.Nonce {
         var bytes = [UInt8](responseNonceBase)
         var c = counter.littleEndian
         withUnsafeBytes(of: &c) { src in
             for i in 0..<8 { bytes[i] ^= src[i] }
         }
-        return try! ChaChaPoly.Nonce(data: Data(bytes))
+        do {
+            return try ChaChaPoly.Nonce(data: Data(bytes))
+        } catch {
+            throw HPKEError.sealFailed
+        }
     }
 
     /// Seal a non-streaming response body. Uses counter 0; do not mix
     /// with `sealStreamChunk`.
     public func sealNonStreaming(_ plaintext: Data) throws -> Data {
-        let sealed = try ChaChaPoly.seal(plaintext, using: responseKey, nonce: nonce(for: 0))
+        let n = try nonce(for: 0)
+        let sealed = try ChaChaPoly.seal(plaintext, using: responseKey, nonce: n)
         return sealed.combined
     }
 
@@ -208,7 +217,8 @@ public final class HPKEServerContext: @unchecked Sendable {
         responseCounter += 1
         responseLock.unlock()
 
-        let sealed = try ChaChaPoly.seal(plaintext, using: responseKey, nonce: nonce(for: counter))
+        let n = try nonce(for: counter)
+        let sealed = try ChaChaPoly.seal(plaintext, using: responseKey, nonce: n)
         return (counter, sealed.combined.base64urlEncoded)
     }
 }
@@ -315,7 +325,6 @@ public final class HPKEClientContext: @unchecked Sendable {
     public let encapsulatedKey: Data
 
     private let responseKey: SymmetricKey
-    private let responseNonceBase: Data
 
     /// - Parameters:
     ///   - recipientPublicKey: 32-byte X25519 public key from the peer
@@ -344,19 +353,14 @@ public final class HPKEClientContext: @unchecked Sendable {
         self.method = method
         self.path = path
 
-        // Pre-derive response symmetric material via exporter (which
-        // doesn't advance the AEAD counter) before retaining the sender
-        // for the actual body seal. Once `seal` is called, AEAD state
-        // advances and a second seal would land at counter 1.
+        // Pre-derive the response AEAD key via the HPKE exporter (which
+        // doesn't advance the seal counter). The matching nonce is
+        // embedded in each `combined` ChaChaPoly box on the wire, so we
+        // don't need to derive a nonce base on this side.
         self.responseKey = try sender.exportSecret(
             context: HPKELabel.responseKey,
             outputByteCount: 32
         )
-        let nonceKey = try sender.exportSecret(
-            context: HPKELabel.responseNonce,
-            outputByteCount: 12
-        )
-        self.responseNonceBase = nonceKey.withUnsafeBytes { Data($0) }
         self._sender = sender
     }
 
@@ -384,15 +388,6 @@ public final class HPKEClientContext: @unchecked Sendable {
             HPKEHeader.timestamp: timestamp,
             HPKEHeader.bodyEncoding: "base64",
         ]
-    }
-
-    private func nonce(for counter: UInt64) -> ChaChaPoly.Nonce {
-        var bytes = [UInt8](responseNonceBase)
-        var c = counter.littleEndian
-        withUnsafeBytes(of: &c) { src in
-            for i in 0..<8 { bytes[i] ^= src[i] }
-        }
-        return try! ChaChaPoly.Nonce(data: Data(bytes))
     }
 
     /// Decrypt a non-streaming response body sealed via `sealNonStreaming`.
