@@ -417,18 +417,67 @@ public actor ModelRuntime {
 
     /// Installs the cache coordinator on a freshly-loaded holder.
     ///
-    /// Single call to `enableCaching(config:)` is all that's needed — vmlx
-    /// auto-detects hybrid SSM models on first slot admission inside
-    /// `BatchEngine`, so osaurus must not call `setHybrid(_:)` manually
-    /// (per OSAURUS-INTEGRATION.md). Actor-isolated, so the install is
-    /// observed atomically by the next request.
+    /// `enableCaching(config:)` constructs the coordinator with our
+    /// recommended knobs (paged + L2 disk + TurboQuant default + 8K window).
+    /// vmlx's `BatchEngine.admitPendingRequests` auto-flips
+    /// `coordinator.isHybrid` on first slot admission for any model whose
+    /// per-layer cache list contains a `MambaCache` or `ArraysCache` — that
+    /// covers the BatchEngine path osaurus uses today.
+    ///
+    /// **Eager `setHybrid(true)` for known hybrid families**: per
+    /// `OMNI-OSAURUS-HOOKUP.md` §5.1 the eager-set is harmless on any
+    /// admission path and avoids a one-frame stale-flag window if a request
+    /// ever lands via the single-slot `Evaluate` path before BatchEngine
+    /// has had a chance to flip it. We tag known hybrid model_types here
+    /// instead of inspecting the model's cache list (which would require an
+    /// async `context.read` round-trip just to check for an `is MambaCache`
+    /// match) — the family list is short, drift is caught by tests, and
+    /// the auto-flip remains the source of truth for any model_type the
+    /// list misses.
     private func installCacheCoordinator(on holder: SessionHolder) async {
         let cacheConfig = Self.buildCacheCoordinatorConfig(modelName: holder.name)
         holder.container.enableCaching(config: cacheConfig)
 
+        if Self.isKnownHybridModel(name: holder.name) {
+            holder.container.cacheCoordinator?.setHybrid(true)
+        }
+
         genLog.info(
-            "installCacheCoordinator: enabled for \(holder.name, privacy: .public) disk=\(cacheConfig.enableDiskCache, privacy: .public) (sizing left to vmlx defaults)"
+            "installCacheCoordinator: enabled for \(holder.name, privacy: .public) disk=\(cacheConfig.enableDiskCache, privacy: .public) hybrid=\(Self.isKnownHybridModel(name: holder.name), privacy: .public) (sizing left to vmlx defaults)"
         )
+    }
+
+    /// Substring-match against the families whose per-layer cache lists
+    /// vmlx's `newCache(parameters:)` populates with `MambaCache` /
+    /// `ArraysCache` slots. Lower-cased model_id, so picker forms (without
+    /// the org prefix) match too.
+    ///
+    /// The list intentionally tracks model_type _families_, not exact ids,
+    /// so new bundles in the same architecture (e.g. another Holo3 / Qwen
+    /// 3.x MoE quant tier, a future Nemotron-4 hybrid) flip the flag
+    /// without a registry edit. Worst case a non-hybrid match would still
+    /// be safe: vmlx's `setHybrid(true)` only enables the SSM-state
+    /// companion-cache lookup; the lookup is keyed and just misses on a
+    /// non-hybrid model — no incorrect routing.
+    nonisolated static func isKnownHybridModel(name: String) -> Bool {
+        let lower = name.lowercased()
+        // Mamba+Attn+MoE — Nemotron-3 / Cascade-2 / Hyper.
+        if lower.contains("nemotron-3") || lower.contains("nemotron-cascade")
+            || lower.contains("nemotron_h")
+        {
+            return true
+        }
+        // Qwen 3.5 / 3.6 MoE family (qwen3_5_moe model_type) covers Holo3 too.
+        if lower.contains("qwen3.5") || lower.contains("qwen3.6") || lower.contains("holo3")
+            || lower.contains("holo-3")
+        {
+            return true
+        }
+        // MiniMax M2 / M2.7 — gated SSM in some layers.
+        if lower.contains("minimax-m2") || lower.contains("minimax_m2") {
+            return true
+        }
+        return false
     }
 
     // MARK: - Generation driver
