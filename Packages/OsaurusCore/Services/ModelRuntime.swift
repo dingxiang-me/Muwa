@@ -878,11 +878,29 @@ public actor ModelRuntime {
         out.reserveCapacity(max(6, msgs.count))
         for m in msgs {
             let images = extractImageSources(from: m)
+            let videos = extractVideoSources(from: m)
+            let audios = extractAudioSources(from: m)
             switch m.role {
             case "system":
-                out.append(.init(role: .system, content: m.content ?? "", images: images))
+                out.append(
+                    MLXLMCommon.Chat.Message(
+                        role: .system,
+                        content: m.content ?? "",
+                        images: images,
+                        videos: videos,
+                        audios: audios
+                    )
+                )
             case "user":
-                out.append(.init(role: .user, content: m.content ?? "", images: images))
+                out.append(
+                    MLXLMCommon.Chat.Message(
+                        role: .user,
+                        content: m.content ?? "",
+                        images: images,
+                        videos: videos,
+                        audios: audios
+                    )
+                )
             case "assistant":
                 let content = (m.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let toolCalls = toMLXToolCalls(m.tool_calls)
@@ -893,7 +911,8 @@ public actor ModelRuntime {
                         role: .assistant,
                         content: content,
                         images: images,
-                        videos: [],
+                        videos: videos,
+                        audios: audios,
                         toolCalls: toolCalls,
                         toolCallId: nil
                     )
@@ -904,13 +923,22 @@ public actor ModelRuntime {
                         role: .tool,
                         content: m.content ?? "",
                         images: images,
-                        videos: [],
+                        videos: videos,
+                        audios: audios,
                         toolCalls: nil,
                         toolCallId: m.tool_call_id
                     )
                 )
             default:
-                out.append(.init(role: .user, content: m.content ?? "", images: images))
+                out.append(
+                    MLXLMCommon.Chat.Message(
+                        role: .user,
+                        content: m.content ?? "",
+                        images: images,
+                        videos: videos,
+                        audios: audios
+                    )
+                )
             }
         }
         return out
@@ -959,6 +987,115 @@ public actor ModelRuntime {
             }
         }
         return sources
+    }
+
+    /// Extract `[UserInput.Video]` from `video_url` content parts. Mirrors
+    /// `extractImageSources` — `data:` URLs are written to a temp file so
+    /// AVAsset can decode them; `http(s):` URLs go through directly. The
+    /// vmlx side (`NemotronHOmniProcessor.prepare()`) extracts frames via
+    /// `nemotronOmniExtractVideoFrames` regardless of source shape.
+    nonisolated private static func extractVideoSources(
+        from message: ChatMessage
+    ) -> [MLXLMCommon.UserInput.Video] {
+        let urls = message.videoUrls
+        guard !urls.isEmpty else { return [] }
+
+        var sources: [MLXLMCommon.UserInput.Video] = []
+        for urlString in urls {
+            if urlString.hasPrefix("data:video/") {
+                // data:video/<container>;base64,<bytes>
+                if let url = materializeMediaDataUrl(urlString, defaultExtension: "mp4") {
+                    sources.append(.url(url))
+                }
+            } else if let url = URL(string: urlString) {
+                sources.append(.url(url))
+            }
+        }
+        return sources
+    }
+
+    /// Extract `[UserInput.Audio]` from `input_audio` content parts. The
+    /// OpenAI shape is `{data: <base64>, format: "wav"|"mp3"|...}`; we
+    /// materialize a temp file with that extension and hand the URL to vmlx
+    /// so `nemotronOmniLoadAudioFile` (AVAudioConverter → 16 kHz mono Float32)
+    /// drives the decode end-to-end. Going through a file URL keeps the path
+    /// uniform across formats — there is no in-memory `[Float]` decode here
+    /// because we'd have to duplicate vmlx's AVAudioConverter rig and lose
+    /// resampling fidelity in the process.
+    nonisolated private static func extractAudioSources(
+        from message: ChatMessage
+    ) -> [MLXLMCommon.UserInput.Audio] {
+        let inputs = message.audioInputs
+        guard !inputs.isEmpty else { return [] }
+
+        var sources: [MLXLMCommon.UserInput.Audio] = []
+        for (data, format) in inputs {
+            let ext = format.lowercased()
+            // Synthesize a `data:audio/<format>;base64,<data>` URL so we can
+            // reuse the same materializer the video path uses. The audio data
+            // comes in as a bare base64 string from `input_audio.data`, not a
+            // data URL — wrap it before handing off so the helper's data-URL
+            // parsing applies uniformly.
+            let dataUrl = "data:audio/\(ext);base64,\(data)"
+            if let url = materializeMediaDataUrl(dataUrl, defaultExtension: ext.isEmpty ? "wav" : ext) {
+                sources.append(.url(url))
+            }
+        }
+        return sources
+    }
+
+    /// Decode a `data:<mediatype>;base64,<bytes>` URL into a temp file URL with
+    /// an extension reflecting the mediatype. Returns `nil` on parse / decode
+    /// failure.
+    ///
+    /// Lifecycle: temp files live in `FileManager.default.temporaryDirectory`
+    /// and are not actively cleaned up here. macOS evicts the system temp dir
+    /// on its own schedule (`/private/var/folders/.../T/` rotates per session
+    /// and on reboot). Per-request cleanup would require threading a teardown
+    /// hook through the generation lifecycle, which is more complexity than
+    /// it's worth for what amounts to short-lived audio/video bytes.
+    nonisolated private static func materializeMediaDataUrl(
+        _ urlString: String,
+        defaultExtension: String
+    ) -> URL? {
+        // Expect `data:<mediatype>[;base64],<payload>`. Pull the mediatype
+        // subtype as the file extension when available so AVFoundation /
+        // AVAudioConverter's extension-keyed dispatch picks the right decoder.
+        guard urlString.hasPrefix("data:") else { return nil }
+        guard let commaIndex = urlString.firstIndex(of: ",") else { return nil }
+        let header = String(urlString[urlString.index(urlString.startIndex, offsetBy: 5) ..< commaIndex])
+        let payload = String(urlString[urlString.index(after: commaIndex)...])
+        guard let bytes = Data(base64Encoded: payload) else { return nil }
+
+        // Header looks like `audio/wav;base64` or `video/mp4`. Take the part
+        // after the slash, before any `;`.
+        var ext = defaultExtension
+        if let slash = header.firstIndex(of: "/") {
+            let afterSlash = header[header.index(after: slash)...]
+            if let semi = afterSlash.firstIndex(of: ";") {
+                ext = String(afterSlash[..<semi]).lowercased()
+            } else {
+                ext = String(afterSlash).lowercased()
+            }
+            // Some clients send `audio/x-wav` or `audio/mpeg` — coerce to the
+            // canonical extensions vmlx's AVAudioConverter recognizes.
+            switch ext {
+            case "x-wav", "wave": ext = "wav"
+            case "mpeg", "mp3", "x-mpeg": ext = "mp3"
+            case "x-m4a", "mp4": ext = "m4a"
+            default: break
+            }
+        }
+
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension(ext)
+        do {
+            try bytes.write(to: tmp, options: .atomic)
+            return tmp
+        } catch {
+            return nil
+        }
     }
 
     private static func computeWeightsSizeBytes(at url: URL) -> Int64 {
