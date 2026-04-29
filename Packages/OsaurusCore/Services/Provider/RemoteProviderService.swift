@@ -559,13 +559,21 @@ public actor RemoteProviderService: ToolCapableService {
                 let dataPrefix = Data("data: ".utf8)
                 let commentPrefix = Data(":".utf8)
                 var buffer = Data()
+                // Index in `buffer` from which the next \n\n search may
+                // start. Avoids the O(n²) cost of re-scanning bytes that
+                // were already known not to contain the separator.
+                var searchStart = 0
                 do {
                     for try await byte in bytes {
                         if Task.isCancelled { break }
                         buffer.append(byte)
-                        while let r = buffer.range(of: separator) {
+                        while let r = buffer.range(
+                            of: separator,
+                            in: searchStart..<buffer.count
+                        ) {
                             let event = buffer.subdata(in: 0..<r.lowerBound)
                             buffer.removeSubrange(0..<r.upperBound)
+                            searchStart = 0
                             if event.isEmpty { continue }
                             if event.starts(with: dataPrefix) {
                                 let payloadBytes = event.subdata(in: dataPrefix.count..<event.count)
@@ -584,6 +592,10 @@ public actor RemoteProviderService: ToolCapableService {
                             }
                             // Unknown lines drop on the floor.
                         }
+                        // Advance the search window past the bytes we've
+                        // already inspected, leaving 1 byte of overlap so
+                        // a separator straddling the boundary still matches.
+                        searchStart = max(0, buffer.count - (separator.count - 1))
                     }
                     continuation.finish()
                 } catch {

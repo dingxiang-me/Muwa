@@ -49,6 +49,8 @@ public final class HPKEKeyStore: @unchecked Sendable {
 
     private let lock = NSLock()
     private var _privateKey: Curve25519.KeyAgreement.PrivateKey?
+    private var _publicKeyBytes: Data?
+    private var _publicKeyEncoded: String?
     /// True when `_privateKey` came from a deterministic source (keychain
     /// or master-key derivation). False = ephemeral fallback that should
     /// be replaced as soon as `warmUp` is callable.
@@ -62,33 +64,29 @@ public final class HPKEKeyStore: @unchecked Sendable {
     public var privateKey: Curve25519.KeyAgreement.PrivateKey {
         lock.lock()
         defer { lock.unlock() }
-        if let cached = _privateKey { return cached }
-
-        if let bytes = Self.loadKeychain(),
-           let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: bytes)
-        {
-            _privateKey = key
-            _isDeterministic = true
-            return key
-        }
-
-        // Ephemeral fallback — no identity yet (or keychain wiped). Keeps
-        // the process functional; will be overwritten by `warmUp`.
-        let ephemeral = Curve25519.KeyAgreement.PrivateKey()
-        _privateKey = ephemeral
-        _isDeterministic = false
-        return ephemeral
+        return privateKeyLocked()
     }
 
     /// 32-byte raw public key — what Bonjour publishes and what clients
-    /// pass to `HPKE.Sender`.
+    /// pass to `HPKE.Sender`. Cached so each Bonjour-advertised agent
+    /// doesn't re-derive the public key from the private key.
     public var publicKeyBytes: Data {
-        privateKey.publicKey.rawRepresentation
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = _publicKeyBytes { return cached }
+        let bytes = privateKeyLocked().publicKey.rawRepresentation
+        _publicKeyBytes = bytes
+        return bytes
     }
 
     /// Base64url (no padding) encoding of `publicKeyBytes`.
     public var publicKeyEncoded: String {
-        publicKeyBytes.base64urlEncoded
+        lock.lock()
+        defer { lock.unlock() }
+        if let cached = _publicKeyEncoded { return cached }
+        let encoded = (_publicKeyBytes ?? privateKeyLocked().publicKey.rawRepresentation).base64urlEncoded
+        _publicKeyEncoded = encoded
+        return encoded
     }
 
     /// True when the cached key was derived from the master key (and
@@ -97,8 +95,7 @@ public final class HPKEKeyStore: @unchecked Sendable {
     public var isDeterministic: Bool {
         lock.lock()
         defer { lock.unlock() }
-        // Force lazy init so the flag reflects an actual load attempt.
-        _ = privateKeyUnlocked()
+        _ = privateKeyLocked()
         return _isDeterministic
     }
 
@@ -110,13 +107,20 @@ public final class HPKEKeyStore: @unchecked Sendable {
     /// Idempotent: re-running with the same master key yields the same
     /// derived bytes.
     public func warmUp(masterKey: Data) {
-        let bytes = Self.derive(from: masterKey)
+        var bytes = Self.derive(from: masterKey)
+        defer {
+            bytes.withUnsafeMutableBytes { ptr in
+                if let base = ptr.baseAddress { memset(base, 0, ptr.count) }
+            }
+        }
         Self.saveKeychain(bytes)
 
         lock.lock()
         defer { lock.unlock() }
         if let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: bytes) {
             _privateKey = key
+            _publicKeyBytes = key.publicKey.rawRepresentation
+            _publicKeyEncoded = nil
             _isDeterministic = true
         }
     }
@@ -129,15 +133,16 @@ public final class HPKEKeyStore: @unchecked Sendable {
         lock.lock()
         defer { lock.unlock() }
         _privateKey = nil
+        _publicKeyBytes = nil
+        _publicKeyEncoded = nil
         _isDeterministic = false
     }
 
     // MARK: - Private helpers
 
-    /// Lock-free internal getter used by `isDeterministic`. Caller must
-    /// hold `lock` already, OR be tolerant of a race that only affects
-    /// the diagnostic flag.
-    private func privateKeyUnlocked() -> Curve25519.KeyAgreement.PrivateKey {
+    /// Returns the cached private key, lazily loading from keychain or
+    /// minting an ephemeral fallback. The caller must already hold `lock`.
+    private func privateKeyLocked() -> Curve25519.KeyAgreement.PrivateKey {
         if let cached = _privateKey { return cached }
         if let bytes = Self.loadKeychain(),
            let key = try? Curve25519.KeyAgreement.PrivateKey(rawRepresentation: bytes)

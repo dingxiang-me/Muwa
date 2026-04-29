@@ -317,7 +317,6 @@ public enum HPKEServerDecoder {
 /// matching response symmetric state lives behind `decryptResponseBody`
 /// and `decryptStreamChunk`.
 public final class HPKEClientContext: @unchecked Sendable {
-    public let suite = HPKEKeyStore.suiteIdentifier
     public let nonce: String
     public let timestamp: String
     public let method: String
@@ -364,14 +363,20 @@ public final class HPKEClientContext: @unchecked Sendable {
         self._sender = sender
     }
 
-    private var _sender: HPKE.Sender
+    /// Consumed on the first `sealRequestBody` call: a second seal would
+    /// land at AEAD counter 1 and fail to open server-side, so the API
+    /// surface forbids it instead of silently corrupting ciphertext.
+    private var _sender: HPKE.Sender?
 
-    /// Seal the request body. Single-shot; calling twice will produce
-    /// ciphertext at AEAD counter 1 which the server can't open.
+    /// Seal the request body. Consumes the sender — to retry, build a
+    /// fresh `HPKEClientContext` (which also gets a fresh nonce + timestamp
+    /// for replay protection).
     public func sealRequestBody(_ plaintext: Data) throws -> Data {
+        guard var sender = _sender else { throw HPKEError.sealFailed }
+        _sender = nil
         let aad = hpkeRequestAAD(method: method, path: path, nonce: nonce, timestamp: timestamp)
         do {
-            return try _sender.seal(plaintext, authenticating: aad)
+            return try sender.seal(plaintext, authenticating: aad)
         } catch {
             throw HPKEError.sealFailed
         }

@@ -164,12 +164,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             // HPKE decrypt: if the client signaled encryption, open the
             // body now and replace the buffered request body with
             // plaintext so all downstream handlers stay encryption-blind.
-            // Failures here short-circuit the request with 400.
+            // Failures here short-circuit the request with 400. Plaintext
+            // requests skip the entire branch so they don't pay for an
+            // extra body copy.
             if head.headers.contains(name: HPKEHeader.encryption) {
-                let bodyData: Data = stateRef.value.requestBodyBuffer.flatMap {
-                    var b = $0
-                    return b.readData(length: b.readableBytes)
-                } ?? Data()
+                var bodyData = Data()
+                if var b = stateRef.value.requestBodyBuffer {
+                    bodyData = b.readData(length: b.readableBytes) ?? Data()
+                }
                 do {
                     if let decrypted = try HPKEServerDecoder.decodeIfNeeded(
                         headerLookup: { head.headers.first(name: $0) },
@@ -472,6 +474,11 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
             stateRef.value.requestHead = nil
             stateRef.value.requestBodyBuffer = nil
+            // Defensive: handlers that respond async snapshot the
+            // context locally, so clearing here is safe and stops a
+            // prior request's context from leaking into a later one if
+            // keep-alive is ever re-enabled.
+            stateRef.value.encryptionContext = nil
         }
     }
 
