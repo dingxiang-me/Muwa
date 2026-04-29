@@ -18,28 +18,38 @@ let package = Package(
         // under us between identical osaurus source revisions. Bump
         // intentionally when validating a new upstream commit.
         //
-        // a7db6e5 closes the deterministic Metal-assertion crash class
-        // `notifyExternalReferencesNonZeroOnDealloc` inside
-        // `BatchEngine.stepPrefill` after `Cache disk hit`. Two upstream
-        // commits land that fix together:
-        //   - 98289d9 forces `MLX.asyncEval(slot.cache)` after disk
-        //     restore so lazy-restore graph ops don't extend into the
-        //     next request's command buffer.
-        //   - a7db6e5 sets `continuation.onTermination` on
-        //     `BatchEngine.generate`'s outStream so orphan slots get
-        //     reaped via `engine.cancel(requestId)` whenever a consumer
-        //     breaks early.
-        // Net effect: the `Task.isCancelled` break in MLXBatchAdapter
-        // line 209-222 is safe, and no `enableDiskCache: false` workaround
-        // is needed.
+        // ae526a3 brings five things in one bump from a7db6e5:
+        //   - b4eec09 native Swift port of the Nemotron-3-Nano-Omni
+        //     multimodal stack (replaces the pytorch-bridged path) —
+        //     building blocks for Parakeet/RADIO native runtime.
+        //   - 08994b0 OMNI-OSAURUS-HOOKUP.md spec — cited by
+        //     `ModelRuntime.installCacheCoordinator` (§5.1) and the
+        //     Nemotron-3 registry comments (§12.5).
+        //   - 75549cb @ModuleInfo single-segment fix for the omni stack
+        //     weight loader.
+        //   - ae526a3 authoritative blockSize + omni quant plumbing —
+        //     **closes the `rms_norm` trap class** that was killing
+        //     Cascade-2 JANG_4M and Nemotron-Omni MXFP4 first-prefill
+        //     under the bits=4 / 164-override JANG path. Symbolicated
+        //     against `nemotron-cascade-2-30b-a3b-jang_4m` during
+        //     PR #967 triage. Pairs with osaurus-side
+        //     `MLXErrorRecovery.installGlobalHandler()` belt+suspenders.
         //
-        // Also includes c992df9's `GenerateCompletionInfo.unclosedReasoning`,
-        // which the chat UI consumes to surface a "thinking didn't close"
-        // chip when reasoning-trained models trap themselves on validation
-        // prompts.
+        // Carries forward the prior fixes from a7db6e5:
+        //   - 98289d9 `MLX.asyncEval(slot.cache)` after disk restore
+        //   - a7db6e5 `continuation.onTermination` on
+        //     `BatchEngine.generate` so orphan slots reap on early break
+        //   - c992df9 `GenerateCompletionInfo.unclosedReasoning`
+        //
+        // The audio + video API surface (UserInput.Audio, Chat.Message.
+        // audios, processor wiring, mic recorder, system TTS, Parakeet
+        // E2E) ships separately as a coordinated osaurus + vmlx pair —
+        // see the audio-API follow-up PR. That PR pins to vmlx
+        // 3b78db4 which adds the Chat.Message.audios bridge needed for
+        // OpenAI `input_audio` content parts to flow end-to-end.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "a7db6e5fdde525c43f72ba48df8ba12a07451ee9"
+            revision: "ae526a38c033533940f383f0d31d0a55100938d2"
         ),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.0"),
