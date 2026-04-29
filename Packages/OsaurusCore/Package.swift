@@ -18,38 +18,63 @@ let package = Package(
         // under us between identical osaurus source revisions. Bump
         // intentionally when validating a new upstream commit.
         //
-        // ae526a3 brings five things in one bump from a7db6e5:
-        //   - b4eec09 native Swift port of the Nemotron-3-Nano-Omni
-        //     multimodal stack (replaces the pytorch-bridged path) —
-        //     building blocks for Parakeet/RADIO native runtime.
-        //   - 08994b0 OMNI-OSAURUS-HOOKUP.md spec — cited by
-        //     `ModelRuntime.installCacheCoordinator` (§5.1) and the
-        //     Nemotron-3 registry comments (§12.5).
-        //   - 75549cb @ModuleInfo single-segment fix for the omni stack
-        //     weight loader.
+        // 1c62d21 collects every relevant runtime + docs fix accrued
+        // since a7db6e5 (the prior osaurus pin). Picker entries PR #967
+        // adds (Nemotron-3 omni bundles + the broader hybrid family
+        // setHybrid path) all want these:
+        //
+        // Runtime fixes:
         //   - ae526a3 authoritative blockSize + omni quant plumbing —
-        //     **closes the `rms_norm` trap class** that was killing
+        //     **closes the `rms_norm` trap class** that killed
         //     Cascade-2 JANG_4M and Nemotron-Omni MXFP4 first-prefill
         //     under the bits=4 / 164-override JANG path. Symbolicated
         //     against `nemotron-cascade-2-30b-a3b-jang_4m` during
-        //     PR #967 triage. Pairs with osaurus-side
+        //     PR #967 triage. Pairs with the osaurus-side
         //     `MLXErrorRecovery.installGlobalHandler()` belt+suspenders.
+        //   - 537e386 `NemotronHJANGTQ` — closes
+        //     `Unhandled keys ["experts"]` on omni JANGTQ bundles by
+        //     stacking per-expert TQ-packed tensors and swapping in
+        //     `TurboQuantSwitchLinear` for the routed-expert switch.
+        //   - d020e76 `NemotronHOmni.prepare(_:)` text-only returns
+        //     `.logits` instead of `.tokens` — dodges a `[concatenate]
+        //     dims 3 vs 4` trap when `BatchEngine.stepPrefill` adds a
+        //     `[.newAxis]` axis to processor tokens, which then cascaded
+        //     into Mamba2 conv state merge. Mirrors `Gemma3.prepare` /
+        //     `FastVLM.prepare`.
         //
-        // Carries forward the prior fixes from a7db6e5:
+        // Foundational omni stack:
+        //   - b4eec09 native Swift port of Nemotron-3-Nano-Omni — first
+        //     time osaurus drives Parakeet/RADIO without a torch dep.
+        //   - 08994b0 OMNI-OSAURUS-HOOKUP.md spec — cited by
+        //     `ModelRuntime.installCacheCoordinator` (§5.1) and the
+        //     Nemotron-3 registry comments (§12.5).
+        //   - 75549cb @ModuleInfo single-segment fix for omni weight
+        //     loading.
+        //   - 1c62d21 OMNI-OSAURUS-HOOKUP §10 correction: the prior
+        //     "BatchEngine omni B=1 empty stream" claim was a bench
+        //     methodology artifact — the bench counted only `.chunk`
+        //     events and missed `.reasoning(_)` events that
+        //     reasoning-on-by-default omni emits during
+        //     `<think>...</think>`. Osaurus's `GenerationEventMapper`
+        //     correctly forwards `.reasoning(_)` (see
+        //     `PluginHostAPI.swift:1139` emitting
+        //     `delta.reasoning_content`), so streaming clients see the
+        //     full output. No osaurus-side workaround needed.
+        //
+        // Carries forward all prior fixes:
         //   - 98289d9 `MLX.asyncEval(slot.cache)` after disk restore
         //   - a7db6e5 `continuation.onTermination` on
         //     `BatchEngine.generate` so orphan slots reap on early break
         //   - c992df9 `GenerateCompletionInfo.unclosedReasoning`
         //
-        // The audio + video API surface (UserInput.Audio, Chat.Message.
-        // audios, processor wiring, mic recorder, system TTS, Parakeet
-        // E2E) ships separately as a coordinated osaurus + vmlx pair —
-        // see the audio-API follow-up PR. That PR pins to vmlx
-        // 3b78db4 which adds the Chat.Message.audios bridge needed for
-        // OpenAI `input_audio` content parts to flow end-to-end.
+        // The audio + video HTTP-API surface
+        // (`MessageContentPart.audioInput` / `.videoUrl` →
+        // `UserInput.audios` / `.videos`) ships in a follow-up osaurus
+        // PR on top of this one; vmlx-side wiring is already in place
+        // at this pin.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "ae526a38c033533940f383f0d31d0a55100938d2"
+            revision: "1c62d210d7f23e1ba1e8d5cc45ec9f1221357f01"
         ),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.0"),
