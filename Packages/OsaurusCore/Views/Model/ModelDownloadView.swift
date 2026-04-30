@@ -590,14 +590,11 @@ struct ModelDownloadView: View {
             if modelManager.isLoadingModels && lists.displayed.isEmpty {
                 loadingState
             } else {
-                VStack(spacing: 0) {
-                    sortFilterBar
-                        .padding(.horizontal, 24)
-                        .padding(.top, 12)
-                        .padding(.bottom, 4)
-
-                    ScrollView {
+                ScrollView {
                     VStack(spacing: 12) {
+                        sortFilterBar
+                            .padding(.bottom, -4)
+
                         if !modelManager.deprecationNotices.isEmpty {
                             deprecationBanner
                         }
@@ -629,24 +626,6 @@ struct ModelDownloadView: View {
                     .padding(.horizontal, 24)
                     .padding(.bottom, 24)
                     .padding(.top, 12)
-                    }
-                    .mask(
-                        VStack(spacing: 0) {
-                            LinearGradient(
-                                gradient: Gradient(colors: [.clear, .black]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: 16)
-                            Color.black
-                            LinearGradient(
-                                gradient: Gradient(colors: [.black, .clear]),
-                                startPoint: .top,
-                                endPoint: .bottom
-                            )
-                            .frame(height: 24)
-                        }
-                    )
                 }
             }
         }
