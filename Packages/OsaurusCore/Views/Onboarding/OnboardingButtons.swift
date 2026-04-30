@@ -206,12 +206,13 @@ struct OnboardingStatefulButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Outer glow
+                // Outer glow — kept very soft so the button stays grounded
+                // in the footer instead of looking like a floating halo.
                 Capsule()
                     .fill(fillColor)
-                    .blur(radius: isHovered ? 18 : 12)
-                    .opacity(shouldDisable ? 0 : (isHovered ? 0.55 : 0.35))
-                    .scaleEffect(isHovered ? 1.04 : 1.0)
+                    .blur(radius: isHovered ? 6 : 4)
+                    .opacity(shouldDisable ? 0 : (isHovered ? 0.22 : 0.12))
+                    .scaleEffect(isHovered ? 1.02 : 1.0)
 
                 // Main fill
                 Capsule()
@@ -282,7 +283,7 @@ struct OnboardingStatefulButton: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: OnboardingMetrics.buttonHeight)
-            .scaleEffect(isHovered && !shouldDisable ? 1.03 : 1.0)
+            .scaleEffect(isHovered && !shouldDisable ? 1.015 : 1.0)
         }
         .buttonStyle(.plain)
         .disabled(shouldDisable)
@@ -385,12 +386,13 @@ struct OnboardingBrandButton: View {
     var body: some View {
         Button(action: action) {
             ZStack {
-                // Outer glow
+                // Outer glow — kept very soft so the button stays grounded
+                // in the footer instead of looking like a floating halo.
                 Capsule()
                     .fill(fillColor)
-                    .blur(radius: isHovered ? 18 : 12)
-                    .opacity(isHovered ? 0.55 : 0.35)
-                    .scaleEffect(isHovered ? 1.04 : 1.0)
+                    .blur(radius: isHovered ? 6 : 4)
+                    .opacity(isHovered ? 0.22 : 0.12)
+                    .scaleEffect(isHovered ? 1.02 : 1.0)
 
                 // Main fill
                 Capsule()
@@ -459,7 +461,7 @@ struct OnboardingBrandButton: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: OnboardingMetrics.buttonHeight)
-            .scaleEffect(isHovered ? 1.03 : 1.0)
+            .scaleEffect(isHovered ? 1.015 : 1.0)
         }
         .buttonStyle(.plain)
         .disabled(!isEnabled)

@@ -100,7 +100,8 @@ final class NativeHeaderView: NSView {
 
         let avatarLeading = avatarImageView.leadingAnchor.constraint(equalTo: leadingAnchor)
         let nameToAvatar = nameLabel.leadingAnchor.constraint(
-            equalTo: avatarImageView.trailingAnchor, constant: 6
+            equalTo: avatarImageView.trailingAnchor,
+            constant: 6
         )
         let nameToSelf = nameLabel.leadingAnchor.constraint(equalTo: leadingAnchor)
         nameToSelf.isActive = true
@@ -390,7 +391,9 @@ final class NativeAssistantActionsView: NSView {
 
         let size: CGFloat = 28
         let speakLeading = speakButton.leadingAnchor.constraint(
-            equalTo: regenerateButton.trailingAnchor, constant: 4)
+            equalTo: regenerateButton.trailingAnchor,
+            constant: 4
+        )
         let speakWidth = speakButton.widthAnchor.constraint(equalToConstant: size)
         self.speakLeadingConstraint = speakLeading
         self.speakWidthConstraint = speakWidth

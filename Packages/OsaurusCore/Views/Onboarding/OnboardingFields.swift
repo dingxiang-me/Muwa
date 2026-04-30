@@ -95,7 +95,9 @@ struct OnboardingTextField: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            OnboardingFieldLabel(text: label)
+            if !label.isEmpty {
+                OnboardingFieldLabel(text: label)
+            }
 
             TextField(text: $text, prompt: Text(LocalizedStringKey(placeholder), bundle: .module)) {
                 Text(LocalizedStringKey(placeholder), bundle: .module)

@@ -650,7 +650,7 @@ struct ModelDownloadView: View {
                     } else {
                         Text("Sort: ", bundle: .module)
                             .font(.system(size: 13, weight: .medium))
-                        + Text(sortOption.displayName)
+                            + Text(sortOption.displayName)
                             .font(.system(size: 13, weight: .semibold))
                     }
                 }
@@ -689,7 +689,7 @@ struct ModelDownloadView: View {
                     if let active = activeFilterSummary {
                         Text("Filter: ", bundle: .module)
                             .font(.system(size: 13, weight: .medium))
-                        + Text(active)
+                            + Text(active)
                             .font(.system(size: 13, weight: .semibold))
                     } else {
                         Text("Filter", bundle: .module)
