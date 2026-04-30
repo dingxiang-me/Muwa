@@ -13,7 +13,21 @@ let package = Package(
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.0"),
         .package(url: "https://github.com/orlandos-nl/IkigaJSON", from: "2.3.2"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.7.0"),
-        .package(url: "https://github.com/osaurus-ai/mlx-swift", branch: "osaurus-0.31.3"),
+        // mlx-swift pinned by revision (was `branch: "osaurus-0.31.3"`) so
+        // the runtime can't change under us if the branch tip moves. The
+        // revision below is the merge point on `osaurus-0.31.3` that
+        // (a) refreshes the submodule URL to the host-side `osaurus-ai/mlx`
+        // fork and (b) advances the submodule pointer to a commit
+        // (`f58e52da` on the fork's `fix/clear-library-no-release`) that
+        // contains the Bug-1 fix for the deterministic Metal validation
+        // crash class `notifyExternalReferencesNonZeroOnDealloc` that
+        // fired on warm-disk-cache 2nd-request flows on Apple M4 Pro
+        // Debug builds. Revert by setting `MLX_CLEAR_LIBRARY_RELEASE=1`
+        // at runtime if needed for A/B testing.
+        .package(
+            url: "https://github.com/osaurus-ai/mlx-swift",
+            revision: "e0b61113f0190e3503ad9123bf4d4508248cd316"
+        ),
         // Pinned by commit (was `branch: "main"`) so the runtime can't change
         // under us between identical osaurus source revisions. Bump
         // intentionally when validating a new upstream commit.
@@ -74,7 +88,7 @@ let package = Package(
         // at this pin.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "1c62d210d7f23e1ba1e8d5cc45ec9f1221357f01"
+            revision: "13abe407df83d1836f640d0cb56f63a7e640ede3"
         ),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         .package(url: "https://github.com/FluidInference/FluidAudio.git", from: "0.14.0"),
