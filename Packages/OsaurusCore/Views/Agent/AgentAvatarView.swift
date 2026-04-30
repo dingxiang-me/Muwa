@@ -15,7 +15,7 @@ public enum AgentMascot: String, CaseIterable, Identifiable, Sendable {
     case blue, green, orange, purple, red, yellow
 
     public var id: String { rawValue }
-    public var assetName: String { "osaurus-pfp-\(rawValue)@4x" }
+    public var assetName: String { "osaurus-pfp-\(rawValue)" }
 }
 
 /// Renders an agent avatar at the given diameter. Uses the mascot image when
