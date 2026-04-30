@@ -954,17 +954,32 @@ extension AppDelegate {
     }
 
     /// `osaurus://<addr>?pair=<base64url(invite)>` — incoming agent share link.
-    /// Stages the decoded invite for `IncomingPairSheet` to present.
+    /// `osaurus://plugins-install?tool=<plugin_id>` — open Plugins tab on a plugin's detail page.
     fileprivate func handleOsaurusDeepLink(_ url: URL) {
         Task { @MainActor in
-            // Make sure SOMETHING is on screen so the approval panel doesn't
-            // open behind a hidden app. Bring the management window forward
-            // as the anchor — it doesn't matter which tab is selected; the
-            // approval is presented as its own NSPanel via PairingPromptService.
             NSApp.activate(ignoringOtherApps: true)
+
+            if url.host?.lowercased() == "plugins-install" {
+                handlePluginsInstallDeepLink(url)
+                return
+            }
+
+            // default: pairing. bring the management window forward as the anchor
+            // the approval is presented as its own NSPanel via PairingPromptService
             showManagementWindow(initialTab: .agents)
             _ = PairingDeepLinkRouter.handle(url)
         }
+    }
+
+    @MainActor
+    fileprivate func handlePluginsInstallDeepLink(_ url: URL) {
+        let components = URLComponents(url: url, resolvingAgainstBaseURL: false)
+        let toolId = components?.queryItems?
+            .first(where: { $0.name.lowercased() == "tool" })?.value?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        ManagementStateManager.shared.pendingPluginDetailId = (toolId?.isEmpty == false) ? toolId : nil
+        showManagementWindow(initialTab: .plugins)
     }
 
     fileprivate func handleHuggingFaceDeepLink(_ url: URL) {
