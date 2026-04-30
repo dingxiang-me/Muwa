@@ -116,9 +116,6 @@ final class ConfigureAIState: ObservableObject {
     @Published var downloadErrorMessage = ""
 
     // API
-    /// Preset radio-selected on the picker substate. Drives the disabled
-    /// state of the picker's `Continue` CTA. Cleared in `resetAPIState()`.
-    @Published var selectedAPIPreset: ProviderPreset? = nil
     @Published var apiKey: String = ""
     @Published var openAIAuthMode: OpenAIProviderCredentialMode = .chatGPTSubscription
     @Published var oauthTokens: RemoteProviderOAuthTokens? = nil
@@ -158,28 +155,13 @@ final class ConfigureAIState: ObservableObject {
 
     // MARK: Back handling
 
-    /// Drill out of any sub-substate. If the user is on the picker root for
-    /// the selected path, calls `parentBack` to leave the step entirely;
-    /// otherwise pops back to the picker within the same path.
+    /// The global header back button always exits the Configure AI step.
+    /// Sub-substates (key form, custom form, local downloading) have their
+    /// own in-section back rows, so the header back button doesn't double
+    /// as both global-step nav AND substate nav — that ambiguity used to
+    /// confuse users.
     func handleBack(parentBack: () -> Void) {
-        switch selectedPath {
-        case .apiProvider:
-            switch apiSubstate {
-            case .picker:
-                parentBack()
-            case .keyForm, .customForm:
-                resetAPIState()
-            }
-        case .local:
-            switch localSubstate {
-            case .picker:
-                parentBack()
-            case .downloading:
-                localSubstate = .picker
-            }
-        case .appleFoundation:
-            parentBack()
-        }
+        parentBack()
     }
 
     // MARK: Local
@@ -272,7 +254,6 @@ final class ConfigureAIState: ObservableObject {
 
     func resetAPIState() {
         apiSubstate = .picker
-        selectedAPIPreset = nil
         apiKey = ""
         openAIAuthMode = .chatGPTSubscription
         oauthTokens = nil
@@ -280,11 +261,10 @@ final class ConfigureAIState: ObservableObject {
         testResult = nil
     }
 
-    /// Advances to the matching key-form substate for the currently
-    /// selected preset. No-op if nothing is selected (matches the disabled
-    /// CTA semantics on the picker).
-    func confirmAPIPreset() {
-        guard let preset = selectedAPIPreset else { return }
+    /// Picker → form drill-in. Tapping a provider card immediately advances
+    /// to its key form (or the custom-provider form), no "Continue" press
+    /// required.
+    func selectAPIPreset(_ preset: ProviderPreset) {
         if preset == .custom {
             apiSubstate = .customForm
         } else {
@@ -386,24 +366,22 @@ struct ConfigureAIBody: View {
             leftHeadline: "Pick a brain",
             leftBody:
                 "Apple Intelligence on-device, a local MLX model, or any cloud provider. Models are interchangeable — switch any time without losing your history.",
-            subtitle: pathSubtitle
+            subtitle: pathSubtitle,
+            // We manage our own inner scroll: the segmented control stays
+            // pinned at the top while the substate body scrolls beneath it.
+            useScrollView: false
         ) {
-            VStack(alignment: .leading, spacing: OnboardingMetrics.sectionSpacing) {
+            VStack(alignment: .leading, spacing: 14) {
                 pathSegmentedControl
 
-                ZStack {
-                    substateContent
-                        .id(substateID)
-                        .transition(substateTransition)
-                }
-                .animation(.spring(response: 0.5, dampingFraction: 0.85), value: substateID)
+                substateContainer
+                    .id(substateID)
+                    .transition(substateTransition)
+                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: substateID)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .onAppear { state.ensureLocalSelection() }
-        .onChange(of: state.isLocalCompleted) { _, completed in
-            // Auto-advance handled by CTA; nothing to do here for now.
-            _ = completed
-        }
         .onChange(of: state.isLocalFailed) { _, failed in
             if failed, let error = state.localFailedError {
                 state.downloadErrorMessage = error
@@ -476,7 +454,15 @@ struct ConfigureAIBody: View {
             .background(
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(isSelected ? theme.accentColor : Color.clear)
+                    // Localized animation on the fill ONLY — keeps the
+                    // segment selection smooth without leaking into the
+                    // footer CTA via `selectedPath`.
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: isSelected)
             )
+            // Make the entire segment hit-testable, not just the icon+text.
+            // `Button { … } label: { … }` with `.plain` style only registers
+            // hits on the label's drawn pixels by default.
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -507,23 +493,106 @@ struct ConfigureAIBody: View {
         )
     }
 
+    /// Substate container — owns its own scrolling and in-section back row
+    /// when the user has drilled into a sub-substate (key form, custom form,
+    /// downloading). The segmented control above stays pinned in place.
     @ViewBuilder
-    private var substateContent: some View {
+    private var substateContainer: some View {
         switch state.selectedPath {
         case .appleFoundation:
             appleConfirmView
+
         case .local:
             switch state.localSubstate {
-            case .picker: localPickerView
-            case .downloading: localDownloadingView
+            case .picker:
+                scrollableSubstate { localPickerView }
+            case .downloading:
+                substateWithBackBar(
+                    title: state.selectedModel?.name ?? L("Downloading"),
+                    onBack: { state.localSubstate = .picker }
+                ) {
+                    localDownloadingView
+                }
             }
+
         case .apiProvider:
             switch state.apiSubstate {
-            case .picker: apiPickerView
-            case .keyForm: apiKeyFormView
-            case .customForm: apiCustomFormView
+            case .picker:
+                scrollableSubstate { apiPickerView }
+            case .keyForm(let provider):
+                substateWithBackBar(
+                    title: provider == .openai ? L("Connect OpenAI") : "Connect \(provider.name)",
+                    onBack: { state.resetAPIState() }
+                ) {
+                    apiKeyFormView
+                }
+            case .customForm:
+                substateWithBackBar(
+                    title: L("Custom provider"),
+                    onBack: { state.resetAPIState() }
+                ) {
+                    apiCustomFormView
+                }
             }
         }
+    }
+
+    /// Wraps content in a vertical ScrollView so long lists don't overflow
+    /// the body while keeping the segmented control above it pinned. The
+    /// internal vertical padding (`scrollContentVerticalBuffer`) gives the
+    /// first/last card's hover shadow + scale room to render without
+    /// clipping at the scroll-area edges.
+    private func scrollableSubstate<C: View>(@ViewBuilder content: () -> C) -> some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            content()
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.vertical, scrollContentVerticalBuffer)
+                .padding(.horizontal, scrollContentHorizontalBuffer)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+    }
+
+    /// Sub-substate frame: an in-context back row (drills out to the picker)
+    /// followed by the substate body wrapped in a ScrollView for any
+    /// overflow (key forms, custom-provider form, etc.).
+    private func substateWithBackBar<C: View>(
+        title: String,
+        onBack: @escaping () -> Void,
+        @ViewBuilder content: () -> C
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            substateBackRow(title: title, onBack: onBack)
+            ScrollView(.vertical, showsIndicators: false) {
+                content()
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.vertical, scrollContentVerticalBuffer)
+                    .padding(.horizontal, scrollContentHorizontalBuffer)
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+        }
+    }
+
+    /// Buffer space inside scroll regions so hover shadows + scale on
+    /// row/glass cards don't clip against the scroll-area edges.
+    private var scrollContentVerticalBuffer: CGFloat { 6 }
+    private var scrollContentHorizontalBuffer: CGFloat { 4 }
+
+    private func substateBackRow(title: String, onBack: @escaping () -> Void) -> some View {
+        Button(action: onBack) {
+            HStack(spacing: 6) {
+                Image(systemName: "chevron.left")
+                    .font(.system(size: 11, weight: .semibold))
+                Text(title)
+                    .font(theme.font(size: 13, weight: .semibold))
+                    .lineLimit(1)
+                Spacer(minLength: 0)
+            }
+            .foregroundColor(theme.secondaryText)
+            .padding(.vertical, 4)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .help(Text("Back to providers", bundle: .module))
     }
 
     // MARK: - Apple confirm
@@ -680,8 +749,7 @@ struct ConfigureAIBody: View {
     }
 
     private func apiPresetCard(_ preset: ProviderPreset) -> some View {
-        let isSelected = state.selectedAPIPreset == preset
-        return OnboardingRowCard(
+        OnboardingRowCard(
             icon: .custom {
                 ProviderIcon(preset: preset, size: 18, color: theme.secondaryText)
             },
@@ -690,13 +758,11 @@ struct ConfigureAIBody: View {
                 ? L("OpenRouter, Together AI, LM Studio, and more")
                 : (preset == .openai ? L("ChatGPT, Codex, or Platform API") : preset.description),
             badges: preset.badge.map { [OnboardingRowBadge($0)] } ?? [],
-            accessory: .radio(isSelected: isSelected),
-            isSelected: isSelected
+            accessory: .chevron
         ) {
-            // Radio selection — the picker matches the Local picker pattern:
-            // pick first, confirm with Continue. No `withAnimation` here, since
-            // it would propagate to the footer CTA's enabled-state change.
-            state.selectedAPIPreset = preset
+            // Drill-in: tapping a card commits the choice and advances
+            // straight to the matching key form. No "Continue" press needed.
+            state.selectAPIPreset(preset)
         }
     }
 
@@ -819,11 +885,14 @@ struct ConfigureAIBody: View {
     ) -> some View {
         let selected = state.openAIAuthMode == mode
         return Button {
-            withAnimation(.spring(response: 0.4, dampingFraction: 0.85)) {
-                state.openAIAuthMode = mode
-                state.oauthTokens = nil
-                state.testResult = nil
-            }
+            // No `withAnimation` wrapper — propagating to the CTA (which
+            // observes `openAIAuthMode` to switch between "Sign in with
+            // ChatGPT" and "Connect") morphs the button. Selection
+            // crossfade is handled locally by the `.animation(value:)`
+            // modifier on the background fill below.
+            state.openAIAuthMode = mode
+            state.oauthTokens = nil
+            state.testResult = nil
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: icon)
@@ -852,7 +921,9 @@ struct ConfigureAIBody: View {
                         RoundedRectangle(cornerRadius: 9)
                             .stroke(selected ? theme.accentColor.opacity(0.55) : theme.cardBorder, lineWidth: 1)
                     )
+                    .animation(.spring(response: 0.35, dampingFraction: 0.85), value: selected)
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -951,13 +1022,11 @@ struct ConfigureAICTA: View {
         case .apiProvider:
             switch state.apiSubstate {
             case .picker:
-                // Disabled `Continue` until a provider preset is radio-selected.
-                OnboardingBrandButton(
-                    title: "Continue",
-                    action: { state.confirmAPIPreset() },
-                    isEnabled: state.selectedAPIPreset != nil
-                )
-                .frame(width: OnboardingMetrics.ctaWidthCompact)
+                // Provider cards drill in on tap — no Continue press
+                // required. Reserve the button footprint so the footer
+                // doesn't reflow when the user navigates into a key form.
+                Color.clear
+                    .frame(width: OnboardingMetrics.ctaWidthCompact, height: OnboardingMetrics.buttonHeight)
             case .keyForm, .customForm:
                 apiActionButton
             }

@@ -75,7 +75,6 @@ struct OnboardingChromeShell<
         VStack(spacing: 0) {
             header
             bodyRegion
-            progressStrip
             footerColumn
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -113,24 +112,21 @@ struct OnboardingChromeShell<
             .clipped()
     }
 
-    // MARK: - Progress strip (transparent, between body and footer)
-
-    /// Centered step-indicator strip. The slot is animated by the caller so
-    /// the dots slide along with the rest of the content; this view just
-    /// provides the layout chrome (centering + fixed height).
-    private var progressStrip: some View {
-        progressSlot
-            .frame(maxWidth: .infinity)
-            .frame(height: OnboardingMetrics.progressStripHeight)
-            .padding(.top, OnboardingMetrics.progressStripTopPadding)
-            .padding(.bottom, OnboardingMetrics.progressStripBottomPadding)
-    }
-
     // MARK: - Footer (transparent, no rule)
 
+    /// Footer chrome cluster. Vertically: progress dots → footer caption →
+    /// action row. The dots live at the top of the footer (not in a strip
+    /// between body and footer) so they read as global chrome paired with
+    /// the action row, instead of crowding the last row of the body content.
     private var footerColumn: some View {
-        VStack(spacing: OnboardingMetrics.footerCaptionToCTA) {
+        VStack(spacing: 0) {
+            progressSlot
+                .frame(maxWidth: .infinity)
+                .frame(height: OnboardingMetrics.progressStripHeight)
+                .padding(.bottom, OnboardingMetrics.footerCaptionToCTA)
+
             footerCaptionSlot
+                .padding(.bottom, OnboardingMetrics.footerCaptionToCTA)
 
             // Action row — wizard layout: secondary on the leading edge,
             // primary CTA on the trailing edge.

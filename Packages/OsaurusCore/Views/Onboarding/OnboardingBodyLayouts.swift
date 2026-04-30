@@ -25,6 +25,11 @@ struct OnboardingTwoColumnBody<RightContent: View>: View {
     let leftHeadline: LocalizedStringKey?
     let leftBody: LocalizedStringKey?
     let subtitle: LocalizedStringKey?
+    /// When `true` (default) the right column wraps `rightContent` in a
+    /// single vertical `ScrollView`. Set `false` for steps that need to
+    /// manage their own internal scroll regions (e.g. a sticky header above
+    /// a scrollable substate body).
+    let useScrollView: Bool
     let rightContent: RightContent
 
     @Environment(\.theme) private var theme
@@ -34,12 +39,14 @@ struct OnboardingTwoColumnBody<RightContent: View>: View {
         leftHeadline: LocalizedStringKey? = nil,
         leftBody: LocalizedStringKey? = nil,
         subtitle: LocalizedStringKey? = nil,
+        useScrollView: Bool = true,
         @ViewBuilder rightContent: () -> RightContent
     ) {
         self.illustrationAsset = illustrationAsset
         self.leftHeadline = leftHeadline
         self.leftBody = leftBody
         self.subtitle = subtitle
+        self.useScrollView = useScrollView
         self.rightContent = rightContent()
     }
 
@@ -115,30 +122,43 @@ struct OnboardingTwoColumnBody<RightContent: View>: View {
 
     // MARK: - Right Column
 
-    /// Right column scrolls vertically when content overflows. The optional
-    /// `subtitle` is the first row inside the scroll content so it scrolls
-    /// with the form (otherwise the chrome would feel busy).
+    /// Right column. When `useScrollView` is `true`, the optional subtitle +
+    /// `rightContent` are wrapped in a single vertical `ScrollView`. When
+    /// `false`, the subtitle and content are laid out non-scrollably and the
+    /// caller is expected to manage any inner scroll regions itself.
+    @ViewBuilder
     private var rightColumn: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 0) {
-                if let subtitle = subtitle {
-                    Text(subtitle, bundle: .module)
-                        .font(theme.font(size: OnboardingMetrics.subtitleSize))
-                        .foregroundColor(theme.secondaryText)
-                        .multilineTextAlignment(.leading)
-                        .lineSpacing(3)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(.bottom, 14)
-                }
-
-                rightContent
-                    .frame(maxWidth: .infinity, alignment: .leading)
+        if useScrollView {
+            ScrollView(.vertical, showsIndicators: false) {
+                rightInnerStack
+                    .padding(.horizontal, OnboardingMetrics.rightColumnHorizontalPadding)
+                    .padding(.vertical, OnboardingMetrics.bodyVerticalPadding)
             }
-            .padding(.horizontal, OnboardingMetrics.rightColumnHorizontalPadding)
-            .padding(.vertical, OnboardingMetrics.bodyVerticalPadding)
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+        } else {
+            rightInnerStack
+                .padding(.horizontal, OnboardingMetrics.rightColumnHorizontalPadding)
+                .padding(.vertical, OnboardingMetrics.bodyVerticalPadding)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var rightInnerStack: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            if let subtitle = subtitle {
+                Text(subtitle, bundle: .module)
+                    .font(theme.font(size: OnboardingMetrics.subtitleSize))
+                    .foregroundColor(theme.secondaryText)
+                    .multilineTextAlignment(.leading)
+                    .lineSpacing(3)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.bottom, 14)
+            }
+
+            rightContent
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
     }
 }
 

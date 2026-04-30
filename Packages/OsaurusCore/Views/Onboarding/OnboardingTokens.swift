@@ -27,11 +27,9 @@ enum OnboardingMetrics {
     /// Horizontal padding for header content (back/close hug the edges via this).
     static let headerHorizontal: CGFloat = 20
 
-    // Step indicator strip (between body and footer)
-    /// Total height of the dedicated step-indicator strip (just the dots).
+    // Step indicator
+    /// Height the progress-dots row occupies inside the footer column.
     static let progressStripHeight: CGFloat = 8
-    static let progressStripTopPadding: CGFloat = 4
-    static let progressStripBottomPadding: CGFloat = 6
 
     // Footer
     /// Vertical padding above the footer's caption / action row.
