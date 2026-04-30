@@ -412,24 +412,12 @@ private struct AgentCard: View {
         Button(action: onSelect) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .center, spacing: 12) {
-                    ZStack {
-                        Circle()
-                            .fill(
-                                LinearGradient(
-                                    colors: [agentColor.opacity(0.15), agentColor.opacity(0.05)],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-
-                        Circle()
-                            .strokeBorder(agentColor.opacity(0.4), lineWidth: 2)
-
-                        Text(agent.name.prefix(1).uppercased())
-                            .font(.system(size: 16, weight: .bold, design: .rounded))
-                            .foregroundColor(agentColor)
-                    }
-                    .frame(width: 36, height: 36)
+                    AgentAvatarView(
+                        mascotId: agent.avatar,
+                        name: agent.name,
+                        tint: agentColor,
+                        diameter: 36
+                    )
 
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
@@ -798,6 +786,7 @@ struct AgentDetailView: View {
     @State private var pluginInstructionsMap: [String: String] = [:]
     @State private var disableTools: Bool = false
     @State private var disableMemory: Bool = false
+    @State private var avatar: String? = nil
     /// Drives the title-bar agent picker popover. Tapping the avatar / name in the
     /// header bar reveals the list of other custom agents so the user can jump
     /// between them without bouncing back to the Agents grid every time.
@@ -1087,23 +1076,16 @@ struct AgentDetailView: View {
             showingAgentSwitcher = true
         } label: {
             HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [agentColor.opacity(0.2), agentColor.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Circle()
-                        .strokeBorder(agentColor.opacity(0.5), lineWidth: 1.5)
-                    Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
-                        .font(.system(size: 13, weight: .bold, design: .rounded))
-                        .foregroundColor(agentColor)
-                }
-                .frame(width: 28, height: 28)
+                AgentAvatarView(
+                    mascotId: avatar,
+                    name: name,
+                    tint: agentColor,
+                    diameter: 28,
+                    monogramFontSize: 13,
+                    borderWidth: 1.5
+                )
                 .animation(.spring(response: 0.3), value: name)
+                .animation(.spring(response: 0.3), value: avatar)
 
                 VStack(alignment: .leading, spacing: 1) {
                     HStack(spacing: 6) {
@@ -1192,21 +1174,14 @@ struct AgentDetailView: View {
             }
         } label: {
             HStack(spacing: 10) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [color.opacity(0.2), color.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Circle().strokeBorder(color.opacity(0.5), lineWidth: 1.5)
-                    Text(other.name.isEmpty ? "?" : other.name.prefix(1).uppercased())
-                        .font(.system(size: 11, weight: .bold, design: .rounded))
-                        .foregroundColor(color)
-                }
-                .frame(width: 26, height: 26)
+                AgentAvatarView(
+                    mascotId: other.avatar,
+                    name: other.name,
+                    tint: color,
+                    diameter: 26,
+                    monogramFontSize: 11,
+                    borderWidth: 1.5
+                )
 
                 VStack(alignment: .leading, spacing: 1) {
                     Text(other.name.isEmpty ? L("Untitled Agent") : other.name)
@@ -1571,8 +1546,54 @@ struct AgentDetailView: View {
     @ViewBuilder
     private var customizationTabContent: some View {
         tabHelperText(DetailTab.customization.helperText)
+        avatarSection
         quickActionsSection
         themeSection
+    }
+
+    private var avatarSection: some View {
+        AgentDetailSection(title: "Avatar", icon: "person.crop.circle") {
+            VStack(alignment: .leading, spacing: 12) {
+                HStack(spacing: 10) {
+                    avatarOption(mascotId: nil)
+                    ForEach(AgentMascot.allCases) { mascot in
+                        avatarOption(mascotId: mascot.id)
+                    }
+                    Spacer(minLength: 0)
+                }
+
+                Text("Pick a mascot, or fall back to the agent's first letter.", bundle: .module)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.tertiaryText)
+            }
+        }
+    }
+
+    private func avatarOption(mascotId: String?) -> some View {
+        let isSelected = avatar == mascotId
+        return Button {
+            avatar = mascotId
+            saveAgent()
+        } label: {
+            AgentAvatarView(
+                mascotId: mascotId,
+                name: name,
+                tint: agentColor,
+                diameter: 40,
+                monogramFontSize: 16,
+                borderWidth: 1.5
+            )
+            .overlay(
+                Circle()
+                    .strokeBorder(
+                        isSelected ? theme.accentColor : Color.clear,
+                        lineWidth: 2
+                    )
+                    .padding(-3)
+            )
+        }
+        .buttonStyle(.plain)
+        .help(Text(mascotId.map { "Mascot: \($0)" } ?? "Initial", bundle: .module))
     }
 
     @ViewBuilder
@@ -3055,6 +3076,7 @@ struct AgentDetailView: View {
         workQuickActions = agent.workQuickActions
         disableTools = agent.disableTools ?? false
         disableMemory = agent.disableMemory ?? false
+        avatar = agent.avatar
         var instrMap: [String: String] = [:]
         let overrides = agent.pluginInstructions ?? [:]
         for loaded in PluginManager.shared.plugins {
@@ -3129,7 +3151,8 @@ struct AgentDetailView: View {
             manualToolNames: current.manualToolNames,
             manualSkillNames: current.manualSkillNames,
             disableTools: disableTools ? true : nil,
-            disableMemory: disableMemory ? true : nil
+            disableMemory: disableMemory ? true : nil,
+            avatar: avatar
         )
 
         agentManager.update(updated)
@@ -3335,6 +3358,7 @@ private struct AgentEditorSheet: View {
     /// the suggested name in sync. Once the user types their own value, the
     /// name is theirs and presets stop touching it.
     @State private var nameUserEdited: Bool = false
+    @State private var selectedAvatar: String? = nil
     @State private var systemPrompt: String = ""
     @State private var selectedModel: String?
     @State private var pickerItems: [ModelPickerItem] = []
@@ -3459,6 +3483,7 @@ private struct AgentEditorSheet: View {
             VStack(alignment: .leading, spacing: 18) {
                 templatesStrip
                 nameField
+                avatarField
                 modelField
                 capabilitiesField
                 promptField
@@ -3526,6 +3551,45 @@ private struct AgentEditorSheet: View {
                 }
             }
         }
+    }
+
+    private var avatarField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            AgentSheetSectionLabel("Avatar")
+            HStack(spacing: 10) {
+                avatarChip(mascotId: nil)
+                ForEach(AgentMascot.allCases) { mascot in
+                    avatarChip(mascotId: mascot.id)
+                }
+                Spacer(minLength: 0)
+            }
+        }
+    }
+
+    private func avatarChip(mascotId: String?) -> some View {
+        let isSelected = selectedAvatar == mascotId
+        return Button {
+            selectedAvatar = mascotId
+        } label: {
+            AgentAvatarView(
+                mascotId: mascotId,
+                name: name,
+                tint: agentColor,
+                diameter: 36,
+                monogramFontSize: 14,
+                borderWidth: 1.5
+            )
+            .overlay(
+                Circle()
+                    .strokeBorder(
+                        isSelected ? theme.accentColor : Color.clear,
+                        lineWidth: 2
+                    )
+                    .padding(-3)
+            )
+        }
+        .buttonStyle(.plain)
+        .help(Text(mascotId.map { "Mascot: \($0)" } ?? "Initial", bundle: .module))
     }
 
     private var modelField: some View {
@@ -3747,22 +3811,14 @@ private struct AgentEditorSheet: View {
         let modelText = selectedModel.map(formatModelName) ?? L("Default")
         return VStack(alignment: .leading, spacing: 12) {
             HStack(alignment: .center, spacing: 12) {
-                ZStack {
-                    Circle()
-                        .fill(
-                            LinearGradient(
-                                colors: [agentColor.opacity(0.15), agentColor.opacity(0.05)],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                    Circle().strokeBorder(agentColor.opacity(0.4), lineWidth: 2)
-                    Text(name.isEmpty ? "?" : name.prefix(1).uppercased())
-                        .font(.system(size: 16, weight: .bold, design: .rounded))
-                        .foregroundColor(agentColor)
-                }
-                .frame(width: 36, height: 36)
+                AgentAvatarView(
+                    mascotId: selectedAvatar,
+                    name: name,
+                    tint: agentColor,
+                    diameter: 36
+                )
                 .animation(.spring(response: 0.3), value: name)
+                .animation(.spring(response: 0.3), value: selectedAvatar)
 
                 VStack(alignment: .leading, spacing: 2) {
                     Text(displayName)
@@ -3879,7 +3935,8 @@ private struct AgentEditorSheet: View {
             updatedAt: Date(),
             toolSelectionMode: draftMode,
             manualToolNames: Array(draftToolNames),
-            manualSkillNames: Array(draftSkillNames)
+            manualSkillNames: Array(draftSkillNames),
+            avatar: selectedAvatar
         )
 
         onSave(agent)
