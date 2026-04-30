@@ -132,13 +132,19 @@ struct CreateAgentBody: View {
 
     private var rightColumn: some View {
         ScrollView(.vertical, showsIndicators: false) {
-            VStack(alignment: .leading, spacing: 22) {
-                identityGroup
-                behaviorGroup
+            // Sequenced top-to-bottom in dependency order: pick a visual
+            // identity (avatar), then a behavior preset (starter) — which
+            // prefills both name and prompt — then refine.
+            VStack(alignment: .leading, spacing: 16) {
+                avatarRow
+                starterRow
+                nameField
+                systemPromptField
             }
             .frame(maxWidth: formMaxWidth, alignment: .leading)
             .padding(.horizontal, OnboardingMetrics.rightColumnHorizontalPadding)
-            .padding(.vertical, OnboardingMetrics.bodyVerticalPadding)
+            .padding(.top, OnboardingMetrics.bodyVerticalPadding)
+            .padding(.bottom, 8)
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
@@ -244,28 +250,6 @@ struct CreateAgentBody: View {
         return trimmedPrompt
     }
 
-    // MARK: - Groups
-
-    /// Identity (who the agent IS) — avatar + name. Visually paired so the
-    /// chosen avatar reads as a property of the named agent rather than a
-    /// detached chrome detail.
-    private var identityGroup: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            avatarRow
-            nameField
-        }
-    }
-
-    /// Behavior (what the agent DOES) — starter chips that prefill the
-    /// system prompt, and the prompt editor itself. Stacked tightly so the
-    /// connection between starter and prompt is obvious.
-    private var behaviorGroup: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            starterRow
-            systemPromptField
-        }
-    }
-
     // MARK: - Starter chips
 
     private var starterRow: some View {
@@ -339,8 +323,8 @@ struct CreateAgentBody: View {
                 label: "",
                 placeholder: "Instructions for this agent…",
                 text: $state.systemPrompt,
-                minHeight: 110,
-                maxHeight: 180
+                minHeight: 96,
+                maxHeight: 130
             )
             .onChange(of: state.systemPrompt) { _, newValue in
                 // Track edits so switching starters won't overwrite the
@@ -351,40 +335,18 @@ struct CreateAgentBody: View {
                     state.systemPromptUserEdited = true
                 }
             }
-            promptHelperRow
         }
-    }
-
-    private var promptHelperRow: some View {
-        HStack(spacing: 6) {
-            Image(systemName: state.systemPromptUserEdited ? "checkmark.circle.fill" : "sparkles")
-                .font(.system(size: 10, weight: .semibold))
-            Text(promptHelperText, bundle: .module)
-                .font(theme.font(size: 11))
-                .lineLimit(1)
-            Spacer(minLength: 0)
-        }
-        .foregroundColor(state.systemPromptUserEdited ? theme.accentColor : theme.tertiaryText)
-        .padding(.top, 2)
-    }
-
-    private var promptHelperText: LocalizedStringKey {
-        if state.systemPromptUserEdited {
-            return "Custom prompt saved as you type."
-        }
-        if state.selectedTemplate == .blank {
-            return "Blank starts empty; add instructions when you are ready."
-        }
-        return "Starter text is editable and will not be overwritten after you change it."
     }
 
     // MARK: - Avatar
 
+    /// Six mascots, one chip each. The "no avatar" / monogram option lives
+    /// in Configure post-onboarding — the create form always picks a
+    /// colorful mascot so the row of cute dinos can read as the brand.
     private var avatarRow: some View {
         VStack(alignment: .leading, spacing: OnboardingMetrics.labelToInput) {
             sectionLabel("Avatar")
-            HStack(spacing: 12) {
-                avatarChip(mascotId: nil)
+            HStack(spacing: 8) {
                 ForEach(AgentMascot.allCases) { mascot in
                     avatarChip(mascotId: mascot.id)
                 }
@@ -396,8 +358,8 @@ struct CreateAgentBody: View {
 
     private func avatarChip(mascotId: String?) -> some View {
         let isSelected = state.selectedAvatar == mascotId
-        let diameter: CGFloat = 48
-        let cellSize: CGFloat = 56
+        let diameter: CGFloat = 64
+        let cellSize: CGFloat = 64
         return Button {
             withAnimation(theme.animationQuick()) {
                 state.selectedAvatar = mascotId

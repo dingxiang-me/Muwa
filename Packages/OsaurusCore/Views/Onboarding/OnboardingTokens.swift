@@ -38,7 +38,7 @@ enum OnboardingMetrics {
     static let footerTopPadding: CGFloat = 18
     /// Vertical padding below the footer's action row — generous so the
     /// CTA never hugs the window's bottom edge.
-    static let footerBottomPadding: CGFloat = 36
+    static let footerBottomPadding: CGFloat = 48
     /// Horizontal padding inside the footer.
     static let footerHorizontal: CGFloat = 28
     /// Spacing between the footer caption row and the action row.
@@ -62,7 +62,7 @@ enum OnboardingMetrics {
     static let leftHeadlineToBody: CGFloat = 8
 
     // Hero body
-    static let heroIllustrationMaxHeight: CGFloat = 260
+    static let heroIllustrationMaxHeight: CGFloat = 200
     static let heroIllustrationToHeadline: CGFloat = 24
     static let heroHeadlineToSubtitle: CGFloat = 12
     static let heroMaxTextWidth: CGFloat = 460

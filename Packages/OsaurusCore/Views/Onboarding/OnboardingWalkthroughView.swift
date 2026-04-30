@@ -17,7 +17,7 @@ import SwiftUI
 // MARK: - Walkthrough Page
 
 enum WalkthroughPage: Int, CaseIterable, Identifiable {
-    case modes = 0
+    case loop = 0
     case sandbox = 1
     case personal = 2
     case privacy = 3
@@ -26,10 +26,8 @@ enum WalkthroughPage: Int, CaseIterable, Identifiable {
 
     var illustrationAsset: String {
         switch self {
-        // No new artwork yet for these two — `OnboardingHeroBody` falls back
-        // to the styled placeholder until they land in the asset catalog.
-        case .modes: return "osaurus-onboarding-tour-modes"
-        case .sandbox: return "osaurus-onboarding-tour-sandbox"
+        case .loop: return "osaurus-tool"
+        case .sandbox: return "osaurus-sandbox"
         case .personal: return "osaurus-built"
         case .privacy: return "osaurus-data"
         }
@@ -37,7 +35,7 @@ enum WalkthroughPage: Int, CaseIterable, Identifiable {
 
     var headline: LocalizedStringKey {
         switch self {
-        case .modes: return "Two modes, one chat"
+        case .loop: return "Every chat is an agent loop"
         case .sandbox: return "Safe sandbox"
         case .personal: return "Built around you"
         case .privacy: return "Your data stays yours"
@@ -46,12 +44,12 @@ enum WalkthroughPage: Int, CaseIterable, Identifiable {
 
     var subtitle: LocalizedStringKey {
         switch self {
-        case .modes:
+        case .loop:
             return
-                "Talk back and forth in Chat, or hand off long jobs to Work — background sessions triggered by schedules, webhooks, or plugins."
+                "Ask anything. Osaurus plans with todos, calls tools, pauses for clarification when it matters, and ends with a verified summary — no mode switching."
         case .sandbox:
             return
-                "Agents install packages, run scripts, and work with files inside a Linux container — completely isolated from your system."
+                "Toggle the sandbox to give your agent shell access — install packages, run scripts, and work with files inside a Linux container, isolated from your Mac."
         case .personal:
             return
                 "Specialized agents, voice control, and your own theme. Memory belongs to you, surfaced exactly when the next question needs it."
@@ -65,7 +63,7 @@ enum WalkthroughPage: Int, CaseIterable, Identifiable {
 
 @MainActor
 final class WalkthroughState: ObservableObject {
-    @Published var currentPage: WalkthroughPage = .modes
+    @Published var currentPage: WalkthroughPage = .loop
     @Published var direction: OnboardingDirection = .forward
 
     var pages: [WalkthroughPage] { WalkthroughPage.allCases }

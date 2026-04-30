@@ -162,58 +162,52 @@ struct OnboardingHeroBody: View {
     }
 
     var body: some View {
-        ScrollView(.vertical, showsIndicators: false) {
-            VStack(spacing: 0) {
-                Spacer(minLength: 0)
+        VStack(spacing: 0) {
+            // Top spacer is slightly heavier than the bottom (3:2) so the
+            // content reads "above the fold" rather than floating dead-center.
+            Spacer(minLength: 0)
+                .layoutPriority(0.6)
 
-                heroIllustration
+            heroIllustration
 
-                if headline != nil || subtitle != nil {
-                    Spacer().frame(height: OnboardingMetrics.heroIllustrationToHeadline)
-                }
-
-                if let headline = headline {
-                    Text(headline, bundle: .module)
-                        .font(theme.font(size: OnboardingMetrics.heroHeadlineSize, weight: .bold))
-                        .foregroundColor(theme.primaryText)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: OnboardingMetrics.heroMaxTextWidth)
-                }
-
-                if let subtitle = subtitle {
-                    Spacer().frame(height: OnboardingMetrics.heroHeadlineToSubtitle)
-                    Text(subtitle, bundle: .module)
-                        .font(theme.font(size: OnboardingMetrics.heroSubtitleSize))
-                        .foregroundColor(theme.secondaryText)
-                        .multilineTextAlignment(.center)
-                        .lineSpacing(4)
-                        .fixedSize(horizontal: false, vertical: true)
-                        .frame(maxWidth: OnboardingMetrics.heroMaxTextWidth)
-                }
-
-                Spacer(minLength: 0)
-                // Pull content slightly above true center so it reads as
-                // "above the fold" rather than floating mid-window.
-                Color.clear.frame(height: 28)
+            if headline != nil || subtitle != nil {
+                Spacer().frame(height: OnboardingMetrics.heroIllustrationToHeadline)
             }
-            .frame(maxWidth: .infinity)
-            .padding(.horizontal, 32)
-            .padding(.vertical, 18)
-            .frame(minHeight: minHeroHeight, alignment: .center)
-        }
-    }
 
-    private var minHeroHeight: CGFloat {
-        // Body region is roughly windowHeight − header − footer.
-        OnboardingMetrics.windowHeight - OnboardingMetrics.headerHeight - 110
+            if let headline = headline {
+                Text(headline, bundle: .module)
+                    .font(theme.font(size: OnboardingMetrics.heroHeadlineSize, weight: .bold))
+                    .foregroundColor(theme.primaryText)
+                    .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: OnboardingMetrics.heroMaxTextWidth)
+            }
+
+            if let subtitle = subtitle {
+                Spacer().frame(height: OnboardingMetrics.heroHeadlineToSubtitle)
+                Text(subtitle, bundle: .module)
+                    .font(theme.font(size: OnboardingMetrics.heroSubtitleSize))
+                    .foregroundColor(theme.secondaryText)
+                    .multilineTextAlignment(.center)
+                    .lineSpacing(4)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: OnboardingMetrics.heroMaxTextWidth)
+            }
+
+            Spacer(minLength: 0)
+                .layoutPriority(0.4)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .padding(.horizontal, 32)
+        .padding(.vertical, 18)
     }
 
     private var heroIllustration: some View {
-        ZStack {
+        let glowDiameter = OnboardingMetrics.heroIllustrationMaxHeight + 40
+        return ZStack {
             Circle()
                 .fill(theme.accentColor.opacity(theme.isDark ? 0.16 : 0.10))
-                .frame(width: 280, height: 280)
+                .frame(width: glowDiameter, height: glowDiameter)
                 .blur(radius: 60)
 
             if let asset = illustrationAsset, OnboardingAssetCheck.exists(asset) {
@@ -223,7 +217,7 @@ struct OnboardingHeroBody: View {
                     .frame(maxWidth: .infinity, maxHeight: OnboardingMetrics.heroIllustrationMaxHeight)
             } else {
                 IllustrationPlaceholder()
-                    .frame(width: 280, height: OnboardingMetrics.heroIllustrationMaxHeight)
+                    .frame(width: glowDiameter, height: OnboardingMetrics.heroIllustrationMaxHeight)
             }
         }
         .frame(maxWidth: .infinity)
