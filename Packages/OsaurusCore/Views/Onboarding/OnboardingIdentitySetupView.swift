@@ -76,7 +76,7 @@ struct IdentityBody: View {
 
     var body: some View {
         OnboardingTwoColumnBody(
-            illustrationAsset: "osaurus-onboarding-identity",
+            illustrationAsset: "osaurus-identity",
             leftHeadline: leftHeadline,
             leftBody: leftBody,
             subtitle: subtitle

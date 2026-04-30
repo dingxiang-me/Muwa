@@ -26,10 +26,12 @@ enum WalkthroughPage: Int, CaseIterable, Identifiable {
 
     var illustrationAsset: String {
         switch self {
+        // No new artwork yet for these two — `OnboardingHeroBody` falls back
+        // to the styled placeholder until they land in the asset catalog.
         case .modes: return "osaurus-onboarding-tour-modes"
         case .sandbox: return "osaurus-onboarding-tour-sandbox"
-        case .personal: return "osaurus-onboarding-tour-personal"
-        case .privacy: return "osaurus-onboarding-tour-privacy"
+        case .personal: return "osaurus-built"
+        case .privacy: return "osaurus-data"
         }
     }
 

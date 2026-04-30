@@ -382,7 +382,7 @@ struct ConfigureAIBody: View {
 
     var body: some View {
         OnboardingTwoColumnBody(
-            illustrationAsset: "osaurus-onboarding-configure",
+            illustrationAsset: "osaurus-brain",
             leftHeadline: "Pick a brain",
             leftBody:
                 "Apple Intelligence on-device, a local MLX model, or any cloud provider. Models are interchangeable — switch any time without losing your history.",

@@ -16,7 +16,7 @@ struct WelcomeBody: View {
 
     var body: some View {
         OnboardingHeroBody(
-            illustrationAsset: "osaurus-onboarding-welcome",
+            illustrationAsset: "osaurus-main",
             headline: "Own your AI.",
             subtitle:
                 "Agents, memory, tools, and identity that live on your Mac. Models are interchangeable — everything else compounds, and stays with you."

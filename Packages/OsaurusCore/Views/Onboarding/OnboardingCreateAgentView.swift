@@ -19,9 +19,13 @@ import SwiftUI
 final class CreateAgentState: ObservableObject {
     @Published var selectedTemplate: AgentStarterTemplate = .writer
     @Published var name: String = ""
+    @Published var systemPrompt: String = ""
     /// Flips to `true` once the user types into the name field, so switching
     /// presets stops clobbering their input.
     @Published var nameUserEdited: Bool = false
+    /// Flips to `true` once the user edits the system prompt, so switching
+    /// presets stops clobbering their changes.
+    @Published var systemPromptUserEdited: Bool = false
     @Published var selectedAvatar: String? = AgentMascot.allCases.first?.id
     @Published var isSaving: Bool = false
 
@@ -35,10 +39,17 @@ final class CreateAgentState: ObservableObject {
 
     var canSave: Bool { !trimmedName.isEmpty && !isSaving }
 
+    /// Apply a template to the form. The name and system prompt are
+    /// overwritten only if the user hasn't edited those fields directly —
+    /// once they have, the starter chips become an indicator of "where I
+    /// began" rather than a destructive action.
     func applyTemplate(_ template: AgentStarterTemplate) {
         selectedTemplate = template
         if !nameUserEdited {
             name = template.defaultName
+        }
+        if !systemPromptUserEdited {
+            systemPrompt = template.systemPrompt
         }
     }
 
@@ -52,8 +63,7 @@ final class CreateAgentState: ObservableObject {
             id: UUID(),
             name: trimmedName,
             description: "",
-            systemPrompt: selectedTemplate.systemPrompt
-                .trimmingCharacters(in: .whitespacesAndNewlines),
+            systemPrompt: systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines),
             createdAt: Date(),
             updatedAt: Date(),
             toolSelectionMode: .auto,
@@ -72,27 +82,195 @@ struct CreateAgentBody: View {
 
     @Environment(\.theme) private var theme
 
+    private let formMaxWidth: CGFloat = 440
+
     var body: some View {
-        OnboardingTwoColumnBody(
-            illustrationAsset: "osaurus-onboarding-agent",
-            leftHeadline: "Meet your assistant",
-            leftBody:
-                "Pick a starter, give it a name, and choose a mascot. Fine-tune the prompt, model, and tools later in the Agents tab.",
-            subtitle: "A starting point — change anything later."
-        ) {
-            VStack(alignment: .leading, spacing: OnboardingMetrics.sectionSpacing) {
-                templatesSection
-                nameSection
-                mascotSection
+        HStack(alignment: .top, spacing: 0) {
+            leftColumn
+                .frame(width: OnboardingMetrics.leftColumnWidth)
+
+            rightColumn
+                .frame(maxWidth: .infinity)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    // MARK: - Layout
+
+    private var leftColumn: some View {
+        VStack(alignment: .leading, spacing: 0) {
+            Spacer(minLength: 0)
+
+            agentPreviewCard
+
+            Spacer().frame(height: OnboardingMetrics.illustrationToHeadline)
+
+            Text("Meet your assistant", bundle: .module)
+                .font(theme.font(size: OnboardingMetrics.leftHeadlineSize, weight: .bold))
+                .foregroundColor(theme.primaryText)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer().frame(height: OnboardingMetrics.leftHeadlineToBody)
+
+            Text(
+                "Pick a starter, then make it yours. The preview updates as you choose an avatar, name, and role.",
+                bundle: .module
+            )
+            .font(theme.font(size: OnboardingMetrics.leftBodySize))
+            .foregroundColor(theme.secondaryText)
+            .lineSpacing(4)
+            .fixedSize(horizontal: false, vertical: true)
+            .frame(maxWidth: .infinity, alignment: .leading)
+
+            Spacer(minLength: 0)
+        }
+        .padding(.horizontal, OnboardingMetrics.leftColumnPadding)
+        .padding(.vertical, OnboardingMetrics.bodyVerticalPadding)
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .leading)
+    }
+
+    private var rightColumn: some View {
+        ScrollView(.vertical, showsIndicators: false) {
+            VStack(alignment: .leading, spacing: 22) {
+                identityGroup
+                behaviorGroup
             }
+            .frame(maxWidth: formMaxWidth, alignment: .leading)
+            .padding(.horizontal, OnboardingMetrics.rightColumnHorizontalPadding)
+            .padding(.vertical, OnboardingMetrics.bodyVerticalPadding)
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private var agentPreviewCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack(alignment: .center, spacing: 14) {
+                AgentAvatarView(
+                    mascotId: state.selectedAvatar,
+                    name: previewName,
+                    tint: agentColorFor(previewName),
+                    diameter: 68,
+                    monogramFontSize: 24,
+                    borderWidth: 1.5
+                )
+                .shadow(color: theme.accentColor.opacity(theme.isDark ? 0.24 : 0.16), radius: 18, x: 0, y: 8)
+
+                VStack(alignment: .leading, spacing: 6) {
+                    Text(previewName)
+                        .font(theme.font(size: 20, weight: .bold))
+                        .foregroundColor(theme.primaryText)
+                        .lineLimit(1)
+
+                    HStack(spacing: 6) {
+                        Image(systemName: state.selectedTemplate.icon)
+                            .font(.system(size: 11, weight: .semibold))
+                        Text(LocalizedStringKey(state.selectedTemplate.label), bundle: .module)
+                            .font(theme.font(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(theme.accentColor)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(theme.accentColor.opacity(0.12)))
+                    .overlay(Capsule().strokeBorder(theme.accentColor.opacity(0.22), lineWidth: 1))
+                }
+            }
+
+            Divider()
+                .overlay(theme.primaryBorder.opacity(0.45))
+
+            VStack(alignment: .leading, spacing: 7) {
+                HStack(spacing: 6) {
+                    Image(systemName: "quote.opening")
+                        .font(.system(size: 10, weight: .bold))
+                    Text("Prompt preview", bundle: .module)
+                        .textCase(.uppercase)
+                        .font(theme.font(size: 10, weight: .bold))
+                        .tracking(0.6)
+                }
+                .foregroundColor(theme.tertiaryText)
+
+                Text(previewPrompt)
+                    .font(theme.font(size: 12))
+                    .foregroundColor(theme.secondaryText)
+                    .lineSpacing(3)
+                    .lineLimit(4)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(18)
+        .frame(maxWidth: .infinity, minHeight: OnboardingMetrics.illustrationMaxHeight, alignment: .topLeading)
+        .background(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(
+                    LinearGradient(
+                        colors: [
+                            theme.inputBackground.opacity(theme.isDark ? 0.92 : 0.98),
+                            theme.accentColor.opacity(theme.isDark ? 0.10 : 0.06),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    )
+                )
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .strokeBorder(
+                    LinearGradient(
+                        colors: [
+                            theme.glassEdgeLight.opacity(theme.isDark ? 0.24 : 0.34),
+                            theme.accentColor.opacity(0.18),
+                            theme.primaryBorder.opacity(0.18),
+                        ],
+                        startPoint: .topLeading,
+                        endPoint: .bottomTrailing
+                    ),
+                    lineWidth: 1
+                )
+        )
+        .shadow(color: Color.black.opacity(theme.isDark ? 0.18 : 0.08), radius: 18, x: 0, y: 12)
+    }
+
+    private var previewName: String {
+        state.trimmedName.isEmpty ? "Your agent" : state.trimmedName
+    }
+
+    private var previewPrompt: String {
+        let trimmedPrompt = state.systemPrompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        if trimmedPrompt.isEmpty {
+            return "Start blank, or choose a starter to give your agent a clear role."
+        }
+        return trimmedPrompt
+    }
+
+    // MARK: - Groups
+
+    /// Identity (who the agent IS) — avatar + name. Visually paired so the
+    /// chosen avatar reads as a property of the named agent rather than a
+    /// detached chrome detail.
+    private var identityGroup: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            avatarRow
+            nameField
         }
     }
 
-    // MARK: - Templates
+    /// Behavior (what the agent DOES) — starter chips that prefill the
+    /// system prompt, and the prompt editor itself. Stacked tightly so the
+    /// connection between starter and prompt is obvious.
+    private var behaviorGroup: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            starterRow
+            systemPromptField
+        }
+    }
 
-    private var templatesSection: some View {
+    // MARK: - Starter chips
+
+    private var starterRow: some View {
         VStack(alignment: .leading, spacing: OnboardingMetrics.labelToInput) {
-            sectionLabel("Start From")
+            sectionLabel("Starter")
             HStack(spacing: 6) {
                 ForEach(AgentStarterTemplate.allCases) { template in
                     templateChip(template)
@@ -136,7 +314,7 @@ struct CreateAgentBody: View {
 
     // MARK: - Name
 
-    private var nameSection: some View {
+    private var nameField: some View {
         VStack(alignment: .leading, spacing: OnboardingMetrics.labelToInput) {
             sectionLabel("Name")
             OnboardingTextField(
@@ -152,24 +330,74 @@ struct CreateAgentBody: View {
         }
     }
 
-    // MARK: - Mascot
+    // MARK: - System Prompt
 
-    private var mascotSection: some View {
+    private var systemPromptField: some View {
         VStack(alignment: .leading, spacing: OnboardingMetrics.labelToInput) {
-            sectionLabel("Mascot")
-            HStack(spacing: 10) {
+            sectionLabel("System Prompt")
+            OnboardingTextEditor(
+                label: "",
+                placeholder: "Instructions for this agent…",
+                text: $state.systemPrompt,
+                minHeight: 110,
+                maxHeight: 180
+            )
+            .onChange(of: state.systemPrompt) { _, newValue in
+                // Track edits so switching starters won't overwrite the
+                // user's hand-tuned prompt. Equality with the active
+                // template's prompt covers the no-op "I just re-selected
+                // the same chip" case so we don't lock prematurely.
+                if newValue != state.selectedTemplate.systemPrompt {
+                    state.systemPromptUserEdited = true
+                }
+            }
+            promptHelperRow
+        }
+    }
+
+    private var promptHelperRow: some View {
+        HStack(spacing: 6) {
+            Image(systemName: state.systemPromptUserEdited ? "checkmark.circle.fill" : "sparkles")
+                .font(.system(size: 10, weight: .semibold))
+            Text(promptHelperText, bundle: .module)
+                .font(theme.font(size: 11))
+                .lineLimit(1)
+            Spacer(minLength: 0)
+        }
+        .foregroundColor(state.systemPromptUserEdited ? theme.accentColor : theme.tertiaryText)
+        .padding(.top, 2)
+    }
+
+    private var promptHelperText: LocalizedStringKey {
+        if state.systemPromptUserEdited {
+            return "Custom prompt saved as you type."
+        }
+        if state.selectedTemplate == .blank {
+            return "Blank starts empty; add instructions when you are ready."
+        }
+        return "Starter text is editable and will not be overwritten after you change it."
+    }
+
+    // MARK: - Avatar
+
+    private var avatarRow: some View {
+        VStack(alignment: .leading, spacing: OnboardingMetrics.labelToInput) {
+            sectionLabel("Avatar")
+            HStack(spacing: 12) {
                 avatarChip(mascotId: nil)
                 ForEach(AgentMascot.allCases) { mascot in
                     avatarChip(mascotId: mascot.id)
                 }
                 Spacer(minLength: 0)
             }
-            .padding(.vertical, 4)
+            .padding(.vertical, 2)
         }
     }
 
     private func avatarChip(mascotId: String?) -> some View {
         let isSelected = state.selectedAvatar == mascotId
+        let diameter: CGFloat = 48
+        let cellSize: CGFloat = 56
         return Button {
             withAnimation(theme.animationQuick()) {
                 state.selectedAvatar = mascotId
@@ -178,17 +406,17 @@ struct CreateAgentBody: View {
             ZStack {
                 if isSelected {
                     Circle()
-                        .fill(theme.accentColor.opacity(0.18))
-                        .frame(width: 46, height: 46)
-                        .blur(radius: 6)
+                        .fill(theme.accentColor.opacity(0.22))
+                        .frame(width: diameter + 18, height: diameter + 18)
+                        .blur(radius: 8)
                 }
 
                 AgentAvatarView(
                     mascotId: mascotId,
                     name: state.name,
                     tint: agentColorFor(state.name),
-                    diameter: 34,
-                    monogramFontSize: 13,
+                    diameter: diameter,
+                    monogramFontSize: 18,
                     borderWidth: 1.5
                 )
                 .overlay(
@@ -200,10 +428,13 @@ struct CreateAgentBody: View {
                         .padding(-3)
                 )
             }
-            .frame(width: 42, height: 42)
+            .frame(width: cellSize, height: cellSize)
+            .scaleEffect(isSelected ? 1.0 : 0.96)
+            .opacity(isSelected ? 1.0 : 0.85)
+            .animation(theme.animationQuick(), value: isSelected)
         }
         .buttonStyle(.plain)
-        .help(Text(mascotId.map { "Mascot: \($0)" } ?? "Initial", bundle: .module))
+        .help(Text(mascotId.map { "Avatar: \($0)" } ?? "Initial", bundle: .module))
     }
 
     @ViewBuilder

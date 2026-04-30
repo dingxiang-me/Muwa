@@ -15,7 +15,21 @@ public enum AgentMascot: String, CaseIterable, Identifiable, Sendable {
     case blue, green, orange, purple, red, yellow
 
     public var id: String { rawValue }
-    public var assetName: String { "osaurus-pfp-\(rawValue)" }
+    public var assetName: String { "osaurus-avatar-\(rawValue)" }
+
+    /// Asset name for the "create-pose" illustration paired with this
+    /// mascot color (used by the onboarding Create Agent step).
+    ///
+    /// NOTE: the yellow asset ships with a typo in the imageset name
+    /// (`osuarus-yellow-create` instead of `osaurus-yellow-create`).
+    /// We reference the actual filename so the image loads — rename the
+    /// imageset upstream if you want to fix it.
+    public var createPoseAssetName: String {
+        switch self {
+        case .yellow: return "osuarus-yellow-create"
+        default: return "osaurus-\(rawValue)-create"
+        }
+    }
 }
 
 /// Renders an agent avatar at the given diameter. Uses the mascot image when

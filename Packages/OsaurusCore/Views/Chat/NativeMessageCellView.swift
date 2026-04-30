@@ -148,7 +148,7 @@ final class NativeHeaderView: NSView {
         // mascot is set; monogram fallback intentionally renders nothing here.
         let mascotImage: NSImage? = {
             guard role == .assistant, let avatar, !avatar.isEmpty else { return nil }
-            return Bundle.module.image(forResource: "osaurus-pfp-\(avatar)")
+            return Bundle.module.image(forResource: "osaurus-avatar-\(avatar)")
         }()
         avatarImageView.image = mascotImage
         let showAvatar = mascotImage != nil
