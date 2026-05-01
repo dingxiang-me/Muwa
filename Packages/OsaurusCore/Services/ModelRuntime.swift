@@ -340,25 +340,33 @@ public actor ModelRuntime {
     //
     //   - `usePagedCache: true`            — content-addressed paged blocks
     //                                        (multi-turn cache reuse path)
-    //   - `defaultKVMode: .none`             — fp16 KV by default. The prior
-    //                                        `.turboQuant(3,3)` setting
-    //                                        applied 3-bit KV quantization
-    //                                        UNCONDITIONALLY to every slot
-    //                                        (resolveKVPolicy fills mode for
-    //                                        any request with `.none`,
-    //                                        regardless of prompt length —
-    //                                        only the SIZE cap is prompt-
-    //                                        gated). 3-bit KV is aggressive
-    //                                        enough to corrupt attention on
-    //                                        small reasoning / thinking
-    //                                        models, surfacing as degenerate
-    //                                        repetition (`!!!!!!!!!` spam in
-    //                                        the thinking channel) and
-    //                                        community report #995. Default
-    //                                        to fp16; users who need the
-    //                                        memory savings can submit
-    //                                        `kvMode: .turboQuant(...)`
-    //                                        explicitly per request.
+    //   - `defaultKVMode: .turboQuant(4, 4)` — 4-bit codebook KV by default.
+    //                                        The prior `.turboQuant(3, 3)`
+    //                                        setting was reverted to `.none`
+    //                                        in commit e202cbbe after the
+    //                                        3-bit-KV `!!!!!!!!!` repetition
+    //                                        spam reported in community
+    //                                        issue #995. The root cause was
+    //                                        not the bit width itself but
+    //                                        vmlx's `TurboQuantKVCache`
+    //                                        paged-restore path compounding
+    //                                        quantization across multi-turn
+    //                                        handoff (re-encoding an already-
+    //                                        decoded lossy float). That was
+    //                                        fixed in vmlx commit `1173822`
+    //                                        (`restoreFromDecodedKV` keeps
+    //                                        the prefix in `.compressed`
+    //                                        phase without round-tripping).
+    //                                        Per OSAURUS-INTEGRATION-2026-
+    //                                        05-01.md §"3-bit KV verdict",
+    //                                        4-bit is the recommended default
+    //                                        post-`1173822` — 3-bit is also
+    //                                        safe but more error-sensitive
+    //                                        and gains less compression
+    //                                        benefit. Per-request `kvMode`
+    //                                        still overrides; clients that
+    //                                        want fp16 can submit
+    //                                        `kvMode: .none` explicitly.
     //   - `defaultMaxKVSize: 8192`         — 8K ring window for slots that
     //                                        submit `maxKVSize: nil`
     //   - `longPromptMultiplier: 2.0`      — cap kicks in only past 16K
@@ -405,7 +413,7 @@ public actor ModelRuntime {
             enableDiskCache: enableDiskCache,
             diskCacheDir: diskCacheDir,
             modelKey: modelName,
-            defaultKVMode: .none,
+            defaultKVMode: .turboQuant(keyBits: 4, valueBits: 4),
             defaultMaxKVSize: 8192,
             longPromptMultiplier: 2.0
         )
