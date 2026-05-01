@@ -63,6 +63,7 @@ struct CapabilityFromModelIdTests {
         "Qwen/Qwen3-VL-8B",
         "mlx-community/SmolVLM2-2.2B-Instruct",
         "OsaurusAI/Holo3-35B-A3B-vl-mxfp4",
+        "OsaurusAI/Holo3-35B-A3B-mxfp4",  // outer qwen3_5_moe + vision_config (no -vl in name)
         "OsaurusAI/Qwen3.5-VL-mxfp4",
     ])
     func imageVideoBundles(_ id: String) {
@@ -99,7 +100,11 @@ struct CapabilityFromModelIdTests {
     /// from the substring patterns — a Laguna LLM bundle named
     /// `Laguna-XS.2-mxfp4` must NOT pick up the `imageVideo` regex.
     @Test(arguments: [
-        "OsaurusAI/Holo3-35B-A3B-mxfp4",         // dense LLM, NOT vl
+        // NOTE: Holo3 family was previously listed as text-only here based
+        // on the lack of a `-vl` suffix; in fact Holo3 bundles ship a
+        // vision_config under outer model_type=qwen3_5_moe and route via
+        // Qwen35MoE VLM. Moved to imageVideoBundles below — see
+        // ModelMediaCapabilities Holo3 family pattern.
         "JANGQ-AI/Laguna-XS.2-JANGTQ",
         "OsaurusAI/Laguna-XS.2-mxfp4",
         "JANGQ-AI/Laguna-XS.2-mxfp4",
@@ -405,8 +410,9 @@ struct EndToEndComposerAcceptSetTests {
         ("HuggingFaceM4/Idefics3-8B", "audio", false),
         ("apple/FastVLM-7B", "image", true),
         ("mistral-community/pixtral-12b", "image", true),
-        ("OsaurusAI/Holo3-35B-A3B-mxfp4", "image", false),  // dense LLM
-        ("OsaurusAI/Holo3-35B-A3B-mxfp4", "audio", false),
+        ("OsaurusAI/Holo3-35B-A3B-mxfp4", "image", true),   // Holo3 has vision_config
+        ("OsaurusAI/Holo3-35B-A3B-mxfp4", "video", true),
+        ("OsaurusAI/Holo3-35B-A3B-mxfp4", "audio", false),  // image+video, no audio
         ("JANGQ-AI/Laguna-XS.2-JANGTQ", "image", false),
         ("JANGQ-AI/Laguna-XS.2-JANGTQ", "video", false),
         ("JANGQ-AI/MiniMax-M2.7-Small-JANGTQ", "audio", false),
