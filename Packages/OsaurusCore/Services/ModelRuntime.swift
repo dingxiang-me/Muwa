@@ -1211,26 +1211,19 @@ public actor ModelRuntime {
                     textInner = nil
                 }
                 let hasVision = configJSON["vision_config"] != nil
-                _ = hasVision  // intentionally unused — Mistral 3 family
-                                // gate dropped (vmlx@7fa4940 ships
-                                // Mistral3TextJANGTQModel + Mistral3VLMJANGTQ
-                                // covering both LLM and VLM paths).
-                let isLaguna = modelType == "laguna"
-                    || (textInner.map { $0 == "laguna" } ?? false)
-
-                if isLaguna {
-                    throw NSError(
-                        domain: "ModelRuntime",
-                        code: 4,
-                        userInfo: [
-                            NSLocalizedDescriptionKey:
-                                "Model '\(name)' is a JANGTQ-quantized Laguna bundle, but "
-                                + "vmlx-swift-lm hasn't ported a Laguna model class yet. "
-                                + "Use the MXFP4 quant tier (e.g. Laguna-XS.2-mxfp4) until "
-                                + "the engine port lands upstream."
-                        ]
-                    )
-                }
+                _ = hasVision  // No remaining family-pending gates.
+                _ = modelType   // Mistral 3 (LLM + VLM) and Laguna are
+                _ = textInner   // both ported as of vmlx@344dda0.
+                                // MXFP4 paths load via standard MLX
+                                // dequant; JANGTQ Mistral 3 routes via
+                                // Mistral3TextJANGTQModel /
+                                // Mistral3VLMJANGTQ; Laguna MXFP4 via
+                                // LagunaModel; Laguna JANGTQ port
+                                // (LagunaJANGTQModel) is the next
+                                // incremental piece — not blocking
+                                // because the existing forward / inverse
+                                // sidecar checks above still catch
+                                // mislabeled bundles.
             }
         }
 

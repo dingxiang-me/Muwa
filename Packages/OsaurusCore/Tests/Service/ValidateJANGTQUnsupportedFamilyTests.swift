@@ -144,20 +144,21 @@ struct ValidateJANGTQUnsupportedFamilyTests {
             at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
     }
 
-    @Test("D3.laguna outer JANGTQ → throws")
-    func d3_laguna_throws() throws {
+    /// Post vmlx@344dda0 (Laguna LLM engine class shipped):
+    /// Laguna JANGTQ no longer hits the host-side family gate. The
+    /// existing forward/inverse sidecar checks still catch mislabeled
+    /// bundles. JANGTQ Linear shim port for Laguna is the next piece;
+    /// until then, JANGTQ bundles will surface a vmlx-side error if
+    /// the runtime hits an unhandled tq_packed key — same as any
+    /// half-quantized bundle. MXFP4 path loads cleanly today.
+    @Test("D3.laguna outer JANGTQ → no longer family-gated (engine class shipped)")
+    func d3_laguna_unblocked() throws {
         let dir = try makeBundle(
             weightFormat: "mxtq", modelType: "laguna", sidecarPresent: true)
         defer { cleanup(dir) }
-        do {
-            try ModelRuntime.validateJANGTQSidecarIfRequired(
-                at: dir, name: "Laguna-XS.2-JANGTQ2")
-            Issue.record("expected throw for laguna JANGTQ")
-        } catch let error as NSError {
-            #expect(error.code == 4)
-            let msg = error.userInfo[NSLocalizedDescriptionKey] as? String ?? ""
-            #expect(msg.lowercased().contains("laguna"))
-        }
+        // No throw expected — gate dropped.
+        try ModelRuntime.validateJANGTQSidecarIfRequired(
+            at: dir, name: "Laguna-XS.2-JANGTQ2")
     }
 
     // MARK: - Boundary: supported JANGTQ families must NOT trigger the new check
