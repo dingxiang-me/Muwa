@@ -33,7 +33,8 @@ struct ValidateJANGTQUnsupportedFamilyTests {
         weightFormat: String?,
         modelType: String?,
         textInner: String? = nil,
-        sidecarPresent: Bool
+        sidecarPresent: Bool,
+        visionConfigPresent: Bool = false
     ) throws -> URL {
         let dir = FileManager.default.temporaryDirectory
             .appendingPathComponent("validate-jangtq-\(UUID().uuidString)")
@@ -47,6 +48,9 @@ struct ValidateJANGTQUnsupportedFamilyTests {
             var c: [String: Any] = ["model_type": modelType]
             if let textInner {
                 c["text_config"] = ["model_type": textInner] as [String: Any]
+            }
+            if visionConfigPresent {
+                c["vision_config"] = ["model_type": "pixtral"] as [String: Any]
             }
             try JSONSerialization.data(withJSONObject: c).write(
                 to: dir.appendingPathComponent("config.json"))
@@ -86,36 +90,66 @@ struct ValidateJANGTQUnsupportedFamilyTests {
 
     // MARK: - D3 branches: pending JANGTQ families
 
-    @Test("D3.mistral3 outer JANGTQ → throws pending-family error")
-    func d3_mistral3Outer_throws() throws {
+    /// Post vmlx@cb829b6 (Mistral 3 LLM JANGTQ port complete):
+    /// LLM-only mistral3 (no vision_config) bundles should PASS the
+    /// preflight — the engine handles them via Mistral3TextJANGTQModel.
+    @Test("D3.mistral3 outer JANGTQ + no vision → PASSES (LLM port complete)")
+    func d3_mistral3OuterNoVision_passes() throws {
         let dir = try makeBundle(
             weightFormat: "mxtq", modelType: "mistral3", sidecarPresent: true)
+        defer { cleanup(dir) }
+        // No throw expected — Mistral 3 LLM JANGTQ now supported.
+        try ModelRuntime.validateJANGTQSidecarIfRequired(
+            at: dir, name: "Mistral-7B-JANGTQ2")
+    }
+
+    /// VLM-shaped Mistral 3 family (vision_config present) STILL fires
+    /// the gate — VLM JANGTQ port is in-flight upstream.
+    @Test("D3.mistral3 + vision_config JANGTQ → STILL throws (VLM port pending)")
+    func d3_mistral3VLM_throws() throws {
+        let dir = try makeBundle(
+            weightFormat: "mxtq",
+            modelType: "mistral3",
+            sidecarPresent: true,
+            visionConfigPresent: true)
         defer { cleanup(dir) }
         do {
             try ModelRuntime.validateJANGTQSidecarIfRequired(
                 at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
-            Issue.record("expected throw for JANGTQ Mistral 3 family")
+            Issue.record("expected throw for VLM-shaped Mistral 3 family JANGTQ")
         } catch let error as NSError {
             #expect(error.code == 4)
             let msg = error.userInfo[NSLocalizedDescriptionKey] as? String ?? ""
-            #expect(msg.contains("JANGTQ"))
-            #expect(msg.contains("MXFP4"), "error must point at MXFP4 alternative")
+            #expect(msg.contains("VLM"), "VLM-specific error message expected")
         }
     }
 
-    @Test("D3.ministral3 inner (text_config) JANGTQ → throws")
-    func d3_ministral3Inner_throws() throws {
-        // Outer mistral3 wrapper, inner text_config.model_type=ministral3
+    @Test("D3.ministral3 inner LLM-only → PASSES (LLM port complete)")
+    func d3_ministral3InnerNoVision_passes() throws {
         let dir = try makeBundle(
             weightFormat: "mxtq",
             modelType: "mistral3",
             textInner: "ministral3",
             sidecarPresent: true)
         defer { cleanup(dir) }
+        // No vision_config → LLM path → JANGTQ supported.
+        try ModelRuntime.validateJANGTQSidecarIfRequired(
+            at: dir, name: "Ministral-3-Inner-LLM-JANGTQ2")
+    }
+
+    @Test("D3.ministral3 inner + vision_config → throws (VLM still pending)")
+    func d3_ministral3InnerVLM_throws() throws {
+        let dir = try makeBundle(
+            weightFormat: "mxtq",
+            modelType: "mistral3",
+            textInner: "ministral3",
+            sidecarPresent: true,
+            visionConfigPresent: true)
+        defer { cleanup(dir) }
         do {
             try ModelRuntime.validateJANGTQSidecarIfRequired(
                 at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
-            Issue.record("expected throw for ministral3 inner")
+            Issue.record("expected throw for ministral3 inner with vision")
         } catch let error as NSError {
             #expect(error.code == 4)
         }

@@ -1181,20 +1181,22 @@ public actor ModelRuntime {
         let sidecarPresent = FileManager.default.fileExists(atPath: sidecarURL.path)
         let isMxtq = probe.weight_format == "mxtq"
 
-        // Third check (2026-04-30): JANGTQ-quantized bundles for model_type
-        // families where vmlx hasn't ported a JANGTQ-aware Linear shim yet.
-        // The current Mistral 3 family (mistral3 / ministral3) and Laguna
-        // (laguna) classes use vanilla MLXNN.Linear which reads a flat
-        // `weight` tensor — JANGTQ bundles ship .tq_packed + .scales tensors
-        // that the vanilla Linear would either crash on (shape mismatch) or
-        // silently load as garbage. Vmlx fails fast at the factory dispatch
-        // (LLMModelFactory + VLMModelFactory mistral3 closures throw on
-        // weight_format=mxtq), but we surface the error earlier here — at
-        // the host layer before any vmlx loader runs — so the user sees a
-        // friendly remediation message instead of a thrown NSError mid-load.
-        // The MXFP4 quant tier loads via the standard mlx_lm dequant path
-        // for these families (layout matches mx.quantize), so the message
-        // points at MXFP4 as the working alternative.
+        // Third check: JANGTQ-quantized bundles for model_type families
+        // where vmlx hasn't fully ported the JANGTQ Linear shim yet.
+        //
+        // Status (vmlx@cb829b6):
+        //   - Mistral 3 / ministral3 LLM-only (no vision_config) →
+        //     SUPPORTED via Mistral3TextJANGTQModel + JANGTQDenseLinear.
+        //     The host preflight does NOT fire for these.
+        //   - Mistral 3 / ministral3 VLM (vision_config present, e.g.
+        //     Mistral-Medium-3.5-128B with Pixtral) → IN-FLIGHT. Vmlx's
+        //     VLMModelFactory throws a clear error; we mirror it here.
+        //   - Laguna (laguna model_type) → IN-FLIGHT. No model class
+        //     ported yet on either LLM or VLM side.
+        //
+        // The check fires only for VLM-shaped Mistral 3 family bundles
+        // and for Laguna. Once the VLM JANGTQ port + Laguna model class
+        // land upstream, drop this check entirely.
         if isMxtq {
             let configURL = directory.appendingPathComponent("config.json")
             if let configData = try? Data(contentsOf: configURL),
@@ -1208,22 +1210,42 @@ public actor ModelRuntime {
                 } else {
                     textInner = nil
                 }
-                let pendingJANGTQFamilies: Set<String> = ["mistral3", "ministral3", "laguna"]
-                let matchedOuter = pendingJANGTQFamilies.contains(modelType)
-                let matchedInner = textInner.map { pendingJANGTQFamilies.contains($0) } ?? false
-                if matchedOuter || matchedInner {
-                    let resolved = matchedOuter ? modelType : (textInner ?? modelType)
+                let hasVision = configJSON["vision_config"] != nil
+                let mistral3Family: Set<String> = ["mistral3", "ministral3"]
+                let isMistral3Family = mistral3Family.contains(modelType)
+                    || (textInner.map { mistral3Family.contains($0) } ?? false)
+                let isLaguna = modelType == "laguna"
+                    || (textInner.map { $0 == "laguna" } ?? false)
+
+                // Mistral 3 family: only block when vision_config is
+                // present (VLM path is still pending). Pure LLM
+                // bundles (no vision_config) flow through to vmlx's
+                // Mistral3TextJANGTQModel which handles JANGTQ correctly.
+                if isMistral3Family && hasVision {
                     throw NSError(
                         domain: "ModelRuntime",
                         code: 4,
                         userInfo: [
                             NSLocalizedDescriptionKey:
-                                "Model '\(name)' is a JANGTQ-quantized '\(resolved)' bundle, "
-                                + "but vmlx-swift-lm hasn't ported a JANGTQ-aware Linear shim "
-                                + "for that family yet (Mistral 3 / Mistral 3.5 / Laguna). "
-                                + "The MXFP4 quant tier of the same model loads correctly "
-                                + "via the standard MLX dequant path — switch to the MXFP4 "
-                                + "variant, or wait for the JANGTQ port to land upstream."
+                                "Model '\(name)' is a JANGTQ-quantized Mistral 3 family VLM "
+                                + "bundle (with Pixtral vision tower). The LLM-side JANGTQ "
+                                + "port is complete; the VLM-side port is in-flight. "
+                                + "Use the MXFP4 quant tier (e.g. Mistral-Medium-3.5-128B-mxfp4) "
+                                + "until the VLM JANGTQ port lands."
+                        ]
+                    )
+                }
+
+                if isLaguna {
+                    throw NSError(
+                        domain: "ModelRuntime",
+                        code: 4,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "Model '\(name)' is a JANGTQ-quantized Laguna bundle, but "
+                                + "vmlx-swift-lm hasn't ported a Laguna model class yet. "
+                                + "Use the MXFP4 quant tier (e.g. Laguna-XS.2-mxfp4) until "
+                                + "the engine port lands upstream."
                         ]
                     )
                 }
