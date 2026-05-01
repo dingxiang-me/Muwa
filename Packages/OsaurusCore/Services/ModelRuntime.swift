@@ -1181,6 +1181,55 @@ public actor ModelRuntime {
         let sidecarPresent = FileManager.default.fileExists(atPath: sidecarURL.path)
         let isMxtq = probe.weight_format == "mxtq"
 
+        // Third check (2026-04-30): JANGTQ-quantized bundles for model_type
+        // families where vmlx hasn't ported a JANGTQ-aware Linear shim yet.
+        // The current Mistral 3 family (mistral3 / ministral3) and Laguna
+        // (laguna) classes use vanilla MLXNN.Linear which reads a flat
+        // `weight` tensor — JANGTQ bundles ship .tq_packed + .scales tensors
+        // that the vanilla Linear would either crash on (shape mismatch) or
+        // silently load as garbage. Vmlx fails fast at the factory dispatch
+        // (LLMModelFactory + VLMModelFactory mistral3 closures throw on
+        // weight_format=mxtq), but we surface the error earlier here — at
+        // the host layer before any vmlx loader runs — so the user sees a
+        // friendly remediation message instead of a thrown NSError mid-load.
+        // The MXFP4 quant tier loads via the standard mlx_lm dequant path
+        // for these families (layout matches mx.quantize), so the message
+        // points at MXFP4 as the working alternative.
+        if isMxtq {
+            let configURL = directory.appendingPathComponent("config.json")
+            if let configData = try? Data(contentsOf: configURL),
+                let configJSON = try? JSONSerialization.jsonObject(with: configData)
+                    as? [String: Any]
+            {
+                let modelType = (configJSON["model_type"] as? String)?.lowercased() ?? ""
+                let textInner: String?
+                if let textConfig = configJSON["text_config"] as? [String: Any] {
+                    textInner = (textConfig["model_type"] as? String)?.lowercased()
+                } else {
+                    textInner = nil
+                }
+                let pendingJANGTQFamilies: Set<String> = ["mistral3", "ministral3", "laguna"]
+                let matchedOuter = pendingJANGTQFamilies.contains(modelType)
+                let matchedInner = textInner.map { pendingJANGTQFamilies.contains($0) } ?? false
+                if matchedOuter || matchedInner {
+                    let resolved = matchedOuter ? modelType : (textInner ?? modelType)
+                    throw NSError(
+                        domain: "ModelRuntime",
+                        code: 4,
+                        userInfo: [
+                            NSLocalizedDescriptionKey:
+                                "Model '\(name)' is a JANGTQ-quantized '\(resolved)' bundle, "
+                                + "but vmlx-swift-lm hasn't ported a JANGTQ-aware Linear shim "
+                                + "for that family yet (Mistral 3 / Mistral 3.5 / Laguna). "
+                                + "The MXFP4 quant tier of the same model loads correctly "
+                                + "via the standard MLX dequant path — switch to the MXFP4 "
+                                + "variant, or wait for the JANGTQ port to land upstream."
+                        ]
+                    )
+                }
+            }
+        }
+
         // Forward mismatch: declared JANGTQ, sidecar missing.
         if isMxtq && !sidecarPresent {
             throw NSError(
