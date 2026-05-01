@@ -249,7 +249,7 @@ public struct OnboardingView: View {
         case .createAgent: return "Create your agent"
         case .configureAI: return "Configure your AI"
         case .identitySetup: return "Set up identity"
-        case .walkthrough: return "Tour"
+        case .walkthrough: return "How it works"
         }
     }
 

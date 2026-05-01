@@ -323,8 +323,7 @@ struct CreateAgentBody: View {
                 label: "",
                 placeholder: "Instructions for this agent…",
                 text: $state.systemPrompt,
-                minHeight: 96,
-                maxHeight: 130
+                height: 100
             )
             .onChange(of: state.systemPrompt) { _, newValue in
                 // Track edits so switching starters won't overwrite the

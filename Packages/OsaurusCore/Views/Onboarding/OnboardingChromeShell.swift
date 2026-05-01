@@ -3,9 +3,9 @@
 //  osaurus
 //
 //  The single chrome shell shared by every onboarding step. Owns the
-//  full-width header (back + title + close), a transparent step-indicator
-//  strip between the body and the footer, and the full-width footer
-//  (caption row + macOS-wizard action row [secondary | spacer | primary]).
+//  full-width header (back + title + close), the body region, and the
+//  full-width footer (progress dots, caption row, and macOS-wizard action
+//  row [secondary | spacer | primary]).
 //
 //  All chrome is fully transparent (no fills, no rules) so the window's
 //  blurred glass background shows through naturally. The body slides

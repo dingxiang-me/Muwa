@@ -64,7 +64,6 @@ enum WalkthroughPage: Int, CaseIterable, Identifiable {
 @MainActor
 final class WalkthroughState: ObservableObject {
     @Published var currentPage: WalkthroughPage = .loop
-    @Published var direction: OnboardingDirection = .forward
 
     var pages: [WalkthroughPage] { WalkthroughPage.allCases }
     var pageIndex: Int { pages.firstIndex(of: currentPage) ?? 0 }
@@ -72,17 +71,18 @@ final class WalkthroughState: ObservableObject {
 
     /// Move forward (positive) or backward (negative). Bounded to the
     /// available pages — drag/click overflow at the edges is a no-op.
+    /// Direction is implicit in the index delta — the carousel filmstrip
+    /// reads off the index to compute its offset, so direction never
+    /// needs to be stored.
     func advance(by step: Int) {
         let next = pageIndex + step
         guard next >= 0, next < pages.count else { return }
-        direction = step > 0 ? .forward : .backward
         currentPage = pages[next]
     }
 
     /// Jump directly to a page (used by the clickable page dots).
     func jump(to page: WalkthroughPage) {
         guard page != currentPage else { return }
-        direction = page.rawValue > currentPage.rawValue ? .forward : .backward
         currentPage = page
     }
 
@@ -113,24 +113,86 @@ struct WalkthroughBody: View {
             carousel
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            pageDots
+            paginationControls
                 .padding(.bottom, 4)
         }
     }
 
-    // MARK: - Carousel
-
-    private var carousel: some View {
-        ZStack {
-            pageHero(state.currentPage)
-                .id(state.currentPage)
-                .transition(pageTransition)
+    /// Chevron arrows flanking the page-dot row. Mirror the swipe + click
+    /// affordances already on the carousel so users with trackpads or
+    /// keyboards have a third path to advance pages.
+    private var paginationControls: some View {
+        HStack(spacing: 14) {
+            arrowButton(
+                systemImage: "chevron.left",
+                disabled: state.pageIndex == 0,
+                action: { state.advance(by: -1) }
+            )
+            pageDots
+            arrowButton(
+                systemImage: "chevron.right",
+                disabled: state.isLastPage,
+                action: { state.advance(by: 1) }
+            )
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    private func arrowButton(
+        systemImage: String,
+        disabled: Bool,
+        action: @escaping () -> Void
+    ) -> some View {
+        Button(action: action) {
+            Image(systemName: systemImage)
+                .font(.system(size: 11, weight: .bold))
+                .foregroundColor(disabled ? theme.tertiaryText.opacity(0.4) : theme.secondaryText)
+                .frame(width: 22, height: 22)
+                .background(
+                    Circle()
+                        .fill(theme.tertiaryBackground.opacity(disabled ? 0.0 : 0.5))
+                )
+                .overlay(
+                    Circle()
+                        .strokeBorder(
+                            theme.primaryBorder.opacity(disabled ? 0.0 : 0.4),
+                            lineWidth: 1
+                        )
+                )
+                .contentShape(Circle())
+        }
+        .buttonStyle(.plain)
+        .disabled(disabled)
+        .opacity(disabled ? 0.5 : 1.0)
+        .animation(.easeOut(duration: 0.15), value: disabled)
+    }
+
+    // MARK: - Carousel (filmstrip)
+
+    /// Filmstrip carousel: all four pages live in a horizontal HStack,
+    /// each sized to the carousel's exact width. The strip offsets to show
+    /// the current page (`-index * width`). Direction is naturally encoded
+    /// in the index delta — no captured-state ambiguity (the prior
+    /// `.transition(pageTransition)` setup baked `state.direction` into
+    /// each view's transition value at construction time, which produced
+    /// asymmetric animations when the user reversed direction). Drag is an
+    /// additive offset on top of the index-driven offset.
+    private var carousel: some View {
+        GeometryReader { geo in
+            let pageWidth = geo.size.width
+            HStack(spacing: 0) {
+                ForEach(state.pages) { page in
+                    pageHero(page)
+                        .frame(width: pageWidth, height: geo.size.height)
+                }
+            }
+            .frame(width: pageWidth, height: geo.size.height, alignment: .leading)
+            .offset(x: -CGFloat(state.pageIndex) * pageWidth + dragOffset)
+            .animation(
+                .spring(response: 0.55, dampingFraction: 0.88),
+                value: state.pageIndex
+            )
+        }
         .clipped()
-        .offset(x: dragOffset)
-        .animation(.spring(response: 0.55, dampingFraction: 0.88), value: state.currentPage)
-        .animation(.interactiveSpring(response: 0.3, dampingFraction: 0.85), value: dragOffset)
         .contentShape(Rectangle())
         .gesture(
             DragGesture()
@@ -166,16 +228,6 @@ struct WalkthroughBody: View {
             illustrationAsset: page.illustrationAsset,
             headline: page.headline,
             subtitle: page.subtitle
-        )
-    }
-
-    private var pageTransition: AnyTransition {
-        let dx: CGFloat = OnboardingMetrics.windowWidth - OnboardingMetrics.leftColumnPadding * 2
-        let inOffset = state.direction == .forward ? dx : -dx
-        let outOffset = state.direction == .forward ? -dx : dx
-        return .asymmetric(
-            insertion: .offset(x: inOffset),
-            removal: .offset(x: outOffset)
         )
     }
 

@@ -104,8 +104,8 @@ enum OnboardingMetrics {
 
 // MARK: - Visual Style Tokens
 
-/// Glass / accent / glow tokens consumed by `OnboardingCards` and
-/// `OnboardingButtons`. Centralised so dark/light treatments stay paired.
+/// Glass / accent tokens consumed by `OnboardingCards`. Centralised so
+/// dark/light treatments stay paired.
 enum OnboardingStyle {
     // Glass background
     static let glassOpacityDark: Double = 0.78
@@ -124,12 +124,6 @@ enum OnboardingStyle {
     // Accent edge highlight
     static let accentEdgeHoverOpacity: Double = 0.18
     static let accentEdgeNormalOpacity: Double = 0.10
-
-    // Button glow
-    static let buttonGlowRadiusNormal: CGFloat = 12
-    static let buttonGlowRadiusHover: CGFloat = 16
-    static let buttonGlowOpacityNormal: Double = 0.25
-    static let buttonGlowOpacityHover: Double = 0.4
 }
 
 // MARK: - Per-Step Preferred Size (constant)

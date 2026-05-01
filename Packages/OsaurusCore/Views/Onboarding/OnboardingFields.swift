@@ -116,13 +116,16 @@ struct OnboardingTextField: View {
 
 /// Multi-line text editor with the same chrome as `OnboardingTextField`.
 /// Uses a placeholder overlay since `TextEditor` has no native one.
+///
+/// The editor renders at a **fixed** `height`; longer content scrolls
+/// inside the editor instead of growing the chrome and pushing surrounding
+/// form rows around.
 struct OnboardingTextEditor: View {
     let label: String
     let placeholder: String
     @Binding var text: String
     var isMonospaced: Bool = true
-    var minHeight: CGFloat = 100
-    var maxHeight: CGFloat = 160
+    var height: CGFloat = 100
 
     @Environment(\.theme) private var theme
     @FocusState private var isFocused: Bool
@@ -150,7 +153,7 @@ struct OnboardingTextEditor: View {
                     .font(font)
                     .foregroundColor(theme.primaryText)
                     .scrollContentBackground(.hidden)
-                    .frame(minHeight: minHeight, maxHeight: maxHeight)
+                    .frame(height: height)
                     .padding(10)
                     .focused($isFocused)
             }
