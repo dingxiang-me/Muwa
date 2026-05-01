@@ -9,7 +9,6 @@ import Testing
 
 @testable import OsaurusCore
 
-@Suite(.serialized)  // serial: tests share the static `sidecarFetcherForTests` hook
 struct EnsureJANGTQSidecarTests {
 
     private func makeBundle(
@@ -21,10 +20,9 @@ struct EnsureJANGTQSidecarTests {
         try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 
         if let wf = weightFormat {
-            let json = #"{"version": 2, "weight_format": "\#(wf)"}"#
-            try json.data(using: .utf8)!.write(
-                to: dir.appendingPathComponent("jang_config.json")
-            )
+            let payload: [String: Any] = ["version": 2, "weight_format": wf]
+            let data = try JSONSerialization.data(withJSONObject: payload)
+            try data.write(to: dir.appendingPathComponent("jang_config.json"))
         }
         if withSidecar {
             try Data("dummy".utf8).write(
@@ -34,19 +32,29 @@ struct EnsureJANGTQSidecarTests {
         return dir
     }
 
+    private actor FetchTracker {
+        var calls: [(URL, URL)] = []
+        var count: Int { calls.count }
+        func record(_ url: URL, _ dest: URL) { calls.append((url, dest)) }
+    }
+
     /// Sidecar already present → fetcher MUST NOT fire.
     @Test func noFetchWhenSidecarPresent() async throws {
         let dir = try makeBundle(weightFormat: "mxtq", withSidecar: true)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        var fetcherCallCount = 0
-        ModelRuntime.sidecarFetcherForTests = { _, _ in fetcherCallCount += 1 }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
+        let tracker = FetchTracker()
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
+            await tracker.record(url, dest)
+        }
 
-        try await ModelRuntime.ensureJANGTQSidecar(
-            at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
-        )
-        #expect(fetcherCallCount == 0)
+        try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+            try await ModelRuntime.ensureJANGTQSidecar(
+                at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
+            )
+        }
+        let count = await tracker.count
+        #expect(count == 0)
     }
 
     /// Non-mxtq stamp → fetcher MUST NOT fire (no forward mismatch).
@@ -54,14 +62,18 @@ struct EnsureJANGTQSidecarTests {
         let dir = try makeBundle(weightFormat: "bf16", withSidecar: false)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        var fetcherCallCount = 0
-        ModelRuntime.sidecarFetcherForTests = { _, _ in fetcherCallCount += 1 }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
+        let tracker = FetchTracker()
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
+            await tracker.record(url, dest)
+        }
 
-        try await ModelRuntime.ensureJANGTQSidecar(
-            at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
-        )
-        #expect(fetcherCallCount == 0)
+        try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+            try await ModelRuntime.ensureJANGTQSidecar(
+                at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
+            )
+        }
+        let count = await tracker.count
+        #expect(count == 0)
     }
 
     /// No jang_config.json at all (vanilla model) → fetcher MUST NOT fire.
@@ -69,14 +81,18 @@ struct EnsureJANGTQSidecarTests {
         let dir = try makeBundle(weightFormat: nil, withSidecar: false)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        var fetcherCallCount = 0
-        ModelRuntime.sidecarFetcherForTests = { _, _ in fetcherCallCount += 1 }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
+        let tracker = FetchTracker()
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
+            await tracker.record(url, dest)
+        }
 
-        try await ModelRuntime.ensureJANGTQSidecar(
-            at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
-        )
-        #expect(fetcherCallCount == 0)
+        try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+            try await ModelRuntime.ensureJANGTQSidecar(
+                at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
+            )
+        }
+        let count = await tracker.count
+        #expect(count == 0)
     }
 
     /// Inverse mismatch (sidecar present, stamp says non-mxtq) → fetcher
@@ -85,19 +101,23 @@ struct EnsureJANGTQSidecarTests {
         let dir = try makeBundle(weightFormat: "bf16", withSidecar: true)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        var fetcherCallCount = 0
-        ModelRuntime.sidecarFetcherForTests = { _, _ in fetcherCallCount += 1 }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
+        let tracker = FetchTracker()
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
+            await tracker.record(url, dest)
+        }
 
         var threw: NSError?
         do {
-            try await ModelRuntime.ensureJANGTQSidecar(
-                at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
-            )
+            try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+                try await ModelRuntime.ensureJANGTQSidecar(
+                    at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
+                )
+            }
         } catch let e as NSError {
             threw = e
         }
-        #expect(fetcherCallCount == 0)
+        let count = await tracker.count
+        #expect(count == 0)
         #expect(threw?.code == 3)
     }
 
@@ -107,19 +127,23 @@ struct EnsureJANGTQSidecarTests {
         let dir = try makeBundle(weightFormat: "mxtq", withSidecar: false)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        var fetcherCallCount = 0
-        ModelRuntime.sidecarFetcherForTests = { _, _ in fetcherCallCount += 1 }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
+        let tracker = FetchTracker()
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
+            await tracker.record(url, dest)
+        }
 
         var threw: NSError?
         do {
-            try await ModelRuntime.ensureJANGTQSidecar(
-                at: dir, modelId: "Some-Flat-Model", name: "Flat"
-            )
+            try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+                try await ModelRuntime.ensureJANGTQSidecar(
+                    at: dir, modelId: "Some-Flat-Model", name: "Flat"
+                )
+            }
         } catch let e as NSError {
             threw = e
         }
-        #expect(fetcherCallCount == 0)
+        let count = await tracker.count
+        #expect(count == 0)
         #expect(threw?.code == 2)
     }
 
@@ -130,30 +154,27 @@ struct EnsureJANGTQSidecarTests {
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let modelId = "JANGQ-AI/Laguna-XS.2-JANGTQ"
-        var capturedURL: URL?
-        var capturedDest: URL?
-        var fetchCount = 0
-        ModelRuntime.sidecarFetcherForTests = { url, dest in
-            fetchCount += 1
-            capturedURL = url
-            capturedDest = dest
+        let tracker = FetchTracker()
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
+            await tracker.record(url, dest)
             try Data("real-sidecar-bytes".utf8).write(to: dest)
         }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
 
-        try await ModelRuntime.ensureJANGTQSidecar(
-            at: dir, modelId: modelId, name: "Laguna"
-        )
+        try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+            try await ModelRuntime.ensureJANGTQSidecar(
+                at: dir, modelId: modelId, name: "Laguna"
+            )
+        }
 
-        #expect(fetchCount == 1)
+        let calls = await tracker.calls
+        #expect(calls.count == 1)
         #expect(
-            capturedURL?.absoluteString
+            calls.first?.0.absoluteString
                 == "https://huggingface.co/JANGQ-AI/Laguna-XS.2-JANGTQ/resolve/main/jangtq_runtime.safetensors"
         )
         #expect(
-            capturedDest?.lastPathComponent == "jangtq_runtime.safetensors"
+            calls.first?.1.lastPathComponent == "jangtq_runtime.safetensors"
         )
-        // Sidecar must now be on disk so the next call is a no-op.
         #expect(
             FileManager.default.fileExists(
                 atPath: dir.appendingPathComponent("jangtq_runtime.safetensors").path
@@ -168,17 +189,18 @@ struct EnsureJANGTQSidecarTests {
         let dir = try makeBundle(weightFormat: "mxtq", withSidecar: false)
         defer { try? FileManager.default.removeItem(at: dir) }
 
-        struct StubError: Error { let what: String }
-        ModelRuntime.sidecarFetcherForTests = { _, _ in
+        struct StubError: Error, Sendable { let what: String }
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { _, _ in
             throw StubError(what: "no network")
         }
-        defer { ModelRuntime.sidecarFetcherForTests = nil }
 
         var threw: NSError?
         do {
-            try await ModelRuntime.ensureJANGTQSidecar(
-                at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
-            )
+            try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+                try await ModelRuntime.ensureJANGTQSidecar(
+                    at: dir, modelId: "OsaurusAI/Foo", name: "Foo"
+                )
+            }
         } catch let e as NSError {
             threw = e
         }

@@ -1179,7 +1179,15 @@ public actor ModelRuntime {
 
         let sidecarURL = directory.appendingPathComponent("jangtq_runtime.safetensors")
         let sidecarPresent = FileManager.default.fileExists(atPath: sidecarURL.path)
-        let isMxtq = probe.weight_format == "mxtq"
+        // Normalize stamp comparison: pipelines/users have shipped `MXTQ`,
+        // ` mxtq `, and `Mxtq` in jang_config.json over time. We treat all
+        // of those as the same canonical declaration so the JANGTQ family
+        // (Qwen / MiniMax / DSV4 / Nemotron / Mistral 3 / Laguna / etc.)
+        // never silently slips past the preflight just because of casing.
+        let normalizedStamp = (probe.weight_format ?? "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .lowercased()
+        let isMxtq = normalizedStamp == "mxtq"
 
         // Third check: JANGTQ-quantized bundles for model_type families
         // where vmlx hasn't fully ported the JANGTQ Linear shim yet.
@@ -1245,7 +1253,7 @@ public actor ModelRuntime {
         // safetensors carry `tq_norms` / `tq_packed` keys vmlx's base class
         // can't decode → "Unhandled keys" runtime error. Catch it here.
         if sidecarPresent && !isMxtq {
-            let actualStamp = probe.weight_format ?? "absent"
+            let actualStamp = (probe.weight_format?.isEmpty == false) ? probe.weight_format! : "absent"
             throw NSError(
                 domain: "ModelRuntime",
                 code: 3,
@@ -1283,15 +1291,19 @@ public actor ModelRuntime {
             where error.domain == "ModelRuntime" && error.code == 2
         {
             // Forward mismatch: stamp says mxtq, sidecar missing. Try one HF fetch.
-            guard modelId.contains("/") else {
-                // Flat-layout local id — no canonical HF mapping. Surface original.
+            // Strict id validation — we ONLY auto-fetch when the id looks
+            // like a real `<org>/<repo>` HF path so we never speculatively
+            // hit the network with a malformed id.
+            guard isValidHFRepoId(modelId) else {
                 throw error
             }
             guard
                 let url = ModelDownloadService.resolveURL(
                     repoId: modelId,
                     path: "jangtq_runtime.safetensors"
-                )
+                ),
+                let scheme = url.scheme, scheme == "https",
+                url.host == "huggingface.co"
             else {
                 throw error
             }
@@ -1328,7 +1340,7 @@ public actor ModelRuntime {
     /// Overridable via `sidecarFetcherForTests` so unit tests don't have
     /// to hit the real network.
     static func fetchSidecar(from url: URL, to dest: URL) async throws {
-        if let injected = sidecarFetcherForTests {
+        if let injected = $sidecarFetcherForTests.wrappedValue {
             try await injected(url, dest)
             return
         }
@@ -1358,13 +1370,76 @@ public actor ModelRuntime {
             )
         }
 
-        try? FileManager.default.removeItem(at: dest)
-        try FileManager.default.moveItem(at: tempURL, to: dest)
+        // Cross-volume safe + race tolerant install of the temp file:
+        //   - moveItem fails with EXDEV when temp + dest are on different
+        //     volumes (system temp vs an external drive like /Volumes/...).
+        //     Fall back to copy + delete.
+        //   - If a concurrent caller raced us and already wrote the dest
+        //     between our removeItem and move/copy, treat that as a win and
+        //     drop our copy on the floor — the post-fetch validator will
+        //     accept whichever sidecar is on disk.
+        let fm = FileManager.default
+        let tmpDest = dest.deletingLastPathComponent()
+            .appendingPathComponent(".jangtq_runtime.\(UUID().uuidString).part")
+
+        do {
+            try fm.copyItem(at: tempURL, to: tmpDest)
+        } catch {
+            // copy failed (permissions, disk full, etc.) — try a direct rename
+            // as a last resort; if that ALSO fails, surface the error.
+            try fm.moveItem(at: tempURL, to: tmpDest)
+        }
+
+        defer { try? fm.removeItem(at: tmpDest) }
+
+        // Atomic in-volume rename. If the dest already exists (concurrent
+        // fetch won), `replaceItem` swaps without error. Use replaceItemAt
+        // because it handles "dest already exists" cleanly and stays atomic.
+        if fm.fileExists(atPath: dest.path) {
+            // Another writer beat us. Keep theirs.
+            return
+        }
+        do {
+            _ = try fm.replaceItemAt(dest, withItemAt: tmpDest)
+        } catch {
+            // Last-chance race recovery: if dest now exists, accept it.
+            if fm.fileExists(atPath: dest.path) {
+                return
+            }
+            throw error
+        }
+    }
+
+    /// True iff `id` looks like a real Hugging Face `<org>/<repo>` path —
+    /// strict enough that we never fire the auto-fetch on garbage input.
+    /// Allowed chars match HF's repo-name rules: ASCII letters, digits,
+    /// `-`, `_`, `.`. Each segment must be 1..96 chars; exactly one `/`
+    /// separator; no leading / trailing slash; no whitespace anywhere.
+    static func isValidHFRepoId(_ id: String) -> Bool {
+        guard !id.isEmpty,
+            !id.hasPrefix("/"),
+            !id.hasSuffix("/")
+        else { return false }
+        let segments = id.split(separator: "/", omittingEmptySubsequences: false)
+        guard segments.count == 2 else { return false }
+        let allowed = CharacterSet(charactersIn:
+            "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789-_."
+        )
+        for seg in segments {
+            let s = String(seg)
+            guard !s.isEmpty, s.count <= 96 else { return false }
+            guard s.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return false }
+        }
+        return true
     }
 
     /// Test-only injection point. Production code never sets this.
-    nonisolated(unsafe) static var sidecarFetcherForTests:
-        ((_ url: URL, _ dest: URL) async throws -> Void)?
+    /// Stored as a `@TaskLocal` so parallel tests don't race on a single
+    /// global, and so each test's override is naturally scoped to its own
+    /// task tree via `withValue { ... }`.
+    @TaskLocal
+    static var sidecarFetcherForTests:
+        (@Sendable (_ url: URL, _ dest: URL) async throws -> Void)? = nil
 
     /// Pure, testable sibling of `findLocalDirectory` that takes the root
     /// explicitly. Exposed at module scope so the symlink-resolution

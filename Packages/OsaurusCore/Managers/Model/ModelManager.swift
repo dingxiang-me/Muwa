@@ -1129,8 +1129,12 @@ extension ModelManager {
             if let idx = availableModels.firstIndex(where: { $0.id == r.oldId }) {
                 availableModels[idx] = r.new
             } else if let idx = suggestedModels.firstIndex(where: { $0.id == r.oldId }) {
-                // Suggested entries are immutable from this path; promote into available instead.
-                _ = idx
+                // Suggested entry's id pointed at a path the user doesn't
+                // actually have on disk (curated `OsaurusAI/Foo` vs the user's
+                // flat `Foo`). Drop the curated entry from suggested and add
+                // the on-disk one to available — otherwise the model shows
+                // twice (once "downloaded", once "not downloaded").
+                suggestedModels.remove(at: idx)
                 availableModels.append(r.new)
             } else {
                 availableModels.append(r.new)
