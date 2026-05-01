@@ -187,6 +187,216 @@ private func makeBundle(weightFormatRaw: String?) throws -> URL {
     }
 }
 
+@Suite("HF repo candidate resolution — covers all curated orgs")
+struct HFRepoCandidatesTests {
+
+    @Test func canonicalIdReturnsItselfOnly() {
+        #expect(
+            ModelRuntime.jangtqHFRepoCandidates(for: "OsaurusAI/Foo")
+                == ["OsaurusAI/Foo"]
+        )
+        #expect(
+            ModelRuntime.jangtqHFRepoCandidates(for: "JANGQ-AI/Laguna-XS.2-JANGTQ")
+                == ["JANGQ-AI/Laguna-XS.2-JANGTQ"]
+        )
+        #expect(
+            ModelRuntime.jangtqHFRepoCandidates(for: "mlx-community/Qwen3-MoE")
+                == ["mlx-community/Qwen3-MoE"]
+        )
+    }
+
+    /// Flat-layout dir name → must produce candidates in priority order
+    /// covering every JANGTQ publisher org we know about, including
+    /// OsaurusAI (curated), JANGQ-AI (user's primary), and mlx-community.
+    @Test func flatIdExpandsToAllKnownOrgs() {
+        let cands = ModelRuntime.jangtqHFRepoCandidates(for: "MiniMax-M2.7-Small-JANGTQ")
+        // JANGQ-AI is tried first, OsaurusAI second, mlx-community third.
+        #expect(cands == [
+            "JANGQ-AI/MiniMax-M2.7-Small-JANGTQ",
+            "OsaurusAI/MiniMax-M2.7-Small-JANGTQ",
+            "mlx-community/MiniMax-M2.7-Small-JANGTQ",
+        ])
+    }
+
+    /// Real bundle names that ship under OsaurusAI must round-trip through
+    /// the fallback: the OsaurusAI candidate is always present and valid.
+    @Test(arguments: [
+        "Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
+        "Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4",
+        "Nemotron-3-Nano-Omni-30B-A3B-Multimodal-Addon",
+        "Holo3-35B-A3B-mxfp4",
+        "Laguna-XS.2-mxfp4",
+        "Laguna-XS.2-JANGTQ",
+        "Mistral-Medium-3.5-128B",
+        "DeepSeek-V4-Flash-JANGTQ",
+        "DeepSeek-V4-Flash-JANGTQ2",
+        "Kimi-K2.6-Med-JANGTQ",
+        "Kimi-K2.6-Small-JANGTQ",
+        "MiniMax-M2.7-JANGTQ4",
+        "MiniMax-M2.7-Small-JANGTQ",
+        "Qwen3.5-35B-A3B-JANG_4K",
+        "Qwen3.6-35B-A3B-JANGTQ4",
+    ])
+    func realBundleNamesProduceOsaurusAICandidate(_ flatName: String) {
+        let cands = ModelRuntime.jangtqHFRepoCandidates(for: flatName)
+        #expect(cands.contains("OsaurusAI/\(flatName)"),
+            "OsaurusAI/\(flatName) must be in the fallback list")
+        #expect(cands.contains("JANGQ-AI/\(flatName)"),
+            "JANGQ-AI/\(flatName) must be in the fallback list")
+        #expect(cands.contains("mlx-community/\(flatName)"),
+            "mlx-community/\(flatName) must be in the fallback list")
+        // All candidates must independently pass the strict id gate so
+        // the URL builder produces a clean huggingface.co URL.
+        for c in cands {
+            #expect(ModelRuntime.isValidHFRepoId(c),
+                "\(c) must satisfy isValidHFRepoId")
+        }
+    }
+
+    /// Empty + multi-slash + malformed flat ids never produce candidates.
+    @Test(arguments: ["", "/", "a/b/c", "../etc", "foo bar", "foo\nbar"])
+    func malformedIdsProduceNoCandidates(_ id: String) {
+        #expect(ModelRuntime.jangtqHFRepoCandidates(for: id).isEmpty)
+    }
+
+    /// A flat name containing characters the strict id gate would reject
+    /// must not produce candidates that try to slip those chars through.
+    @Test func flatIdWithIllegalCharsRejected() {
+        // Whitespace in the basename → candidates list is empty because
+        // every prefixed candidate fails isValidHFRepoId on the basename.
+        #expect(ModelRuntime.jangtqHFRepoCandidates(for: "Bad Name").isEmpty)
+        #expect(ModelRuntime.jangtqHFRepoCandidates(for: "ä-name").isEmpty)
+        #expect(ModelRuntime.jangtqHFRepoCandidates(for: "name?evil").isEmpty)
+    }
+}
+
+@Suite(.serialized)
+struct OsaurusOrgAutoFetchTests {
+
+    private func makeMxtqBundle() throws -> URL {
+        let dir = FileManager.default.temporaryDirectory
+            .appendingPathComponent("osu-osaurus-\(UUID().uuidString)")
+        try FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
+        let payload: [String: Any] = ["weight_format": "mxtq"]
+        let data = try JSONSerialization.data(withJSONObject: payload)
+        try data.write(to: dir.appendingPathComponent("jang_config.json"))
+        return dir
+    }
+
+    /// User has a flat-layout JANGTQ bundle whose canonical HF repo lives
+    /// under OsaurusAI. The fallback must walk through the org list, hit
+    /// OsaurusAI/<name>, and recover.
+    @Test func flatBundleResolvesViaOsaurusAIFallback() async throws {
+        let dir = try makeMxtqBundle()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        actor URLLog {
+            var attempts: [URL] = []
+            func record(_ url: URL) { attempts.append(url) }
+        }
+        let log = URLLog()
+
+        let dest = dir.appendingPathComponent("jangtq_runtime.safetensors")
+
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, _ in
+            await log.record(url)
+            // Simulate JANGQ-AI 404 (first in priority order) and
+            // OsaurusAI 200 (second). mlx-community would be third but
+            // we never reach it.
+            if url.absoluteString.contains("/JANGQ-AI/") {
+                throw NSError(domain: "ModelRuntime", code: 5,
+                    userInfo: [NSLocalizedDescriptionKey: "HTTP 404"])
+            }
+            if url.absoluteString.contains("/OsaurusAI/") {
+                try Data("real-osaurus-ai-sidecar".utf8).write(to: dest)
+                return
+            }
+            throw NSError(domain: "ModelRuntime", code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "unexpected"])
+        }
+
+        try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+            try await ModelRuntime.ensureJANGTQSidecar(
+                at: dir, modelId: "Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4", name: "Nemotron"
+            )
+        }
+
+        let attempts = await log.attempts
+        // Ordered fallback: JANGQ-AI tried first, OsaurusAI tried second.
+        #expect(attempts.count == 2)
+        #expect(
+            attempts.first?.absoluteString
+                == "https://huggingface.co/JANGQ-AI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4/resolve/main/jangtq_runtime.safetensors"
+        )
+        #expect(
+            attempts.last?.absoluteString
+                == "https://huggingface.co/OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4/resolve/main/jangtq_runtime.safetensors"
+        )
+        #expect(FileManager.default.fileExists(atPath: dest.path))
+    }
+
+    /// Canonical OsaurusAI/<repo> id (nested layout, downloaded normally
+    /// through osaurus): fetcher hits exactly that URL once.
+    @Test func nestedOsaurusAIFetchesDirectly() async throws {
+        let dir = try makeMxtqBundle()
+        defer { try? FileManager.default.removeItem(at: dir) }
+        let dest = dir.appendingPathComponent("jangtq_runtime.safetensors")
+
+        actor URLLog {
+            var attempts: [URL] = []
+            func record(_ url: URL) { attempts.append(url) }
+        }
+        let log = URLLog()
+
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { url, _ in
+            await log.record(url)
+            try Data("ok".utf8).write(to: dest)
+        }
+
+        try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+            try await ModelRuntime.ensureJANGTQSidecar(
+                at: dir, modelId: "OsaurusAI/Holo3-35B-A3B-JANGTQ",
+                name: "Holo3"
+            )
+        }
+
+        let attempts = await log.attempts
+        #expect(attempts.count == 1)
+        #expect(
+            attempts.first?.absoluteString
+                == "https://huggingface.co/OsaurusAI/Holo3-35B-A3B-JANGTQ/resolve/main/jangtq_runtime.safetensors"
+        )
+    }
+
+    /// All candidates 404 → user gets a code-4 error listing every URL we
+    /// tried, so they know exactly where the sidecar is expected to live.
+    @Test func allCandidatesFailedSurfacesEveryTriedURL() async throws {
+        let dir = try makeMxtqBundle()
+        defer { try? FileManager.default.removeItem(at: dir) }
+
+        let fetcher: @Sendable (URL, URL) async throws -> Void = { _, _ in
+            throw NSError(domain: "ModelRuntime", code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "HTTP 404"])
+        }
+
+        var threw: NSError?
+        do {
+            try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
+                try await ModelRuntime.ensureJANGTQSidecar(
+                    at: dir, modelId: "Some-Lost-Bundle", name: "Lost"
+                )
+            }
+        } catch let e as NSError {
+            threw = e
+        }
+        #expect(threw?.code == 4)
+        let msg = threw?.localizedDescription ?? ""
+        #expect(msg.contains("JANGQ-AI/Some-Lost-Bundle"))
+        #expect(msg.contains("OsaurusAI/Some-Lost-Bundle"))
+        #expect(msg.contains("mlx-community/Some-Lost-Bundle"))
+    }
+}
+
 @Suite struct AutoFetchGuardTests {
 
     private func makeMxtqBundle() throws -> URL {
@@ -194,21 +404,25 @@ private func makeBundle(weightFormatRaw: String?) throws -> URL {
     }
 
     /// All these ids must reach the validator's code-2 throw without ever
-    /// calling the network fetcher — they fail `isValidHFRepoId`.
+    /// calling the network fetcher — `jangtqHFRepoCandidates` returns an
+    /// empty list for them. (Flat-name ids without illegal chars now go
+    /// through the org fallback list — that path is covered separately
+    /// in `OsaurusOrgAutoFetchTests`.)
     @Test(arguments: [
         "",            // empty
         "/",           // bare slash
-        "/foo",        // leading slash
-        "foo/",        // trailing slash
-        "foo",         // no slash
+        "/foo",        // leading slash, not flat
+        "foo/",        // trailing slash, not flat
         "a/b/c",       // too many slashes
         "a//b",        // empty middle segment
         "a b/c",       // whitespace
         "a/b?evil=1",  // URL meta
         "a/b#frag",    // fragment
         "a/../b",      // path traversal
-        "a\\b",        // backslash
-        "ä/b",         // non-ASCII
+        "ä/b",         // non-ASCII (slash-form)
+        "Bad Name",    // flat with whitespace
+        "name?evil",   // flat with URL meta
+        "ä-name",      // flat with non-ASCII
     ])
     func malformedIdsDoNotTriggerFetcher(_ id: String) async throws {
         let dir = try makeMxtqBundle()

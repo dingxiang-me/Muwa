@@ -1291,47 +1291,87 @@ public actor ModelRuntime {
             where error.domain == "ModelRuntime" && error.code == 2
         {
             // Forward mismatch: stamp says mxtq, sidecar missing. Try one HF fetch.
-            // Strict id validation — we ONLY auto-fetch when the id looks
-            // like a real `<org>/<repo>` HF path so we never speculatively
-            // hit the network with a malformed id.
-            guard isValidHFRepoId(modelId) else {
-                throw error
-            }
-            guard
-                let url = ModelDownloadService.resolveURL(
-                    repoId: modelId,
-                    path: "jangtq_runtime.safetensors"
-                ),
-                let scheme = url.scheme, scheme == "https",
-                url.host == "huggingface.co"
-            else {
+            // Build the candidate id list: canonical `<org>/<repo>` first,
+            // then — for flat-layout local ids that aren't directly mappable
+            // to a single HF repo — known JANGTQ publisher orgs as fallbacks.
+            let candidates = jangtqHFRepoCandidates(for: modelId)
+            guard !candidates.isEmpty else {
                 throw error
             }
 
             let dest = directory.appendingPathComponent("jangtq_runtime.safetensors")
-            do {
-                try await Self.fetchSidecar(from: url, to: dest)
-            } catch {
-                // Wrap the network error in the same domain so the UI can
-                // distinguish "we tried, it didn't work" from "we never tried".
-                throw NSError(
-                    domain: "ModelRuntime",
-                    code: 4,
-                    userInfo: [
-                        NSLocalizedDescriptionKey:
-                            "Model '\(name)' is missing 'jangtq_runtime.safetensors' "
-                            + "and we could not auto-fetch it from "
-                            + "huggingface.co/\(modelId): \(error.localizedDescription). "
-                            + "Re-download the full model or place the sidecar next to "
-                            + "the safetensors manually."
-                    ]
-                )
+
+            var lastFetchError: Error?
+            var lastTriedRepo: String?
+            for repoId in candidates {
+                guard
+                    let url = ModelDownloadService.resolveURL(
+                        repoId: repoId,
+                        path: "jangtq_runtime.safetensors"
+                    ),
+                    let scheme = url.scheme, scheme == "https",
+                    url.host == "huggingface.co"
+                else { continue }
+
+                lastTriedRepo = repoId
+                do {
+                    try await Self.fetchSidecar(from: url, to: dest)
+                    // Confirm the freshly-downloaded file actually satisfies
+                    // the check before declaring success — guards against a
+                    // mirror that returns a stub.
+                    try validateJANGTQSidecarIfRequired(at: directory, name: name)
+                    return
+                } catch {
+                    lastFetchError = error
+                    // Try next candidate.
+                    continue
+                }
             }
 
-            // Re-run validation; if the freshly-downloaded file still doesn't
-            // satisfy the check, surface that error rather than silently looping.
-            try validateJANGTQSidecarIfRequired(at: directory, name: name)
+            // All candidates exhausted — surface the last error wrapped so the
+            // UI can distinguish "we tried, none worked" from "we never tried".
+            let triedList = candidates.joined(separator: ", ")
+            let detail = lastFetchError.map { $0.localizedDescription } ?? "no candidate URL was reachable"
+            throw NSError(
+                domain: "ModelRuntime",
+                code: 4,
+                userInfo: [
+                    NSLocalizedDescriptionKey:
+                        "Model '\(name)' is missing 'jangtq_runtime.safetensors' "
+                        + "and we could not auto-fetch it. Tried: \(triedList). "
+                        + "Last error from huggingface.co/\(lastTriedRepo ?? "?"): \(detail). "
+                        + "Re-download the full model or place the sidecar next "
+                        + "to the safetensors manually."
+                ]
+            )
         }
+    }
+
+    /// Build the ordered list of HF `<org>/<repo>` candidates to try when
+    /// auto-fetching a sidecar. Strict gating up-front so we never hit the
+    /// network on garbage:
+    ///
+    /// * Canonical `org/repo` id → only that, validated.
+    /// * Flat-layout id (no slash) → no canonical mapping; we fall back to
+    ///   the small allowlist of orgs known to publish JANGTQ sidecars.
+    ///   Each candidate is independently `isValidHFRepoId`-validated.
+    /// * Anything else (multi-slash, malformed) → empty list, no fetch.
+    static func jangtqHFRepoCandidates(for modelId: String) -> [String] {
+        if isValidHFRepoId(modelId) {
+            return [modelId]
+        }
+        // Flat-layout fallbacks. The basename is whatever directory the
+        // user dropped on disk. We try each known publisher org in
+        // priority order; the fetcher hits HF, takes whichever 200s, and
+        // bails on 404. If none match, the user gets a clear "we tried
+        // these N URLs, none returned a sidecar" error.
+        guard !modelId.contains("/"),
+              !modelId.isEmpty
+        else { return [] }
+        let knownJANGTQOrgs = ["JANGQ-AI", "OsaurusAI", "mlx-community"]
+        return knownJANGTQOrgs
+            .map { "\($0)/\(modelId)" }
+            .filter { isValidHFRepoId($0) }
     }
 
     /// Streams `url` into `dest` using an atomic temp-file → rename so a
@@ -1429,6 +1469,10 @@ public actor ModelRuntime {
             let s = String(seg)
             guard !s.isEmpty, s.count <= 96 else { return false }
             guard s.unicodeScalars.allSatisfy({ allowed.contains($0) }) else { return false }
+            // Block `.` and `..` segments outright — they're individually
+            // composed of allowed chars but represent path-traversal-style
+            // paths that HF refuses anyway.
+            guard s != "." && s != ".." else { return false }
         }
         return true
     }

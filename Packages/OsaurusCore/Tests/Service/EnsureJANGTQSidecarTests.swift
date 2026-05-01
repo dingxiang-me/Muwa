@@ -121,15 +121,19 @@ struct EnsureJANGTQSidecarTests {
         #expect(threw?.code == 3)
     }
 
-    /// Forward mismatch + flat-layout id (no slash) → fetcher MUST NOT fire,
-    /// and the original code-2 error must surface.
-    @Test func noFetchForFlatLayoutId() async throws {
+    /// Forward mismatch + flat-layout id (no slash) → fetcher walks the
+    /// known-org fallback list (JANGQ-AI, OsaurusAI, mlx-community); when
+    /// every candidate fails it surfaces code 4, NOT code 2.
+    @Test func flatLayoutIdTriesOrgFallbacks() async throws {
         let dir = try makeBundle(weightFormat: "mxtq", withSidecar: false)
         defer { try? FileManager.default.removeItem(at: dir) }
 
         let tracker = FetchTracker()
         let fetcher: @Sendable (URL, URL) async throws -> Void = { url, dest in
             await tracker.record(url, dest)
+            // Every candidate "404s" — sidecar never written.
+            throw NSError(domain: "ModelRuntime", code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "HTTP 404"])
         }
 
         var threw: NSError?
@@ -142,9 +146,9 @@ struct EnsureJANGTQSidecarTests {
         } catch let e as NSError {
             threw = e
         }
-        let count = await tracker.count
-        #expect(count == 0)
-        #expect(threw?.code == 2)
+        let calls = await tracker.calls
+        #expect(calls.count == 3)
+        #expect(threw?.code == 4)
     }
 
     /// Forward mismatch + canonical HF id → fetcher fires ONCE, with the
