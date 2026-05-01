@@ -340,8 +340,25 @@ public actor ModelRuntime {
     //
     //   - `usePagedCache: true`            — content-addressed paged blocks
     //                                        (multi-turn cache reuse path)
-    //   - `defaultKVMode: .turboQuant(3,3)`— ~5x KV memory savings on slots
-    //                                        that submit `kvMode: .none`
+    //   - `defaultKVMode: .none`             — fp16 KV by default. The prior
+    //                                        `.turboQuant(3,3)` setting
+    //                                        applied 3-bit KV quantization
+    //                                        UNCONDITIONALLY to every slot
+    //                                        (resolveKVPolicy fills mode for
+    //                                        any request with `.none`,
+    //                                        regardless of prompt length —
+    //                                        only the SIZE cap is prompt-
+    //                                        gated). 3-bit KV is aggressive
+    //                                        enough to corrupt attention on
+    //                                        small reasoning / thinking
+    //                                        models, surfacing as degenerate
+    //                                        repetition (`!!!!!!!!!` spam in
+    //                                        the thinking channel) and
+    //                                        community report #995. Default
+    //                                        to fp16; users who need the
+    //                                        memory savings can submit
+    //                                        `kvMode: .turboQuant(...)`
+    //                                        explicitly per request.
     //   - `defaultMaxKVSize: 8192`         — 8K ring window for slots that
     //                                        submit `maxKVSize: nil`
     //   - `longPromptMultiplier: 2.0`      — cap kicks in only past 16K
@@ -395,7 +412,7 @@ public actor ModelRuntime {
             enableDiskCache: enableDiskCache,
             diskCacheDir: diskCacheDir,
             modelKey: modelName,
-            defaultKVMode: .turboQuant(keyBits: 3, valueBits: 3),
+            defaultKVMode: .none,
             defaultMaxKVSize: 8192,
             longPromptMultiplier: 2.0
         )
