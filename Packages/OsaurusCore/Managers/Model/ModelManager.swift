@@ -1375,46 +1375,46 @@ extension ModelManager {
             return items.contains(where: { $0.pathExtension == "safetensors" })
         }
 
-        // Two layouts are supported and may coexist under the same root:
-        //   1. Flat:   <root>/<modelDir>/{config.json,tokenizer.*,*.safetensors}
-        //   2. Nested: <root>/<org>/<repo>/{config.json,...}              (HuggingFace style)
+        // Three layouts are supported and may coexist under the same root:
+        //   1. Flat:        <root>/<modelDir>/{config.json,tokenizer.*,*.safetensors}
+        //   2. Nested:      <root>/<org>/<repo>/{config.json,...}        (HF style)
+        //   3. Multi-org:   <root>/<parentOrg>/<org>/<repo>/{config.json,...}
+        //                                                                (when the picker points at
+        //                                                                a parent dir containing
+        //                                                                multiple HF-style trees,
+        //                                                                e.g. `/Volumes/X/dealignai`
+        //                                                                next to `/Volumes/X/jangq-ai`)
+        //
         // For each top-level entry, prefer flat detection (entry IS a bundle); otherwise descend
-        // one level and treat children as repos under an org.
-        for topURL in topEntries {
-            guard let resolvedTop = resolvedDirectory(topURL) else { continue }
-
-            if isModelBundle(resolvedTop) {
-                let id = topURL.lastPathComponent
-                let model = MLXModel(
-                    id: id,
-                    name: ModelMetadataParser.friendlyName(from: id),
-                    description: "Local model (detected)",
-                    downloadURL: "https://huggingface.co/\(id)"
-                )
-                models.append(model)
-                continue
-            }
-
-            guard
-                let repos = try? fm.contentsOfDirectory(
-                    at: resolvedTop,
+        // and try the same heuristic at the next level. Maximum depth of 3 keeps the scan bounded
+        // — anything deeper is treated as not-a-bundle.
+        func scanDir(_ root: URL, prefix: [String], maxDepth: Int) {
+            guard maxDepth > 0,
+                let entries = try? fm.contentsOfDirectory(
+                    at: root,
                     includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
-                    options: [.skipsHiddenFiles]
-                )
-            else { continue }
-            for repoURL in repos {
-                guard let resolvedRepoURL = resolvedDirectory(repoURL) else { continue }
-                guard isModelBundle(resolvedRepoURL) else { continue }
-                let id = "\(topURL.lastPathComponent)/\(repoURL.lastPathComponent)"
-                let model = MLXModel(
-                    id: id,
-                    name: ModelMetadataParser.friendlyName(from: id),
-                    description: "Local model (detected)",
-                    downloadURL: "https://huggingface.co/\(id)"
-                )
-                models.append(model)
+                    options: [.skipsHiddenFiles])
+            else { return }
+            for entry in entries {
+                guard let resolved = resolvedDirectory(entry) else { continue }
+                let nameComponents = prefix + [entry.lastPathComponent]
+                if isModelBundle(resolved) {
+                    let id = nameComponents.joined(separator: "/")
+                    let model = MLXModel(
+                        id: id,
+                        name: ModelMetadataParser.friendlyName(from: id),
+                        description: "Local model (detected)",
+                        downloadURL: "https://huggingface.co/\(id)"
+                    )
+                    models.append(model)
+                    continue  // a model dir doesn't itself contain other models
+                }
+                if maxDepth > 1 {
+                    scanDir(resolved, prefix: nameComponents, maxDepth: maxDepth - 1)
+                }
             }
         }
+        scanDir(root, prefix: [], maxDepth: 3)
 
         // De-duplicate by lowercase id
         var seen: Set<String> = []

@@ -75,6 +75,49 @@ struct ModelManagerTests {
 
     }
 
+    @Test func scanLocalModels_detectsThreeLevelMultiOrgLayout() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("osu-multi-\(UUID().uuidString)")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        // Layout the user's drive actually has:
+        //   <root>/dealignai/<flatBundle>/{config.json,...}
+        //   <root>/jangq-ai/JANGQ-AI/<repo>/{config.json,...}
+        //   <root>/jangq-ai/OsaurusAI/<repo>/{config.json,...}
+        let dealignai = root.appendingPathComponent("dealignai")
+        let jangqai = root.appendingPathComponent("jangq-ai")
+        try fm.createDirectory(at: dealignai, withIntermediateDirectories: true)
+        try fm.createDirectory(at: jangqai, withIntermediateDirectories: true)
+
+        func makeBundle(_ dir: URL) throws {
+            try fm.createDirectory(at: dir, withIntermediateDirectories: true)
+            try Data("{}".utf8).write(to: dir.appendingPathComponent("config.json"))
+            try Data("{}".utf8).write(to: dir.appendingPathComponent("tokenizer.json"))
+            try Data().write(to: dir.appendingPathComponent("model.safetensors"))
+        }
+
+        // 2-level under dealignai (HF-style: <root>/dealignai/<flat>)
+        try makeBundle(dealignai.appendingPathComponent("Mistral-Small-4-119B-JANG_6M-CRACK"))
+        try makeBundle(dealignai.appendingPathComponent("Qwen3.6-27B-MXFP4-CRACK"))
+
+        // 3-level under jangq-ai (HF-style: <root>/jangq-ai/<org>/<repo>)
+        try makeBundle(
+            jangqai.appendingPathComponent("JANGQ-AI")
+                .appendingPathComponent("Laguna-XS.2-JANGTQ"))
+        try makeBundle(
+            jangqai.appendingPathComponent("OsaurusAI")
+                .appendingPathComponent("Mistral-Medium-3.5-128B-mxfp4"))
+
+        let detected = ModelManager.scanLocalModels(at: root)
+        let ids = Set(detected.map { $0.id })
+        #expect(ids.contains("dealignai/Mistral-Small-4-119B-JANG_6M-CRACK"))
+        #expect(ids.contains("dealignai/Qwen3.6-27B-MXFP4-CRACK"))
+        #expect(ids.contains("jangq-ai/JANGQ-AI/Laguna-XS.2-JANGTQ"))
+        #expect(ids.contains("jangq-ai/OsaurusAI/Mistral-Medium-3.5-128B-mxfp4"))
+        #expect(detected.count == 4)
+    }
+
     @Test func scanLocalModels_detectsFlatAndNestedLayouts() async throws {
         let fm = FileManager.default
         let root = fm.temporaryDirectory.appendingPathComponent("osu-scan-\(UUID().uuidString)")
