@@ -6,11 +6,14 @@
 //  a local MLX model, or any cloud provider) and configure it inline.
 //
 //  Split into:
-//   - `ConfigureAIState`: ObservableObject holding path/substate selection
-//     and connection-test progress (lives at OnboardingView level).
-//   - `ConfigureAIBody`: the body slot — segmented path picker + per-path
-//     substate body.
-//   - `ConfigureAICTA`: the footer CTA, dispatched per substate.
+//   - `ConfigureAIState`: ObservableObject holding path/substate selection,
+//     connection-test progress, and the substate slide direction (lives at
+//     OnboardingView level).
+//   - `ConfigureAIBody`: the body slot — sticky segmented path picker plus a
+//     per-path substate body that slides direction-aware between picker
+//     and drilled-in forms.
+//   - `ConfigureAICTA`: the footer primary action, dispatched per substate.
+//   - `ConfigureAISecondary`: the footer secondary text-link slot.
 //
 
 import SwiftUI
@@ -110,6 +113,11 @@ final class ConfigureAIState: ObservableObject {
     @Published var localSubstate: LocalSubstate = .picker
     @Published var apiSubstate: APISubstate = .picker
 
+    /// Direction the next substate transition should travel. Mirrors the
+    /// global step `OnboardingDirection` so the substate slide reads as a
+    /// natural continuation of the outer navigation language.
+    @Published var substateDirection: OnboardingDirection = .forward
+
     // Local
     @Published var selectedModel: MLXModel? = nil
     @Published var showDownloadError = false
@@ -147,9 +155,12 @@ final class ConfigureAIState: ObservableObject {
     }
 
     func selectPath(_ path: ConfigurePath) {
+        // Path changes are lateral, but we treat them as forward motion so
+        // the substate body slides in from the trailing edge consistently.
+        substateDirection = .forward
         selectedPath = path
         if path != .local { localSubstate = .picker }
-        if path != .apiProvider { resetAPIState() }
+        if path != .apiProvider { resetAPIState(direction: .forward) }
         testResult = nil
     }
 
@@ -208,6 +219,7 @@ final class ConfigureAIState: ObservableObject {
             onComplete()
             return
         }
+        substateDirection = .forward
         localSubstate = .downloading
         startLocalDownload()
     }
@@ -252,7 +264,12 @@ final class ConfigureAIState: ObservableObject {
         }
     }
 
-    func resetAPIState() {
+    /// Resets the API substate back to the picker. Direction defaults to
+    /// `.backward` so the substate slide reads as "popping out", but
+    /// callers can pass `.forward` when this is invoked as a side-effect
+    /// of a forward path switch.
+    func resetAPIState(direction: OnboardingDirection = .backward) {
+        substateDirection = direction
         apiSubstate = .picker
         apiKey = ""
         openAIAuthMode = .chatGPTSubscription
@@ -265,11 +282,18 @@ final class ConfigureAIState: ObservableObject {
     /// to its key form (or the custom-provider form), no "Continue" press
     /// required.
     func selectAPIPreset(_ preset: ProviderPreset) {
+        substateDirection = .forward
         if preset == .custom {
             apiSubstate = .customForm
         } else {
             apiSubstate = .keyForm(preset)
         }
+    }
+
+    /// Local downloading → picker (backward).
+    func popLocalToPicker() {
+        substateDirection = .backward
+        localSubstate = .picker
     }
 
     func resolvedAPIConfig() -> ResolvedProviderConfig? {
@@ -374,10 +398,18 @@ struct ConfigureAIBody: View {
             VStack(alignment: .leading, spacing: 14) {
                 pathSegmentedControl
 
-                substateContainer
-                    .id(substateID)
-                    .transition(substateTransition)
-                    .animation(.spring(response: 0.5, dampingFraction: 0.85), value: substateID)
+                // Clipped container holds the substate during its slide
+                // animation so the outgoing/incoming views never bleed
+                // outside the right column (e.g. into the left column's
+                // illustration).
+                ZStack(alignment: .topLeading) {
+                    substateContainer
+                        .id(substateID)
+                        .transition(substateTransition)
+                }
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .clipped()
+                .animation(.spring(response: 0.5, dampingFraction: 0.85), value: substateID)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
@@ -486,10 +518,17 @@ struct ConfigureAIBody: View {
         }
     }
 
+    /// Direction-aware horizontal slide that mirrors the global step
+    /// transition's vocabulary: pure offset, no opacity. Sized to the
+    /// substate region width so the body slides cleanly off one edge
+    /// while the next slides in from the opposite edge.
     private var substateTransition: AnyTransition {
-        .asymmetric(
-            insertion: .opacity.combined(with: .offset(x: 24)),
-            removal: .opacity.combined(with: .offset(x: -24))
+        let dx = OnboardingMetrics.substateSlideOffset
+        let inOffset = state.substateDirection == .forward ? dx : -dx
+        let outOffset = state.substateDirection == .forward ? -dx : dx
+        return .asymmetric(
+            insertion: .offset(x: inOffset),
+            removal: .offset(x: outOffset)
         )
     }
 
@@ -509,7 +548,7 @@ struct ConfigureAIBody: View {
             case .downloading:
                 substateWithBackBar(
                     title: state.selectedModel?.name ?? L("Downloading"),
-                    onBack: { state.localSubstate = .picker }
+                    onBack: { state.popLocalToPicker() }
                 ) {
                     localDownloadingView
                 }
@@ -538,16 +577,14 @@ struct ConfigureAIBody: View {
     }
 
     /// Wraps content in a vertical ScrollView so long lists don't overflow
-    /// the body while keeping the segmented control above it pinned. The
-    /// internal vertical padding (`scrollContentVerticalBuffer`) gives the
-    /// first/last card's hover shadow + scale room to render without
-    /// clipping at the scroll-area edges.
+    /// the body while keeping the segmented control above it pinned.
+    /// `scrollContentBuffer` gives the first/last card's hover shadow +
+    /// scale room to render without clipping at the scroll-area edges.
     private func scrollableSubstate<C: View>(@ViewBuilder content: () -> C) -> some View {
         ScrollView(.vertical, showsIndicators: false) {
             content()
                 .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.vertical, scrollContentVerticalBuffer)
-                .padding(.horizontal, scrollContentHorizontalBuffer)
+                .padding(scrollContentBuffer)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -565,17 +602,17 @@ struct ConfigureAIBody: View {
             ScrollView(.vertical, showsIndicators: false) {
                 content()
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.vertical, scrollContentVerticalBuffer)
-                    .padding(.horizontal, scrollContentHorizontalBuffer)
+                    .padding(scrollContentBuffer)
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
     }
 
-    /// Buffer space inside scroll regions so hover shadows + scale on
-    /// row/glass cards don't clip against the scroll-area edges.
-    private var scrollContentVerticalBuffer: CGFloat { 6 }
-    private var scrollContentHorizontalBuffer: CGFloat { 4 }
+    /// Buffer (`EdgeInsets`) inside scroll regions so hover shadows + scale
+    /// on row/glass cards don't clip against the scroll-area edges.
+    private var scrollContentBuffer: EdgeInsets {
+        EdgeInsets(top: 6, leading: 4, bottom: 6, trailing: 4)
+    }
 
     private func substateBackRow(title: String, onBack: @escaping () -> Void) -> some View {
         Button(action: onBack) {
@@ -592,7 +629,7 @@ struct ConfigureAIBody: View {
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
-        .help(Text("Back to providers", bundle: .module))
+        .help(Text("Back", bundle: .module))
     }
 
     // MARK: - Apple confirm
@@ -649,9 +686,11 @@ struct ConfigureAIBody: View {
                     accessory: .radio(isSelected: state.selectedModel?.id == model.id),
                     isSelected: state.selectedModel?.id == model.id
                 ) {
-                    withAnimation(theme.animationQuick()) {
-                        state.selectedModel = model
-                    }
+                    // No `withAnimation` — selecting a model otherwise
+                    // morphs the CTA between "Continue" and
+                    // "Download & Install" as a side-effect of the
+                    // shared transaction.
+                    state.selectedModel = model
                 }
             }
         }
@@ -1023,10 +1062,15 @@ struct ConfigureAICTA: View {
             switch state.apiSubstate {
             case .picker:
                 // Provider cards drill in on tap — no Continue press
-                // required. Reserve the button footprint so the footer
-                // doesn't reflow when the user navigates into a key form.
-                Color.clear
-                    .frame(width: OnboardingMetrics.ctaWidthCompact, height: OnboardingMetrics.buttonHeight)
+                // required. The button stays visible and disabled so the
+                // footer chrome doesn't blank out, and the layout doesn't
+                // reflow when the user navigates into a key form.
+                OnboardingBrandButton(
+                    title: "Continue",
+                    action: {},
+                    isEnabled: false
+                )
+                .frame(width: OnboardingMetrics.ctaWidthCompact)
             case .keyForm, .customForm:
                 apiActionButton
             }

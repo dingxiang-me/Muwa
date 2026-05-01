@@ -95,6 +95,11 @@ enum OnboardingMetrics {
     /// Horizontal offset used by step slide transitions. Sized to the full
     /// window width so views slide cleanly off-screen instead of overlapping.
     static let slideOffset: CGFloat = windowWidth
+
+    /// Horizontal offset used by substate slide transitions inside a step
+    /// (e.g. ConfigureAI's segmented-path body). Sized to the right column
+    /// (window − left column) so substates slide off the column edge.
+    static let substateSlideOffset: CGFloat = windowWidth - leftColumnWidth
 }
 
 // MARK: - Visual Style Tokens
