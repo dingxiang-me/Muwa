@@ -103,25 +103,19 @@ struct ValidateJANGTQUnsupportedFamilyTests {
             at: dir, name: "Mistral-7B-JANGTQ2")
     }
 
-    /// VLM-shaped Mistral 3 family (vision_config present) STILL fires
-    /// the gate — VLM JANGTQ port is in-flight upstream.
-    @Test("D3.mistral3 + vision_config JANGTQ → STILL throws (VLM port pending)")
-    func d3_mistral3VLM_throws() throws {
+    /// Post vmlx@7fa4940 (Mistral 3 family VLM JANGTQ port complete):
+    /// VLM-shaped bundles (vision_config present) now PASS — the
+    /// engine handles them via Mistral3VLMJANGTQ.
+    @Test("D3.mistral3 + vision_config JANGTQ → PASSES (VLM port complete)")
+    func d3_mistral3VLM_passes() throws {
         let dir = try makeBundle(
             weightFormat: "mxtq",
             modelType: "mistral3",
             sidecarPresent: true,
             visionConfigPresent: true)
         defer { cleanup(dir) }
-        do {
-            try ModelRuntime.validateJANGTQSidecarIfRequired(
-                at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
-            Issue.record("expected throw for VLM-shaped Mistral 3 family JANGTQ")
-        } catch let error as NSError {
-            #expect(error.code == 4)
-            let msg = error.userInfo[NSLocalizedDescriptionKey] as? String ?? ""
-            #expect(msg.contains("VLM"), "VLM-specific error message expected")
-        }
+        try ModelRuntime.validateJANGTQSidecarIfRequired(
+            at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
     }
 
     @Test("D3.ministral3 inner LLM-only → PASSES (LLM port complete)")
@@ -137,8 +131,8 @@ struct ValidateJANGTQUnsupportedFamilyTests {
             at: dir, name: "Ministral-3-Inner-LLM-JANGTQ2")
     }
 
-    @Test("D3.ministral3 inner + vision_config → throws (VLM still pending)")
-    func d3_ministral3InnerVLM_throws() throws {
+    @Test("D3.ministral3 inner + vision_config → PASSES (VLM port complete)")
+    func d3_ministral3InnerVLM_passes() throws {
         let dir = try makeBundle(
             weightFormat: "mxtq",
             modelType: "mistral3",
@@ -146,13 +140,8 @@ struct ValidateJANGTQUnsupportedFamilyTests {
             sidecarPresent: true,
             visionConfigPresent: true)
         defer { cleanup(dir) }
-        do {
-            try ModelRuntime.validateJANGTQSidecarIfRequired(
-                at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
-            Issue.record("expected throw for ministral3 inner with vision")
-        } catch let error as NSError {
-            #expect(error.code == 4)
-        }
+        try ModelRuntime.validateJANGTQSidecarIfRequired(
+            at: dir, name: "Mistral-Medium-3.5-128B-JANGTQ2")
     }
 
     @Test("D3.laguna outer JANGTQ → throws")

@@ -1211,30 +1211,12 @@ public actor ModelRuntime {
                     textInner = nil
                 }
                 let hasVision = configJSON["vision_config"] != nil
-                let mistral3Family: Set<String> = ["mistral3", "ministral3"]
-                let isMistral3Family = mistral3Family.contains(modelType)
-                    || (textInner.map { mistral3Family.contains($0) } ?? false)
+                _ = hasVision  // intentionally unused — Mistral 3 family
+                                // gate dropped (vmlx@7fa4940 ships
+                                // Mistral3TextJANGTQModel + Mistral3VLMJANGTQ
+                                // covering both LLM and VLM paths).
                 let isLaguna = modelType == "laguna"
                     || (textInner.map { $0 == "laguna" } ?? false)
-
-                // Mistral 3 family: only block when vision_config is
-                // present (VLM path is still pending). Pure LLM
-                // bundles (no vision_config) flow through to vmlx's
-                // Mistral3TextJANGTQModel which handles JANGTQ correctly.
-                if isMistral3Family && hasVision {
-                    throw NSError(
-                        domain: "ModelRuntime",
-                        code: 4,
-                        userInfo: [
-                            NSLocalizedDescriptionKey:
-                                "Model '\(name)' is a JANGTQ-quantized Mistral 3 family VLM "
-                                + "bundle (with Pixtral vision tower). The LLM-side JANGTQ "
-                                + "port is complete; the VLM-side port is in-flight. "
-                                + "Use the MXFP4 quant tier (e.g. Mistral-Medium-3.5-128B-mxfp4) "
-                                + "until the VLM JANGTQ port lands."
-                        ]
-                    )
-                }
 
                 if isLaguna {
                     throw NSError(
