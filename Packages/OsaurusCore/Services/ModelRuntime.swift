@@ -388,24 +388,17 @@ public actor ModelRuntime {
             )
         }
 
-        // TEMPORARY: disable the L2 disk cache pending an upstream fix.
+        // L2 disk cache: enabled when the disk dir is writable.
         //
-        // vmlx-swift-lm's `CacheCoordinator` disk-restore path crashes Metal
-        // (`notifyExternalReferencesNonZeroOnDealloc` inside
-        // `BatchEngine.stepPrefill` → `CustomKernel.eval_gpu` →
-        // `Device::clear_library`) on any second request whose prompt is fully
-        // satisfied by a previously-stored entry — i.e. the
-        // `Cache disk hit ... prefilling 0 remaining` path. Reproducible on
-        // both `070dc5b8…` and `a7db6e5f…` pins; tracked upstream. Until a
-        // pin lands that actually fixes the restore code path, force
-        // memory-only KV caching so the server can't be killed by a
-        // back-to-back request from any harness or chat UI.
-        //
-        // To re-enable once upstream is fixed: replace `false` with
-        // `diskDirUsable` and bump the vmlx-swift-lm pin in
-        // `Package.resolved`. The `eval_http_stability.py` suite is the
-        // regression check.
-        let enableDiskCache = false && diskDirUsable
+        // The Metal `notifyExternalReferencesNonZeroOnDealloc` crash on the
+        // `Cache disk hit … prefilling 0 remaining` path is fixed upstream
+        // in vmlx-swift-lm `0756dc0` ("close trim-path Metal lifecycle crash
+        // on full disk-cache hit") — the trimmed compiled-cache list is now
+        // forced to realize before its underlying Metal buffers go out of
+        // scope. Now wired in through the `0e22eba` pin. The
+        // `eval_http_stability.py` suite is the regression check; re-run on
+        // any future pin bump that touches the CacheCoordinator restore path.
+        let enableDiskCache = diskDirUsable
 
         return CacheCoordinatorConfig(
             usePagedCache: true,
