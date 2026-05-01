@@ -190,30 +190,54 @@ private func makeBundle(weightFormatRaw: String?) throws -> URL {
 @Suite("HF repo candidate resolution — covers all curated orgs")
 struct HFRepoCandidatesTests {
 
-    @Test func canonicalIdReturnsItselfOnly() {
+    @Test func canonicalIdAlwaysIncludesCanonicalCasedFallbacks() {
+        // Canonical id verbatim FIRST, then OsaurusAI / JANGQ-AI /
+        // mlx-community variants of the basename — recovery for case-
+        // mismatch + wrong-org-guess.
         #expect(
             ModelRuntime.jangtqHFRepoCandidates(for: "OsaurusAI/Foo")
-                == ["OsaurusAI/Foo"]
+                == [
+                    "OsaurusAI/Foo",            // verbatim
+                    "JANGQ-AI/Foo",
+                    "mlx-community/Foo",
+                ]
         )
         #expect(
             ModelRuntime.jangtqHFRepoCandidates(for: "JANGQ-AI/Laguna-XS.2-JANGTQ")
-                == ["JANGQ-AI/Laguna-XS.2-JANGTQ"]
-        )
-        #expect(
-            ModelRuntime.jangtqHFRepoCandidates(for: "mlx-community/Qwen3-MoE")
-                == ["mlx-community/Qwen3-MoE"]
+                == [
+                    "JANGQ-AI/Laguna-XS.2-JANGTQ",
+                    "OsaurusAI/Laguna-XS.2-JANGTQ",
+                    "mlx-community/Laguna-XS.2-JANGTQ",
+                ]
         )
     }
 
-    /// Flat-layout dir name → must produce candidates in priority order
-    /// covering every JANGTQ publisher org we know about, including
-    /// OsaurusAI (curated), JANGQ-AI (user's primary), and mlx-community.
+    /// LOWERCASED org id (osaurus's chat router lowercases ids) must still
+    /// resolve to the canonical-cased HF org via the basename fallback.
+    /// This is the user-reported regression — `jangq-ai/MiniMax-...` 401s
+    /// because HF org names are case-sensitive; the fallback recovers.
+    @Test func lowercasedOrgIdRecoveresToCanonicalCasing() {
+        let cands = ModelRuntime.jangtqHFRepoCandidates(
+            for: "jangq-ai/MiniMax-M2.7-Small-JANGTQ"
+        )
+        // Verbatim (lowercased) attempt first, then canonical-cased
+        // fallbacks for the basename.
+        #expect(cands == [
+            "jangq-ai/MiniMax-M2.7-Small-JANGTQ",         // verbatim — may 401
+            "OsaurusAI/MiniMax-M2.7-Small-JANGTQ",        // recovers!
+            "JANGQ-AI/MiniMax-M2.7-Small-JANGTQ",
+            "mlx-community/MiniMax-M2.7-Small-JANGTQ",
+        ])
+    }
+
+    /// Flat-layout dir name → no verbatim try (no slash); fallbacks only.
     @Test func flatIdExpandsToAllKnownOrgs() {
         let cands = ModelRuntime.jangtqHFRepoCandidates(for: "MiniMax-M2.7-Small-JANGTQ")
-        // JANGQ-AI is tried first, OsaurusAI second, mlx-community third.
+        // OsaurusAI first (curated, most likely hit), then JANGQ-AI,
+        // then mlx-community.
         #expect(cands == [
-            "JANGQ-AI/MiniMax-M2.7-Small-JANGTQ",
             "OsaurusAI/MiniMax-M2.7-Small-JANGTQ",
+            "JANGQ-AI/MiniMax-M2.7-Small-JANGTQ",
             "mlx-community/MiniMax-M2.7-Small-JANGTQ",
         ])
     }
@@ -300,19 +324,15 @@ struct OsaurusOrgAutoFetchTests {
 
         let fetcher: @Sendable (URL, URL) async throws -> Void = { url, _ in
             await log.record(url)
-            // Simulate JANGQ-AI 404 (first in priority order) and
-            // OsaurusAI 200 (second). mlx-community would be third but
-            // we never reach it.
-            if url.absoluteString.contains("/JANGQ-AI/") {
-                throw NSError(domain: "ModelRuntime", code: 5,
-                    userInfo: [NSLocalizedDescriptionKey: "HTTP 404"])
-            }
+            // OsaurusAI is now first in priority order (curated publisher
+            // ships the bundles most users will have on disk). Simulate
+            // OsaurusAI 200 → first attempt succeeds.
             if url.absoluteString.contains("/OsaurusAI/") {
                 try Data("real-osaurus-ai-sidecar".utf8).write(to: dest)
                 return
             }
             throw NSError(domain: "ModelRuntime", code: 5,
-                userInfo: [NSLocalizedDescriptionKey: "unexpected"])
+                userInfo: [NSLocalizedDescriptionKey: "HTTP 404"])
         }
 
         try await ModelRuntime.$sidecarFetcherForTests.withValue(fetcher) {
@@ -322,14 +342,10 @@ struct OsaurusOrgAutoFetchTests {
         }
 
         let attempts = await log.attempts
-        // Ordered fallback: JANGQ-AI tried first, OsaurusAI tried second.
-        #expect(attempts.count == 2)
+        // OsaurusAI tried first now; succeeds on first attempt.
+        #expect(attempts.count == 1)
         #expect(
             attempts.first?.absoluteString
-                == "https://huggingface.co/JANGQ-AI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4/resolve/main/jangtq_runtime.safetensors"
-        )
-        #expect(
-            attempts.last?.absoluteString
                 == "https://huggingface.co/OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-JANGTQ4/resolve/main/jangtq_runtime.safetensors"
         )
         #expect(FileManager.default.fileExists(atPath: dest.path))

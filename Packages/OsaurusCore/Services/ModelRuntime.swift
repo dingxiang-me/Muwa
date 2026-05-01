@@ -1349,29 +1349,64 @@ public actor ModelRuntime {
 
     /// Build the ordered list of HF `<org>/<repo>` candidates to try when
     /// auto-fetching a sidecar. Strict gating up-front so we never hit the
-    /// network on garbage:
+    /// network on garbage, and case-tolerant so a lowercased model id
+    /// (osaurus's chat router lowercases names internally) still resolves
+    /// to the canonical-cased HF org.
     ///
-    /// * Canonical `org/repo` id → only that, validated.
-    /// * Flat-layout id (no slash) → no canonical mapping; we fall back to
-    ///   the small allowlist of orgs known to publish JANGTQ sidecars.
-    ///   Each candidate is independently `isValidHFRepoId`-validated.
-    /// * Anything else (multi-slash, malformed) → empty list, no fetch.
+    /// Resolution order:
+    ///   1. If the supplied id is a valid `<org>/<repo>`, try it FIRST
+    ///      verbatim — for users with a custom-cased org that genuinely
+    ///      ships the sidecar at that exact path.
+    ///   2. Always append canonical-cased fallbacks built from the
+    ///      basename (the part after the last `/`, or the whole id for
+    ///      flat-layout): `OsaurusAI/<basename>`, `JANGQ-AI/<basename>`,
+    ///      `mlx-community/<basename>`. This recovers from both
+    ///      case-mismatch (`jangq-ai/...` → `JANGQ-AI/...`) and
+    ///      wrong-org-guess scenarios.
+    ///   3. Each candidate is independently `isValidHFRepoId`-validated;
+    ///      duplicates are pruned in order so the canonical id never
+    ///      gets retried via a fallback.
+    ///   4. Empty / malformed input → empty list, no fetch.
     static func jangtqHFRepoCandidates(for modelId: String) -> [String] {
-        if isValidHFRepoId(modelId) {
-            return [modelId]
+        let trimmed = modelId.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return [] }
+
+        var ordered: [String] = []
+        var seen: Set<String> = []
+        func add(_ s: String) {
+            guard isValidHFRepoId(s), !seen.contains(s) else { return }
+            seen.insert(s)
+            ordered.append(s)
         }
-        // Flat-layout fallbacks. The basename is whatever directory the
-        // user dropped on disk. We try each known publisher org in
-        // priority order; the fetcher hits HF, takes whichever 200s, and
-        // bails on 404. If none match, the user gets a clear "we tried
-        // these N URLs, none returned a sidecar" error.
-        guard !modelId.contains("/"),
-              !modelId.isEmpty
-        else { return [] }
-        let knownJANGTQOrgs = ["JANGQ-AI", "OsaurusAI", "mlx-community"]
-        return knownJANGTQOrgs
-            .map { "\($0)/\(modelId)" }
-            .filter { isValidHFRepoId($0) }
+
+        // Determine the basename — only TRUSTED for two shapes:
+        //   1. Valid `<org>/<repo>` (basename = repo)
+        //   2. Flat (no slash anywhere; basename = full id)
+        // Any other shape (multi-slash, leading slash, etc.) is untrusted
+        // and produces zero candidates so we never speculatively hit the
+        // network with garbage.
+        let basename: String?
+        if isValidHFRepoId(trimmed) {
+            // Verbatim canonical id is tried FIRST.
+            add(trimmed)
+            basename = trimmed.split(separator: "/").last.map(String.init)
+        } else if !trimmed.contains("/") {
+            // Pure flat layout — id IS the basename.
+            basename = trimmed
+        } else {
+            return []  // Malformed (multi-slash, leading/trailing slash, …).
+        }
+
+        // Canonical-cased org fallbacks. OsaurusAI is the curated
+        // publisher and ships the most user-facing JANGTQ + MXFP4
+        // bundles, so it goes FIRST. JANGQ-AI is the user's primary
+        // JANGTQ research org. mlx-community covers community quants.
+        guard let base = basename, !base.isEmpty else { return ordered }
+        let knownJANGTQOrgs = ["OsaurusAI", "JANGQ-AI", "mlx-community"]
+        for org in knownJANGTQOrgs {
+            add("\(org)/\(base)")
+        }
+        return ordered
     }
 
     /// Streams `url` into `dest` using an atomic temp-file → rename so a
