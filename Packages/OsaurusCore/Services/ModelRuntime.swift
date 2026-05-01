@@ -280,7 +280,7 @@ public actor ModelRuntime {
         // pass, hits a precondition in TurboQuantSwitchLinear, and abort()s
         // the whole process — taking osaurus with it. Caught here so the user
         // gets a clear error and the server stays up.
-        try Self.validateJANGTQSidecarIfRequired(at: localURL, name: name)
+        try await Self.ensureJANGTQSidecar(at: localURL, modelId: id, name: name)
 
         // Tool-call format + reasoning parser are stamped automatically by
         // vmlx-swift-lm's LLM/VLM factories from `jang_config.json` capabilities
@@ -1262,6 +1262,109 @@ public actor ModelRuntime {
             )
         }
     }
+
+    /// Async wrapper around `validateJANGTQSidecarIfRequired` that, on a
+    /// "missing sidecar but stamp says JANGTQ" failure (and ONLY that
+    /// specific failure), tries once to download
+    /// `jangtq_runtime.safetensors` from the model's Hugging Face repo and
+    /// then re-runs the sync validator. Any other failure mode (inverse
+    /// mismatch, malformed jang_config, etc.) propagates immediately
+    /// untouched — the auto-fetch never speculatively fires.
+    ///
+    /// The remote URL is built dynamically from `modelId` using the same
+    /// `<repo>/resolve/main/<path>` shape the rest of the download stack
+    /// uses; a flat-layout id (no `/` in it) cannot be mapped back to an
+    /// HF repo and skips the fetch entirely, surfacing the original error.
+    static func ensureJANGTQSidecar(at directory: URL, modelId: String, name: String) async throws {
+        do {
+            try validateJANGTQSidecarIfRequired(at: directory, name: name)
+            return
+        } catch let error as NSError
+            where error.domain == "ModelRuntime" && error.code == 2
+        {
+            // Forward mismatch: stamp says mxtq, sidecar missing. Try one HF fetch.
+            guard modelId.contains("/") else {
+                // Flat-layout local id — no canonical HF mapping. Surface original.
+                throw error
+            }
+            guard
+                let url = ModelDownloadService.resolveURL(
+                    repoId: modelId,
+                    path: "jangtq_runtime.safetensors"
+                )
+            else {
+                throw error
+            }
+
+            let dest = directory.appendingPathComponent("jangtq_runtime.safetensors")
+            do {
+                try await Self.fetchSidecar(from: url, to: dest)
+            } catch {
+                // Wrap the network error in the same domain so the UI can
+                // distinguish "we tried, it didn't work" from "we never tried".
+                throw NSError(
+                    domain: "ModelRuntime",
+                    code: 4,
+                    userInfo: [
+                        NSLocalizedDescriptionKey:
+                            "Model '\(name)' is missing 'jangtq_runtime.safetensors' "
+                            + "and we could not auto-fetch it from "
+                            + "huggingface.co/\(modelId): \(error.localizedDescription). "
+                            + "Re-download the full model or place the sidecar next to "
+                            + "the safetensors manually."
+                    ]
+                )
+            }
+
+            // Re-run validation; if the freshly-downloaded file still doesn't
+            // satisfy the check, surface that error rather than silently looping.
+            try validateJANGTQSidecarIfRequired(at: directory, name: name)
+        }
+    }
+
+    /// Streams `url` into `dest` using an atomic temp-file → rename so a
+    /// crashed/cancelled download never leaves a partial sidecar in place
+    /// (which the next preflight would then misread as "present, fine").
+    /// Overridable via `sidecarFetcherForTests` so unit tests don't have
+    /// to hit the real network.
+    static func fetchSidecar(from url: URL, to dest: URL) async throws {
+        if let injected = sidecarFetcherForTests {
+            try await injected(url, dest)
+            return
+        }
+        var request = URLRequest(url: url)
+        request.timeoutInterval = 60
+        let (tempURL, response) = try await URLSession.shared.download(for: request)
+        defer { try? FileManager.default.removeItem(at: tempURL) }
+
+        guard let http = response as? HTTPURLResponse, (200..<300).contains(http.statusCode) else {
+            let code = (response as? HTTPURLResponse)?.statusCode ?? -1
+            throw NSError(
+                domain: "ModelRuntime",
+                code: 5,
+                userInfo: [NSLocalizedDescriptionKey: "HTTP \(code) fetching sidecar"]
+            )
+        }
+
+        // Sanity: a real safetensors sidecar will be far larger than a stray
+        // 404 HTML page that somehow returned 200. Reject zero-byte writes.
+        let attrs = try FileManager.default.attributesOfItem(atPath: tempURL.path)
+        let size = (attrs[.size] as? Int64) ?? 0
+        guard size > 0 else {
+            throw NSError(
+                domain: "ModelRuntime",
+                code: 6,
+                userInfo: [NSLocalizedDescriptionKey: "Sidecar fetch returned 0 bytes"]
+            )
+        }
+
+        try? FileManager.default.removeItem(at: dest)
+        try FileManager.default.moveItem(at: tempURL, to: dest)
+    }
+
+    /// Test-only injection point. Production code never sets this.
+    nonisolated(unsafe) static var sidecarFetcherForTests:
+        ((_ url: URL, _ dest: URL) async throws -> Void)?
 
     /// Pure, testable sibling of `findLocalDirectory` that takes the root
     /// explicitly. Exposed at module scope so the symlink-resolution
