@@ -1085,20 +1085,61 @@ extension ModelManager {
     }
 
     fileprivate func mergeAvailable(with newModels: [MLXModel]) {
+        // Repo tail (everything after the last "/") is the basename a user actually
+        // recognises; when two ids share a tail, treat them as the same model — this
+        // collapses cases like flat-layout `Nemotron-3-...` colliding with curated
+        // `OsaurusAI/Nemotron-3-...`.
+        func tail(_ id: String) -> String {
+            (id.split(separator: "/").last.map(String.init) ?? id).lowercased()
+        }
+
         var existingLower: Set<String> = Set(
             (availableModels + suggestedModels).map { $0.id.lowercased() }
         )
+        var existingTails: [String: MLXModel] = [:]
+        for m in availableModels + suggestedModels {
+            existingTails[tail(m.id)] = m
+        }
+
         var appended: [MLXModel] = []
+        var replacements: [(oldId: String, new: MLXModel)] = []
+
         for m in newModels {
             let key = m.id.lowercased()
-            if !existingLower.contains(key) {
-                existingLower.insert(key)
-                appended.append(m)
+            if existingLower.contains(key) { continue }
+
+            let mTail = tail(m.id)
+            if let existing = existingTails[mTail], existing.id.lowercased() != key {
+                // Tail collision: prefer the entry that's actually on disk so users
+                // never see a duplicate "downloaded vs not-downloaded" pair.
+                if m.isDownloaded && !existing.isDownloaded {
+                    replacements.append((oldId: existing.id, new: m))
+                    existingLower.insert(key)
+                    existingTails[mTail] = m
+                }
+                continue
+            }
+
+            existingLower.insert(key)
+            existingTails[mTail] = m
+            appended.append(m)
+        }
+
+        for r in replacements {
+            if let idx = availableModels.firstIndex(where: { $0.id == r.oldId }) {
+                availableModels[idx] = r.new
+            } else if let idx = suggestedModels.firstIndex(where: { $0.id == r.oldId }) {
+                // Suggested entries are immutable from this path; promote into available instead.
+                _ = idx
+                availableModels.append(r.new)
+            } else {
+                availableModels.append(r.new)
             }
         }
-        guard !appended.isEmpty else { return }
+
+        guard !appended.isEmpty || !replacements.isEmpty else { return }
         availableModels.append(contentsOf: appended)
-        downloadService.syncStates(for: appended)
+        downloadService.syncStates(for: appended + replacements.map { $0.new })
     }
 }
 
@@ -1280,10 +1321,16 @@ extension ModelManager {
     }
 
     private nonisolated static func scanLocalModels() -> [MLXModel] {
+        return scanLocalModels(at: DirectoryPickerService.effectiveModelsDirectory())
+    }
+
+    /// Internal entry point used by tests so they can supply a fixture root.
+    /// Detects both the flat (`<root>/<modelDir>/`) and nested (`<root>/<org>/<repo>/`)
+    /// layouts.
+    internal nonisolated static func scanLocalModels(at root: URL) -> [MLXModel] {
         let fm = FileManager.default
-        let root = DirectoryPickerService.effectiveModelsDirectory()
         guard
-            let orgDirs = try? fm.contentsOfDirectory(
+            let topEntries = try? fm.contentsOfDirectory(
                 at: root,
                 includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
                 options: [.skipsHiddenFiles]
@@ -1308,38 +1355,53 @@ extension ModelManager {
             return resolved
         }
 
-        for orgURL in orgDirs {
-            guard let resolvedOrgURL = resolvedDirectory(orgURL) else { continue }
+        /// True if `dir` contains config.json + a recognised tokenizer + at least one safetensors file.
+        func isModelBundle(_ dir: URL) -> Bool {
+            guard exists(dir, "config.json") else { return false }
+            let hasTokenizerJSON = exists(dir, "tokenizer.json")
+            let hasBPE =
+                exists(dir, "merges.txt")
+                && (exists(dir, "vocab.json") || exists(dir, "vocab.txt"))
+            let hasSentencePiece =
+                exists(dir, "tokenizer.model") || exists(dir, "spiece.model")
+            guard hasTokenizerJSON || hasBPE || hasSentencePiece else { return false }
+            guard
+                let items = try? fm.contentsOfDirectory(at: dir, includingPropertiesForKeys: nil)
+            else { return false }
+            return items.contains(where: { $0.pathExtension == "safetensors" })
+        }
+
+        // Two layouts are supported and may coexist under the same root:
+        //   1. Flat:   <root>/<modelDir>/{config.json,tokenizer.*,*.safetensors}
+        //   2. Nested: <root>/<org>/<repo>/{config.json,...}              (HuggingFace style)
+        // For each top-level entry, prefer flat detection (entry IS a bundle); otherwise descend
+        // one level and treat children as repos under an org.
+        for topURL in topEntries {
+            guard let resolvedTop = resolvedDirectory(topURL) else { continue }
+
+            if isModelBundle(resolvedTop) {
+                let id = topURL.lastPathComponent
+                let model = MLXModel(
+                    id: id,
+                    name: ModelMetadataParser.friendlyName(from: id),
+                    description: "Local model (detected)",
+                    downloadURL: "https://huggingface.co/\(id)"
+                )
+                models.append(model)
+                continue
+            }
+
             guard
                 let repos = try? fm.contentsOfDirectory(
-                    at: resolvedOrgURL,
+                    at: resolvedTop,
                     includingPropertiesForKeys: [.isDirectoryKey, .isSymbolicLinkKey],
                     options: [.skipsHiddenFiles]
                 )
             else { continue }
             for repoURL in repos {
                 guard let resolvedRepoURL = resolvedDirectory(repoURL) else { continue }
-
-                // Validate minimal required files (aligned with MLXModel.isDownloaded)
-                guard exists(resolvedRepoURL, "config.json") else { continue }
-                let hasTokenizerJSON = exists(resolvedRepoURL, "tokenizer.json")
-                let hasBPE =
-                    exists(resolvedRepoURL, "merges.txt")
-                    && (exists(resolvedRepoURL, "vocab.json") || exists(resolvedRepoURL, "vocab.txt"))
-                let hasSentencePiece =
-                    exists(resolvedRepoURL, "tokenizer.model") || exists(resolvedRepoURL, "spiece.model")
-                guard hasTokenizerJSON || hasBPE || hasSentencePiece else { continue }
-                guard
-                    let items = try? fm.contentsOfDirectory(
-                        at: resolvedRepoURL,
-                        includingPropertiesForKeys: nil
-                    ),
-                    items.contains(where: { $0.pathExtension == "safetensors" })
-                else { continue }
-
-                let org = orgURL.lastPathComponent
-                let repo = repoURL.lastPathComponent
-                let id = "\(org)/\(repo)"
+                guard isModelBundle(resolvedRepoURL) else { continue }
+                let id = "\(topURL.lastPathComponent)/\(repoURL.lastPathComponent)"
                 let model = MLXModel(
                     id: id,
                     name: ModelMetadataParser.friendlyName(from: id),

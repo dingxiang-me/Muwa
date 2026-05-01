@@ -75,6 +75,60 @@ struct ModelManagerTests {
 
     }
 
+    @Test func scanLocalModels_detectsFlatAndNestedLayouts() async throws {
+        let fm = FileManager.default
+        let root = fm.temporaryDirectory.appendingPathComponent("osu-scan-\(UUID().uuidString)")
+        try fm.createDirectory(at: root, withIntermediateDirectories: true)
+        defer { try? fm.removeItem(at: root) }
+
+        // Flat: <root>/Nemotron-3-Flat/{config.json, tokenizer.json, model.safetensors}
+        let flatBundle = root.appendingPathComponent("Nemotron-3-Flat")
+        try fm.createDirectory(at: flatBundle, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: flatBundle.appendingPathComponent("config.json"))
+        try Data("{}".utf8).write(to: flatBundle.appendingPathComponent("tokenizer.json"))
+        try Data().write(to: flatBundle.appendingPathComponent("model.safetensors"))
+
+        // Nested: <root>/JANGQ-AI/Laguna-XS.2/{config.json, tokenizer.json, model.safetensors}
+        let nestedRepo = root.appendingPathComponent("JANGQ-AI").appendingPathComponent("Laguna-XS.2")
+        try fm.createDirectory(at: nestedRepo, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: nestedRepo.appendingPathComponent("config.json"))
+        try Data("{}".utf8).write(to: nestedRepo.appendingPathComponent("tokenizer.json"))
+        try Data().write(to: nestedRepo.appendingPathComponent("model.safetensors"))
+
+        // Empty/garbage entry that should be ignored at both levels
+        let junk = root.appendingPathComponent("not-a-model")
+        try fm.createDirectory(at: junk, withIntermediateDirectories: true)
+        try Data("garbage".utf8).write(to: junk.appendingPathComponent("README.md"))
+
+        // BPE tokenizer variant under flat layout (merges.txt + vocab.json)
+        let bpeBundle = root.appendingPathComponent("BPE-Model")
+        try fm.createDirectory(at: bpeBundle, withIntermediateDirectories: true)
+        try Data("{}".utf8).write(to: bpeBundle.appendingPathComponent("config.json"))
+        try Data("a b\n".utf8).write(to: bpeBundle.appendingPathComponent("merges.txt"))
+        try Data("{}".utf8).write(to: bpeBundle.appendingPathComponent("vocab.json"))
+        try Data().write(to: bpeBundle.appendingPathComponent("model.safetensors"))
+
+        let detected = ModelManager.scanLocalModels(at: root)
+        let ids = Set(detected.map { $0.id })
+
+        #expect(ids.contains("Nemotron-3-Flat"))
+        #expect(ids.contains("JANGQ-AI/Laguna-XS.2"))
+        #expect(ids.contains("BPE-Model"))
+        #expect(!ids.contains("not-a-model"))
+        #expect(detected.count == 3)
+
+        // Flat-id resolution must round-trip through localDirectory.
+        let flatModel = detected.first { $0.id == "Nemotron-3-Flat" }!
+        let resolved = MLXModel(
+            id: flatModel.id,
+            name: flatModel.name,
+            description: flatModel.description,
+            downloadURL: flatModel.downloadURL,
+            rootDirectory: root
+        ).localDirectory
+        #expect(resolved.path == flatBundle.path)
+    }
+
     @Test func deleteModel_removesDirectoryAndResetsState() async throws {
         let tempDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         try FileManager.default.createDirectory(at: tempDir, withIntermediateDirectories: true)
