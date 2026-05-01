@@ -111,7 +111,7 @@ let package = Package(
         // this pin via `ae49c7c` + `3b78db4`.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "9cd670f8230dc532f4837630bfba5a30cb7476c3"
+            revision: "81e0fd9fd09a241976894011d0ce1c1e7757c7d9"
         ),
         .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
         // FluidAudio 0.14.3 added a breaking `language:` parameter to TTS
