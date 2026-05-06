@@ -6,20 +6,21 @@
 // slots — drives the eager `setHybrid(true)` flip in
 // `installCacheCoordinator`.
 //
-// Decision tree (3 OR-blocks separated by early returns):
+// Decision tree (4 OR-blocks separated by early returns):
 //
 //   Block 1: contains("nemotron-3") ∨ contains("nemotron-cascade")
 //                                   ∨ contains("nemotron_h")    → return true
 //   Block 2: contains("qwen3.5")  ∨ contains("qwen3.6")
 //                                  ∨ contains("holo3") ∨ contains("holo-3") → return true
 //   Block 3: contains("minimax-m2") ∨ contains("minimax_m2")    → return true
+//   Block 4: contains("bailing") ∨ Ling family component        → return true
 //   else: return false
 //
 // MC/DC requirements per OR block: every condition must independently
 // flip the OR's truth value. For an OR of N conditions, that's N+1
 // cases per block (1 all-false + N single-true).
 //
-// Total minimum cases: (3+1) + (4+1) + (2+1) + 1 master-false = 13.
+// Total minimum cases: (3+1) + (4+1) + (2+1) + (2+1) + 1 master-false = 16.
 
 import Foundation
 import Testing
@@ -118,6 +119,26 @@ struct IsKnownHybridModelMCDCTests {
         #expect(!ModelRuntime.isKnownHybridModel(name: "minimax-m1-pro"))
     }
 
+    // MARK: - Block 4: Bailing / Ling family (2 conditions)
+
+    @Test("B4.bailing substring independently flips Block 4")
+    func b4_bailing() {
+        #expect(ModelRuntime.isKnownHybridModel(name: "bailing_hybrid"))
+        #expect(ModelRuntime.isKnownHybridModel(name: "bailing_moe_v2_5"))
+    }
+
+    @Test("B4.Ling family component independently flips Block 4")
+    func b4_ling() {
+        #expect(ModelRuntime.isKnownHybridModel(name: "OsaurusAI/Ling-2.6-flash-MXFP4"))
+        #expect(ModelRuntime.isKnownHybridModel(name: "ling-2.6-flash-jangtq"))
+    }
+
+    @Test("B4 all-false: bare ling without dash does NOT flip Block 4")
+    func b4_allFalse() {
+        #expect(!ModelRuntime.isKnownHybridModel(name: "linguistics-model-7b"))
+        #expect(!ModelRuntime.isKnownHybridModel(name: "darling-llm"))
+    }
+
     // MARK: - Master FALSE: no block matches
 
     @Test("All blocks false → returns false (dense + non-hybrid families)")
@@ -161,5 +182,9 @@ struct IsKnownHybridModelMCDCTests {
 
         // Block 3: caps in minimax
         #expect(ModelRuntime.isKnownHybridModel(name: "MINIMAX-M2-mxfp4"))
+
+        // Block 4: caps in bailing / ling
+        #expect(ModelRuntime.isKnownHybridModel(name: "BAILING_HYBRID"))
+        #expect(ModelRuntime.isKnownHybridModel(name: "LING-2.6-FLASH-MXFP4"))
     }
 }

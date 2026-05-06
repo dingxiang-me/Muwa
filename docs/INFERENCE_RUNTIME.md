@@ -17,25 +17,23 @@ ChatEngine (route resolution, attribution, logging)
                 -> AsyncThrowingStream<ModelRuntimeEvent, Error>
 ```
 
-`BatchEngine.generate` returns three event cases:
+`BatchEngine.generate` returns these event cases:
 
 - `.chunk(String)` -- pure user-visible text. Reasoning markers and
   tool-call markers are stripped by the library before they reach
   osaurus.
+- `.reasoning(String)` -- model reasoning text. Osaurus forwards this to
+  `ModelRuntimeEvent.reasoning`, HTTP `reasoning_content`, the ChatView
+  Think panel, and plugin `chunk.delta.reasoning_content`.
 - `.toolCall(ToolCall)` -- a fully-parsed tool call. Every supported
   family (JSON, Qwen `xml_function`, Mistral, GLM-4, LFM2, Kimi K2,
   Gemma-3/4, MiniMax M2) emits this once the call is complete.
 - `.info(GenerateCompletionInfo)` -- final stats (token counts, prompt
-  / generation time, stop reason). One per request.
+  / generation time, stop reason, and `unclosedReasoning`). One per request.
 
 `GenerationEventMapper` translates those into osaurus's local
 `ModelRuntimeEvent` (`.tokens`, `.reasoning`, `.toolInvocation`,
-`.completionInfo`). Reasoning is wired forward-compat: vmlx does not
-yet emit `Generation.reasoning(String)` on its public enum, so
-`ModelRuntimeEvent.reasoning` is currently never produced -- the
-plumbing is ready end-to-end (HTTP `reasoning_content`, ChatView Think
-panel, `StreamingReasoningHint` sentinel for plugins / remote
-providers) for the day vmlx adds the case.
+`.completionInfo`).
 
 ## Cache management
 
@@ -53,6 +51,11 @@ Everything else (`maxCacheBlocks`, `pagedBlockSize`, `diskCacheMaxGB`,
 `ssmMaxEntries`) is left at the library default so vmlx can ship a
 single tuned answer per release.
 
+DSV4 is intentionally left to vmlx's default cache topology. Osaurus does
+not set `DSV4_KV_MODE`; unset means the production SWA+CSA+HSA
+`DeepseekV4Cache` path. Operator-provided `DSV4_KV_MODE=full` or `tq`
+is treated as a diagnostic override and disables the hybrid pool.
+
 osaurus deliberately does not pass `GenerateParameters.maxKVSize` -- a
 global rotating cache window forced from the app layer conflicted with
 sliding-window attention layers (e.g. Gemma-4 with a fixed per-layer
@@ -60,9 +63,11 @@ sliding-window attention layers (e.g. Gemma-4 with a fixed per-layer
 `[broadcast_shapes] (1,1,1,N) and (1,16,1,1024)` crashes on the first
 decode step.
 
-osaurus also does not call `CacheCoordinator.setHybrid(_:)`. Per
-OSAURUS-INTEGRATION.md, the engine auto-detects hybrid SSM models on
-first slot admission.
+For hybrid SSM families, osaurus eagerly calls `CacheCoordinator.setHybrid(_:)`
+for known model families and vmlx also auto-detects Mamba/Arrays caches on
+first slot admission. DSV4 is not an SSM hybrid; vmlx detects its
+`HybridPoolCache` and flips `isPagedIncompatible` so prefix reuse goes through
+the `LayerKind.deepseekV4` disk serializer instead of generic paged KV blocks.
 
 ## Concurrency
 

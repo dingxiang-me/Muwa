@@ -62,4 +62,61 @@ struct MLXBatchAdapterTests {
             for: "never-registered-\(UUID().uuidString)"
         )
     }
+
+    @Test func additionalContext_mapsDisableThinkingToEnableThinkingKwarg() {
+        let disabled = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(true)]
+        )
+        let enabled = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(false)]
+        )
+        let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
+        let modelName = "OsaurusAI/Qwen3.5-30B-A3B-JANGTQ"
+
+        #expect(MLXBatchAdapter.additionalContext(for: disabled, modelName: modelName)["enable_thinking"] as? Bool == false)
+        #expect(MLXBatchAdapter.additionalContext(for: enabled, modelName: modelName)["enable_thinking"] as? Bool == true)
+        #expect(MLXBatchAdapter.additionalContext(for: unspecified, modelName: modelName)["enable_thinking"] as? Bool == true)
+    }
+
+    @Test func additionalContext_forcesLingThinkingOff() {
+        let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
+        let userEnabled = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(false)]
+        )
+
+        for modelName in [
+            "OsaurusAI/Ling-2.6-flash-MXFP4",
+            "OsaurusAI/Ling-2.6-flash-JANGTQ",
+            "ling-2.6-flash-jangtq",
+            "JANGQ-AI/Ling-2.6-flash-JANGTQ",
+        ] {
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: unspecified,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == false
+            )
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: userEnabled,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == false
+            )
+        }
+
+        for modelName in ["linguistics-model-7b", "darling-llm"] {
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: unspecified,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == true
+            )
+        }
+    }
 }

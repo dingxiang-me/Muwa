@@ -109,9 +109,27 @@ let package = Package(
         // `UserInput.audios` / `.videos`) is part of this PR (the
         // `feat(api)` commit on tip). vmlx-side wiring is in place at
         // this pin via `ae49c7c` + `3b78db4`.
+        //
+        // Current pin also carries the 2026-05-06 Ling/Bailing production
+        // path: BailingHybrid factory wiring, think_xml reasoning stamp,
+        // hybrid cache reset, prestacker startup path, and unsupported
+        // JANGTQ3 rejection (group size does not work out). It maps the
+        // standard `enable_thinking` chat-template context to the upstream
+        // Bailing/Ling "detailed thinking on/off" system directive inside
+        // vmlx, hardens hybrid SSM companion cache state, and fixes
+        // MiniMax JANGTQ_K per-projection bit decoding.
+        //
+        // The final 2026-05-06 hardening commits add DSV4/Laguna runtime
+        // validation and the current Osaurus handoff notes: DSV4 defaults to
+        // the production SWA+CSA+HSA
+        // `DeepseekV4Cache` topology, global TurboQuant KV defaults no
+        // longer replace that hybrid pool, DSV4 L2 disk restore preserves
+        // rotating-window + pool/buffer state, Laguna include-only bundles
+        // use the native Poolside fallback template, and model-factory
+        // fallback logs are quiet unless `VMLINUX_MODEL_FACTORY_TRACE=1`.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "2e61c12a1573d073618ee2f98f39149ea36068e1"
+            revision: "4a832400264e725db384ace4524f2b624b2aefac"
         ),
         // swift-jinja: pinned to osaurus-ai fork at 58d21aa5 — same fork
         // vmlx-swift-lm pins. Must also be declared HERE (root level) so

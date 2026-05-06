@@ -80,6 +80,7 @@ enum ModelProfileRegistry {
         QwenThinkingProfile.self,
         NemotronThinkingProfile.self,
         LagunaThinkingProfile.self,
+        LingRuntimeProfile.self,
         Gemini31FlashImageProfile.self,
         GeminiProImageProfile.self,
         GeminiFlashImageProfile.self,
@@ -96,6 +97,21 @@ enum ModelProfileRegistry {
 
     static func options(for modelId: String) -> [ModelOptionDefinition] {
         profile(for: modelId)?.options ?? []
+    }
+
+    static func normalizedOptions(
+        for modelId: String,
+        persisted: [String: ModelOptionValue]?
+    ) -> [String: ModelOptionValue] {
+        let definitions = options(for: modelId)
+        guard !definitions.isEmpty else { return [:] }
+
+        let allowedIds = Set(definitions.map(\.id))
+        var values = defaults(for: modelId)
+        for (id, value) in persisted ?? [:] where allowedIds.contains(id) {
+            values[id] = value
+        }
+        return values
     }
 }
 
@@ -236,6 +252,24 @@ struct LagunaThinkingProfile: ModelProfile {
     ]
 
     static let thinkingOption: (id: String, inverted: Bool)? = ("disableThinking", true)
+}
+
+// MARK: - Ling Runtime Profile
+
+/// Ling-2.6 Flash (`model_type=bailing_hybrid`) is served as a non-reasoning
+/// chat model in osaurus. The explicit profile reserves Ling IDs ahead of
+/// `AutoThinkingProfile`, so a locally installed template cannot accidentally
+/// expose the generic Thinking toggle. `MLXBatchAdapter` separately forces
+/// `enable_thinking=false` for Ling requests at tokenization time.
+struct LingRuntimeProfile: ModelProfile {
+    static let displayName = "Ling"
+
+    static func matches(modelId: String) -> Bool {
+        ModelFamilyNames.isLingFamily(modelId)
+    }
+
+    static let options: [ModelOptionDefinition] = []
+    static let defaults: [String: ModelOptionValue] = [:]
 }
 
 // MARK: - Auto Thinking Profile (chat-template driven)

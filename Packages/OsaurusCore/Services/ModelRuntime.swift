@@ -528,11 +528,7 @@ public actor ModelRuntime {
     ///
     /// The list intentionally tracks model_type _families_, not exact ids,
     /// so new bundles in the same architecture (e.g. another Holo3 / Qwen
-    /// 3.x MoE quant tier, a future Nemotron-4 hybrid) flip the flag
-    /// without a registry edit. Worst case a non-hybrid match would still
-    /// be safe: vmlx's `setHybrid(true)` only enables the SSM-state
-    /// companion-cache lookup; the lookup is keyed and just misses on a
-    /// non-hybrid model — no incorrect routing.
+    /// 3.x MoE quant tier) flip the flag without a registry edit.
     nonisolated static func isKnownHybridModel(name: String) -> Bool {
         let lower = name.lowercased()
         // Mamba+Attn+MoE — Nemotron-3 / Cascade-2 / Hyper.
@@ -549,6 +545,10 @@ public actor ModelRuntime {
         }
         // MiniMax M2 / M2.7 — gated SSM in some layers.
         if lower.contains("minimax-m2") || lower.contains("minimax_m2") {
+            return true
+        }
+        // Bailing / Ling hybrid: Linear-Attn companion ArraysCache + MLA cache.
+        if lower.contains("bailing") || ModelFamilyNames.isLingFamily(name) {
             return true
         }
         return false

@@ -137,6 +137,21 @@ struct MLXBatchAdapter {
         }
     }
 
+    // MARK: - Thinking template context
+
+    static func additionalContext(
+        for generation: GenerationParameters,
+        modelName: String
+    ) -> [String: any Sendable] {
+        if ModelFamilyNames.isLingFamily(modelName) {
+            return ["enable_thinking": false]
+        }
+        if let disableThinking = generation.modelOptions["disableThinking"]?.boolValue {
+            return ["enable_thinking": !disableThinking]
+        }
+        return ["enable_thinking": true]
+    }
+
     // MARK: - Submission
 
     /// Tokenize the chat + tools, fetch (or create) the per-model
@@ -156,6 +171,7 @@ struct MLXBatchAdapter {
         trace?.mark("batch_prepare_start")
 
         let prepared = try await prepareInput(
+            modelName: modelName,
             container: container,
             buildChat: buildChat,
             buildToolsSpec: buildToolsSpec,
@@ -241,6 +257,7 @@ struct MLXBatchAdapter {
     }
 
     private static func prepareInput(
+        modelName: String,
         container: ModelContainer,
         buildChat: @Sendable () -> [MLXLMCommon.Chat.Message],
         buildToolsSpec: @Sendable () -> [[String: any Sendable]]?,
@@ -257,25 +274,14 @@ struct MLXBatchAdapter {
             let chat = preprocessImages(in: buildChat())
             let toolsSpec = buildToolsSpec()
 
-            // `enable_thinking` handling. If the user set `disableThinking`
-            // explicitly, honor it. Otherwise default to `true` — templates
-            // that don't reference `enable_thinking` silently ignore the
-            // kwarg, but templates that do reference it (Gemma-4 / Qwen-3
-            // thinking / AutoThinkingProfile targets) rely on the flag to
-            // activate reasoning. The previous behavior (send `nil` here
-            // and let the template default win) meant Gemma-4's
-            // `{%- if not enable_thinking | default(false) -%}` branch
-            // fired and suppressed CoT even when the profile said the
-            // model supports thinking — which was invisible to us when
-            // profile detection itself failed (e.g. model stored outside
-            // `~/MLXModels` so `LocalReasoningCapability.analyze` never
-            // got to read the template).
-            let additionalContext: [String: any Sendable]
-            if let disableThinking = generation.modelOptions["disableThinking"]?.boolValue {
-                additionalContext = ["enable_thinking": !disableThinking]
-            } else {
-                additionalContext = ["enable_thinking": true]
-            }
+            // `enable_thinking` handling. Ling-2.6 Flash is served as a
+            // non-reasoning model, so force it off even when a caller omits
+            // model options or an older saved preference says otherwise.
+            // Other families still honor explicit `disableThinking`; when
+            // unspecified, default to `true` because thinking-capable Gemma,
+            // Qwen, and auto-detected templates rely on a present truthy
+            // kwarg to activate reasoning.
+            let additionalContext = additionalContext(for: generation, modelName: modelName)
             let userInput = MLXLMCommon.UserInput(
                 chat: chat,
                 processing: .init(),

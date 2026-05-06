@@ -76,6 +76,21 @@ struct ModelRuntimeIsHybridTests {
         }
     }
 
+    @Test("Bailing / Ling Linear-Attn hybrid family")
+    func bailingLing_isHybrid() {
+        for id in [
+            "OsaurusAI/Ling-2.6-flash-MXFP4",
+            "OsaurusAI/Ling-2.6-flash-JANGTQ",
+            "bailing_hybrid",
+            "bailing_moe_v2_5",
+        ] {
+            #expect(
+                ModelRuntime.isKnownHybridModel(name: id),
+                "Bailing/Ling hybrid family must flip setHybrid eagerly: \(id)"
+            )
+        }
+    }
+
     // MARK: - Non-hybrid families that must NOT flip (regression guards)
 
     /// Dense models without SSM layers must NOT eager-flip the hybrid flag.
@@ -104,10 +119,10 @@ struct ModelRuntimeIsHybridTests {
     /// DSV4-Flash JANGTQ uses Compressor/Indexer hybrid attention, but its
     /// per-layer cache list does NOT contain `MambaCache` / `ArraysCache`
     /// (it's a custom `DeepseekV4Cache`). vmlx's auto-flip only matches on
-    /// Mamba-style cache types, so neither path treats DSV4 as hybrid in
-    /// this sense — and DSV4 has its own `DSV4_KV_MODE` env var to control
-    /// cache topology. Lock that in: DSV4 must NOT match this family list.
-    @Test("DSV4-Flash JANGTQ does NOT match (uses DeepseekV4Cache, controlled via DSV4_KV_MODE)")
+    /// Mamba-style cache types, while DSV4's `HybridPoolCache` flips the
+    /// paged-incompatible disk-serializer path in vmlx. Lock that in:
+    /// DSV4 must NOT match this SSM-family list.
+    @Test("DSV4-Flash JANGTQ does NOT match (uses DeepseekV4Cache, not SSM companion)")
     func dsv4Flash_isNotMambaHybrid() {
         for id in [
             "JANGQ-AI/DeepSeekV4-Flash-JANGTQ",
