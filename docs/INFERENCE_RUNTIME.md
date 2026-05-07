@@ -103,9 +103,14 @@ footprint, and per-request latency.
 via `BatchEngine.updateMaxBatchSize(_:)`. The registry hot-resizes the
 cached engine when a later request asks for a different value, so the
 defaults key takes effect on the next inference call rather than waiting
-for an unload/reload. An `engineShutdown` rejection from vmlx (the engine
-was torn down between calls) falls back to "log and use cached"; the
-coalescer will rebuild on the next first-fetch. See
+for an unload/reload. An `engineShutdown` rejection from vmlx (the cached
+engine was torn down between calls) triggers an evict + rebuild: the
+adapter calls `coalescer.remove(_:dispose:)` to retire the dead handle
+through the same tombstone-protected teardown that `shutdownEngine` uses,
+then recurses into `engine(...)` so the next request lands through the
+coalescer's first-fetch path with a fresh BatchEngine constructed at the
+requested batch size. Other errors (e.g. caller-side
+`invalidMaxBatchSize`) leave the cached engine intact. See
 [`InferenceFeatureFlags.swift`](../Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
 
 ## Upstream runtime boundaries

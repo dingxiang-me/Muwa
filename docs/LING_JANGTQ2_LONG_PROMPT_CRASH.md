@@ -1,8 +1,20 @@
-# Ling JANGTQ2 + long prompt — vmlx Metal crash (separate vmlx fix)
+# Ling JANGTQ2 + long prompt — vmlx Metal crash
 
-**Status:** Tracked, **NOT introduced by the vmlx 88fc352 bump**, **NOT
-fixable in osaurus.** Filed so the next vmlx pin bump (or a stand-alone
-vmlx PR) can address the underlying Metal pipeline-state lifetime bug.
+**Status:** ✅ **Fixed in vmlx pin `b9da180`** (this PR).
+`BailingLinearAttention.recurrentGLA` now ports to a fused Metal kernel
+(`bailing_recurrent_gla` via a singleton `BailingGLAKernelManager`),
+running the recurrent loop in one Metal command instead of dispatching
+`L * layers` small MLX graphs. The pipeline state is owned at
+process-init scope by the singleton, so it cannot be released between
+prefill steps — the lifetime window that the codebook `Gather` op was
+hitting at ~2 k tokens is closed.
+
+The reference path (`recurrentGLAReference`) is preserved for unusual
+head dimensions (`D % 32 != 0`); production Ling/Bailing bundles all
+satisfy `D % 32 == 0` so they take the fused-kernel path.
+
+Original symptom + repro retained below for archival reference and so
+future regressions on the same surface can compare diagnostic shape.
 
 ## Symptom
 

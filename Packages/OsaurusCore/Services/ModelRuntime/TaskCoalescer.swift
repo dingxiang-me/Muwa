@@ -153,43 +153,64 @@ public actor TaskCoalescer<Value: Sendable> {
     ///
     /// Pass `nil` to `dispose` for resources that don't need an async
     /// teardown (purely-resolved-value-cache use cases).
+    ///
+    /// **Tombstone discipline**: both the in-flight and resolved-cache
+    /// paths install a single `drainTask` into `draining[key]` that
+    /// wraps `creation.value` (if any) AND the `dispose` step. The task
+    /// resolves only after dispose completes, so a `value(for:)` racing
+    /// us sees `draining[key]` set, awaits the drain, and is unblocked
+    /// only after the resource has been fully released. The resolved-
+    /// cache path is the auditor finding from PR #1037 — without the
+    /// synthetic drainTask it would skip the tombstone and let racers
+    /// build fresh while shutdown was still running.
     @discardableResult
     public func remove(
         _ key: String,
         dispose: (@Sendable (Value) async -> Void)?
     ) async -> Value? {
+        let drainTask: Task<Value, Never>?
         if let creation = creating.removeValue(forKey: key) {
-            // Tombstone the task so concurrent `value(for:)` callers
-            // can join (no duplicate factory). Stays set through the
-            // dispose step below so racers also wait for the resource
-            // teardown, not just the creation task.
-            draining[key] = creation
-            let value = await creation.value
-            if let dispose = dispose {
-                // Dispose runs WHILE `draining[key]` is still set. This
-                // is the load-bearing window: a `value(for:)` racing us
-                // sees `draining[key] == creation`, awaits it, and only
-                // restarts a fresh factory after we've cleared the
-                // tombstone below — i.e. after the resource is gone.
-                await dispose(value)
+            // In-flight path. Wrap creation + dispose into a single
+            // tombstone task so the drain window covers BOTH the
+            // creation completion and the resource teardown.
+            drainTask = Task<Value, Never> {
+                let value = await creation.value
+                if let dispose = dispose {
+                    await dispose(value)
+                }
+                return value
             }
-            // Canonicality: clear only if our task is still the
-            // registered drainer.
-            if draining[key] == creation {
-                draining[key] = nil
+        } else if let resolved = values.removeValue(forKey: key) {
+            // Resolved path. There is no creation task to await, but we
+            // STILL need a tombstone to gate racers across `dispose`.
+            // Without it, a `value(for:)` landing during dispose finds
+            // `values[key]` empty (just removed), `creating[key]` empty,
+            // and `draining[key]` empty, then starts a fresh factory
+            // while the previous resource is still being torn down —
+            // exactly the build-while-shutting-down race. Wrapping
+            // dispose into a synthetic task that returns the resolved
+            // value gives us the same `drainTask` shape as the in-flight
+            // path so racers can await it uniformly.
+            drainTask = Task<Value, Never> {
+                if let dispose = dispose {
+                    await dispose(resolved)
+                }
+                return resolved
             }
-            return value
+        } else {
+            return nil
         }
-        if let resolved = values.removeValue(forKey: key) {
-            // Resolved-value path: no in-flight creation to gate
-            // against, but we still run the dispose for symmetry. No
-            // tombstone needed — there's no creation race window.
-            if let dispose = dispose {
-                await dispose(resolved)
-            }
-            return resolved
+        guard let drainTask else { return nil }
+
+        draining[key] = drainTask
+        let value = await drainTask.value
+        // Canonicality: clear only if our task is still the registered
+        // drainer (a concurrent `removeAll(dispose:)` could have moved
+        // it; the dict-eq check costs nothing and locks against drift).
+        if draining[key] == drainTask {
+            draining[key] = nil
         }
-        return nil
+        return value
     }
 
     /// Drain every entry — both already-resolved and in-flight — and
@@ -203,49 +224,54 @@ public actor TaskCoalescer<Value: Sendable> {
     }
 
     /// `removeAll()` variant that runs `dispose(key, value)` inside the
-    /// tombstone window for each in-flight entry, mirroring
-    /// `remove(_:dispose:)`. Pre-resolved entries also receive the
-    /// `dispose` call after the in-flight drain finishes — see
-    /// `remove(_:dispose:)` for the rationale on why the resolved path
-    /// doesn't need a tombstone.
+    /// tombstone window for each entry — both in-flight creations and
+    /// pre-resolved values. Mirrors `remove(_:dispose:)`'s drainTask
+    /// discipline so the build-while-shutting-down race is closed for
+    /// every entry the caller is tearing down, not just the in-flight
+    /// ones.
     @discardableResult
     public func removeAll(
         dispose: (@Sendable (String, Value) async -> Void)?
     ) async -> [(key: String, value: Value)] {
-        let pending = creating
+        let pendingCreations = creating
         creating.removeAll()
-        // Move every in-flight task to `draining` BEFORE the first
-        // await, so a `value(for:)` that lands in the gap between
-        // iterations finds the task on the join path and never starts
-        // a duplicate factory.
-        for (key, task) in pending {
-            draining[key] = task
-        }
-        // Snapshot resolved entries before the awaits — a concurrent
-        // `value(for:)` that completes a fresh creation during our
-        // drain (after its tombstone clears) writes to `values[key]`,
-        // and that fresh entry is NOT one we asked to remove.
         let preExistingValues = values
         values.removeAll()
 
-        var resolved: [(key: String, value: Value)] = []
-        for (key, creation) in pending {
-            let value = await creation.value
-            if let dispose = dispose {
-                // Dispose runs WHILE `draining[key]` is still set, so
-                // racers can't build a fresh resource until teardown
-                // is complete — same load-bearing window as
-                // `remove(_:dispose:)`.
-                await dispose(key, value)
+        // Build one drainTask per entry that wraps creation+dispose
+        // (in-flight) or just dispose (resolved). Install all of them
+        // BEFORE the first await so a `value(for:)` racing into any
+        // affected key finds the tombstone on the first lookup.
+        var drainTasks: [(key: String, task: Task<Value, Never>)] = []
+        for (key, creation) in pendingCreations {
+            let task = Task<Value, Never> {
+                let value = await creation.value
+                if let dispose = dispose {
+                    await dispose(key, value)
+                }
+                return value
             }
-            resolved.append((key, value))
-            draining[key] = nil
+            draining[key] = task
+            drainTasks.append((key, task))
         }
         for (key, value) in preExistingValues {
-            if let dispose = dispose {
-                await dispose(key, value)
+            let task = Task<Value, Never> {
+                if let dispose = dispose {
+                    await dispose(key, value)
+                }
+                return value
             }
+            draining[key] = task
+            drainTasks.append((key, task))
+        }
+
+        var resolved: [(key: String, value: Value)] = []
+        for (key, task) in drainTasks {
+            let value = await task.value
             resolved.append((key, value))
+            if draining[key] == task {
+                draining[key] = nil
+            }
         }
         return resolved
     }

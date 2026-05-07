@@ -56,7 +56,7 @@ documented quality floor:
 
 | Bundle | Status | Failure mode at long-prompt chat |
 |---|---|---|
-| `ling-2.6-flash-jangtq2-crack` | **Crashes** | `EXC_BAD_ACCESS` in vmlx's `BailingLinearAttention.recurrentGLA` Metal Gather kernel during prefill. Tracked in `LING_JANGTQ2_LONG_PROMPT_CRASH.md`. Vmlx-side Metal-pipeline-state lifetime bug specific to the 2-bit codebook code path. |
+| `ling-2.6-flash-jangtq2-crack` | OK on long prompts as of vmlx pin `b9da180`; the 2–3 k coherence ceiling below still applies | Pre-`b9da180`: `EXC_BAD_ACCESS` in vmlx's `BailingLinearAttention.recurrentGLA` Metal Gather kernel during prefill at ≥ ~2 k tokens. `b9da180` ports `recurrentGLA` to a fused Metal kernel with a singleton kernel manager — pipeline state is now process-scoped instead of request-local, so the lifetime window is closed. See `LING_JANGTQ2_LONG_PROMPT_CRASH.md`. The 2-bit-codebook coherence ceiling at the bottom of this doc is a separate, model-side limit and remains. |
 | `zaya1-8b-jangtq2` | **Degenerates** | Reasoning-mode loop (e.g. "build a REST API from a JSON file" repeated 30+ times) once cumulative output crosses the 2–3 k ceiling. Confirmed 2026-05-07: 3419-token preamble + `enable_thinking=false` → 75 s of looping content before user cancelled. Bundle metadata is correct (`bits=8`, `routed_expert_bits=2`); the failure is the codebook precision floor under heavy chat preambles. |
 | `nemotron-omni-nano-jangtq4-crack` | OK (4-bit, not affected) | — |
 | `zaya1-8b-jangtq4` | OK (4-bit, not affected) | — |
@@ -97,13 +97,15 @@ documented quality floor:
 
 ## Pointers to follow-up surface
 
-* Vmlx fix candidate for `BailingLinearAttention.recurrentGLA` 2-bit
-  Metal pipeline-state lifetime — see `LING_JANGTQ2_LONG_PROMPT_CRASH.md`
-  for the crash trace and probe suggestions.
-* Vmlx fix candidate for emitting `.info` BEFORE
-  `coordinator.storeAfterGeneration` runs — see the SSM re-derive
-  comment block in `Services/ModelRuntime.swift` for why the
-  end-of-generation cache write should be fire-and-forget.
+* ✅ Closed in vmlx pin `b9da180`: `BailingLinearAttention.recurrentGLA`
+  2-bit Metal pipeline-state lifetime. Fused Metal kernel + singleton
+  kernel manager. See `LING_JANGTQ2_LONG_PROMPT_CRASH.md` for the
+  pre-fix crash trace; the doc is retained for archival reference.
+* ✅ Closed in vmlx pin `b9da180`: `coordinator.storeAfterGeneration`
+  now runs AFTER `.info` is yielded, not before. Osaurus still keeps
+  `enableSSMReDerive: false` for chat workloads with mutating system
+  prefixes — see the SSM re-derive comment block in
+  `Services/ModelRuntime.swift`.
 * Osaurus prompt-bloat reduction (lazy tool schemas) — see
   `PROMPT_BLOAT_FOLLOWUP.md`. Most impactful single change to make
   JANGTQ2 useful again on chat workloads (since the 3500-token
