@@ -1,8 +1,8 @@
 # Prompt Bloat — TTFT Follow-Up (osaurus chat UI)
 
-**Status:** Tracked, **out of scope for the vmlx 88fc352 bump PR**. Filed as a
-distinct concern so a future PR can take it on without needing to re-derive the
-analysis from scratch.
+**Status:** Tracked, **out of scope for the vmlx `b9da180` bump PR**. Filed
+as a distinct concern so a future PR can take it on without needing to
+re-derive the analysis from scratch.
 
 ## Symptom
 
@@ -99,12 +99,17 @@ that's where ~70% of the budget goes.
 
 ## Why this isn't blocking the bump PR
 
-The vmlx 88fc352 bump fixes:
+The vmlx `b9da180` bump fixes:
 
 * Ling B>1 RoPE / per-slot offsets / `BailingHybrid.applyRotaryPosition`
 * ZAYA1 CCA-attention hybrid wiring (`ZayaCCACache`, eager `setHybrid(true)`)
 * `ReasoningParser.forPrompt` prompt-tail derivation (closes the 2026-05
   Ling Stop-stuck regression)
+* `BailingLinearAttention.recurrentGLA` fused Metal kernel (closes the
+  Ling JANGTQ2 long-prompt `EXC_BAD_ACCESS`)
+* `BatchEngine` lifecycle: `isShutdown`, `controlPlaneYieldInterval`,
+  `updateMaxBatchSize(_:)` (host-side hot-resize support)
+* `Evaluate.swift` yields `.info` BEFORE post-generation `cacheStoreAction`
 * Audio MediaSalt + DSV4 reasoning_effort strip (smaller fixes)
 
 Those are correctness fixes against the runtime. The TTFT pain is a
