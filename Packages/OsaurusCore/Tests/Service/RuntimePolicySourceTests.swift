@@ -115,6 +115,38 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    /// Lock the `.engineShutdown` evict-and-rebuild path. If
+    /// `BatchEngine.updateMaxBatchSize(_:)` throws `engineShutdown`
+    /// (the cached engine has been torn down between calls), the
+    /// adapter MUST evict the dead handle and rebuild — leaving it in
+    /// `coalescer.values` would loop forever, contradicting the
+    /// "coalescer rebuilds on next first-fetch" doc claim.
+    @Test("MLXBatchAdapter handles BatchEngine.updateMaxBatchSize engineShutdown by evicting + rebuilding")
+    func mlxBatchAdapterEvictsAndRebuildsOnEngineShutdown() throws {
+        let adapter = try Self.source("Services/ModelRuntime/MLXBatchAdapter.swift")
+
+        #expect(
+            adapter.contains("BatchEngineConfigurationError.engineShutdown"),
+            "Registry.engine(...) must catch BatchEngineConfigurationError.engineShutdown specifically — a generic catch loses the eviction signal and the dead engine stays in the coalescer forever"
+        )
+        #expect(
+            adapter.contains("evicting and rebuilding at maxBatchSize"),
+            "The eviction log line must be present so future debug sessions can confirm the dead-engine path was taken"
+        )
+        // Eviction goes through the coalescer's dispose variant so the
+        // tombstone protects racers from building on a half-shut-down
+        // engine. The exact call shape is what locks the discipline.
+        #expect(
+            adapter.contains("await coalescer.remove(modelName) { engine in"),
+            "Eviction must call `coalescer.remove(_:dispose:)` so the tombstone stays alive across the defensive `engine.shutdown()` call (mirrors the shutdownEngine path)"
+        )
+        // After eviction, recurse so the next first-fetch builds fresh.
+        #expect(
+            adapter.contains("return await self.engine("),
+            "Post-eviction must recurse into engine(...) so the rebuild lands through the coalescer's first-fetch path"
+        )
+    }
+
     /// Lock the removal of the `activeGenerationTask?.value` gate at
     /// the entry of `generateEventStream`. The gate was serializing
     /// every same-model overlapping request before vmlx's `BatchEngine`
