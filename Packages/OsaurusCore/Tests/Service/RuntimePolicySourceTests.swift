@@ -46,4 +46,23 @@ struct RuntimePolicySourceTests {
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }
+
+    /// Lock the post-generation SSM re-derive opt-out. vmlx defaults
+    /// `enableSSMReDerive=true`, which on hybrid families (Ling, ZAYA1,
+    /// Nemotron-3) runs a FULL second prefill at end-of-generation BEFORE
+    /// yielding `.info`. For a 2962-token Ling prompt at ~226 tok/s prefill
+    /// that adds ~13 s of "stream stays open after the visible answer
+    /// finished" — the production-witnessed Ling stuck-before-end
+    /// symptom. The 2026-05-07 PR explicitly turns the knob off in
+    /// `buildCacheCoordinatorConfig`; if a future refactor drops or
+    /// inverts it, this assertion breaks first.
+    @Test("CacheCoordinatorConfig disables SSM re-derive for chat workflow")
+    func cacheConfigDisablesSSMReDerive() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(
+            runtime.contains("enableSSMReDerive: false"),
+            "ModelRuntime.buildCacheCoordinatorConfig must opt out of vmlx's default SSM re-derive — leaving it on adds a per-request post-decode prefill stall that the chat UI surfaces as the Ling stuck-before-end freeze"
+        )
+    }
 }

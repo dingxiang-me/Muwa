@@ -458,6 +458,32 @@ public actor ModelRuntime {
             usePagedCache: true,
             enableDiskCache: enableDiskCache,
             diskCacheDir: diskCacheDir,
+            // Disable the post-generation SSM re-derive pass for hybrid
+            // models. vmlx's default (`enableSSMReDerive: true`) runs a
+            // FULL second prefill at end-of-generation
+            // (`BatchEngine.swift:1591` →
+            // `reDeriveAndStoreSSMStatesForPromptBoundaries`) BEFORE
+            // yielding `.info`, so for a 2962-token Ling prompt at
+            // ~226 prompt-tokens/sec the SSE stream stays open for an
+            // extra ~13 seconds AFTER the visible answer is done. In the
+            // chat UI this surfaces as the 2026-05-07 "greeting → freeze
+            // → end" symptom: the user sees the answer stream out, then
+            // the stream stays open during the SSM store, then finishes
+            // with no further visible content. (This is on top of any
+            // visible reasoning routing — the reasoning-merge in
+            // `GenerationEventMapper` is a separate fix for a different
+            // case.) The cost would amortize across multi-turn cache
+            // hits, but osaurus's chat path mutates the system prefix
+            // every turn (memory injection, preflight capability
+            // search, dynamic skills) so the SSM cache rarely lands a
+            // boundary-matching hit and the re-derive cost is paid
+            // without payoff. Disabling restores the responsive
+            // end-of-stream that the user expects. Re-evaluate if vmlx
+            // ships the architectural fix that emits `.info` BEFORE
+            // `coordinator.storeAfterGeneration` (cache write should
+            // be fire-and-forget from the consumer's perspective).
+            ssmMaxEntries: 50,
+            enableSSMReDerive: false,
             modelKey: scopedKey,
             // `defaultKVMode: .none` (fp16) — see file-level comment for the
             // 3-bit and 4-bit codebook KV degenerate-repetition trail.
@@ -531,19 +557,34 @@ public actor ModelRuntime {
     /// 3.x MoE quant tier) flip the flag without a registry edit.
     nonisolated static func isKnownHybridModel(name: String) -> Bool {
         let lower = name.lowercased()
-        // Mamba+Attn+MoE — Nemotron-3 / Cascade-2 / Hyper.
+        // Mamba+Attn+MoE — Nemotron-3 / Cascade-2 / Hyper. vmlx
+        // `Models/NemotronH.swift` allocates `MambaCache` slots for the
+        // Mamba layers and standard KV for the attention layers; the
+        // `SSMStateCache` companion covers the Mamba state.
         if lower.contains("nemotron-3") || lower.contains("nemotron-cascade")
             || lower.contains("nemotron_h")
         {
             return true
         }
         // Qwen 3.5 / 3.6 MoE family (qwen3_5_moe model_type) covers Holo3 too.
+        // vmlx `Models/Qwen35.swift` + `Qwen35JANGTQ.swift` allocate
+        // `ArraysCache` for the linear-attention slots.
         if lower.contains("qwen3.5") || lower.contains("qwen3.6") || lower.contains("holo3")
             || lower.contains("holo-3")
         {
             return true
         }
-        // Bailing / Ling hybrid: Linear-Attn companion ArraysCache + MLA cache.
+        // Qwen3-Next (qwen3_next model_type) — newer hybrid MoE that vmlx
+        // dispatches via `Qwen3Next.swift`. Same `ArraysCache` companion
+        // pattern as the 3.5 / 3.6 family.
+        if lower.contains("qwen3-next") || lower.contains("qwen3_next")
+            || lower.contains("qwen3next")
+        {
+            return true
+        }
+        // Bailing / Ling hybrid: Linear-Attn companion ArraysCache + MLA
+        // cache. Covers `bailing_hybrid`, `bailing_moe_v2_5`, and the
+        // explicit Ling-2.6 Flash bundles via `isLingFamily`.
         if lower.contains("bailing") || ModelFamilyNames.isLingFamily(name) {
             return true
         }
@@ -555,6 +596,59 @@ public actor ModelRuntime {
         // on first ZayaCCACache slot admission; this is the parity flip
         // for the single-slot `Evaluate` path.
         if ModelFamilyNames.isZayaFamily(name) {
+            return true
+        }
+        // Granite-MoE-Hybrid (granitemoehybrid model_type) — IBM Granite
+        // hybrid Mamba+Attn-MoE. vmlx `Models/GraniteMoeHybrid.swift`
+        // allocates `MambaCache` for the SSM layers. Match the collapsed
+        // model_type AND the conventional bundle-id form
+        // (`granite-3.0-moe-hybrid-7b` etc.) by looking for "granite"
+        // alongside "moe-hybrid" / "moe_hybrid" — the conjunction guards
+        // against false positives like `moe-hybridge` lacking the family
+        // prefix.
+        if lower.contains("granitemoehybrid") {
+            return true
+        }
+        if lower.contains("granite")
+            && (lower.contains("moe-hybrid") || lower.contains("moe_hybrid"))
+        {
+            return true
+        }
+        // Falcon-H1 (falcon_h1 model_type) — TII hybrid Mamba+Attn. vmlx
+        // `Models/FalconH1.swift`. Match dash, underscore, AND collapsed
+        // forms; reject `falcon-h11` / `falcon_h10` etc. with the
+        // boundary regex below.
+        if lower.range(
+            of: #"(^|/)falcon[\-_]?h1([\-_].*)?$"#,
+            options: .regularExpression
+        ) != nil {
+            return true
+        }
+        // Baichuan-M1 (baichuan_m1 model_type) — Baichuan hybrid (linear +
+        // sliding-window attention with Mamba mix). vmlx
+        // `Models/BaichuanM1.swift`.
+        if lower.range(
+            of: #"(^|/)baichuan[\-_]?m1([\-_].*)?$"#,
+            options: .regularExpression
+        ) != nil {
+            return true
+        }
+        // Jamba (jamba_3b model_type) — AI21 hybrid Mamba+Attn-MoE. vmlx
+        // `Models/Jamba.swift` allocates `MambaCache` slots. Match
+        // `jamba-`, `jamba_`, and dot/digit forms; reject `jamba` alone
+        // with the boundary regex.
+        if lower.range(
+            of: #"(^|/)jamba[\-_\.0-9]"#,
+            options: .regularExpression
+        ) != nil {
+            return true
+        }
+        // LFM2 / LFM2-MoE (lfm2 / lfm2_moe model_types) — Liquid Foundation
+        // Mamba hybrids. vmlx `Models/LFM2.swift` + `LFM2MoE.swift`.
+        if lower.range(
+            of: #"(^|/)lfm2([\-_].*)?$"#,
+            options: .regularExpression
+        ) != nil {
             return true
         }
         return false
