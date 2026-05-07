@@ -55,70 +55,82 @@ struct MLXBatchAdapter {
     actor Registry {
         static let shared = Registry()
 
-        private var engines: [String: BatchEngine] = [:]
-        /// In-flight `BatchEngine` creations, keyed by model name. Coalesces
-        /// concurrent first-fetch callers onto the same `Task` so they all
-        /// receive the same engine instance instead of each spawning their
-        /// own. See the rationale on `engine(for:container:maxBatchSize:)`.
-        private var creating: [String: Task<BatchEngine, Never>] = [:]
+        /// Single-flight cache for the per-model `BatchEngine` instance.
+        /// Coalesces concurrent first-fetch callers onto the same
+        /// creation `Task` so the registry never returns two `BatchEngine`
+        /// objects bound to the same MLX `ModelContainer`. Two engines
+        /// on one container would put concurrent producers on the shared
+        /// GPU command queue, which surfaces as a Metal completion-queue
+        /// abort. See `TaskCoalescer` for the construction-order
+        /// invariant the coalescer enforces.
+        private let coalescer = TaskCoalescer<BatchEngine>()
 
         /// Returns the cached engine for `modelName`, creating it on first
         /// use from the supplied `ModelContainer`. The container's existing
         /// cache coordinator is captured automatically by `makeBatchEngine`.
         ///
-        /// **Concurrency invariant**: although this actor serializes its own
-        /// methods, `await container.makeBatchEngine(...)` suspends the
-        /// actor and lets a second caller observe `engines[modelName] ==
-        /// nil` while the first creation is still in flight. Without
-        /// coalescing, both callers fall through, both call `makeBatchEngine`,
-        /// and both end up with their own `BatchEngine` running concurrent
-        /// GPU work on the *same* MLX `ModelContainer` — Metal's command
-        /// queue then aborts on completion (`MTLReleaseAssertionFailure` →
-        /// `SIGABRT`), trace shows two `registry: created BatchEngine` lines
-        /// at the same timestamp. The fix is the classic
-        /// "creation-in-flight" pattern: park the in-progress `Task` in
-        /// `creating`, every concurrent caller awaits the same task value,
-        /// and the post-creation cleanup transitions the entry from
-        /// `creating[…]` to `engines[…]` atomically (the actor enforces it).
+        /// `BatchEngine.maxBatchSize` is fixed at construction in vmlx.
+        /// A later request whose `maxBatchSize` differs from the cached
+        /// engine's runs on the captured value; the request log records
+        /// the mismatch so a UserDefaults change to
+        /// `mlxBatchEngineMaxBatchSize` between requests is visible.
+        /// To rebuild at a new value, evict the model via
+        /// `ModelRuntime.unload`, which calls `shutdownEngine(for:)`.
+        /// Auto-rebuilding here would race in-flight requests already
+        /// holding the cached engine.
         func engine(
             for modelName: String,
             container: ModelContainer,
             maxBatchSize: Int
         ) async -> BatchEngine {
-            if let existing = engines[modelName] { return existing }
-            if let inFlight = creating[modelName] {
-                return await inFlight.value
-            }
-            let creation = Task<BatchEngine, Never> {
+            let engine = await makeAndRegister(
+                modelName: modelName,
+                maxBatchSize: maxBatchSize
+            ) {
                 await container.makeBatchEngine(maxBatchSize: maxBatchSize)
             }
-            creating[modelName] = creation
-            let engine = await creation.value
-            engines[modelName] = engine
-            creating[modelName] = nil
+            // `BatchEngine.maxBatchSize` is actor-isolated; the await
+            // suspends the registry actor while we read it. Subsequent
+            // callers see the engine in `coalescer` already and won't
+            // race the read.
+            let cached = await engine.maxBatchSize
+            if cached != maxBatchSize {
+                batchAdapterLog.notice(
+                    "registry: cached BatchEngine for \(modelName, privacy: .public) was constructed with maxBatchSize=\(cached, privacy: .public); current request asked for \(maxBatchSize, privacy: .public). Evict the model to rebuild."
+                )
+            }
+            return engine
+        }
+
+        /// Test seam. Coalesces a concurrent first-fetch using a custom
+        /// `factory`, returning whatever the factory produces. Production
+        /// callers go through `engine(for:container:maxBatchSize:)`. The
+        /// `maxBatchSize` argument is only used in the log line.
+        internal func makeAndRegister(
+            modelName: String,
+            maxBatchSize: Int,
+            factory: @Sendable @escaping () async -> BatchEngine
+        ) async -> BatchEngine {
+            let engine = await coalescer.value(for: modelName, factory: factory)
             batchAdapterLog.info(
-                "registry: created BatchEngine for \(modelName, privacy: .public) maxBatchSize=\(maxBatchSize, privacy: .public)"
+                "registry: ready BatchEngine for \(modelName, privacy: .public) maxBatchSize=\(maxBatchSize, privacy: .public)"
             )
             return engine
         }
 
+        /// Diagnostic accessor. Test-only; production callers do not need
+        /// to inspect the coalescer's internal state.
+        internal func registrySnapshot() async -> (resolved: Int, inFlight: Int) {
+            await coalescer.snapshot()
+        }
+
         /// Shut down and remove the engine for `modelName`. Safe to call
         /// when no engine exists. Pending requests on the engine receive a
-        /// `.cancelled` info event before the actor exits.
+        /// `.cancelled` info event before the actor exits. If a first-request
+        /// engine creation is in flight, the coalescer drains it so the
+        /// freshly created engine is also shut down rather than leaked.
         func shutdownEngine(for modelName: String) async {
-            // Drain any in-flight creation first so a shutdown that races
-            // a first-request engine creation cleanly stops the freshly
-            // created engine instead of leaking it.
-            if let creation = creating.removeValue(forKey: modelName) {
-                let engine = await creation.value
-                engines[modelName] = nil
-                await engine.shutdown()
-                batchAdapterLog.info(
-                    "registry: shutdown BatchEngine for \(modelName, privacy: .public) (was in-flight)"
-                )
-                return
-            }
-            guard let engine = engines.removeValue(forKey: modelName) else { return }
+            guard let engine = await coalescer.remove(modelName) else { return }
             await engine.shutdown()
             batchAdapterLog.info(
                 "registry: shutdown BatchEngine for \(modelName, privacy: .public)"
@@ -126,27 +138,14 @@ struct MLXBatchAdapter {
         }
 
         /// Shut down every cached engine. Used by `ModelRuntime.clearAll()`.
-        ///
-        /// Mirrors `shutdownEngine(for:)` for the in-flight creation case:
-        /// drains every pending creation so a `clearAll` invoked while a
-        /// first request is still bringing an engine up cleanly tears down
-        /// the freshly-created engine instead of leaving it orphaned.
+        /// Drains in-flight creations and resolved entries through the
+        /// coalescer.
         func shutdownAll() async {
-            let pending = creating
-            creating.removeAll()
-            for (name, creation) in pending {
-                let engine = await creation.value
-                await engine.shutdown()
+            let drained = await coalescer.removeAll()
+            for entry in drained {
+                await entry.value.shutdown()
                 batchAdapterLog.info(
-                    "registry: shutdown BatchEngine for \(name, privacy: .public) (was in-flight)"
-                )
-            }
-            let snapshot = engines
-            engines.removeAll()
-            for (name, engine) in snapshot {
-                await engine.shutdown()
-                batchAdapterLog.info(
-                    "registry: shutdown BatchEngine for \(name, privacy: .public)"
+                    "registry: shutdown BatchEngine for \(entry.key, privacy: .public)"
                 )
             }
         }
