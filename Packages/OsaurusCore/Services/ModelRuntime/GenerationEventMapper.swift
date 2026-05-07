@@ -80,15 +80,23 @@ enum GenerationEventMapper {
 
                     case .reasoning(let text):
                         guard !text.isEmpty else { continue }
+                        // Reasoning-capable families (DSV4-Flash thinking,
+                        // Qwen 3.5 / 3.6 thinking-on, etc.) can stream
+                        // `.reasoning` deltas for many seconds before the
+                        // first `.chunk`. Marking prefill done on the
+                        // first non-empty event of either kind keeps the
+                        // "loading model" / spinner UI honest — the model
+                        // IS producing output, just on a different
+                        // channel.
+                        if firstChunk {
+                            firstChunk = false
+                            InferenceProgressManager.shared.prefillDidFinishAsync()
+                        }
                         if mergeReasoning {
                             // Ling / ZAYA — non-reasoning families. vmlx
                             // already stripped the `<think>` / `</think>`
                             // markers; the inner text is plain content the
                             // user should see in real time.
-                            if firstChunk {
-                                firstChunk = false
-                                InferenceProgressManager.shared.prefillDidFinishAsync()
-                            }
                             continuation.yield(.tokens(text))
                         } else {
                             continuation.yield(.reasoning(text))
