@@ -56,18 +56,46 @@ struct MLXBatchAdapter {
         static let shared = Registry()
 
         private var engines: [String: BatchEngine] = [:]
+        /// In-flight `BatchEngine` creations, keyed by model name. Coalesces
+        /// concurrent first-fetch callers onto the same `Task` so they all
+        /// receive the same engine instance instead of each spawning their
+        /// own. See the rationale on `engine(for:container:maxBatchSize:)`.
+        private var creating: [String: Task<BatchEngine, Never>] = [:]
 
         /// Returns the cached engine for `modelName`, creating it on first
         /// use from the supplied `ModelContainer`. The container's existing
         /// cache coordinator is captured automatically by `makeBatchEngine`.
+        ///
+        /// **Concurrency invariant**: although this actor serializes its own
+        /// methods, `await container.makeBatchEngine(...)` suspends the
+        /// actor and lets a second caller observe `engines[modelName] ==
+        /// nil` while the first creation is still in flight. Without
+        /// coalescing, both callers fall through, both call `makeBatchEngine`,
+        /// and both end up with their own `BatchEngine` running concurrent
+        /// GPU work on the *same* MLX `ModelContainer` — Metal's command
+        /// queue then aborts on completion (`MTLReleaseAssertionFailure` →
+        /// `SIGABRT`), trace shows two `registry: created BatchEngine` lines
+        /// at the same timestamp. The fix is the classic
+        /// "creation-in-flight" pattern: park the in-progress `Task` in
+        /// `creating`, every concurrent caller awaits the same task value,
+        /// and the post-creation cleanup transitions the entry from
+        /// `creating[…]` to `engines[…]` atomically (the actor enforces it).
         func engine(
             for modelName: String,
             container: ModelContainer,
             maxBatchSize: Int
         ) async -> BatchEngine {
             if let existing = engines[modelName] { return existing }
-            let engine = await container.makeBatchEngine(maxBatchSize: maxBatchSize)
+            if let inFlight = creating[modelName] {
+                return await inFlight.value
+            }
+            let creation = Task<BatchEngine, Never> {
+                await container.makeBatchEngine(maxBatchSize: maxBatchSize)
+            }
+            creating[modelName] = creation
+            let engine = await creation.value
             engines[modelName] = engine
+            creating[modelName] = nil
             batchAdapterLog.info(
                 "registry: created BatchEngine for \(modelName, privacy: .public) maxBatchSize=\(maxBatchSize, privacy: .public)"
             )
@@ -78,6 +106,18 @@ struct MLXBatchAdapter {
         /// when no engine exists. Pending requests on the engine receive a
         /// `.cancelled` info event before the actor exits.
         func shutdownEngine(for modelName: String) async {
+            // Drain any in-flight creation first so a shutdown that races
+            // a first-request engine creation cleanly stops the freshly
+            // created engine instead of leaking it.
+            if let creation = creating.removeValue(forKey: modelName) {
+                let engine = await creation.value
+                engines[modelName] = nil
+                await engine.shutdown()
+                batchAdapterLog.info(
+                    "registry: shutdown BatchEngine for \(modelName, privacy: .public) (was in-flight)"
+                )
+                return
+            }
             guard let engine = engines.removeValue(forKey: modelName) else { return }
             await engine.shutdown()
             batchAdapterLog.info(
@@ -86,7 +126,21 @@ struct MLXBatchAdapter {
         }
 
         /// Shut down every cached engine. Used by `ModelRuntime.clearAll()`.
+        ///
+        /// Mirrors `shutdownEngine(for:)` for the in-flight creation case:
+        /// drains every pending creation so a `clearAll` invoked while a
+        /// first request is still bringing an engine up cleanly tears down
+        /// the freshly-created engine instead of leaving it orphaned.
         func shutdownAll() async {
+            let pending = creating
+            creating.removeAll()
+            for (name, creation) in pending {
+                let engine = await creation.value
+                await engine.shutdown()
+                batchAdapterLog.info(
+                    "registry: shutdown BatchEngine for \(name, privacy: .public) (was in-flight)"
+                )
+            }
             let snapshot = engines
             engines.removeAll()
             for (name, engine) in snapshot {
