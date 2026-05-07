@@ -663,7 +663,7 @@ public actor ModelRuntime {
             await ModelLease.shared.release(modelName)
         }
 
-        return GenerationEventMapper.map(events: prepared.stream)
+        return GenerationEventMapper.map(events: prepared.stream, modelName: modelName)
     }
 
     // MARK: - New message-based (OpenAI ChatMessage) APIs

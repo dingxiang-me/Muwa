@@ -26,6 +26,19 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
     public func applicationDidFinishLaunching(_ notification: Notification) {
         AppDelegate.shared = self
 
+        // Pin the process against macOS automatic termination. We're an
+        // `LSUIElement=YES` agent (no Dock window) that exposes a local HTTP
+        // server, so the AppKit defaults can decide we're "idle" once the
+        // chat overlay closes and quietly suspend or kill us — which on a
+        // 2026-05-07 repro silently terminated the app mid-Ling decode after
+        // ~12 minutes of UI idleness, surfacing in the chat UI as
+        // "greeting → freeze → end" (the streamed connection drops with the
+        // process). The reason string is held for app lifetime; we never
+        // re-enable, since the inference path is always potentially active.
+        ProcessInfo.processInfo.disableAutomaticTermination(
+            "Osaurus local LLM HTTP server (long-running)"
+        )
+
         // Make MLX C++ errors recoverable instead of process-fatal. Must run
         // before any model load can call into MLX so the first forward pass
         // is already protected. See `MLXErrorRecovery` for the rationale and
