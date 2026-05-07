@@ -38,18 +38,25 @@ ChatEngine (route resolution, attribution, logging)
 ## Cache management
 
 vmlx's `CacheCoordinator` owns KV cache geometry. osaurus configures it
-per container at load time with three minimal overrides
-(`installCacheCoordinator` in [`ModelRuntime.swift`](../Packages/OsaurusCore/Services/ModelRuntime.swift)):
+per container at load time
+(`installCacheCoordinator` / `buildCacheCoordinatorConfig` in
+[`ModelRuntime.swift`](../Packages/OsaurusCore/Services/ModelRuntime.swift)):
 
-| Override | Why |
-|---|---|
-| `modelKey` | per-model isolation across loads |
-| `diskCacheDir` | osaurus-managed sandbox path |
-| `enableDiskCache=false` when dir is unwritable | graceful fallback to memory-only |
+| Field | Value | Why |
+|---|---|---|
+| `modelKey` | `"<modelName>\|kv=fp16"` | per-model isolation across loads; KV-mode tag prevents serving disk entries encoded under a different `defaultKVMode` after a mid-session change |
+| `diskCacheDir` | `OsaurusPaths.diskKVCache()` | osaurus-managed sandbox path |
+| `enableDiskCache` | `true` when probe-write succeeds, else `false` | graceful fallback to memory-only when the dir is read-only / out-of-disk |
+| `usePagedCache` | `true` | content-addressed paged blocks for prefix reuse |
+| `defaultKVMode` | `.none` (fp16) | TurboQuant 3-bit / 4-bit codebooks have an open per-step drift bug (`CompilableTurboQuantKVCache.swift` iter-10 measurement); fp16 is the only safe default until that closes |
+| `defaultMaxKVSize` | `65536` | prefill window; `longPromptMultiplier=2.0` covers the 131K case |
+| `longPromptMultiplier` | `2.0` | rotating-cache cap kicks in only past 131K |
+| `ssmMaxEntries` | `50` | SSM state cap for hybrid Mamba/CCA companion cache |
+| `enableSSMReDerive` | `false` | disables vmlx's end-of-generation second-prefill SSM re-derive — see "Upstream runtime boundaries" below |
 
-Everything else (`maxCacheBlocks`, `pagedBlockSize`, `diskCacheMaxGB`,
-`ssmMaxEntries`) is left at the library default so vmlx can ship a
-single tuned answer per release.
+`maxCacheBlocks`, `pagedBlockSize`, and `diskCacheMaxGB` are not
+overridden; vmlx's defaults are used so a library tuning bump lands
+without an app-layer redeploy.
 
 DSV4 is intentionally left to vmlx's default cache topology. Osaurus does
 not set `DSV4_KV_MODE`; unset means the production SWA+CSA+HSA
@@ -74,6 +81,7 @@ the `LayerKind.deepseekV4` disk serializer instead of generic paged KV blocks.
 | Layer | What it protects |
 |---|---|
 | `BatchEngine` actor (vmlx) | Serializes Metal / model access. Continuous batching for same-model concurrent requests. |
+| `MLXBatchAdapter.Registry` | Keeps one `BatchEngine` per model name and coalesces concurrent first creation so two same-model requests cannot build duplicate engines for one `ModelContainer`. |
 | `ModelLease` | Pins a model name for the lifetime of one stream so eviction (`unload`, `clearAll`, GC) blocks until the lease drops to zero. |
 | `PluginHostAPI` per-plugin in-flight cap | Caps concurrent inference calls per plugin (default 2). Excess returns `plugin_busy`. |
 | `MetalGate.enterEmbedding` | Embedding service (`MetalSafeEmbedder`) opt-in serialization point. The generation surface of the gate was retired; only embeddings call into it today. |
@@ -86,9 +94,38 @@ A single `defaults` knob remains:
 defaults write ai.osaurus ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize -int 8
 ```
 
-Defaults to `4`, clamped to `[1, 32]`. Higher values raise total
-throughput at the cost of wired-memory footprint and per-request
-latency. See [`InferenceFeatureFlags.swift`](../Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
+Defaults to `1`, clamped to `[1, 32]`. The default preserves vmlx's
+compiled-decode path for single-user chat. Higher values raise possible
+same-model concurrency at the cost of compile eligibility, wired-memory
+footprint, and per-request latency.
+
+`BatchEngine.maxBatchSize` is fixed when the engine is constructed. Changing
+the defaults key affects the next engine build; an already-loaded model keeps
+its cached engine until the model is unloaded or cleared. The registry logs a
+notice when the requested value differs from the cached engine's construction
+value. See [`InferenceFeatureFlags.swift`](../Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
+
+## Upstream runtime boundaries
+
+These are deliberately not papered over in osaurus because they belong in
+vmlx-swift-lm or mlx-swift, but the app has explicit policy around each one:
+
+- Ling JANGTQ2 long prompts can crash inside vmlx's
+  `BailingLinearAttention.recurrentGLA` Metal path during prefill. Osaurus
+  documents the repro in `LING_JANGTQ2_LONG_PROMPT_CRASH.md`, forces Ling into
+  a non-reasoning profile, and recommends MXFP4/JANGTQ4 for long chat
+  preambles.
+- vmlx currently performs SSM re-derive and cache store before yielding final
+  `.info`. Osaurus sets `enableSSMReDerive=false` for chat traffic so the UI
+  does not stay open after the visible answer while a second prompt pass runs.
+- A load-time `convertToBFloat16(model:)` crash has been observed after prior
+  GPU faults on the same boot: `mlx::core::Fence::wait` ->
+  `AGX::ComputeContext::endComputePass`. This is below the recoverable MLX
+  error-handler layer. Treat it as mlx-swift/Metal diagnostic evidence; reboot
+  clears the poisoned GPU state.
+- Runtime changes to `mlxBatchEngineMaxBatchSize` require model eviction or a
+  future vmlx mutable engine API. Osaurus logs the mismatch rather than
+  replacing an engine while streams may still hold it.
 
 ## Sentinel scheme (in-band streaming hints)
 
@@ -125,7 +162,9 @@ reasoning gets dropped together with the other sentinels.
 
 | File | Coverage |
 |---|---|
-| `MLXBatchAdapterTests` | Max-batch-size flag clamping; registry-shutdown safety. |
+| `MLXBatchAdapterTests` | Max-batch-size flag clamping; Ling/ZAYA thinking-off context; registry-shutdown safety. |
+| `TaskCoalescerTests` | Single-flight engine-creation discipline and teardown-during-creation races. |
+| `RuntimePolicySourceTests` | Source-level guardrails for DSV4 cache ownership, vmlx pin, SSM re-derive opt-out, and max-batch docs. |
 | `GenerationEventMapperTests` | `chunk` -> `tokens`; `toolCall` -> `toolInvocation` JSON serialization (happy path + failure envelope); `info` -> `completionInfo`; cross-chunk stop-sequence cut. |
 | `StreamingReasoningHintTests` | Sentinel encode/decode round-trip; co-existence with the tool sentinel filter. |
 | `MetalGateTests` | Embedding gate happy paths. |

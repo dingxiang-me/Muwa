@@ -7,35 +7,26 @@ BailingHybrid runtime path.
 
 ## Dependency Pins
 
-- `vmlx-swift-lm`: `4a832400264e725db384ace4524f2b624b2aefac`
-  - BailingHybrid model/factory support for `bailing_moe`,
-    `bailing_hybrid`, and `bailing_moe_v2_5`.
-  - Bailing/Ling `think_xml` reasoning stamp.
-  - Hybrid cache reset/prestacker fixes needed for production loading.
-  - Unsupported JANGTQ3 route removed. Ling uses JANGTQ2/JANGTQ4-style
-    supported group sizing only.
-  - Bailing input processor maps `additionalContext["enable_thinking"]` to
-    the upstream template contract: `detailed thinking on/off` in the system
-    message before tokenizer rendering. Osaurus always sends `false` for
-    Ling-2.6 Flash.
-  - Hybrid SSM companion cache state is hardened with the production
-    prompt-boundary re-derive gate and disk companion cap.
-  - MiniMax JANGTQ_K config decoding now honors nested
-    `mxtq_bits.routed_expert` per-projection bits.
-  - DSV4 Flash keeps the production SWA+CSA+HSA `DeepseekV4Cache` topology by
-    default. Global TurboQuant KV settings no longer replace that hybrid pool;
-    `DSV4_KV_MODE=full` / `tq` are diagnostic-only operator overrides.
-  - DSV4 L2 disk restore persists the rotating SWA window plus CSA/HSA pool and
-    incomplete compressor/indexer buffers under the vmlx `LayerKind.deepseekV4`
-    serializer path.
-  - Laguna include-only tokenizer bundles render through the native
-    Poolside/Laguna fallback template, including reasoning history preservation
-    and closed-thinking direct-answer mode.
-  - Model-factory fallback diagnostics are quiet by default; set
-    `VMLINUX_MODEL_FACTORY_TRACE=1` only when debugging factory dispatch.
-  - The vmlx Osaurus runtime handoff notes include the DSV4/Laguna status,
-    BatchEngine versus simple TokenIterator speed rows, and reproducible
-    `RunBench` commands through the current vmlx `origin/main` pin.
+- `vmlx-swift-lm`: `88fc352b932a61ae4cfeb763fffc6547ad9725a4`
+  - Carries forward the prior `4a832400` content (BailingHybrid model/factory
+    for `bailing_moe`, `bailing_hybrid`, `bailing_moe_v2_5`; Bailing/Ling
+    `think_xml` reasoning stamp; Bailing input processor template contract;
+    hybrid SSM prompt-boundary re-derive gate and disk companion cap; MiniMax
+    JANGTQ_K nested `mxtq_bits.routed_expert` decoding; DSV4 SWA+CSA+HSA
+    hybrid cache topology and L2 disk restore via `LayerKind.deepseekV4`;
+    Laguna fallback chat template; quiet model-factory diagnostics).
+  - Adds BailingHybrid `B>1` RoPE / per-slot offset correctness — fixes the
+    multi-turn recall regression where same-key cache slots reused stale
+    rotary position state across consecutive requests.
+  - Adds the prompt-tail derivation needed for hybrid stop-token routing so
+    Ling reasoning stops at `</think>` instead of streaming silently to the
+    `.reasoning` channel until EOS.
+  - Adds a `ZayaCCACache` round-trip path under the `SSMStateCache` companion
+    so ZAYA1 hybrid CCA-attention slots behave like the Mamba families on
+    extract / restore.
+  - Unsupported JANGTQ3 route still removed.
+  - `enableSSMReDerive` default remains `true`; osaurus opts out per chat
+    workload (see `INFERENCE_RUNTIME.md` "Upstream runtime boundaries").
 - `swift-jinja`: unchanged at the existing Osaurus fork pin. No new parser
   behavior is needed for Ling in this PR.
 - `mlx-swift` / `mlx`: unchanged. No MLX kernel or ABI change is required by

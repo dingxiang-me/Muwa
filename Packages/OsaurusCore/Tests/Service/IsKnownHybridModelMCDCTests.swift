@@ -2,24 +2,35 @@
 //
 // MC/DC tests for `ModelRuntime.isKnownHybridModel(name:)`. Substring-match
 // against the families whose per-layer cache lists vmlx populates with
-// `MambaCache` / `ArraysCache` / `ZayaCCACache` slots — drives the eager
-// `setHybrid(true)` flip in `installCacheCoordinator`.
+// `MambaCache` / `ArraysCache` / `ZayaCCACache` / `HybridPoolCache` slots —
+// drives the eager `setHybrid(true)` flip in `installCacheCoordinator`.
 //
-// Decision tree (4 OR-blocks separated by early returns):
+// Decision tree (10 OR-blocks separated by early returns; the matcher
+// short-circuits on the first true block):
 //
-//   Block 1: contains("nemotron-3") ∨ contains("nemotron-cascade")
-//                                   ∨ contains("nemotron_h")    → return true
-//   Block 2: contains("qwen3.5")  ∨ contains("qwen3.6")
-//                                  ∨ contains("holo3") ∨ contains("holo-3") → return true
-//   Block 3: contains("bailing") ∨ Ling family component        → return true
-//   Block 4: ZAYA family component (`(^|/)zaya[\-0-9]`)         → return true
+//   Block 1:  contains("nemotron-3") ∨ contains("nemotron-cascade")
+//                                    ∨ contains("nemotron_h")        → true
+//   Block 2:  contains("qwen3.5") ∨ contains("qwen3.6")
+//                                 ∨ contains("holo3") ∨ contains("holo-3") → true
+//   Block 3:  contains("qwen3-next") ∨ contains("qwen3_next")
+//                                    ∨ contains("qwen3next")         → true
+//   Block 4:  contains("bailing") ∨ Ling family component             → true
+//   Block 5:  ZAYA family component (`(^|/)zaya[\-0-9]`)              → true
+//   Block 6:  contains("granitemoehybrid")                            → true
+//   Block 7:  contains("granite") ∧ (contains("moe-hybrid")
+//                                  ∨ contains("moe_hybrid"))          → true
+//   Block 8:  regex `(^|/)falcon[\-_]?h1([\-_].*)?$`                  → true
+//   Block 9:  regex `(^|/)baichuan[\-_]?m1([\-_].*)?$`                → true
+//   Block 10: regex `(^|/)jamba[\-_\.0-9]`                            → true
+//   Block 11: regex `(^|/)lfm2([\-_].*)?$`                            → true
 //   else: return false
 //
 // MC/DC requirements per OR block: every condition must independently
 // flip the OR's truth value. For an OR of N conditions, that's N+1
-// cases per block (1 all-false + N single-true). Block 4 is a single
-// regex condition so its independence is covered by one positive +
-// the master-false sweep.
+// cases per block (1 all-false + N single-true). Single-condition blocks
+// (5, 6, 8, 9, 10, 11) get coverage from one positive + the master-false
+// sweep. Block 7 is an AND — both conjuncts get independent positive +
+// negative coverage.
 //
 // MiniMax M2 / M2.7 was historically in this matcher with a "gated SSM in
 // some layers" comment, but vmlx's `MiniMaxModel` and `MiniMaxJANGTQModel`
@@ -27,8 +38,6 @@
 // `ZayaCCACache`. The eager set was therefore a no-op (vmlx's BatchEngine
 // auto-flip would never have triggered either) and was removed for matcher
 // precision. Negative MiniMax cases below lock that decision.
-//
-// Total minimum cases: (3+1) + (4+1) + (2+1) + (1+1) + 1 master-false = 16.
 
 import Foundation
 import Testing
