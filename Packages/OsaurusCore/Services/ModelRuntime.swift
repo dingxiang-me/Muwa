@@ -461,27 +461,28 @@ public actor ModelRuntime {
             // Disable the post-generation SSM re-derive pass for hybrid
             // models. vmlx's default (`enableSSMReDerive: true`) runs a
             // FULL second prefill at end-of-generation
-            // (`BatchEngine.swift:1591` →
-            // `reDeriveAndStoreSSMStatesForPromptBoundaries`) BEFORE
-            // yielding `.info`, so for a 2962-token Ling prompt at
-            // ~226 prompt-tokens/sec the SSE stream stays open for an
-            // extra ~13 seconds AFTER the visible answer is done. In the
-            // chat UI this surfaces as the 2026-05-07 "greeting → freeze
-            // → end" symptom: the user sees the answer stream out, then
-            // the stream stays open during the SSM store, then finishes
-            // with no further visible content. (This is on top of any
-            // visible reasoning routing — the reasoning-merge in
-            // `GenerationEventMapper` is a separate fix for a different
-            // case.) The cost would amortize across multi-turn cache
-            // hits, but osaurus's chat path mutates the system prefix
-            // every turn (memory injection, preflight capability
-            // search, dynamic skills) so the SSM cache rarely lands a
-            // boundary-matching hit and the re-derive cost is paid
-            // without payoff. Disabling restores the responsive
-            // end-of-stream that the user expects. Re-evaluate if vmlx
-            // ships the architectural fix that emits `.info` BEFORE
-            // `coordinator.storeAfterGeneration` (cache write should
-            // be fire-and-forget from the consumer's perspective).
+            // (`reDeriveAndStoreSSMStatesForPromptBoundaries`) so the
+            // next turn can land an SSM-state cache hit at the new
+            // prompt boundary.
+            //
+            // vmlx pin `b9da180` reordered this pass to run AFTER the
+            // generation yields completion `.info`, so the SSE stream
+            // no longer stays open while the re-derive runs (the old
+            // "greeting → freeze → end" UX symptom is gone upstream).
+            // The work is still serialized on the generation task —
+            // detached re-derive raced Metal command encoders, so vmlx
+            // kept it serial — which means the actor stays busy for the
+            // re-derive duration before the next request lands.
+            //
+            // We KEEP `enableSSMReDerive: false` regardless because the
+            // cost still doesn't amortize on osaurus's chat workload:
+            // the system prefix mutates every turn (memory injection,
+            // preflight capability search, dynamic skills) so the SSM
+            // cache rarely lands a boundary-matching hit on the next
+            // turn. Re-derive cost is paid without warm-cache payoff.
+            // Re-evaluate if osaurus ever exposes a chat surface with a
+            // stable system prefix across turns (or the SSM companion
+            // cache becomes prefix-keyed instead of boundary-keyed).
             ssmMaxEntries: 50,
             enableSSMReDerive: false,
             modelKey: scopedKey,
@@ -679,8 +680,19 @@ public actor ModelRuntime {
         let trace = parameters.ttftTrace
         trace?.mark("runtime_start")
 
-        trace?.mark("await_active_gen")
-        _ = await activeGenerationTask?.value
+        // No serialization gate against `activeGenerationTask` here:
+        // `ModelLease` is the authoritative "is anyone still using the model"
+        // signal (per the field's own doc on line 82-87 — "tracks at most one
+        // task even when many are active — the lease drains the rest"), and
+        // the lease + container-load discipline already block model-swap
+        // teardown. Awaiting the previous generation here serialized
+        // same-model overlapping requests *before* `MLXBatchAdapter.generate`
+        // could submit them to vmlx's `BatchEngine`, defeating the
+        // continuous-batching path that osaurus advertises as a feature.
+        // Removed 2026-05-07 (vmlx pin b9da180 also adds engine-side
+        // `isShutdown` defense in depth, so a stale handle landing during
+        // unload now returns a `.cancelled` info instead of restarting GPU
+        // work).
         if Task.isCancelled { throw CancellationError() }
 
         genLog.info("generateEventStream: start model=\(modelName, privacy: .public)")

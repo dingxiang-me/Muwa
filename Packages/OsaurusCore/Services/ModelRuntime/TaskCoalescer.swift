@@ -64,38 +64,58 @@ public actor TaskCoalescer<Value: Sendable> {
     /// Lookup order:
     ///   1. `values[key]`   — resolved cache hit.
     ///   2. `creating[key]` — in-flight first-fetch; join it.
-    ///   3. `draining[key]` — in-flight teardown; join it. Crucially,
-    ///      callers landing here do NOT start a fresh factory: the
-    ///      `Task` is on its way out, but starting a duplicate would
-    ///      put two consumers on the underlying resource (e.g. two
-    ///      `BatchEngine`s on the same `ModelContainer`).
+    ///   3. `draining[key]` — in-flight teardown. Callers landing here
+    ///      **wait for the drain to complete and then start a fresh
+    ///      factory**. They do NOT receive the drained value: the
+    ///      caller of `remove(_:)` owns it and is about to release the
+    ///      underlying resource (e.g. `engine.shutdown()`); handing
+    ///      that same `Value` to a `value(for:)` caller would put a
+    ///      consumer on a resource that is being torn down. Joining
+    ///      the drain rather than starting a duplicate factory remains
+    ///      the load-bearing invariant — two `BatchEngine`s on one
+    ///      `ModelContainer` Metal-abort the shared GPU command queue.
     ///   4. otherwise — start a new factory.
+    ///
+    /// The drain-wait path is a `while` loop with a re-check after the
+    /// await suspension: another `value(for:)` caller may have started
+    /// a fresh task while we waited, in which case we fall through to
+    /// the join path on the next iteration.
     public func value(
         for key: String,
         factory: @Sendable @escaping () async -> Value
     ) async -> Value {
-        if let existing = values[key] { return existing }
-        if let inFlight = creating[key] {
-            return await inFlight.value
+        while true {
+            if let existing = values[key] { return existing }
+            if let inFlight = creating[key] {
+                return await inFlight.value
+            }
+            if let drainingTask = draining[key] {
+                _ = await drainingTask.value
+                // Defensively clear `draining[key]` so racing
+                // `value(for:)` callers don't tight-loop on an already-
+                // resolved drainingTask before `remove(_:)` finishes its
+                // own canonicality check. Idempotent: if `remove(_:)`
+                // already cleared the slot, this is a no-op; if `remove`
+                // hasn't run its post-await statements yet, its
+                // canonicality (`draining[key] == creation`) will fail
+                // and it will skip a redundant clear.
+                if draining[key] == drainingTask {
+                    draining[key] = nil
+                }
+                // Re-check on the next loop iteration. Another
+                // `value(for:)` caller may have started a fresh task
+                // (which we should join, not duplicate).
+                continue
+            }
+            let ourTask = Task<Value, Never> { await factory() }
+            creating[key] = ourTask
+            let value = await ourTask.value
+            if creating[key] == ourTask {
+                values[key] = value
+                creating[key] = nil
+            }
+            return value
         }
-        if let drainingTask = draining[key] {
-            // A concurrent `remove(_:)` / `removeAll()` owns this task.
-            // We observe the same resolved value but do not take
-            // ownership; not starting a duplicate factory is the
-            // load-bearing invariant for callers like
-            // `MLXBatchAdapter.Registry` whose underlying resource
-            // (a `BatchEngine` on a shared `ModelContainer`) cannot
-            // tolerate two simultaneous owners.
-            return await drainingTask.value
-        }
-        let ourTask = Task<Value, Never> { await factory() }
-        creating[key] = ourTask
-        let value = await ourTask.value
-        if creating[key] == ourTask {
-            values[key] = value
-            creating[key] = nil
-        }
-        return value
     }
 
     /// Remove and return the cached entry for `key`, draining any

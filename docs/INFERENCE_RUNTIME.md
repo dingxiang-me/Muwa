@@ -99,33 +99,51 @@ compiled-decode path for single-user chat. Higher values raise possible
 same-model concurrency at the cost of compile eligibility, wired-memory
 footprint, and per-request latency.
 
-`BatchEngine.maxBatchSize` is fixed when the engine is constructed. Changing
-the defaults key affects the next engine build; an already-loaded model keeps
-its cached engine until the model is unloaded or cleared. The registry logs a
-notice when the requested value differs from the cached engine's construction
-value. See [`InferenceFeatureFlags.swift`](../Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
+`BatchEngine.maxBatchSize` is mutable at runtime as of vmlx pin `b9da180`
+via `BatchEngine.updateMaxBatchSize(_:)`. The registry hot-resizes the
+cached engine when a later request asks for a different value, so the
+defaults key takes effect on the next inference call rather than waiting
+for an unload/reload. An `engineShutdown` rejection from vmlx (the engine
+was torn down between calls) falls back to "log and use cached"; the
+coalescer will rebuild on the next first-fetch. See
+[`InferenceFeatureFlags.swift`](../Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
 
 ## Upstream runtime boundaries
 
 These are deliberately not papered over in osaurus because they belong in
 vmlx-swift-lm or mlx-swift, but the app has explicit policy around each one:
 
-- Ling JANGTQ2 long prompts can crash inside vmlx's
-  `BailingLinearAttention.recurrentGLA` Metal path during prefill. Osaurus
-  documents the repro in `LING_JANGTQ2_LONG_PROMPT_CRASH.md`, forces Ling into
-  a non-reasoning profile, and recommends MXFP4/JANGTQ4 for long chat
-  preambles.
-- vmlx currently performs SSM re-derive and cache store before yielding final
-  `.info`. Osaurus sets `enableSSMReDerive=false` for chat traffic so the UI
-  does not stay open after the visible answer while a second prompt pass runs.
-- A load-time `convertToBFloat16(model:)` crash has been observed after prior
-  GPU faults on the same boot: `mlx::core::Fence::wait` ->
-  `AGX::ComputeContext::endComputePass`. This is below the recoverable MLX
-  error-handler layer. Treat it as mlx-swift/Metal diagnostic evidence; reboot
-  clears the poisoned GPU state.
-- Runtime changes to `mlxBatchEngineMaxBatchSize` require model eviction or a
-  future vmlx mutable engine API. Osaurus logs the mismatch rather than
-  replacing an engine while streams may still hold it.
+- Ling JANGTQ2 long prompts (`BailingLinearAttention.recurrentGLA`):
+  pre-`b9da180`, vmlx dispatched the recurrent loop as `L * layers` small
+  MLX graphs and the codebook gather hit a Metal pipeline-state lifetime
+  bug at ~2 k tokens, surfacing as `EXC_BAD_ACCESS` on Ling JANGTQ2 long
+  prompts. `b9da180` ports the recurrent GLA to a fused Metal kernel
+  (`bailing_recurrent_gla` via a singleton kernel manager) so the loop
+  runs in one command, eliminating the lifetime bug. Osaurus still
+  forces Ling into a non-reasoning profile (`enable_thinking=false`) and
+  recommends MXFP4/JANGTQ4 for long preambles for the orthogonal
+  JANGTQ2 quality-ceiling reason. See
+  `LING_JANGTQ2_LONG_PROMPT_CRASH.md`.
+- vmlx pin `b9da180` reorders the SSM re-derive pass to run AFTER the
+  generation yields completion `.info`, so the SSE stream no longer
+  stays open while the re-derive runs. Osaurus still sets
+  `enableSSMReDerive=false` for chat traffic — not for the old stream-
+  ordering reason but because osaurus's chat workload mutates the
+  system prefix every turn (memory injection, preflight capability
+  search, dynamic skills) so the SSM cache rarely lands a boundary-
+  matching hit and the re-derive cost is paid without warm-cache payoff.
+- A load-time `convertToBFloat16(model:)` crash has been observed after
+  prior GPU faults on the same boot: `mlx::core::Fence::wait` ->
+  `AGX::ComputeContext::endComputePass`. This is below the recoverable
+  MLX error-handler layer. Treat it as mlx-swift/Metal diagnostic
+  evidence; reboot clears the poisoned GPU state.
+- Runtime `BatchEngine.maxBatchSize` is now mutable on `b9da180` via
+  `updateMaxBatchSize(_:)`; the registry hot-resizes instead of evicting.
+- `BatchEngine.isShutdown` (also new on `b9da180`) makes terminated-engine
+  submissions fail-closed: a stale handle landing during unload returns a
+  `.cancelled` info event from vmlx instead of restarting GPU work. This
+  is defense-in-depth for the host-side TaskCoalescer drain semantics
+  documented in `MLXBatchAdapter.Registry`.
 
 ## Sentinel scheme (in-band streaming hints)
 

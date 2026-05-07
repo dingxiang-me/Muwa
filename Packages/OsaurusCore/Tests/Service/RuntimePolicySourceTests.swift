@@ -51,38 +51,72 @@ struct RuntimePolicySourceTests {
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
 
-        // Bumped 2026-05-07 from 4a832400 (DSV4 + Laguna) to 88fc352b
+        // Bumped 2026-05-07 from 4a832400 (DSV4 + Laguna) to b9da180
         // (BailingHybrid B>1 RoPE/per-slot offsets, ZAYA1 CCA hybrid,
-        // ReasoningParser prompt-tail, Gemma4 SWA, audio MediaSalt).
-        // The earlier comments still document DSV4Cache and Laguna so
-        // those content anchors remain valid as a smoke that the bump
-        // narrative wasn't dropped wholesale.
-        #expect(manifest.contains("88fc352b932a61ae4cfeb763fffc6547ad9725a4"))
+        // ReasoningParser prompt-tail, Gemma4 SWA, audio MediaSalt; PLUS
+        // BatchEngine isShutdown/updateMaxBatchSize/controlPlaneYield,
+        // BailingLinearAttention.recurrentGLA fused Metal kernel, and
+        // .info-before-cacheStoreAction reordering). The earlier comments
+        // still document DSV4Cache and Laguna so those content anchors
+        // remain valid as a smoke that the bump narrative wasn't dropped
+        // wholesale.
+        #expect(manifest.contains("b9da180158365c20a0fab130217e4fa50b8ec674"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }
 
+    @Test("SwiftPM graph stays on Osaurus transformers/Jinja chain")
+    func swiftPMGraphUsesOsaurusTransformerForks() throws {
+        let manifest = try Self.source("Package.swift")
+        let workspaceMirrors = try Self.source("../../osaurus.xcworkspace/xcshareddata/swiftpm/configuration/mirrors.json")
+        let appProjectMirrors = try Self.source("../../App/osaurus.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/mirrors.json")
+        let contributing = try Self.source("../../docs/CONTRIBUTING.md")
+
+        #expect(manifest.contains("https://github.com/osaurus-ai/swift-transformers"))
+        #expect(manifest.contains("b4a094b34b997167549c7f45bde16c80f18ed5a8"))
+        #expect(manifest.contains("https://github.com/osaurus-ai/Jinja.git"))
+        #expect(manifest.contains("58d21aa5b69fdd9eb7e23ce2c3730f47db8e0c9d"))
+        #expect(manifest.contains(".product(name: \"Jinja\", package: \"jinja\")"))
+        #expect(!manifest.contains("https://github.com/huggingface/swift-transformers\","))
+        #expect(!manifest.contains("https://github.com/osaurus-ai/swift-jinja"))
+
+        for mirrors in [workspaceMirrors, appProjectMirrors] {
+            #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-transformers\""))
+            #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-transformers.git\""))
+            #expect(mirrors.contains("\"mirror\" : \"https://github.com/osaurus-ai/swift-transformers\""))
+            #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-jinja\""))
+            #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-jinja.git\""))
+            #expect(mirrors.contains("\"mirror\" : \"https://github.com/osaurus-ai/Jinja.git\""))
+        }
+
+        #expect(contributing.contains("Osaurus-owned `swift-transformers` / `Jinja` chain"))
+        #expect(contributing.contains("Jinja parser fix at `58d21aa`"))
+        #expect(contributing.contains("Keep the two mirror files in sync"))
+    }
+
     /// Lock the post-generation SSM re-derive opt-out. vmlx defaults
-    /// `enableSSMReDerive=true`, which on hybrid families (Ling, ZAYA1,
-    /// Nemotron-3) runs a FULL second prefill at end-of-generation BEFORE
-    /// yielding `.info`. For a 2962-token Ling prompt at ~226 tok/s prefill
-    /// that adds ~13 s of "stream stays open after the visible answer
-    /// finished" — the production-witnessed Ling stuck-before-end
-    /// symptom. The 2026-05-07 PR explicitly turns the knob off in
-    /// `buildCacheCoordinatorConfig`; if a future refactor drops or
-    /// inverts it, this assertion breaks first.
+    /// `enableSSMReDerive=true`. Pre-`b9da180` this ran a FULL second
+    /// prefill BEFORE yielding `.info` (the Ling stuck-before-end
+    /// symptom). vmlx pin `b9da180` reordered the pass to run AFTER
+    /// `.info`, fixing the stream-stays-open UX. We KEEP the opt-out
+    /// regardless because osaurus's chat workload mutates the system
+    /// prefix every turn (memory injection, preflight capability search,
+    /// dynamic skills) so the SSM cache rarely lands a boundary-matching
+    /// hit on the next turn — re-derive cost is paid without warm-cache
+    /// payoff. If a future refactor drops or inverts the knob, this
+    /// assertion breaks first.
     @Test("CacheCoordinatorConfig disables SSM re-derive for chat workflow")
     func cacheConfigDisablesSSMReDerive() throws {
         let runtime = try Self.source("Services/ModelRuntime.swift")
 
         #expect(
             runtime.contains("enableSSMReDerive: false"),
-            "ModelRuntime.buildCacheCoordinatorConfig must opt out of vmlx's default SSM re-derive — leaving it on adds a per-request post-decode prefill stall that the chat UI surfaces as the Ling stuck-before-end freeze"
+            "ModelRuntime.buildCacheCoordinatorConfig must opt out of vmlx's default SSM re-derive — osaurus's mutating-system-prefix chat workload doesn't amortize the cost across turns"
         )
     }
 
-    @Test("Inference docs match max-batch construction semantics")
-    func inferenceDocsDescribeMaxBatchDefaultsAndRebuild() throws {
+    @Test("Inference docs match max-batch hot-resize semantics")
+    func inferenceDocsDescribeMaxBatchDefaultsAndHotResize() throws {
         let flags = try Self.source("Services/ModelRuntime/InferenceFeatureFlags.swift")
         let runtimeDoc = try Self.source("../../docs/INFERENCE_RUNTIME.md")
         let featuresDoc = try Self.source("../../docs/FEATURES.md")
@@ -91,14 +125,14 @@ struct RuntimePolicySourceTests {
         #expect(flags.contains("Defaults to **1**"))
         #expect(flags.contains("return raw > 0 ? min(raw, 32) : 1"))
         #expect(runtimeDoc.contains("Defaults to `1`, clamped to `[1, 32]`"))
-        #expect(runtimeDoc.contains("fixed when the engine is constructed"))
-        #expect(runtimeDoc.contains("unloaded or cleared"))
+        #expect(runtimeDoc.contains("mutable at runtime"))
+        #expect(runtimeDoc.contains("updateMaxBatchSize"))
         #expect(featuresDoc.contains("default `1`, clamped to `[1, 32]`"))
-        #expect(featuresDoc.contains("unload/reload the model after changing it"))
+        #expect(featuresDoc.contains("hot-resized via `BatchEngine.updateMaxBatchSize(_:)`"))
         #expect(!runtimeDoc.contains("Defaults to `4`"))
         #expect(!featuresDoc.contains("default `4`"))
-        #expect(adapter.contains("current request asked for"))
-        #expect(adapter.contains("Evict the model to rebuild"))
+        #expect(adapter.contains("hot-resized BatchEngine"))
+        #expect(adapter.contains("rejected updateMaxBatchSize"))
     }
 
     @Test("Runtime docs keep upstream Metal fault boundaries explicit")

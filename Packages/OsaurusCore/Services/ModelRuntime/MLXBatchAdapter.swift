@@ -69,15 +69,19 @@ struct MLXBatchAdapter {
         /// use from the supplied `ModelContainer`. The container's existing
         /// cache coordinator is captured automatically by `makeBatchEngine`.
         ///
-        /// `BatchEngine.maxBatchSize` is fixed at construction in vmlx.
-        /// A later request whose `maxBatchSize` differs from the cached
-        /// engine's runs on the captured value; the request log records
-        /// the mismatch so a UserDefaults change to
-        /// `mlxBatchEngineMaxBatchSize` between requests is visible.
-        /// To rebuild at a new value, evict the model via
-        /// `ModelRuntime.unload`, which calls `shutdownEngine(for:)`.
-        /// Auto-rebuilding here would race in-flight requests already
-        /// holding the cached engine.
+        /// `BatchEngine.maxBatchSize` is mutable at runtime as of vmlx
+        /// `b9da180` via `BatchEngine.updateMaxBatchSize(_:)`. When a later
+        /// request asks for a different `maxBatchSize` than the cached
+        /// engine's, we hot-resize the existing engine instead of rebuilding
+        /// (which would have raced in-flight callers holding the cached
+        /// handle). vmlx's `updateMaxBatchSize` is fail-closed: an
+        /// `engineShutdown` throw means the engine has been torn down and
+        /// the next caller will create a fresh one through the coalescer.
+        ///
+        /// Submitting to a shut-down engine returns a `.cancelled` info
+        /// event from vmlx (`b9da180`), so even if a stale handle leaks
+        /// past this gate the upstream stream finishes cleanly instead of
+        /// restarting GPU work.
         func engine(
             for modelName: String,
             container: ModelContainer,
@@ -95,9 +99,16 @@ struct MLXBatchAdapter {
             // race the read.
             let cached = await engine.maxBatchSize
             if cached != maxBatchSize {
-                batchAdapterLog.notice(
-                    "registry: cached BatchEngine for \(modelName, privacy: .public) was constructed with maxBatchSize=\(cached, privacy: .public); current request asked for \(maxBatchSize, privacy: .public). Evict the model to rebuild."
-                )
+                do {
+                    try await engine.updateMaxBatchSize(maxBatchSize)
+                    batchAdapterLog.info(
+                        "registry: hot-resized BatchEngine for \(modelName, privacy: .public) maxBatchSize=\(cached, privacy: .public) → \(maxBatchSize, privacy: .public)"
+                    )
+                } catch {
+                    batchAdapterLog.notice(
+                        "registry: BatchEngine for \(modelName, privacy: .public) rejected updateMaxBatchSize(\(maxBatchSize, privacy: .public)) — \(String(describing: error), privacy: .public). Engine will continue at cached \(cached, privacy: .public); evict the model to force a rebuild."
+                    )
+                }
             }
             return engine
         }

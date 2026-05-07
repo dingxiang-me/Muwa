@@ -165,12 +165,18 @@ struct TaskCoalescerTests {
     /// Regression: previously `remove(_:)` cleared `creating[key]` BEFORE
     /// `await creation.value`, so a concurrent `value(for:)` that landed
     /// during the actor-suspension window saw both `values[key]` and
-    /// `creating[key]` empty and started a duplicate factory — the exact
-    /// race the coalescer is meant to prevent. The fix tombstones the
-    /// task into `draining[key]` so concurrent first-fetches join the
-    /// drain rather than start fresh.
-    @Test("value() racing remove() during drain joins the same task — does NOT start a duplicate")
-    func value_during_remove_doesNotDuplicate() async {
+    /// `creating[key]` empty and started a duplicate factory.
+    ///
+    /// New invariant after the 2026-05-07 audit: no two factories run
+    /// **simultaneously** for the same key. A `value(for:)` racing a
+    /// `remove(_:)` waits for the drain to complete and *then* starts a
+    /// fresh factory — it does NOT receive the drained value, because the
+    /// caller of `remove(_:)` owns that value and is about to release the
+    /// underlying resource (e.g. `engine.shutdown()`). Handing the
+    /// drained value to a `value(for:)` caller would put a consumer on a
+    /// resource that is being torn down.
+    @Test("value() racing remove() waits for drain, then starts a fresh factory — never receives the draining value")
+    func value_during_remove_waitsForDrainThenStartsFresh() async {
         let coalescer = TaskCoalescer<Sentinel>()
         let factory = SlowFactory(sleepMs: 200)
         // Kick off the original creation.
@@ -186,13 +192,14 @@ struct TaskCoalescerTests {
         try? await Task.sleep(nanoseconds: 20_000_000)
         // The racer: pre-fix, this would start a SECOND factory because
         // both `values[key]` and `creating[key]` are empty at this
-        // moment. Post-fix, it joins via `draining[key]`.
+        // moment. Post-fix, it joins `draining[key]` to wait for the
+        // drain, then starts a fresh factory after.
         async let racing = coalescer.value(for: "k") { await factory.make() }
         let (creatingValue, removedValue, racingValue) = await (creating, removed, racing)
         let creates = await factory.creates
         #expect(
-            creates == 1,
-            "factory ran \(creates) times; concurrent value() during remove() must NOT start a duplicate factory"
+            creates == 2,
+            "factory ran \(creates) times; expected exactly 2 — once for the original starter, once for the racer's fresh post-drain creation. (Pre-fix would be 1 for racer-joins-drain or unbounded for racer-starts-during-drain.)"
         )
         #expect(
             removedValue != nil,
@@ -200,16 +207,16 @@ struct TaskCoalescerTests {
         )
         #expect(
             creatingValue === removedValue,
-            "remove()'s drained value must be the same task's resolved value"
+            "remove()'s drained value must be the same task's resolved value (the original starter and the remover share the first task)"
         )
         #expect(
-            racingValue === creatingValue,
-            "the racing value() caller must observe the same value, not a fresh creation"
+            racingValue !== creatingValue,
+            "the racing value() caller must NOT receive the draining value — that value belongs to the remover and the underlying resource is about to be released"
         )
         let snap = await coalescer.snapshot()
         #expect(
-            snap.resolved == 0 && snap.inFlight == 0 && snap.draining == 0,
-            "every map must be clear after the drain completes"
+            snap.resolved == 1 && snap.inFlight == 0 && snap.draining == 0,
+            "after racing creation completes, the fresh value sits in `values` (1 resolved, 0 inFlight, 0 draining); the drained value was returned to remove()'s caller and is not in any map"
         )
     }
 
@@ -259,12 +266,13 @@ struct TaskCoalescerTests {
         #expect(snap.resolved == 0 && snap.inFlight == 0 && snap.draining == 0)
     }
 
-    /// Same race surface as `value_during_remove_doesNotDuplicate` but
-    /// for `removeAll()`: a `value(for:)` for a key whose in-flight
-    /// task is being drained by a concurrent `removeAll()` must join
-    /// the drain rather than start a duplicate factory.
-    @Test("value() racing removeAll() during drain joins the same task")
-    func value_duringRemoveAll_doesNotDuplicate() async {
+    /// Same race surface as `value_during_remove_waitsForDrainThenStartsFresh`
+    /// but for `removeAll()`: a `value(for:)` for a key whose in-flight
+    /// task is being drained by a concurrent `removeAll()` must wait for
+    /// the drain and then start a fresh factory — never receive the
+    /// drained value (which is being torn down by the `removeAll` caller).
+    @Test("value() racing removeAll() waits for drain, then starts a fresh factory")
+    func value_duringRemoveAll_waitsForDrainThenStartsFresh() async {
         let coalescer = TaskCoalescer<Sentinel>()
         let factory = SlowFactory(sleepMs: 200)
         async let creating = coalescer.value(for: "k") { await factory.make() }
@@ -275,14 +283,17 @@ struct TaskCoalescerTests {
         let (creatingValue, drainedEntries, racingValue) = await (creating, drained, racing)
         let creates = await factory.creates
         #expect(
-            creates == 1,
-            "factory ran \(creates) times; concurrent value() during removeAll() must NOT start a duplicate factory"
+            creates == 2,
+            "factory ran \(creates) times; expected exactly 2 — original + post-drain fresh creation. removeAll()'s caller owns the drained value; racing value() callers must rebuild."
         )
         #expect(drainedEntries.count == 1)
         let drainedValue = drainedEntries.first?.value
-        #expect(drainedValue === creatingValue)
-        #expect(racingValue === creatingValue)
+        #expect(drainedValue === creatingValue, "removeAll drained the original starter's task")
+        #expect(racingValue !== creatingValue, "racing value() caller got a fresh value, not the drained one")
         let snap = await coalescer.snapshot()
-        #expect(snap.resolved == 0 && snap.inFlight == 0 && snap.draining == 0)
+        #expect(
+            snap.resolved == 1 && snap.inFlight == 0 && snap.draining == 0,
+            "post-drain fresh value sits in `values`; drained value was returned to removeAll()'s caller"
+        )
     }
 }
