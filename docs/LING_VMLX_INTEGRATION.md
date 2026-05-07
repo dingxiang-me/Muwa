@@ -7,26 +7,40 @@ BailingHybrid runtime path.
 
 ## Dependency Pins
 
-- `vmlx-swift-lm`: `88fc352b932a61ae4cfeb763fffc6547ad9725a4`
-  - Carries forward the prior `4a832400` content (BailingHybrid model/factory
-    for `bailing_moe`, `bailing_hybrid`, `bailing_moe_v2_5`; Bailing/Ling
-    `think_xml` reasoning stamp; Bailing input processor template contract;
-    hybrid SSM prompt-boundary re-derive gate and disk companion cap; MiniMax
-    JANGTQ_K nested `mxtq_bits.routed_expert` decoding; DSV4 SWA+CSA+HSA
-    hybrid cache topology and L2 disk restore via `LayerKind.deepseekV4`;
-    Laguna fallback chat template; quiet model-factory diagnostics).
-  - Adds BailingHybrid `B>1` RoPE / per-slot offset correctness — fixes the
-    multi-turn recall regression where same-key cache slots reused stale
-    rotary position state across consecutive requests.
-  - Adds the prompt-tail derivation needed for hybrid stop-token routing so
-    Ling reasoning stops at `</think>` instead of streaming silently to the
-    `.reasoning` channel until EOS.
-  - Adds a `ZayaCCACache` round-trip path under the `SSMStateCache` companion
-    so ZAYA1 hybrid CCA-attention slots behave like the Mamba families on
-    extract / restore.
+- `vmlx-swift-lm`: `b9da180158365c20a0fab130217e4fa50b8ec674`
+  - Carries forward the prior `4a832400` + `88fc352b` content (BailingHybrid
+    model/factory for `bailing_moe`, `bailing_hybrid`, `bailing_moe_v2_5`;
+    Bailing/Ling `think_xml` reasoning stamp; Bailing input processor
+    template contract; hybrid SSM prompt-boundary re-derive gate and disk
+    companion cap; MiniMax JANGTQ_K nested `mxtq_bits.routed_expert`
+    decoding; DSV4 SWA+CSA+HSA hybrid cache topology and L2 disk restore
+    via `LayerKind.deepseekV4`; Laguna fallback chat template; quiet
+    model-factory diagnostics; BailingHybrid `B>1` RoPE / per-slot offset
+    correctness; prompt-tail derivation; `ZayaCCACache` round-trip via
+    `SSMStateCache` companion).
+  - Adds `BatchEngine` lifecycle/fairness hardening: `isShutdown` flag
+    rejects late submits with a `.cancelled` info event,
+    `controlPlaneYieldInterval=8` keeps long B=1 decodes from starving
+    cancel/shutdown/config-update, and `updateMaxBatchSize(_:)` is a
+    runtime API so hosts hot-resize without an explicit model evict.
+    Osaurus's `MLXBatchAdapter.Registry.engine(...)` adopts the new API
+    and evict-rebuilds on `.engineShutdown`.
+  - Ports `BailingLinearAttention.recurrentGLA` to a fused Metal kernel
+    (`bailing_recurrent_gla` via singleton kernel manager). Closes the
+    `EXC_BAD_ACCESS` Metal pipeline-state lifetime crash on Ling JANGTQ2
+    long prompts (≥ ~2 k tokens) tracked in `LING_JANGTQ2_LONG_PROMPT_CRASH.md`.
+    Reference path is preserved for `D % 32 != 0`.
+  - Reorders `Evaluate.swift` `cacheStoreAction` to run AFTER `.info` is
+    yielded. Stream consumers see completion immediately; the SSM
+    re-derive runs serialized on the same task.
+  - Adds ANE acceleration contract scaffolding (`AccelerationMode`,
+    `AccelerationRuntime.resolveTextDecode`). Fail-closed for text decode.
   - Unsupported JANGTQ3 route still removed.
   - `enableSSMReDerive` default remains `true`; osaurus opts out per chat
-    workload (see `INFERENCE_RUNTIME.md` "Upstream runtime boundaries").
+    workload — not for the old `.info`-ordering reason (b9 fixed that)
+    but because osaurus's chat path mutates the system prefix every turn
+    so the SSM cache rarely lands a boundary-matching hit (see
+    `INFERENCE_RUNTIME.md` "Upstream runtime boundaries").
 - `swift-jinja`: unchanged at the existing Osaurus fork pin. No new parser
   behavior is needed for Ling in this PR.
 - `mlx-swift` / `mlx`: unchanged. No MLX kernel or ABI change is required by

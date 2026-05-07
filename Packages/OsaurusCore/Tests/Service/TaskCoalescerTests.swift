@@ -296,4 +296,131 @@ struct TaskCoalescerTests {
             "post-drain fresh value sits in `values`; drained value was returned to removeAll()'s caller"
         )
     }
+
+    /// Regression for the host-side race that landed in PR #1037 review:
+    /// `MLXBatchAdapter.shutdownEngine` calls `coalescer.remove(...)` and
+    /// then `await engine.shutdown()`. With the plain `remove(_:)` the
+    /// tombstone clears the moment the creation task resolves, so a
+    /// `value(for:)` racing the shutdown could build a fresh `BatchEngine`
+    /// on the same `ModelContainer` while the old one is mid-shutdown
+    /// (the exact two-engines-on-one-container Metal abort the registry
+    /// exists to prevent). The `dispose:` variant runs the teardown
+    /// INSIDE the tombstone window so racers wait for the resource to
+    /// be fully released.
+    @Test("remove(_:dispose:) keeps tombstone alive across async dispose; racing value() waits for dispose to finish")
+    func remove_disposeKeepsTombstoneAcrossTeardown() async {
+        let coalescer = TaskCoalescer<Sentinel>()
+        let factory = SlowFactory(sleepMs: 50)
+
+        // Establish a resolved entry first.
+        let initial = await coalescer.value(for: "k") { await factory.make() }
+        #expect(await factory.creates == 1)
+
+        // Slow disposer that simulates an async `engine.shutdown()`. We
+        // use the start of the dispose to broadcast to the racer that
+        // teardown has begun, and verify the racer's fresh-factory call
+        // does NOT complete until AFTER the dispose finishes.
+        let disposeStart = AtomicTimestamp()
+        let disposeEnd = AtomicTimestamp()
+        async let removed: Sentinel? = coalescer.remove("k") { _ in
+            await disposeStart.set()
+            try? await Task.sleep(nanoseconds: 100_000_000) // 100 ms shutdown
+            await disposeEnd.set()
+        }
+
+        // Wait until the dispose has actually started before racing.
+        await disposeStart.waitForSet()
+
+        let raceFactory = SlowFactory(sleepMs: 5)
+        let racingStart = Date.timeIntervalSinceReferenceDate
+        let racingValue = await coalescer.value(for: "k") {
+            await raceFactory.make()
+        }
+        let racingEnd = Date.timeIntervalSinceReferenceDate
+
+        let removedValue = await removed
+        let disposeFinishedAt = await disposeEnd.value
+        #expect(
+            disposeFinishedAt != nil,
+            "dispose must finish before racing value() returns — otherwise the tombstone window doesn't protect the shutdown"
+        )
+        if let disposeFinishedAt {
+            #expect(
+                racingEnd >= disposeFinishedAt,
+                "racing value() must NOT return before dispose finishes (race window leaked)"
+            )
+            #expect(
+                racingStart < disposeFinishedAt,
+                "test setup invariant: racing value() must START before dispose ends, otherwise we're not exercising the race"
+            )
+        }
+
+        let raceCreates = await raceFactory.creates
+        #expect(
+            raceCreates == 1,
+            "racing value() must build exactly one fresh resource AFTER dispose completes"
+        )
+        #expect(removedValue === initial, "remove() returned the original resolved value")
+        #expect(racingValue !== initial, "racing value() got a fresh post-dispose creation")
+
+        let snap = await coalescer.snapshot()
+        #expect(
+            snap.resolved == 1 && snap.inFlight == 0 && snap.draining == 0,
+            "fresh post-dispose value sits in values; tombstone fully cleared"
+        )
+    }
+
+    /// Locks the resolved-value path of `remove(_:dispose:)`: when the
+    /// entry is already in `values` (no in-flight creation), the dispose
+    /// step still runs but no tombstone is needed because there's no
+    /// creation race window to gate.
+    @Test("remove(_:dispose:) on a resolved entry runs dispose without tombstoning")
+    func remove_disposeOnResolvedEntry_runsDispose() async {
+        let coalescer = TaskCoalescer<Sentinel>()
+        let factory = SlowFactory(sleepMs: 5)
+        let stored = await coalescer.value(for: "k") { await factory.make() }
+
+        let captured = SentinelHolder()
+        let removed = await coalescer.remove("k") { value in
+            await captured.set(value)
+        }
+        #expect(removed === stored)
+        let disposeRanWith = await captured.value
+        #expect(disposeRanWith === stored, "dispose must receive the resolved value")
+        let snap = await coalescer.snapshot()
+        #expect(snap.resolved == 0 && snap.inFlight == 0 && snap.draining == 0)
+    }
+}
+
+/// Sendable-safe holder so the dispose closure (which is `@Sendable`) can
+/// publish the value it received back to the test thread without crossing
+/// the Sendable boundary.
+private actor SentinelHolder {
+    var value: TaskCoalescerTests.Sentinel?
+    func set(_ v: TaskCoalescerTests.Sentinel) { value = v }
+}
+
+/// Test-only timestamp helper for `remove_disposeKeepsTombstoneAcrossTeardown`.
+/// Used to coordinate "dispose has started" / "dispose has finished" between
+/// the test producer (the disposer closure) and the consumer (the assertion
+/// thread). Stores a `Date.timeIntervalSinceReferenceDate` in a Sendable-safe
+/// way and exposes a tiny wait API instead of a continuation handshake — the
+/// drift this introduces is bounded by the sleeps in the test and is
+/// negligible compared to the 100 ms dispose window we exercise.
+private actor AtomicTimestamp {
+    private(set) var value: TimeInterval?
+    private var waiters: [CheckedContinuation<Void, Never>] = []
+
+    func set() {
+        value = Date.timeIntervalSinceReferenceDate
+        for w in waiters { w.resume() }
+        waiters.removeAll()
+    }
+
+    func waitForSet() async {
+        if value != nil { return }
+        await withCheckedContinuation { (c: CheckedContinuation<Void, Never>) in
+            waiters.append(c)
+        }
+    }
 }

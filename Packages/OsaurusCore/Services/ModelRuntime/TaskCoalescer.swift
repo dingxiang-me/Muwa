@@ -123,6 +123,15 @@ public actor TaskCoalescer<Value: Sendable> {
     /// release the resource it represents (e.g. `engine.shutdown()`).
     /// Returns `nil` when no entry exists.
     ///
+    /// **Use the `dispose:` variant for resources that need explicit
+    /// teardown.** The plain `remove(_:)` clears the tombstone the
+    /// instant the creation task resolves; if the caller then runs an
+    /// async teardown (e.g. `engine.shutdown()`), a racing `value(for:)`
+    /// can build a fresh resource on the same backing object while the
+    /// old one is mid-shutdown. `remove(_:dispose:)` keeps
+    /// `draining[key]` set across the teardown so racing creators wait
+    /// for the resource to be fully released.
+    ///
     /// Concurrent removers: the first call removes `creating[key]`
     /// (atomic on the actor), tombstones it into `draining[key]`, and
     /// awaits. A second concurrent `remove(_:)` finds `creating[key]`
@@ -131,29 +140,56 @@ public actor TaskCoalescer<Value: Sendable> {
     /// `nil`. Exclusive ownership transfer prevents double-shutdown.
     @discardableResult
     public func remove(_ key: String) async -> Value? {
+        await remove(key, dispose: nil)
+    }
+
+    /// Remove and return the cached entry for `key`, draining any
+    /// in-flight creation first, **and run an async `dispose` step
+    /// inside the tombstone window**. Concurrent `value(for:)` callers
+    /// for the same key wait for the dispose step to finish before they
+    /// can build a fresh resource — preventing the
+    /// build-while-shutting-down race that two-engines-on-one-container
+    /// hits.
+    ///
+    /// Pass `nil` to `dispose` for resources that don't need an async
+    /// teardown (purely-resolved-value-cache use cases).
+    @discardableResult
+    public func remove(
+        _ key: String,
+        dispose: (@Sendable (Value) async -> Void)?
+    ) async -> Value? {
         if let creation = creating.removeValue(forKey: key) {
             // Tombstone the task so concurrent `value(for:)` callers
-            // can join (no duplicate factory). Cleared after our await
-            // so a fresh `value(for:)` after the drain is allowed to
-            // start a new task.
+            // can join (no duplicate factory). Stays set through the
+            // dispose step below so racers also wait for the resource
+            // teardown, not just the creation task.
             draining[key] = creation
             let value = await creation.value
+            if let dispose = dispose {
+                // Dispose runs WHILE `draining[key]` is still set. This
+                // is the load-bearing window: a `value(for:)` racing us
+                // sees `draining[key] == creation`, awaits it, and only
+                // restarts a fresh factory after we've cleared the
+                // tombstone below — i.e. after the resource is gone.
+                await dispose(value)
+            }
             // Canonicality: clear only if our task is still the
-            // registered drainer (defensive; `draining` has a single
-            // writer per key — the `remove(_:)`/`removeAll()` that
-            // tombstoned the task — but the dict-eq check costs nothing
-            // and locks against future drift).
+            // registered drainer.
             if draining[key] == creation {
                 draining[key] = nil
             }
-            // The original `value(for:)` starter that was awaiting
-            // `creation.value` will see `creating[key] != ourTask`
-            // (since we removed it above) and skip the commit, so
-            // `values[key]` cannot have been written during our
-            // drain — no sweep needed.
             return value
         }
-        return values.removeValue(forKey: key)
+        if let resolved = values.removeValue(forKey: key) {
+            // Resolved-value path: no in-flight creation to gate
+            // against, but we still run the dispose for symmetry. No
+            // tombstone needed — there's no creation race window.
+            if let dispose = dispose {
+                await dispose(resolved)
+            }
+            return resolved
+        }
+        return nil
     }
 
     /// Drain every entry — both already-resolved and in-flight — and
@@ -163,6 +199,19 @@ public actor TaskCoalescer<Value: Sendable> {
     /// `draining[key]` tombstone while we await.
     @discardableResult
     public func removeAll() async -> [(key: String, value: Value)] {
+        await removeAll(dispose: nil)
+    }
+
+    /// `removeAll()` variant that runs `dispose(key, value)` inside the
+    /// tombstone window for each in-flight entry, mirroring
+    /// `remove(_:dispose:)`. Pre-resolved entries also receive the
+    /// `dispose` call after the in-flight drain finishes — see
+    /// `remove(_:dispose:)` for the rationale on why the resolved path
+    /// doesn't need a tombstone.
+    @discardableResult
+    public func removeAll(
+        dispose: (@Sendable (String, Value) async -> Void)?
+    ) async -> [(key: String, value: Value)] {
         let pending = creating
         creating.removeAll()
         // Move every in-flight task to `draining` BEFORE the first
@@ -182,10 +231,20 @@ public actor TaskCoalescer<Value: Sendable> {
         var resolved: [(key: String, value: Value)] = []
         for (key, creation) in pending {
             let value = await creation.value
+            if let dispose = dispose {
+                // Dispose runs WHILE `draining[key]` is still set, so
+                // racers can't build a fresh resource until teardown
+                // is complete — same load-bearing window as
+                // `remove(_:dispose:)`.
+                await dispose(key, value)
+            }
             resolved.append((key, value))
             draining[key] = nil
         }
         for (key, value) in preExistingValues {
+            if let dispose = dispose {
+                await dispose(key, value)
+            }
             resolved.append((key, value))
         }
         return resolved

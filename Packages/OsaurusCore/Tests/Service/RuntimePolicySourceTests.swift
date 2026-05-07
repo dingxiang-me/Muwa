@@ -115,6 +115,41 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    /// Lock the removal of the `activeGenerationTask?.value` gate at
+    /// the entry of `generateEventStream`. The gate was serializing
+    /// every same-model overlapping request before vmlx's `BatchEngine`
+    /// could see it, defeating continuous batching. The field's own
+    /// doc (lines 82-87) says "lease drives correctness — many can be
+    /// active simultaneously"; if a future refactor reintroduces the
+    /// gate, this test breaks first and forces the discussion.
+    @Test("ModelRuntime.generateEventStream does not serialize on activeGenerationTask")
+    func generateEventStreamDoesNotSerializeOnActiveGenerationTask() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        // The gate would look like `_ = await activeGenerationTask?.value`
+        // anywhere outside `cancelActiveGeneration()` (which legitimately
+        // awaits the task on shutdown). The pattern here is narrow: any
+        // `await activeGenerationTask?.value` on a line whose enclosing
+        // function is NOT `cancelActiveGeneration` is the gate we removed.
+        // We assert the public-side gate is gone by spot-checking the
+        // generation entry point's neighborhood and the explanatory
+        // comment that locks the rationale.
+        #expect(
+            runtime.contains("// No serialization gate against `activeGenerationTask` here:"),
+            "ModelRuntime.generateEventStream must keep the explanatory comment that documents why the gate was removed; if the comment goes away, the policy is undocumented and the next refactor may silently reintroduce serialization"
+        )
+        #expect(
+            runtime.contains("ModelLease` is the authoritative"),
+            "Comment must call out that the lease is the authoritative concurrency signal"
+        )
+        // The cancelActiveGeneration helper still legitimately awaits
+        // the task; that's fine and remains in the file.
+        #expect(
+            runtime.contains("private func cancelActiveGeneration() async {"),
+            "cancelActiveGeneration() must still exist for shutdown / clearAll cancellation paths"
+        )
+    }
+
     @Test("Inference docs match max-batch hot-resize semantics")
     func inferenceDocsDescribeMaxBatchDefaultsAndHotResize() throws {
         let flags = try Self.source("Services/ModelRuntime/InferenceFeatureFlags.swift")

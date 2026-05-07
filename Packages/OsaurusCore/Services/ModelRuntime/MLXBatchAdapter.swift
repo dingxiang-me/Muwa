@@ -104,9 +104,38 @@ struct MLXBatchAdapter {
                     batchAdapterLog.info(
                         "registry: hot-resized BatchEngine for \(modelName, privacy: .public) maxBatchSize=\(cached, privacy: .public) → \(maxBatchSize, privacy: .public)"
                     )
-                } catch {
+                } catch BatchEngineConfigurationError.engineShutdown {
+                    // The cached engine was torn down between calls. Leaving
+                    // it in `values` would loop here forever (every future
+                    // call would resize-fail-and-return the same dead
+                    // handle). Evict it so the coalescer's next first-fetch
+                    // builds a fresh engine. The dispose step is a defensive
+                    // shutdown — vmlx makes shutdown idempotent, and
+                    // tombstoning across the dispose blocks racers from
+                    // building a fresh BatchEngine on the same
+                    // `ModelContainer` while teardown completes.
                     batchAdapterLog.notice(
-                        "registry: BatchEngine for \(modelName, privacy: .public) rejected updateMaxBatchSize(\(maxBatchSize, privacy: .public)) — \(String(describing: error), privacy: .public). Engine will continue at cached \(cached, privacy: .public); evict the model to force a rebuild."
+                        "registry: cached BatchEngine for \(modelName, privacy: .public) is shut down; evicting and rebuilding at maxBatchSize=\(maxBatchSize, privacy: .public)"
+                    )
+                    await coalescer.remove(modelName) { engine in
+                        await engine.shutdown()
+                    }
+                    // Rebuild via the same path. The new engine is
+                    // constructed with `maxBatchSize` directly, so the
+                    // resize check on the recursive call sees a match and
+                    // skips `updateMaxBatchSize`.
+                    return await self.engine(
+                        for: modelName,
+                        container: container,
+                        maxBatchSize: maxBatchSize
+                    )
+                } catch {
+                    // Other errors (e.g. `invalidMaxBatchSize` from a
+                    // caller bug) leave the cached engine intact — it's
+                    // still serving requests at its construction value, and
+                    // the next valid resize call will succeed.
+                    batchAdapterLog.notice(
+                        "registry: BatchEngine for \(modelName, privacy: .public) rejected updateMaxBatchSize(\(maxBatchSize, privacy: .public)) — \(String(describing: error), privacy: .public). Engine continues at cached \(cached, privacy: .public)."
                     )
                 }
             }
@@ -140,29 +169,38 @@ struct MLXBatchAdapter {
 
         /// Shut down and remove the engine for `modelName`. Safe to call
         /// when no engine exists. Pending requests on the engine receive a
-        /// `.cancelled` info event before the actor exits. If a first-request
-        /// engine creation is in flight, the coalescer drains it so the
-        /// freshly created engine is also shut down rather than leaked.
+        /// `.cancelled` info event before the actor exits.
+        ///
+        /// Uses the coalescer's `dispose:` variant so the
+        /// `engine.shutdown()` call runs INSIDE the `draining[key]`
+        /// tombstone window. A racing `value(for:)` for the same model
+        /// waits for the shutdown to complete before its post-drain fresh
+        /// factory builds a new `BatchEngine` — preventing two engines on
+        /// one `ModelContainer` (the Metal-abort scenario the registry
+        /// exists to prevent).
         func shutdownEngine(for modelName: String) async {
-            guard let engine = await coalescer.remove(modelName) else { return }
-            await engine.shutdown()
-            batchAdapterLog.info(
-                "registry: shutdown BatchEngine for \(modelName, privacy: .public)"
-            )
+            await coalescer.remove(modelName) { engine in
+                await engine.shutdown()
+                batchAdapterLog.info(
+                    "registry: shutdown BatchEngine for \(modelName, privacy: .public)"
+                )
+            }
         }
 
         /// Shut down every cached engine. Used by `ModelRuntime.clearAll()`.
         /// Drains in-flight creations and resolved entries through the
-        /// coalescer.
+        /// coalescer's `dispose:` variant so per-key tombstones stay set
+        /// across the per-engine `shutdown()` — same race protection as
+        /// `shutdownEngine(for:)`, applied to every cached entry.
         func shutdownAll() async {
-            let drained = await coalescer.removeAll()
-            for entry in drained {
-                await entry.value.shutdown()
+            await coalescer.removeAll { modelName, engine in
+                await engine.shutdown()
                 batchAdapterLog.info(
-                    "registry: shutdown BatchEngine for \(entry.key, privacy: .public)"
+                    "registry: shutdown BatchEngine for \(modelName, privacy: .public)"
                 )
             }
         }
+
     }
 
     // MARK: - Image preprocessing
