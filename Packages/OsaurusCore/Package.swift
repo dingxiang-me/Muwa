@@ -128,8 +128,10 @@ let package = Package(
         // use the native Poolside fallback template, and model-factory
         // fallback logs are quiet unless `VMLINUX_MODEL_FACTORY_TRACE=1`.
         //
-        // 2026-05-07 bump (`4a832400` → `88fc352b`) brings the production
-        // ZAYA1 CCA-attention port and two Ling/Bailing multi-turn fixes:
+        // 2026-05-07 bump (`4a832400` → `b9da180`) lands the ZAYA1 port,
+        // two Ling/Bailing multi-turn fixes, AND a host-integration
+        // hardening checkpoint that addresses three concerns flagged in
+        // PR #1037 review:
         //
         //   - a138f47 fix(runtime): derive prompt tail for token iterator
         //     generation. Reconstructs the decoded prompt tail from
@@ -151,6 +153,27 @@ let package = Package(
         //     the recurrent GLA state advances per-slot instead of by the
         //     batch maximum. Closes the Ling cross-turn cache-state desync
         //     class that surfaced as language drift on multi-turn flows.
+        //   - b9da180 feat(runtime): harden osaurus integration checkpoint.
+        //     (a) `BatchEngine` lifecycle/fairness: `isShutdown` flag rejects
+        //     late submits with a `.cancelled` info event,
+        //     `controlPlaneYieldInterval=8` keeps long B=1 decodes from
+        //     starving cancel/shutdown/config-update, and
+        //     `updateMaxBatchSize(_:)` lets hosts hot-resize without an
+        //     explicit model evict. (b) `BailingLinearAttention.recurrentGLA`
+        //     ports to a fused Metal kernel (`bailing_recurrent_gla` via a
+        //     singleton kernel manager) — closes the `EXC_BAD_ACCESS` Metal
+        //     pipeline-state lifetime crash on Ling JANGTQ2 long prompts
+        //     (≥ ~2k tokens) tracked in LING_JANGTQ2_LONG_PROMPT_CRASH.md.
+        //     Reference path is preserved for `D % 32 != 0`. (c)
+        //     `Evaluate.swift` yields completion `.info` BEFORE running
+        //     `cacheStoreAction` so consumers don't see the end-of-stream
+        //     SSM re-derive stall. The osaurus-side
+        //     `enableSSMReDerive: false` policy stays for chat workloads
+        //     with mutating system prefixes (no warm-cache payoff to amortize
+        //     the cost). (d) ANE acceleration contract
+        //     (`AccelerationMode` + `AccelerationRuntime.resolveTextDecode`)
+        //     scaffolds future routing — fail-closed for text decode, so no
+        //     behavior change today.
         //
         // ZAYA1 (Zyphra; `model_type=zaya`) — full port replaces the prior
         // `unsupportedModelType` throw with a real model class, the
@@ -184,27 +207,21 @@ let package = Package(
         // `reasoning_effort` when `enable_thinking=false`.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "88fc352b932a61ae4cfeb763fffc6547ad9725a4"
+            revision: "b9da180158365c20a0fab130217e4fa50b8ec674"
         ),
-        // swift-jinja: pinned to osaurus-ai fork at 58d21aa5 — same fork
-        // vmlx-swift-lm pins. Must also be declared HERE (root level) so
-        // the app's xcodeproj resolution picks up the fork instead of
-        // resolving the upstream `huggingface/swift-jinja` transitively
-        // via swift-transformers. SwiftPM resolves the root package's
-        // declared deps, so without this line the app silently uses
-        // upstream and Mistral 3.5 / Mistral-Medium-3.5-128B-JANGTQ
-        // chat templates throw "Expected '%}' after for loop.. Got plus
-        // instead" on the `loop_messages + [{'role': '__sentinel__'}]`
-        // construct (line 72 of Mistral 3.5's chat_template.jinja). Fork
-        // adds for-loop iterable expression support via parseFilter →
-        // parseOr in Sources/Jinja/Parser.swift:186. All 756 swift-jinja
-        // tests pass + 2 new regression tests (forLoopIterableAccepts-
-        // BinaryPlus + mistral3RealNativeTemplateParses).
+        // Osaurus-owned transformers/Jinja chain. `swift-transformers`
+        // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
+        // resolve to tag 2.3.5. Pin Jinja's root constraint to 58d21aa so
+        // the for-loop iterable parser fix used by Mistral 3.5
+        // (`loop_messages + [...]`) is not lost on a clean resolver.
         .package(
-            url: "https://github.com/osaurus-ai/swift-jinja",
+            url: "https://github.com/osaurus-ai/Jinja.git",
             revision: "58d21aa5b69fdd9eb7e23ce2c3730f47db8e0c9d"
         ),
-        .package(url: "https://github.com/huggingface/swift-transformers", from: "1.1.6"),
+        .package(
+            url: "https://github.com/osaurus-ai/swift-transformers",
+            revision: "b4a094b34b997167549c7f45bde16c80f18ed5a8"
+        ),
         // FluidAudio 0.14.3 added a breaking `language:` parameter to TTS
         // calls that osaurus's `TTSService` doesn't pass. Pinning to the
         // last working version until osaurus catches up. Bumping requires
@@ -354,6 +371,7 @@ let package = Package(
             dependencies: [
                 "OsaurusCore",
                 "OsaurusSQLCipher",
+                .product(name: "Jinja", package: "jinja"),
                 .product(name: "NIOEmbedded", package: "swift-nio"),
                 .product(name: "VecturaKit", package: "VecturaKit"),
             ],
