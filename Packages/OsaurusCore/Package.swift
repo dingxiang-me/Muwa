@@ -127,9 +127,64 @@ let package = Package(
         // rotating-window + pool/buffer state, Laguna include-only bundles
         // use the native Poolside fallback template, and model-factory
         // fallback logs are quiet unless `VMLINUX_MODEL_FACTORY_TRACE=1`.
+        //
+        // 2026-05-07 bump (`4a832400` → `88fc352b`) brings the production
+        // ZAYA1 CCA-attention port and two Ling/Bailing multi-turn fixes:
+        //
+        //   - a138f47 fix(runtime): derive prompt tail for token iterator
+        //     generation. Reconstructs the decoded prompt tail from
+        //     `TokenIterator.promptTokenIds` when the caller does not pass
+        //     `promptTail`, so `ReasoningParser.forPrompt(...)` reads the
+        //     actual rendered prompt state instead of a family stamp. Live
+        //     impact: Ling/Bailing ChatSession multi-turn output now streams
+        //     visible answers through `.chunk` when the prompt tail has no
+        //     `<think>` opener, instead of routing the whole answer to
+        //     `.reasoning` (the host-visible "Stop button stuck with no
+        //     answer text" symptom on Ling 2.6 Flash JANGTQ).
+        //   - 88fc352 feat(runtime): harden hybrid cache model gates.
+        //     BailingLinearAttention + BailingMLAAttention switch from
+        //     `rope(_, offset: cache.offset)` to
+        //     `applyRotaryPosition(rope, to:cache:)` so RoPE position comes
+        //     from `BatchArraysCache.offsetArray` (per-slot) on mixed-length
+        //     B>1 decode. `BatchArraysCache` gains per-sequence
+        //     `offsets: [Int]` + `offsetArray: MLXArray` + `advance(by:)` so
+        //     the recurrent GLA state advances per-slot instead of by the
+        //     batch maximum. Closes the Ling cross-turn cache-state desync
+        //     class that surfaced as language drift on multi-turn flows.
+        //
+        // ZAYA1 (Zyphra; `model_type=zaya`) — full port replaces the prior
+        // `unsupportedModelType` throw with a real model class, the
+        // `ZayaCCACache` (KV + path-dependent `conv_state` + `prev_hs`)
+        // hybrid cache, `BatchZayaCCACache` per-slot CCA gather/scatter
+        // for batched decode, `TQDiskSerializer` `.zayaCCA` LayerKind for
+        // disk round-trip, and `BatchEngine` admission auto-flips
+        // `setHybrid` + `setPagedIncompatible` whenever a slot's per-layer
+        // cache list contains `ZayaCCACache`. `LLMUserInputProcessor.
+        // defaultContext` clamps `enable_thinking=false` for `model_type=
+        // zaya`/`zyphra` until live thinking-on parity is proven (per
+        // 2026-05-06 ZAYA Production Notes in OSAURUS-RUNTIME-HANDOFF).
+        // Tool calls route through `ToolCallFormat.zayaXml` (`<zyphra_tool_call>`
+        // wrapper). Osaurus-side wiring in this PR mirrors the Ling
+        // pattern: `ModelFamilyNames.isZayaFamily` helper + `ZayaRuntimeProfile`
+        // (reserves ZAYA ahead of `AutoThinkingProfile` so the chat UI
+        // doesn't expose a misleading Thinking toggle) + `MLXBatchAdapter.
+        // additionalContext` short-circuit (forces `enable_thinking=false`)
+        // + `ModelRuntime.isKnownHybridModel` ZAYA family addition for
+        // eager `setHybrid(true)` parity with the BatchEngine auto-flip.
+        //
+        // Adjacent runtime hardening also included: `LMInput.hasMediaContent`
+        // (image/video/audio) replaces ad-hoc image/video checks in
+        // `BatchEngine` + `TokenIterator` partial-cache safety; `MediaSalt`
+        // extends fingerprinting to audio waveforms; `Evaluate.swift`
+        // TokenIterator restore path now gates partial cache hits on
+        // SSM/media to match BatchEngine; `RotatingKVCache` (Gemma4 SWA)
+        // is now correctly marked paged-incompatible at admission so
+        // prefix reuse routes through the v2 disk serializer instead of
+        // the paged tier; DSV4 chat-template context strips
+        // `reasoning_effort` when `enable_thinking=false`.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "4a832400264e725db384ace4524f2b624b2aefac"
+            revision: "88fc352b932a61ae4cfeb763fffc6547ad9725a4"
         ),
         // swift-jinja: pinned to osaurus-ai fork at 58d21aa5 — same fork
         // vmlx-swift-lm pins. Must also be declared HERE (root level) so

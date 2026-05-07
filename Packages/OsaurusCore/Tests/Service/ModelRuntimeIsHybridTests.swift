@@ -65,17 +65,6 @@ struct ModelRuntimeIsHybridTests {
         }
     }
 
-    @Test("MiniMax M2 / M2.7 family")
-    func minimaxM2_isHybrid() {
-        for id in [
-            "OsaurusAI/MiniMax-M2.7-JANGTQ",
-            "OsaurusAI/MiniMax-M2.7-JANGTQ4",
-            "minimax-m2.7-small-jangtq",
-        ] {
-            #expect(ModelRuntime.isKnownHybridModel(name: id))
-        }
-    }
-
     @Test("Bailing / Ling Linear-Attn hybrid family")
     func bailingLing_isHybrid() {
         for id in [
@@ -87,6 +76,28 @@ struct ModelRuntimeIsHybridTests {
             #expect(
                 ModelRuntime.isKnownHybridModel(name: id),
                 "Bailing/Ling hybrid family must flip setHybrid eagerly: \(id)"
+            )
+        }
+    }
+
+    /// Zyphra ZAYA1 CCA-attention hybrid: per-layer cache list contains
+    /// `ZayaCCACache` (KV + path-dependent `conv_state` + `prev_hs`).
+    /// vmlx's `extractSSMStates` / `restoreSSMStates` round-trips the
+    /// CCA state through the `SSMStateCache` companion, so eager
+    /// `setHybrid(true)` parallels the Mamba families above.
+    @Test("Zyphra ZAYA1 CCA hybrid family — eager setHybrid")
+    func zaya_isHybrid() {
+        for id in [
+            "Zyphra/Zaya1-8B-JANGTQ4",
+            "Zyphra/Zaya1-8B-MXFP4",
+            "OsaurusAI/Zaya1-8B-JANGTQ2",
+            "Zaya1-8B-JANGTQ4",  // bare picker
+            "zaya1-8b-mxfp4",  // case-folded
+            "Zyphra/Zaya-S-7B-Future",  // dash-boundary, forward-compat
+        ] {
+            #expect(
+                ModelRuntime.isKnownHybridModel(name: id),
+                "ZAYA CCA hybrid must flip setHybrid eagerly: \(id)"
             )
         }
     }
@@ -112,6 +123,28 @@ struct ModelRuntimeIsHybridTests {
             #expect(
                 !ModelRuntime.isKnownHybridModel(name: id),
                 "dense family must NOT flip setHybrid: \(id)"
+            )
+        }
+    }
+
+    /// MiniMax M2 / M2.7 was historically in the eager-flip list with a
+    /// "gated SSM in some layers" comment, but vmlx's `MiniMaxModel` and
+    /// `MiniMaxJANGTQModel` use only standard `KVCache` — no `MambaCache`
+    /// / `ArraysCache` / `ZayaCCACache`. Removed in the 2026-05-07
+    /// vmlx bump cleanup. Locked here so a future regression doesn't
+    /// silently re-add the misclassification.
+    @Test("MiniMax M2 / M2.7 — dense MoE, NOT Mamba/SSM hybrid")
+    func minimaxM2_isNotMambaHybrid() {
+        for id in [
+            "OsaurusAI/MiniMax-M2.7-JANGTQ",
+            "OsaurusAI/MiniMax-M2.7-JANGTQ4",
+            "minimax-m2.7-small-jangtq",
+            "minimax_m2-mxfp4",
+            "MiniMax_M2-3-future",
+        ] {
+            #expect(
+                !ModelRuntime.isKnownHybridModel(name: id),
+                "MiniMax has no MambaCache layers — must NOT eager-flip setHybrid: \(id)"
             )
         }
     }

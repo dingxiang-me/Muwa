@@ -119,4 +119,61 @@ struct MLXBatchAdapterTests {
             )
         }
     }
+
+    /// ZAYA1 (Zyphra; `model_type=zaya`) is served as non-reasoning per the
+    /// 2026-05-06 vmlx Osaurus runtime handoff. Even when a stale persisted
+    /// preference says `disableThinking=false`, the host short-circuit must
+    /// emit `enable_thinking=false` so the request context does NOT override
+    /// vmlx's `LLMUserInputProcessor.defaultContext` clamp (caller-wins
+    /// merge). Negative cases lock the matcher boundary so that adjacent
+    /// names like `dataset/zayasaurus` or `lazyaardvark` do NOT short-circuit.
+    @Test func additionalContext_forcesZayaThinkingOff() {
+        let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
+        let userEnabled = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(false)]
+        )
+
+        for modelName in [
+            "Zyphra/Zaya1-8B-JANGTQ4",
+            "Zyphra/Zaya1-8B-MXFP4",
+            "OsaurusAI/Zaya1-8B-JANGTQ2",
+            "Zaya1-8B-JANGTQ4",  // bare picker form
+            "zaya1-8b-mxfp4",  // case-folded picker form
+            "Zyphra/Zaya-S-7B-Future",  // forward-compat dash-suffix variant
+        ] {
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: unspecified,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == false,
+                "ZAYA must default enable_thinking=false: \(modelName)"
+            )
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: userEnabled,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == false,
+                "ZAYA must clamp enable_thinking=false even when host preference enables it: \(modelName)"
+            )
+        }
+
+        // Boundary regression guards: names that contain `zaya` as a
+        // substring but are NOT ZAYA bundles must take the default path.
+        for modelName in [
+            "dataset/zayasaurus",  // `/zaya` followed by letter — not ZAYA
+            "lazyaardvark",  // bare prefix `lazya`, not `zaya`
+            "dazaya-llm",  // `zaya` not at boundary
+            "zayasaurus-7b",  // `zaya` followed by letter at start
+        ] {
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: unspecified,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == true,
+                "non-ZAYA substring match must NOT force thinking off: \(modelName)"
+            )
+        }
+    }
 }

@@ -543,12 +543,18 @@ public actor ModelRuntime {
         {
             return true
         }
-        // MiniMax M2 / M2.7 — gated SSM in some layers.
-        if lower.contains("minimax-m2") || lower.contains("minimax_m2") {
-            return true
-        }
         // Bailing / Ling hybrid: Linear-Attn companion ArraysCache + MLA cache.
         if lower.contains("bailing") || ModelFamilyNames.isLingFamily(name) {
+            return true
+        }
+        // Zyphra ZAYA1 CCA-attention hybrid: per-layer caches contain
+        // `ZayaCCACache` (KV + path-dependent conv_state + prev_hs). vmlx's
+        // `extractSSMStates` / `restoreSSMStates` round-trips the CCA state
+        // through the `SSMStateCache` companion, so eager `setHybrid(true)`
+        // mirrors the Mamba families above. vmlx's BatchEngine auto-flips
+        // on first ZayaCCACache slot admission; this is the parity flip
+        // for the single-slot `Evaluate` path.
+        if ModelFamilyNames.isZayaFamily(name) {
             return true
         }
         return false

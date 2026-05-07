@@ -81,6 +81,7 @@ enum ModelProfileRegistry {
         NemotronThinkingProfile.self,
         LagunaThinkingProfile.self,
         LingRuntimeProfile.self,
+        ZayaRuntimeProfile.self,
         Gemini31FlashImageProfile.self,
         GeminiProImageProfile.self,
         GeminiFlashImageProfile.self,
@@ -266,6 +267,29 @@ struct LingRuntimeProfile: ModelProfile {
 
     static func matches(modelId: String) -> Bool {
         ModelFamilyNames.isLingFamily(modelId)
+    }
+
+    static let options: [ModelOptionDefinition] = []
+    static let defaults: [String: ModelOptionValue] = [:]
+}
+
+// MARK: - Zaya Runtime Profile
+
+/// ZAYA1 (Zyphra; `model_type=zaya`) — hybrid CCA-attention bundles
+/// (BF16 base + JANGTQ2 / JANGTQ4 / MXFP4 routed-expert variants). Per the
+/// 2026-05-06 vmlx Osaurus runtime handoff, ZAYA is served as non-reasoning
+/// in osaurus until the JANGTQ thinking-on path is verified to close
+/// reasoning and emit visible content. The chat template ships standard
+/// `<think>` markers and an `enable_thinking` Jinja kwarg, so without this
+/// reservation `AutoThinkingProfile` would expose a misleading Thinking
+/// toggle. `MLXBatchAdapter` separately forces `enable_thinking=false` for
+/// ZAYA at tokenization, and vmlx's `LLMUserInputProcessor.defaultContext`
+/// clamps the same value for `model_type=zaya`/`zyphra` as defense in depth.
+struct ZayaRuntimeProfile: ModelProfile {
+    static let displayName = "Zaya"
+
+    static func matches(modelId: String) -> Bool {
+        ModelFamilyNames.isZayaFamily(modelId)
     }
 
     static let options: [ModelOptionDefinition] = []
