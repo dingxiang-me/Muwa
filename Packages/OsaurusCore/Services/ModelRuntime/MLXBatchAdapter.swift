@@ -119,8 +119,11 @@ struct MLXBatchAdapter {
         }
 
         /// Diagnostic accessor. Test-only; production callers do not need
-        /// to inspect the coalescer's internal state.
-        internal func registrySnapshot() async -> (resolved: Int, inFlight: Int) {
+        /// to inspect the coalescer's internal state. `draining` reports
+        /// engines whose in-flight creation has been claimed by a
+        /// concurrent `shutdownEngine` / `shutdownAll` but whose factory
+        /// has not yet completed.
+        internal func registrySnapshot() async -> (resolved: Int, inFlight: Int, draining: Int) {
             await coalescer.snapshot()
         }
 
