@@ -32,11 +32,17 @@ struct RuntimePolicySourceTests {
         #expect(source.contains("SWA+CSA+HSA"))
     }
 
-    @Test("vmlx pin includes DSV4 and Laguna hardening commit")
+    @Test("vmlx pin includes Ling multi-turn + ZAYA hardening commit")
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
 
-        #expect(manifest.contains("4a832400264e725db384ace4524f2b624b2aefac"))
+        // Bumped 2026-05-07 from 4a832400 (DSV4 + Laguna) to 88fc352b
+        // (BailingHybrid B>1 RoPE/per-slot offsets, ZAYA1 CCA hybrid,
+        // ReasoningParser prompt-tail, Gemma4 SWA, audio MediaSalt).
+        // The earlier comments still document DSV4Cache and Laguna so
+        // those content anchors remain valid as a smoke that the bump
+        // narrative wasn't dropped wholesale.
+        #expect(manifest.contains("88fc352b932a61ae4cfeb763fffc6547ad9725a4"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }
