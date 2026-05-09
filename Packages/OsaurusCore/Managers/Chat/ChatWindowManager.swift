@@ -574,6 +574,7 @@ private final class ChatPanel: NSPanel {
 @MainActor
 private final class ChatToolbarDelegate: NSObject, NSToolbarDelegate {
     private static let sidebarItem = NSToolbarItem.Identifier("ChatToolbar.sidebar")
+    private static let modeToggleItem = NSToolbarItem.Identifier("ChatToolbar.modeToggle")
     private static let actionItem = NSToolbarItem.Identifier("ChatToolbar.action")
     private static let pinItem = NSToolbarItem.Identifier("ChatToolbar.pin")
 
@@ -593,14 +594,14 @@ private final class ChatToolbarDelegate: NSObject, NSToolbarDelegate {
         // stale toolbar identifiers in user defaults render as no-ops
         // instead of crashing.
         [
-            Self.sidebarItem, .flexibleSpace, .flexibleSpace, Self.actionItem,
+            Self.sidebarItem, .flexibleSpace, Self.modeToggleItem, .flexibleSpace, Self.actionItem,
             Self.pinItem,
         ]
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
-            Self.sidebarItem, .flexibleSpace, .flexibleSpace, Self.actionItem,
+            Self.sidebarItem, .flexibleSpace, Self.modeToggleItem, .flexibleSpace, Self.actionItem,
             Self.pinItem,
         ]
     }
@@ -618,6 +619,13 @@ private final class ChatToolbarDelegate: NSObject, NSToolbarDelegate {
                 identifier: itemIdentifier,
                 rootView:
                     ChatToolbarSidebarView(windowState: windowState)
+            )
+            
+        case Self.modeToggleItem:
+            return makeHostingItem(
+                identifier: itemIdentifier,
+                rootView:
+                    ChatToolbarModeToggleView(windowState: windowState, session: session)
             )
 
         case Self.actionItem:
@@ -652,6 +660,26 @@ private final class ChatToolbarDelegate: NSObject, NSToolbarDelegate {
 }
 
 // MARK: - Toolbar Item Views
+
+private struct ChatToolbarModeToggleView: View {
+    @ObservedObject var windowState: ChatWindowState
+    @ObservedObject var session: ChatSession
+
+    private var isDashboardMode: Bool { windowState.mode == .dashboard }
+
+    var body: some View {
+        ModeToggleButton(
+            currentMode: isDashboardMode ? .dashboard : .chat,
+            isDisabled: !isDashboardMode && !session.hasAnyModel,
+            action: { tappedMode in
+                let current: ChatMode = isDashboardMode ? .dashboard : .chat
+                guard tappedMode != current else { return }
+                windowState.switchMode(to: tappedMode == .dashboard ? .dashboard : .chat)
+            }
+        )
+        .environment(\.theme, windowState.theme)
+    }
+}
 
 /// Sidebar toggle button.
 private struct ChatToolbarSidebarView: View {

@@ -442,3 +442,47 @@ private struct PopoverRow<Content: View>: View {
         }
     }
 }
+
+struct ModeToggleButton: View {
+    let currentMode: ChatMode
+    var isDisabled: Bool = false
+    let action: (ChatMode) -> Void
+
+    @State private var isHovered = false
+    @Environment(\.theme) private var theme
+    @Namespace private var animation
+
+    var body: some View {
+        HStack(spacing: 0) {
+            segment(icon: ChatMode.dashboard.icon, label: "Dashboard", mode: .dashboard, isSelected: currentMode == .dashboard)
+            segment(icon: ChatMode.chat.icon, label: "Chat", mode: .chat, isSelected: currentMode == .chat)
+        }
+        .padding(.horizontal, 6)
+        .padding(.vertical, 2)
+        .contentShape(Rectangle())
+        .opacity(isDisabled ? 0.4 : 1.0)
+        .allowsHitTesting(!isDisabled)
+    }
+
+    @ViewBuilder
+    private func segment(icon: String, label: String, mode: ChatMode, isSelected: Bool) -> some View {
+        HStack(spacing: 5) {
+            Image(systemName: icon).font(.system(size: 10, weight: .semibold))
+            Text(label).font(.system(size: 11, weight: .semibold))
+        }
+        .fixedSize()
+        .foregroundColor(isSelected ? theme.primaryText : theme.tertiaryText)
+        .padding(.horizontal, 14)
+        .padding(.vertical, 5)
+        .background {
+            if isSelected {
+                RoundedRectangle(cornerRadius: 20, style: .continuous)
+                    .fill(theme.secondaryBackground.opacity(0.8))
+                    .shadow(color: theme.shadowColor.opacity(0.08), radius: 1.5, x: 0, y: 0.5)
+                    .matchedGeometryEffect(id: "modeIndicator", in: animation)
+            }
+        }
+        .animation(theme.springAnimation(), value: isSelected)
+        .onTapGesture { action(mode) }
+    }
+}

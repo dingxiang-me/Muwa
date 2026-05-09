@@ -22,6 +22,7 @@ final class ChatWindowState: ObservableObject {
 
     // MARK: - View State
 
+    @Published var mode: ChatMode = .chat
     @Published var showSidebar: Bool = false
 
     // MARK: - Agent State
@@ -155,6 +156,17 @@ final class ChatWindowState: ObservableObject {
         flushCurrentSession()
         session.reset(for: agentId)
         refreshSessions()
+    }
+    
+    func switchMode(to newMode: ChatMode) {
+        guard newMode != mode else { return }
+
+        // save current chat if switching away from chat mode
+        if mode == .chat && !session.turns.isEmpty {
+            session.save()
+        }
+
+        mode = newMode
     }
 
     func loadSession(_ sessionData: ChatSessionData) {
