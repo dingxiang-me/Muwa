@@ -471,14 +471,14 @@ struct ModeToggleButton: View {
             Text(label).font(.system(size: 11, weight: .semibold))
         }
         .fixedSize()
-        .foregroundColor(isSelected ? theme.primaryText : theme.tertiaryText)
+        .foregroundColor(isSelected ? .white : theme.tertiaryText)
         .padding(.horizontal, 14)
         .padding(.vertical, 5)
         .background {
             if isSelected {
                 RoundedRectangle(cornerRadius: 20, style: .continuous)
-                    .fill(theme.secondaryBackground.opacity(0.8))
-                    .shadow(color: theme.shadowColor.opacity(0.08), radius: 1.5, x: 0, y: 0.5)
+                    .fill(theme.accentColor)
+                    .shadow(color: theme.shadowColor.opacity(0.12), radius: 1.5, x: 0, y: 0.5)
                     .matchedGeometryEffect(id: "modeIndicator", in: animation)
             }
         }
