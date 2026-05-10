@@ -128,10 +128,19 @@ let package = Package(
         // use the native Poolside fallback template, and model-factory
         // fallback logs are quiet unless `VMLINUX_MODEL_FACTORY_TRACE=1`.
         //
-        // 2026-05-07 bump (`4a832400` → `b9da180`) lands the ZAYA1 port,
-        // two Ling/Bailing multi-turn fixes, AND a host-integration
-        // hardening checkpoint that addresses three concerns flagged in
-        // PR #1037 review:
+        // 2026-05-07 bump (`4a832400` → `b9da180`) landed the ZAYA1 port,
+        // two Ling/Bailing multi-turn fixes, and a host-integration
+        // hardening checkpoint.
+        //
+        // 2026-05-10 bump (`b9da180` → `7273ba2`) adds the Osaurus runtime
+        // readiness wave: ZAYA/ZAYA1-VL parser/cache contracts,
+        // Hy3 native text runtime and Hunyuan tool/reasoning parser wiring,
+        // reasoning/media cache-scope salt propagation, generation_config
+        // defaults, VLM extent guards, JANGTQ top-k override plumbing, and
+        // the B>1 admission coalescing fix that lets concurrent requests
+        // actually overlap before decode starts.
+        //
+        // The 2026-05-07 concerns addressed for PR #1037 were:
         //
         //   - a138f47 fix(runtime): derive prompt tail for token iterator
         //     generation. Reconstructs the decoded prompt tail from
@@ -182,18 +191,15 @@ let package = Package(
         // for batched decode, `TQDiskSerializer` `.zayaCCA` LayerKind for
         // disk round-trip, and `BatchEngine` admission auto-flips
         // `setHybrid` + `setPagedIncompatible` whenever a slot's per-layer
-        // cache list contains `ZayaCCACache`. `LLMUserInputProcessor.
-        // defaultContext` clamps `enable_thinking=false` for `model_type=
-        // zaya`/`zyphra` until live thinking-on parity is proven (per
-        // 2026-05-06 ZAYA Production Notes in OSAURUS-RUNTIME-HANDOFF).
-        // Tool calls route through `ToolCallFormat.zayaXml` (`<zyphra_tool_call>`
-        // wrapper). Osaurus-side wiring in this PR mirrors the Ling
-        // pattern: `ModelFamilyNames.isZayaFamily` helper + `ZayaRuntimeProfile`
-        // (reserves ZAYA ahead of `AutoThinkingProfile` so the chat UI
-        // doesn't expose a misleading Thinking toggle) + `MLXBatchAdapter.
-        // additionalContext` short-circuit (forces `enable_thinking=false`)
-        // + `ModelRuntime.isKnownHybridModel` ZAYA family addition for
-        // eager `setHybrid(true)` parity with the BatchEngine auto-flip.
+        // cache list contains `ZayaCCACache`. ZAYA is reasoning-capable:
+        // osaurus must trust bundle stamps (`supports_thinking=true`,
+        // `think_in_template=false`) and pass structured `enable_thinking`
+        // context through Swift Jinja instead of forcing family-name
+        // defaults. Tool calls route through `ToolCallFormat.zayaXml`
+        // (`<zyphra_tool_call>` wrapper). Osaurus-side wiring keeps only
+        // topology policy here: `ModelRuntime.isKnownHybridModel` includes
+        // ZAYA family names for eager `setHybrid(true)` parity with the
+        // BatchEngine auto-flip.
         //
         // Adjacent runtime hardening also included: `LMInput.hasMediaContent`
         // (image/video/audio) replaces ad-hoc image/video checks in
@@ -207,7 +213,7 @@ let package = Package(
         // `reasoning_effort` when `enable_thinking=false`.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "b9da180158365c20a0fab130217e4fa50b8ec674"
+            revision: "7273ba22d6e608b5575bef91e70975a8ad3e1862"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

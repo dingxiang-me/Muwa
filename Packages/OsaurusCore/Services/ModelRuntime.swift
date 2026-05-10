@@ -75,7 +75,14 @@ public actor ModelRuntime {
     // MARK: - State
 
     private var modelCache: [String: SessionHolder] = [:]
-    private var loadingTasks: [String: Task<SessionHolder, Error>] = [:]
+    private struct LoadingTaskRecord {
+        let id: UInt64
+        let task: Task<SessionHolder, Error>
+    }
+
+    private var loadingTasks: [String: LoadingTaskRecord] = [:]
+    private var supersededLoadingTaskIDs = Set<UInt64>()
+    private var nextLoadingTaskID: UInt64 = 0
     private var currentModelName: String?
     private var cachedConfig: RuntimeConfig?
 
@@ -122,6 +129,70 @@ public actor ModelRuntime {
         activeGenerationTask = nil
     }
 
+    private func allocateLoadingTaskID() -> UInt64 {
+        nextLoadingTaskID &+= 1
+        return nextLoadingTaskID
+    }
+
+    private func cancelAndDrainLoadingTasks(_ records: [(String, LoadingTaskRecord)]) async {
+        guard !records.isEmpty else { return }
+
+        for (name, record) in records {
+            if loadingTasks[name]?.id == record.id {
+                supersededLoadingTaskIDs.insert(record.id)
+            }
+            record.task.cancel()
+        }
+
+        for (_, record) in records {
+            if let holder = try? await record.task.value,
+               supersededLoadingTaskIDs.contains(record.id) {
+                holder.container.disableCaching()
+            }
+        }
+
+        for (name, record) in records {
+            if loadingTasks[name]?.id == record.id {
+                loadingTasks.removeValue(forKey: name)
+            }
+            supersededLoadingTaskIDs.remove(record.id)
+        }
+
+        Stream.gpu.synchronize()
+        Memory.clearCache()
+    }
+
+    private func finishLoadedContainer(
+        name: String,
+        holder: SessionHolder,
+        loadID: UInt64
+    ) async throws -> SessionHolder {
+        if let cached = modelCache[name], cached === holder {
+            return cached
+        }
+
+        guard loadingTasks[name]?.id == loadID,
+              !supersededLoadingTaskIDs.contains(loadID)
+        else {
+            holder.container.disableCaching()
+            throw CancellationError()
+        }
+
+        modelCache[name] = holder
+        loadingTasks.removeValue(forKey: name)
+        currentModelName = name
+        Memory.cacheLimit = mlxCacheLimit()
+
+        // Enable multi-tier KV caching via vmlx-swift-lm's CacheCoordinator.
+        // Cache tier config is entirely osaurus-internal — not user-visible.
+        await installCacheCoordinator(on: holder)
+
+        genLog.info(
+            "loadContainer: loaded \(name, privacy: .public) isVLM=\(holder.isVLM, privacy: .public)"
+        )
+        return holder
+    }
+
     /// Unload `name`, blocking until any in-flight generation against this
     /// model has fully released its lease. The lease is held for the entire
     /// stream lifetime (see `generateEventStream`), so this guarantees we
@@ -137,15 +208,15 @@ public actor ModelRuntime {
         // rare case where a task was cancelled mid-setup before acquiring.
         await cancelActiveGeneration()
 
-        if let holder = modelCache[name] {
-            holder.container.disableCaching()
+        if let record = loadingTasks[name] {
+            await cancelAndDrainLoadingTasks([(name, record)])
         }
+
+        modelCache[name]?.container.disableCaching()
 
         autoreleasepool {
             _ = modelCache.removeValue(forKey: name)
         }
-        loadingTasks[name]?.cancel()
-        loadingTasks.removeValue(forKey: name)
         if currentModelName == name { currentModelName = nil }
 
         Memory.cacheLimit = mlxCacheLimit()
@@ -178,6 +249,9 @@ public actor ModelRuntime {
             await ModelLease.shared.waitForZero(name)
         }
 
+        let loadingRecords = loadingTasks.map { ($0.key, $0.value) }
+        await cancelAndDrainLoadingTasks(loadingRecords)
+
         for holder in modelCache.values {
             holder.container.disableCaching()
         }
@@ -185,8 +259,8 @@ public actor ModelRuntime {
         autoreleasepool {
             modelCache.removeAll()
         }
-        for task in loadingTasks.values { task.cancel() }
         loadingTasks.removeAll()
+        supersededLoadingTaskIDs.removeAll()
         currentModelName = nil
         cachedConfig = nil
 
@@ -226,38 +300,68 @@ public actor ModelRuntime {
     }
 
     private func loadContainer(id: String, name: String) async throws -> SessionHolder {
-        if let existing = modelCache[name] { return existing }
-
         let policy = await ServerConfigurationStore.load()?.modelEvictionPolicy ?? .strictSingleModel
 
-        if policy == .strictSingleModel {
-            for other in modelCache.keys where other != name {
+        while true {
+            if let existing = modelCache[name] { return existing }
+
+            if let existingRecord = loadingTasks[name] {
+                do {
+                    let holder = try await existingRecord.task.value
+                    return try await finishLoadedContainer(
+                        name: name,
+                        holder: holder,
+                        loadID: existingRecord.id
+                    )
+                } catch is CancellationError {
+                    if loadingTasks[name]?.id == existingRecord.id {
+                        loadingTasks.removeValue(forKey: name)
+                    }
+                    supersededLoadingTaskIDs.remove(existingRecord.id)
+                    continue
+                } catch {
+                    if loadingTasks[name]?.id == existingRecord.id {
+                        loadingTasks.removeValue(forKey: name)
+                    }
+                    supersededLoadingTaskIDs.remove(existingRecord.id)
+                    throw error
+                }
+            }
+
+            if let otherLoading = loadingTasks.first(where: { $0.key != name }) {
+                let otherName = otherLoading.key
+                let otherRecord = otherLoading.value
+                if policy == .strictSingleModel {
+                    genLog.info(
+                        "loadContainer: strict drain of in-flight load \(otherName, privacy: .public)"
+                    )
+                    await cancelAndDrainLoadingTasks([(otherName, otherRecord)])
+                } else {
+                    do {
+                        let holder = try await otherRecord.task.value
+                        _ = try? await finishLoadedContainer(
+                            name: otherName,
+                            holder: holder,
+                            loadID: otherRecord.id
+                        )
+                    } catch {
+                        if loadingTasks[otherName]?.id == otherRecord.id {
+                            loadingTasks.removeValue(forKey: otherName)
+                        }
+                        supersededLoadingTaskIDs.remove(otherRecord.id)
+                    }
+                }
+                continue
+            }
+
+            if policy == .strictSingleModel,
+               let other = modelCache.keys.first(where: { $0 != name }) {
                 genLog.info("loadContainer: strict eviction of \(other, privacy: .public)")
                 await unload(name: other)
+                continue
             }
-            for other in loadingTasks.keys where other != name {
-                loadingTasks[other]?.cancel()
-                loadingTasks.removeValue(forKey: other)
-            }
-        }
 
-        // Re-entry fast path: another caller is already loading this model.
-        // If their task was cancelled by an evictor between our enqueue and
-        // our await (a real race when two chat windows trigger concurrent
-        // loads under `strictSingleModel`), fall through and create a new
-        // task instead of propagating the stale CancellationError to our
-        // caller — which would leave the UI stuck at "loading" with no
-        // recovery path short of quitting the app.
-        if let existingTask = loadingTasks[name] {
-            do {
-                return try await existingTask.value
-            } catch is CancellationError {
-                genLog.info(
-                    "loadContainer: existing load for \(name, privacy: .public) was cancelled mid-flight; retrying with fresh task"
-                )
-                loadingTasks[name] = nil
-                // fall through to create a new task below
-            }
+            break
         }
 
         guard let localURL = Self.findLocalDirectory(forModelId: id) else {
@@ -288,6 +392,7 @@ public actor ModelRuntime {
         // the app layer — `BatchEngine.generate` reads them directly from
         // the resolved `ModelConfiguration` to emit `.toolCall` events.
 
+        let loadID = allocateLoadingTaskID()
         let task = Task<SessionHolder, Error> {
             let tokenizerLoader = SwiftTransformersTokenizerLoader()
             let container = try await loadModelContainer(
@@ -304,25 +409,20 @@ public actor ModelRuntime {
             )
         }
 
-        loadingTasks[name] = task
+        loadingTasks[name] = LoadingTaskRecord(id: loadID, task: task)
 
         do {
             let holder = try await task.value
-            modelCache[name] = holder
-            loadingTasks[name] = nil
-            currentModelName = name
-            Memory.cacheLimit = mlxCacheLimit()
-
-            // Enable multi-tier KV caching via vmlx-swift-lm's CacheCoordinator.
-            // Cache tier config is entirely osaurus-internal — not user-visible.
-            await installCacheCoordinator(on: holder)
-
-            genLog.info(
-                "loadContainer: loaded \(name, privacy: .public) isVLM=\(holder.isVLM, privacy: .public)"
+            return try await finishLoadedContainer(
+                name: name,
+                holder: holder,
+                loadID: loadID
             )
-            return holder
         } catch {
-            loadingTasks[name] = nil
+            if loadingTasks[name]?.id == loadID {
+                loadingTasks.removeValue(forKey: name)
+            }
+            supersededLoadingTaskIDs.remove(loadID)
             throw error
         }
     }

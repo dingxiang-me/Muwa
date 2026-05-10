@@ -51,16 +51,12 @@ struct RuntimePolicySourceTests {
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
 
-        // Bumped 2026-05-07 from 4a832400 (DSV4 + Laguna) to b9da180
-        // (BailingHybrid B>1 RoPE/per-slot offsets, ZAYA1 CCA hybrid,
-        // ReasoningParser prompt-tail, Gemma4 SWA, audio MediaSalt; PLUS
-        // BatchEngine isShutdown/updateMaxBatchSize/controlPlaneYield,
-        // BailingLinearAttention.recurrentGLA fused Metal kernel, and
-        // .info-before-cacheStoreAction reordering). The earlier comments
-        // still document DSV4Cache and Laguna so those content anchors
-        // remain valid as a smoke that the bump narrative wasn't dropped
-        // wholesale.
-        #expect(manifest.contains("b9da180158365c20a0fab130217e4fa50b8ec674"))
+        // Bumped 2026-05-10 from b9da180 to 7273ba2. This keeps the
+        // 2026-05-07 Bailing/ZAYA/Gemma4/Ling hardening and adds the
+        // Osaurus readiness wave: Hy3 native runtime, ZAYA1-VL contracts,
+        // reasoning/media cache-scope salt, generation_config defaults,
+        // JANGTQ top-k override plumbing, and B>1 admission coalescing.
+        #expect(manifest.contains("7273ba22d6e608b5575bef91e70975a8ad3e1862"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }
@@ -179,6 +175,28 @@ struct RuntimePolicySourceTests {
         #expect(
             runtime.contains("private func cancelActiveGeneration() async {"),
             "cancelActiveGeneration() must still exist for shutdown / clearAll cancellation paths"
+        )
+    }
+
+    /// Lock the cold-load drain discipline. Swift task cancellation is
+    /// cooperative; a cancelled `loadModelContainer` can still be inside MLX
+    /// weight materialization. Starting a replacement load before the old task
+    /// drains leaves two independent MLX load/eval paths racing on Metal.
+    @Test("ModelRuntime drains superseded cold loads before starting replacements")
+    func modelRuntimeDrainsSupersededColdLoads() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(runtime.contains("private struct LoadingTaskRecord"))
+        #expect(runtime.contains("supersededLoadingTaskIDs"))
+        #expect(runtime.contains("private func cancelAndDrainLoadingTasks"))
+        #expect(runtime.contains("record.task.cancel()"))
+        #expect(runtime.contains("try? await record.task.value"))
+        #expect(runtime.contains("holder.container.disableCaching()"))
+        #expect(runtime.contains("loadContainer: strict drain of in-flight load"))
+        #expect(runtime.contains("return try await finishLoadedContainer"))
+        #expect(
+            !runtime.contains("loadingTasks[other]?.cancel()"),
+            "Strict single-model replacement must not fire-and-forget cancel an in-flight model load"
         )
     }
 
