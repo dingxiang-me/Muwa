@@ -255,7 +255,30 @@ struct ThemeEditorView: View {
                 ).textCase(.uppercase)
                 colorRowOptional("Bubble Color", hex: $editingTheme.messages.assistantBubbleColor)
                 sliderRow("Opacity", value: $editingTheme.messages.assistantBubbleOpacity, range: 0 ... 1)
+
+                Divider().opacity(0.3)
+
+                Text("Inline Avatar", bundle: .module).font(.system(size: 11, weight: .semibold)).foregroundColor(
+                    currentTheme.tertiaryText
+                ).textCase(.uppercase)
+                inlineAvatarToggleRow
+                sliderRow("Size", value: $editingTheme.messages.inlineAvatarSize, range: 16 ... 36)
+                    .disabled(!editingTheme.messages.showInlineAvatar)
+                    .opacity(editingTheme.messages.showInlineAvatar ? 1 : 0.5)
             }
+        }
+    }
+
+    private var inlineAvatarToggleRow: some View {
+        HStack {
+            Text("Show in chat", bundle: .module)
+                .font(.system(size: 13))
+                .foregroundColor(currentTheme.primaryText)
+            Spacer()
+            Toggle("", isOn: $editingTheme.messages.showInlineAvatar)
+                .labelsHidden()
+                .toggleStyle(.switch)
+                .tint(currentTheme.accentColor)
         }
     }
 
@@ -309,15 +332,18 @@ struct ThemeEditorView: View {
                     .font(.system(size: 13))
                     .foregroundColor(isImageBackground ? currentTheme.tertiaryText : currentTheme.primaryText)
                 Spacer()
-                Toggle("", isOn: Binding(
-                    get: { editingTheme.glass.enabled && !isImageBackground },
-                    set: { newValue in
-                        editingTheme.glass.enabled = newValue
-                        if newValue {
-                            showGlassPerformanceWarning = true
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { editingTheme.glass.enabled && !isImageBackground },
+                        set: { newValue in
+                            editingTheme.glass.enabled = newValue
+                            if newValue {
+                                showGlassPerformanceWarning = true
+                            }
                         }
-                    }
-                ))
+                    )
+                )
                 .labelsHidden()
                 .toggleStyle(.switch)
                 .tint(currentTheme.accentColor)

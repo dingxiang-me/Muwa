@@ -577,6 +577,18 @@ final class ChatSession: ObservableObject {
         }
     }
 
+    /// Appends a `user`-role turn carrying a plugin-supplied interrupt
+    /// message. Called by `BackgroundTaskManager.interruptTask` when a
+    /// plugin invokes `dispatch_interrupt(taskId, message)` with a
+    /// non-empty `message`. The turn lands in the persisted transcript
+    /// so the model picks it up on the next completion round.
+    func appendInterruptMessage(_ message: String) {
+        let turn = ChatTurn(role: .user, content: message)
+        turns.append(turn)
+        isDirty = true
+        rebuildVisibleBlocks()
+    }
+
     func reset() {
         stop()
         turns.removeAll()
@@ -1801,6 +1813,21 @@ final class ChatSession: ObservableObject {
                             return toolTurn
                         }
 
+                        // Materialise the tool-call row BEFORE we await
+                        // execute(...). Without this the chat skips
+                        // straight from `pendingToolCall` (args still
+                        // streaming) to `toolCallGroup` with the result
+                        // already attached — `NativeToolCallRowView`
+                        // never gets a chance to render with
+                        // `item.result == nil`, so its inline live-
+                        // streaming pane (TerminalDisplayView) never mounts
+                        // for sandbox_exec / shell_run. Rebuilding here
+                        // emits the row with a nil result; the row
+                        // subscribes to LiveExecRegistry and starts
+                        // streaming the moment the tool body registers
+                        // its sink.
+                        rebuildVisibleBlocks()
+
                         // Execute tool and append hidden tool result turn
                         var resultText: String
                         do {
@@ -2708,6 +2735,7 @@ struct ChatView: View {
                     width: width,
                     agentName: displayName,
                     agentAvatar: windowState.cachedActiveAgent.avatar,
+                    agentCustomAvatarPath: windowState.cachedActiveAgent.customAvatarURL?.path,
                     isStreaming: session.isStreaming,
                     lastAssistantTurnId: lastAssistantTurnId,
                     expandedBlocksStore: session.expandedBlocksStore,
@@ -2821,6 +2849,7 @@ private struct IsolatedThreadView: View {
     let width: CGFloat
     let agentName: String
     let agentAvatar: String?
+    let agentCustomAvatarPath: String?
     let isStreaming: Bool
     let lastAssistantTurnId: UUID?
     let expandedBlocksStore: ExpandedBlocksStore
@@ -2849,6 +2878,7 @@ private struct IsolatedThreadView: View {
             width: width,
             agentName: agentName,
             agentAvatar: agentAvatar,
+            agentCustomAvatarPath: agentCustomAvatarPath,
             isStreaming: isStreaming,
             lastAssistantTurnId: lastAssistantTurnId,
             expandedBlocksStore: expandedBlocksStore,

@@ -4,6 +4,8 @@ Run agent code in an isolated Linux virtual machine — safely, locally, and wit
 
 The Sandbox is a shared Linux container powered by Apple's [Containerization](https://developer.apple.com/documentation/containerization) framework. It gives every Osaurus agent access to a real Linux environment with shell, package managers, compilers, and file system access — all running natively on Apple Silicon with zero risk to your Mac.
 
+> **Sandbox Tools vs Native Plugins:** Osaurus has two distinct extensibility systems. **Sandbox tools** (this guide) are JSON recipes that run inside the Linux container — no compiler, no code signing, ideal for shell-based workflows. **Native plugins** are compiled `.dylib` files with full host API access (inference, storage, HTTP routes, web UIs); see [`docs/plugins/README.md`](plugins/README.md). The terms used to overlap; this doc uses **Sandbox Tools** consistently.
+
 ---
 
 ## Why Sandbox?
@@ -20,9 +22,9 @@ Agents gain a full Linux environment with shell access, Python (pip), Node.js (n
 
 Each agent gets its own Linux user and home directory. One agent's files, processes, and installed packages cannot interfere with another's. Run multiple specialized agents simultaneously — a Python data analyst, a Node.js web developer, and a system administration agent — without cross-contamination.
 
-### Lightweight Plugin Ecosystem
+### Lightweight Tool Ecosystem
 
-Sandbox plugins are simple JSON recipes. No compiled dylibs, no Xcode, no code signing required. Anyone can write, share, and import plugins that install dependencies, seed files, and define custom tools — dramatically lowering the barrier to extending agent capabilities.
+Sandbox tools are simple JSON recipes. No compiled dylibs, no Xcode, no code signing required. Anyone can write, share, and import tools that install dependencies, seed files, and define custom capabilities — dramatically lowering the barrier to extending agent capabilities. (For richer extensibility with full host API access, see [native plugins](plugins/README.md).)
 
 ### Local-First
 
@@ -55,9 +57,9 @@ Click **Provision** to download the Linux kernel and initial filesystem, then bo
 
 Once the container is running, sandbox tools are automatically registered for the active agent. The agent can now execute commands, read/write files, install packages, and more — all inside the VM.
 
-### 4. Install Plugins (Optional)
+### 4. Install Sandbox Tools (Optional)
 
-Switch to the **Plugins** tab to browse, import, or create sandbox plugins that extend your agents with custom tools.
+Switch to the **Sandbox** tab in the Tools manager to browse, import, or create JSON tool recipes that extend your agents with custom capabilities. For native dylib plugins (full host API access), use the **Available** tab and see [`docs/plugins/README.md`](plugins/README.md).
 
 ---
 
@@ -226,6 +228,54 @@ Every sandbox tool returns a [ToolEnvelope](TOOL_CONTRACT.md) JSON string. Succe
 - Install family: `{installed, exit_code, output}` on success; `execution_error` envelope on non-zero exit. Both shapes carry `retried: true` when the auto-recovery harness ran a cleanup + second attempt. Failure envelopes additionally carry `cleanup_failed: true` if the cleanup step itself threw — that signals to the model that it should not retry the same operation right away.
 
 Failures use `kind: invalid_args` with `field` pointing at the offending argument (`path`, `cwd`, `content`, etc.) so the model can self-correct on the next turn.
+
+---
+
+## Streaming Exec & Terminate
+
+`sandbox_exec` (foreground OR `background: true`) and folder-mode `shell_run` stream their live output into the chat tool-call card while the process runs. The model still gets the final `{stdout, stderr, exit_code}` blob when the process exits — streaming is purely a side-channel for the user.
+
+### What the user sees
+
+When a long-running command starts, the tool-call card mounts an inline terminal pane:
+
+- **Status pill** in the header: `running 0:42`, `exited (0)`, `terminated (user)`.
+- **Live output** below: monospaced, ANSI-stripped, auto-follows the tail unless the user scrolls up.
+- **`[Copy]`** button: snapshots the current output to the clipboard.
+- **`[Terminate]`** button: red-tinted, only visible while the process is running. Sends SIGTERM, then SIGKILL after a 3 s grace.
+
+The pane is capped at ~14 lines of monospaced text (240 pt); content beyond that scrolls inside the pane rather than growing the row, so a 10 MB build log can't blow up the chat layout.
+
+### Untimed by default
+
+Phase 1 dropped the wall-clock timeouts that used to kill long commands at ~2 minutes:
+
+- The registry-level 120 s safety net is bypassed for `sandbox_exec` and `shell_run` via `OsaurusTool.bypassRegistryTimeout`.
+- The tool's own `timeout` parameter is now an **optional inactivity ceiling**, not a wall-clock cap. When the model omits it, the command runs to completion or until the user terminates.
+- Pass `timeout: <seconds>` ONLY when you want a hard idle ceiling (kill if no output for N seconds). The user's `[Terminate]` button is the primary control.
+
+The inactivity timer (when set) resets on every byte of output, so a `cargo build` that produces silent stretches between status lines won't trip it as long as it's actually progressing.
+
+### Terminate semantics
+
+When the user presses `[Terminate]`:
+
+1. SIGTERM is sent to the process group.
+2. After a 3 s grace, SIGKILL.
+3. The result envelope returned to the model carries `killed_by: "user"` (alongside the usual `stdout` / `stderr` / `exit_code`) so it can decide whether to retry, fall back, or move on.
+4. The status pill flips to `terminated (user)`.
+
+Terminating from the chat card races the model the same way `sandbox_process(kill)` does — both end up at the SIGTERM/SIGKILL path. A model `read` mid-flight returns the captured output up to termination.
+
+### Pipeline diagnostics
+
+Two related changes catch the silent-pipeline-failure pattern that used to surface as `{exit_code: 0, stdout: "", stderr: ""}` from a failed `curl ... 2>/dev/null | grep ... | head -80`:
+
+- **`set -o pipefail` is on by default** for both `sandbox_exec` and `shell_run`. A real upstream failure now surfaces as the rightmost non-zero exit instead of being masked by `head` / `tee` / `cat`.
+- **Empty-output warning**. When `exit_code == 0` AND stdout AND stderr are all empty AND the command contained `|` or `2>/dev/null`, the result envelope's `warnings:` array carries a hint pointing at the suppressed-stderr / pipeline pattern.
+- **SIGPIPE soft note**. `cmd | head -n N` legitimately kills `cmd` with SIGPIPE (exit 141) once `head` reaches its limit. The result envelope flags this with a softer "captured stdout is still trustworthy" warning so the model doesn't treat it as a failure.
+
+**Don't use `2>/dev/null` in pipelines.** It hides errors from the result envelope. If you genuinely need silent stderr, redirect to a log file you can `sandbox_read_file` later.
 
 ---
 
