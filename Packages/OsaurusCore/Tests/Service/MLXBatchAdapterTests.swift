@@ -203,7 +203,10 @@ struct MLXBatchAdapterTests {
 
         #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: nil)?.count == 2)
         #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: .auto)?.count == 2)
-        #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: .none) == nil)
+        // The parameter is optional, so `.none` alone would mean
+        // `Optional.none` and exercise the nil/default-auto path. Spell the
+        // enum case explicitly to pin OpenAI `tool_choice: "none"`.
+        #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: ToolChoiceOption.none) == nil)
 
         let selected = ModelRuntime.makeTokenizerTools(
             tools: tools,
