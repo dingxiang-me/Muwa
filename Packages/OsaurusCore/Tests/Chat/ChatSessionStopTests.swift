@@ -41,6 +41,22 @@ struct ChatSessionStopTests {
             #expect(session.turns.first?.content == "Hello")
         }
     }
+
+    @Test
+    func send_ignoresReentrantSendBeforeStreamingFlagFlips() async throws {
+        try await ChatHistoryTestStorage.run {
+            let session = ChatSession()
+            session.chatEngineFactory = { IgnoringCancellationChatEngine() }
+
+            session.send("first")
+            session.send("second")
+
+            let userTurns = session.turns.filter { $0.role == .user }
+            #expect(userTurns.map(\.content) == ["first"])
+
+            session.stop()
+        }
+    }
 }
 
 private actor IgnoringCancellationChatEngine: ChatEngineProtocol {
