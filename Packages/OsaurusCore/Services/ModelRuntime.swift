@@ -1083,13 +1083,13 @@ public actor ModelRuntime {
     ) -> MLXLMCommon.GenerateParameters {
         MLXLMCommon.GenerateParameters(
             maxTokens: maxTokens,
+            enableCompiledBatchDecode: enableCompiledBatchDecode,
             temperature: temperature,
             topP: topP,
             topK: topK,
             repetitionPenalty: repetitionPenalty,
             repetitionContextSize: 20,
-            extraStopStrings: stopSequences,
-            enableCompiledBatchDecode: enableCompiledBatchDecode
+            extraStopStrings: stopSequences
         )
     }
 

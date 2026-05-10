@@ -23,35 +23,35 @@ struct MLXBatchAdapterTests {
     /// lift the constraint. If you change the default again, update both
     /// this test AND the doc comment so they stay aligned.
     @Test func maxBatchSize_defaultsToOne_forCompileEngagement() {
-        UserDefaults.standard.removeObject(forKey: "ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize")
-        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize == 1)
+        let defaults = isolatedDefaults()
+        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize(in: defaults) == 1)
     }
 
     @Test func maxBatchSize_respectsUserDefaults() {
         let key = "ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize"
-        UserDefaults.standard.set(8, forKey: key)
-        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let defaults = isolatedDefaults()
+        defaults.set(8, forKey: key)
         // Server deployments override to multi-slot at the cost of the
         // compile path — same value the test pinned before; only the
         // default changed.
-        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize == 8)
+        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize(in: defaults) == 8)
     }
 
     @Test func maxBatchSize_clampsAbsurdValues() {
         let key = "ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize"
-        UserDefaults.standard.set(9999, forKey: key)
-        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let defaults = isolatedDefaults()
+        defaults.set(9999, forKey: key)
         // Clamp to 32 so a typo doesn't blow out wired memory.
-        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize == 32)
+        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize(in: defaults) == 32)
     }
 
     @Test func maxBatchSize_zeroFallsBackToDefault_one() {
         let key = "ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize"
-        UserDefaults.standard.set(0, forKey: key)
-        defer { UserDefaults.standard.removeObject(forKey: key) }
+        let defaults = isolatedDefaults()
+        defaults.set(0, forKey: key)
         // Zero is treated as "unset" — falls back to the compile-friendly
         // default of 1 (was 4 prior to fa694e9e).
-        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize == 1)
+        #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize(in: defaults) == 1)
     }
 
     @Test func generateParameters_enableCompiledBatchDecodeForSoloDefault() {
@@ -260,5 +260,12 @@ struct MLXBatchAdapterTests {
             unknown == nil,
             "Unknown forced tool must not expose every schema; nil keeps the injected tool surface closed."
         )
+    }
+
+    private func isolatedDefaults() -> UserDefaults {
+        let suiteName = "MLXBatchAdapterTests.\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suiteName)!
+        defaults.removePersistentDomain(forName: suiteName)
+        return defaults
     }
 }
