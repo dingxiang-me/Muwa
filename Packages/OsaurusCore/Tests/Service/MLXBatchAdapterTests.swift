@@ -89,6 +89,54 @@ struct MLXBatchAdapterTests {
         )
     }
 
+    @Test func soloGenerationGate_serializesSameModelUntilRelease() async throws {
+        final class Flag: @unchecked Sendable {
+            private let lock = NSLock()
+            private var value = false
+
+            func set() {
+                lock.lock()
+                value = true
+                lock.unlock()
+            }
+
+            func get() -> Bool {
+                lock.lock()
+                defer { lock.unlock() }
+                return value
+            }
+        }
+
+        let gate = MLXBatchAdapter.SoloGenerationGate()
+        let first = await gate.acquire(modelName: "minimax-m2.7-jangtq")
+        let secondAcquired = Flag()
+        let second = Task {
+            let lease = await gate.acquire(modelName: "minimax-m2.7-jangtq")
+            secondAcquired.set()
+            return lease
+        }
+
+        try await Task.sleep(nanoseconds: 50_000_000)
+        #expect(
+            !secondAcquired.get(),
+            "same-model solo requests must wait until the active generation releases the gate"
+        )
+
+        await first.release()
+        let secondLease = await second.value
+        #expect(secondAcquired.get())
+        await secondLease.release()
+    }
+
+    @Test func soloGenerationGate_allowsDifferentModelsConcurrently() async {
+        let gate = MLXBatchAdapter.SoloGenerationGate()
+        let first = await gate.acquire(modelName: "minimax-m2.7-jangtq")
+        let second = await gate.acquire(modelName: "qwen3.5-30b-a3b-jangtq")
+
+        await first.release()
+        await second.release()
+    }
+
     @Test func additionalContext_mapsDisableThinkingToEnableThinkingKwarg() {
         let disabled = GenerationParameters(
             temperature: nil,

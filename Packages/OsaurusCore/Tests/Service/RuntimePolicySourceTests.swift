@@ -151,6 +151,26 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    /// With the default `maxBatchSize == 1`, vmlx can use its solo
+    /// TokenIterator-backed fast path. Osaurus must not let a second same-model
+    /// request run prompt tokenization / `MLXArray.asArray(...)` while that
+    /// decode is still active; the 2026-05-10 MiniMax crash report showed the
+    /// exact Metal overlap (`TokenIterator.next()` plus `prepareInput`).
+    @Test("MLXBatchAdapter gates same-model solo generation and propagates stream cancellation")
+    func mlxBatchAdapterGatesSoloGenerationAndCancelsProducer() throws {
+        let adapter = try Self.source("Services/ModelRuntime/MLXBatchAdapter.swift")
+
+        #expect(adapter.contains("actor SoloGenerationGate"))
+        #expect(adapter.contains("maxBatchSize == 1"))
+        #expect(adapter.contains("acquireSoloLease"))
+        #expect(adapter.contains("await soloLease.release()"))
+        #expect(
+            adapter.contains("continuation.onTermination = { @Sendable _ in")
+                && adapter.contains("producerTask.cancel()"),
+            "adapter stream termination must cancel the producer so UI Stop reaches vmlx's upstream AsyncStream termination handler"
+        )
+    }
+
     /// Lock the removal of the `activeGenerationTask?.value` gate at
     /// the entry of `generateEventStream`. The gate was serializing
     /// every same-model overlapping request before vmlx's `BatchEngine`

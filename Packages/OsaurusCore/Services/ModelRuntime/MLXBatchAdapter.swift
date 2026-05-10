@@ -43,6 +43,48 @@ struct MLXBatchAdapter {
         let genTask: Task<Void, Never>
     }
 
+    /// Same-model gate for the single-slot runtime path. With
+    /// `maxBatchSize == 1`, vmlx can route through its TokenIterator-backed
+    /// solo fast path. There is no batching upside to overlapping a second
+    /// prompt-prep/eval against that active decode, and MLX/Metal command
+    /// encoders are not safe to drive concurrently from the same container.
+    actor SoloGenerationGate {
+        private var busyModels: Set<String> = []
+        private var waiters: [String: [CheckedContinuation<Void, Never>]] = [:]
+
+        struct Lease: @unchecked Sendable {
+            fileprivate let modelName: String
+            fileprivate let gate: SoloGenerationGate
+
+            func release() async {
+                await gate.release(modelName)
+            }
+        }
+
+        func acquire(modelName: String) async -> Lease {
+            if !busyModels.contains(modelName) {
+                busyModels.insert(modelName)
+                return Lease(modelName: modelName, gate: self)
+            }
+
+            await withCheckedContinuation { continuation in
+                waiters[modelName, default: []].append(continuation)
+            }
+            return Lease(modelName: modelName, gate: self)
+        }
+
+        private func release(_ modelName: String) {
+            guard busyModels.contains(modelName) else { return }
+            if var queue = waiters[modelName], !queue.isEmpty {
+                let next = queue.removeFirst()
+                waiters[modelName] = queue.isEmpty ? nil : queue
+                next.resume()
+            } else {
+                busyModels.remove(modelName)
+            }
+        }
+    }
+
     // MARK: - Per-model engine cache
 
     /// Per-process cache of `BatchEngine` instances keyed by model name.
@@ -54,6 +96,7 @@ struct MLXBatchAdapter {
     /// only happen if those requests submit into the *same* engine instance.
     actor Registry {
         static let shared = Registry()
+        private let soloGate = SoloGenerationGate()
 
         /// Single-flight cache for the per-model `BatchEngine` instance.
         /// Coalesces concurrent first-fetch callers onto the same
@@ -201,6 +244,10 @@ struct MLXBatchAdapter {
             }
         }
 
+        func acquireSoloLease(for modelName: String) async -> SoloGenerationGate.Lease {
+            await soloGate.acquire(modelName: modelName)
+        }
+
     }
 
     // MARK: - Image preprocessing
@@ -303,15 +350,29 @@ struct MLXBatchAdapter {
     ) async throws -> PreparedStream {
         let trace = generation.ttftTrace
         trace?.mark("batch_prepare_start")
+        let soloLease =
+            maxBatchSize == 1
+            ? await Registry.shared.acquireSoloLease(for: modelName)
+            : nil
+        if Task.isCancelled {
+            if let soloLease { await soloLease.release() }
+            throw CancellationError()
+        }
 
-        let prepared = try await prepareInput(
-            modelName: modelName,
-            container: container,
-            buildChat: buildChat,
-            buildToolsSpec: buildToolsSpec,
-            generation: generation,
-            trace: trace
-        )
+        let prepared: PreparedInput
+        do {
+            prepared = try await prepareInput(
+                modelName: modelName,
+                container: container,
+                buildChat: buildChat,
+                buildToolsSpec: buildToolsSpec,
+                generation: generation,
+                trace: trace
+            )
+        } catch {
+            if let soloLease { await soloLease.release() }
+            throw error
+        }
 
         let engine = await Registry.shared.engine(
             for: modelName,
@@ -358,6 +419,11 @@ struct MLXBatchAdapter {
 
         let (outStream, continuation) = AsyncStream<Generation>.makeStream()
         let producerTask = Task<Void, Never> {
+            defer {
+                if let soloLease {
+                    Task { await soloLease.release() }
+                }
+            }
             await withTaskCancellationHandler {
                 for await event in upstream {
                     if Task.isCancelled { break }
@@ -371,6 +437,10 @@ struct MLXBatchAdapter {
                 // and finishes the stream).
                 continuation.finish()
             }
+        }
+
+        continuation.onTermination = { @Sendable _ in
+            producerTask.cancel()
         }
 
         batchAdapterLog.info(
