@@ -213,14 +213,15 @@ let package = Package(
         // the paged tier; DSV4 chat-template context strips
         // `reasoning_effort` when `enable_thinking=false`.
         //
-        // 2026-05-10 follow-up (`a5a0e37` → `cb8b3df`) restores MiniMax M2.7
+        // 2026-05-10 follow-up (`a5a0e37` → `d256885`) restores MiniMax M2.7
         // JANGTQ single-slot decode speed on the Osaurus path. It adds a
         // cache-safe B=1 `BatchEngine.generate` fast path, restores the
         // JANGTQ Hadamard `newv[8]` + cached-meta kernel optimization, and fixes
-        // TokenIterator max-token stop accounting.
+        // TokenIterator max-token stop accounting. It also keeps text-only ZAYA
+        // out of the VLM registry so `model_type=zaya` routes through MLXLLM.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "cb8b3df95b8a72dd8f9162c67779d95f32cc7b0a"
+            revision: "d256885cf560f6e30e77ea84d7be68eb9eccf57b"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
