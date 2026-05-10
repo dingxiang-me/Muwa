@@ -2575,7 +2575,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var opts = iterationReq.modelOptions ?? [:]
                     opts["disableThinking"] = .bool(!enable)
                     iterationReq.modelOptions = opts
+                    iterationReq.enable_thinking = enable
                 }
+                iterationReq.reasoning_effort = req.reasoning_effort
 
                 var responseContent = ""
                 // Local models can emit multiple tool calls in a single

@@ -248,16 +248,42 @@ struct MLXBatchAdapter {
         for generation: GenerationParameters,
         modelName: String
     ) -> [String: any Sendable] {
-        if ModelFamilyNames.isLingFamily(modelName) {
-            return ["enable_thinking": false]
+        var context: [String: any Sendable] = [:]
+        let normalizedReasoningEffort: String? = {
+            guard let effort = generation.modelOptions["reasoningEffort"]?.stringValue else {
+                return nil
+            }
+            let normalized = effort.trimmingCharacters(in: .whitespacesAndNewlines)
+            return normalized.isEmpty ? nil : normalized
+        }()
+        let disableThinking = generation.modelOptions["disableThinking"]?.boolValue
+
+        if Hy3ReasoningProfile.matches(modelId: modelName) {
+            if let normalizedReasoningEffort {
+                context["reasoning_effort"] = normalizedReasoningEffort
+            } else if let disableThinking {
+                context["reasoning_effort"] = disableThinking ? "no_think" : "high"
+            }
+            return context
         }
-        if let disableThinking = generation.modelOptions["disableThinking"]?.boolValue {
-            return ["enable_thinking": !disableThinking]
+
+        if let normalizedReasoningEffort {
+            context["reasoning_effort"] = normalizedReasoningEffort
+        }
+        if ModelFamilyNames.isLingFamily(modelName) {
+            context["enable_thinking"] = false
+            return context
+        }
+        if let disableThinking {
+            context["enable_thinking"] = !disableThinking
+            return context
         }
         if ModelFamilyNames.isZayaFamily(modelName) {
-            return ["enable_thinking": false]
+            context["enable_thinking"] = false
+            return context
         }
-        return ["enable_thinking": true]
+        context["enable_thinking"] = true
+        return context
     }
 
     // MARK: - Submission
@@ -383,16 +409,11 @@ struct MLXBatchAdapter {
             let chat = preprocessImages(in: buildChat())
             let toolsSpec = buildToolsSpec()
 
-            // `enable_thinking` handling. Ling-2.6 Flash is served as a
-            // non-reasoning model, so force it off even when a caller omits
-            // model options or an older saved preference says otherwise.
-            // ZAYA is reasoning-capable, but its template defaults to a
-            // closed/no-thinking assistant prefix; preserve that default
-            // when callers omit the option, while still honoring an explicit
-            // user/API `disableThinking=false` opt-in. Other families default
-            // to `true` because thinking-capable Gemma, Qwen, and
-            // auto-detected templates rely on a present truthy kwarg to
-            // activate reasoning.
+            // Reasoning template context. Hy3 uses `reasoning_effort`
+            // instead of the generic boolean; Ling is force-off; ZAYA is
+            // reasoning-capable but defaults off unless explicitly opted in.
+            // Other thinking-capable families default to a truthy
+            // `enable_thinking` kwarg.
             let additionalContext = additionalContext(for: generation, modelName: modelName)
             let userInput = MLXLMCommon.UserInput(
                 chat: chat,

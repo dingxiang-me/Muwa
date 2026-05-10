@@ -283,6 +283,27 @@ struct ModelProfileRegistryTests {
         #expect(defaults["disableThinking"]?.boolValue == true)
     }
 
+    @Test("Hy3 bundles expose native reasoning_effort values")
+    func hy3_matchesReasoningEffortProfile() {
+        for id in [
+            "JANGQ-AI/Hy3-preview-JANGTQ",
+            "Tencent/Hy3-preview",
+            "hy_v3-preview",
+            "hunyuan-v3-jangtq2",
+        ] {
+            let profile = ModelProfileRegistry.profile(for: id)
+            #expect(profile?.displayName == Hy3ReasoningProfile.displayName)
+            #expect(profile?.defaults["reasoningEffort"]?.stringValue == "no_think")
+            #expect(profile?.thinkingOption?.id == nil)
+        }
+
+        let explicit = ModelProfileRegistry.normalizedOptions(
+            for: "JANGQ-AI/Hy3-preview-JANGTQ",
+            persisted: ["reasoningEffort": .string("high")]
+        )
+        #expect(explicit["reasoningEffort"]?.stringValue == "high")
+    }
+
     /// Mistral Medium 3.5 has no thinking toggle today (no `<think>` block
     /// in its chat template). Match must NOT shortcut into a thinking
     /// profile; if it falls through to `AutoThinkingProfile` that's fine

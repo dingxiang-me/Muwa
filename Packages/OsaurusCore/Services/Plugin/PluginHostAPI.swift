@@ -680,7 +680,11 @@ final class PluginHostContext: @unchecked Sendable {
             tool_choice: request.tool_choice,
             session_id: request.session_id
         )
-        return EnrichedInference(request: enriched, tools: effectiveTools)
+        var enrichedWithRuntimeOptions = enriched
+        enrichedWithRuntimeOptions.enable_thinking = request.enable_thinking
+        enrichedWithRuntimeOptions.reasoning_effort = request.reasoning_effort
+        enrichedWithRuntimeOptions.modelOptions = request.modelOptions
+        return EnrichedInference(request: enrichedWithRuntimeOptions, tools: effectiveTools)
     }
 
     private static func iterationRequest(
@@ -688,7 +692,7 @@ final class PluginHostContext: @unchecked Sendable {
         messages: [ChatMessage],
         tools: [Tool]?
     ) -> ChatCompletionRequest {
-        ChatCompletionRequest(
+        var request = ChatCompletionRequest(
             model: base.model,
             messages: messages,
             temperature: base.temperature,
@@ -703,6 +707,10 @@ final class PluginHostContext: @unchecked Sendable {
             tool_choice: base.tool_choice,
             session_id: base.session_id
         )
+        request.enable_thinking = base.enable_thinking
+        request.reasoning_effort = base.reasoning_effort
+        request.modelOptions = base.modelOptions
+        return request
     }
 
     // MARK: Preflight Capability Search
@@ -858,7 +866,7 @@ final class PluginHostContext: @unchecked Sendable {
 
         let messages = inference.request.messages
         let effectiveTools = tools.isEmpty ? nil : tools
-        let request = ChatCompletionRequest(
+        var request = ChatCompletionRequest(
             model: inference.request.model,
             messages: messages,
             temperature: inference.request.temperature,
@@ -873,6 +881,9 @@ final class PluginHostContext: @unchecked Sendable {
             tool_choice: inference.request.tool_choice,
             session_id: inference.request.session_id
         )
+        request.enable_thinking = inference.request.enable_thinking
+        request.reasoning_effort = inference.request.reasoning_effort
+        request.modelOptions = inference.request.modelOptions
         return EnrichedInference(request: request, tools: effectiveTools)
     }
 

@@ -115,6 +115,51 @@ struct MLXBatchAdapterTests {
         )
     }
 
+    @Test func additionalContext_mapsReasoningEffortToTemplateKwarg() {
+        let high = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["reasoningEffort": .string("high")]
+        )
+        let noThink = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: [
+                "reasoningEffort": .string("no_think"),
+                "disableThinking": .bool(true),
+            ]
+        )
+
+        let hy3Context = MLXBatchAdapter.additionalContext(
+            for: high,
+            modelName: "JANGQ-AI/Hy3-preview-JANGTQ"
+        )
+        #expect(hy3Context["reasoning_effort"] as? String == "high")
+        #expect(
+            hy3Context["enable_thinking"] == nil,
+            "Hy3 is effort-based; adding generic enable_thinking would pollute cache salt without changing the template"
+        )
+
+        let combined = MLXBatchAdapter.additionalContext(
+            for: noThink,
+            modelName: "JANGQ-AI/Hy3-preview-JANGTQ"
+        )
+        #expect(combined["reasoning_effort"] as? String == "no_think")
+        #expect(combined["enable_thinking"] == nil)
+
+        let legacyBoolOnly = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(false)]
+        )
+        let legacyContext = MLXBatchAdapter.additionalContext(
+            for: legacyBoolOnly,
+            modelName: "JANGQ-AI/Hy3-preview-JANGTQ"
+        )
+        #expect(legacyContext["reasoning_effort"] as? String == "high")
+        #expect(legacyContext["enable_thinking"] == nil)
+    }
+
     @Test func additionalContext_forcesLingThinkingOff() {
         let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
         let userEnabled = GenerationParameters(

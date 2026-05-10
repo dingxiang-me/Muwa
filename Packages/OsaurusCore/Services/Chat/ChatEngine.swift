@@ -101,6 +101,33 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         }()
         let seedBits: UInt64? = request.seed.map { UInt64(bitPattern: Int64($0)) }
         let isJSONObject = (request.response_format?.type == "json_object")
+        var modelOptions = request.modelOptions ?? [:]
+        let isHy3 = Hy3ReasoningProfile.matches(modelId: request.model)
+        let requestReasoningEffort: String? = {
+            guard let value = request.reasoning_effort?
+                .trimmingCharacters(in: .whitespacesAndNewlines),
+                !value.isEmpty
+            else { return nil }
+            return value
+        }()
+
+        if isHy3 {
+            if let requestReasoningEffort {
+                modelOptions["reasoningEffort"] = .string(requestReasoningEffort)
+            } else if modelOptions["reasoningEffort"] == nil,
+                      let enableThinking = request.enable_thinking {
+                modelOptions["reasoningEffort"] = .string(enableThinking ? "high" : "no_think")
+            }
+            modelOptions.removeValue(forKey: "disableThinking")
+        } else {
+            if let enableThinking = request.enable_thinking {
+                modelOptions["disableThinking"] = .bool(!enableThinking)
+            }
+            if let requestReasoningEffort {
+                modelOptions["reasoningEffort"] = .string(requestReasoningEffort)
+            }
+        }
+
         let params = GenerationParameters(
             temperature: temperature,
             maxTokens: maxTokens,
@@ -110,7 +137,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             presencePenalty: request.presence_penalty,
             seed: seedBits,
             jsonMode: isJSONObject,
-            modelOptions: request.modelOptions ?? [:],
+            modelOptions: modelOptions,
             sessionId: request.session_id,
             ttftTrace: trace
         )

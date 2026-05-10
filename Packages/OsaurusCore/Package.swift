@@ -132,10 +132,10 @@ let package = Package(
         // two Ling/Bailing multi-turn fixes, and a host-integration
         // hardening checkpoint.
         //
-        // 2026-05-10 bump (`b9da180` → `7e29418`) adds the Osaurus runtime
+        // 2026-05-10 bump (`b9da180` → `a5a0e37`) adds the Osaurus runtime
         // readiness wave: ZAYA parser/cache contracts, native ZAYA1-VL
         // image/text generation with disk-backed CCA cache restore, Hy3
-        // native text runtime and Hunyuan tool/reasoning parser wiring,
+        // native text runtime plus `reasoning_effort`/Hunyuan parser wiring,
         // reasoning/media cache-scope salt propagation, generation_config
         // defaults, VLM extent guards, JANGTQ top-k override plumbing, and
         // the B>1 admission coalescing fix that lets concurrent requests
@@ -214,7 +214,7 @@ let package = Package(
         // `reasoning_effort` when `enable_thinking=false`.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "7e29418abaa5fa69193f68ee2b3b5ed6baa86ff5"
+            revision: "a5a0e3747cd774f3981d255cfedd64abf463f1fb"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

@@ -81,6 +81,7 @@ enum ModelProfileRegistry {
         QwenThinkingProfile.self,
         NemotronThinkingProfile.self,
         LagunaThinkingProfile.self,
+        Hy3ReasoningProfile.self,
         LingRuntimeProfile.self,
         ZayaThinkingProfile.self,
         Gemini31FlashImageProfile.self,
@@ -254,6 +255,43 @@ struct LagunaThinkingProfile: ModelProfile {
     ]
 
     static let thinkingOption: (id: String, inverted: Bool)? = ("disableThinking", true)
+}
+
+// MARK: - Hy3 Reasoning Profile
+
+/// Tencent Hunyuan v3 / Hy3 (`model_type=hy_v3`) uses a `reasoning_effort`
+/// chat-template kwarg instead of the boolean `enable_thinking` convention.
+/// The shipped template defaults to `no_think` and opens `<think>` only for
+/// `low` / `high`, so expose the native effort values rather than mapping it
+/// through the generic Disable Thinking toggle.
+struct Hy3ReasoningProfile: ModelProfile {
+    static let displayName = "Hy3 Reasoning"
+
+    static func matches(modelId: String) -> Bool {
+        let lower = modelId.lowercased()
+        return lower.contains("hy3")
+            || lower.contains("hy-v3")
+            || lower.contains("hy_v3")
+            || lower.contains("hunyuan-v3")
+            || lower.contains("hunyuan_v3")
+    }
+
+    static let options: [ModelOptionDefinition] = [
+        ModelOptionDefinition(
+            id: "reasoningEffort",
+            label: "Reasoning Effort",
+            icon: "brain.head.profile",
+            kind: .segmented([
+                ModelOptionSegment(id: "no_think", label: "Off"),
+                ModelOptionSegment(id: "low", label: "Low"),
+                ModelOptionSegment(id: "high", label: "High"),
+            ])
+        )
+    ]
+
+    static let defaults: [String: ModelOptionValue] = [
+        "reasoningEffort": .string("no_think")
+    ]
 }
 
 // MARK: - Ling Runtime Profile
