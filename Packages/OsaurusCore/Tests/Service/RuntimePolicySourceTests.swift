@@ -53,13 +53,14 @@ struct RuntimePolicySourceTests {
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
 
-        // Bumped 2026-05-10 from b9da180 to a5a0e37. This keeps the
+        // Bumped 2026-05-10 from b9da180 to cb8b3df. This keeps the
         // 2026-05-07 Bailing/ZAYA/Gemma4/Ling hardening and adds the
         // Osaurus readiness wave: Hy3 native runtime, native ZAYA1-VL
         // image/text generation with disk-backed CCA cache restore,
         // reasoning/media cache-scope salt, generation_config defaults,
-        // JANGTQ top-k override plumbing, and B>1 admission coalescing.
-        #expect(manifest.contains("a5a0e3747cd774f3981d255cfedd64abf463f1fb"))
+        // JANGTQ top-k override plumbing, B>1 admission coalescing, and
+        // the MiniMax B=1 BatchEngine speed restoration.
+        #expect(manifest.contains("cb8b3df95b8a72dd8f9162c67779d95f32cc7b0a"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }
