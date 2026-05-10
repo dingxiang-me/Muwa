@@ -227,16 +227,14 @@ struct ModelProfileRegistryTests {
         #expect(qwenDefaults["disableThinking"]?.boolValue == true)
     }
 
-    /// ZAYA1 (Zyphra; `model_type=zaya`) is served as non-reasoning. The
+    /// ZAYA1 (Zyphra; `model_type=zaya`) is served as reasoning-capable. The
     /// runtime profile must reserve every canonical bundle name ahead of
-    /// `AutoThinkingProfile` (whose template-driven match would otherwise
-    /// fire because ZAYA's chat template ships standard `<think>` markers
-    /// + an `enable_thinking` Jinja kwarg). The profile carries no options
-    /// — there is no UI Thinking toggle to expose. Negative cases lock the
-    /// matcher boundary so adjacent names like `zayasaurus-7b` or
-    /// `dataset/zayasaurus` do NOT shortcut into the runtime profile.
-    @Test("Zaya bundles match non-reasoning runtime profile, boundary-safe")
-    func zaya_matchesRuntimeProfileWithoutThinkingToggle() {
+    /// `AutoThinkingProfile` so its default stays OFF while still exposing
+    /// a real opt-in Thinking toggle. Negative cases lock the matcher
+    /// boundary so adjacent names like `zayasaurus-7b` or
+    /// `dataset/zayasaurus` do NOT shortcut into the ZAYA profile.
+    @Test("Zaya bundles match reasoning runtime profile, boundary-safe")
+    func zaya_matchesThinkingProfileWithDefaultOffToggle() {
         for id in [
             "Zyphra/Zaya1-8B-JANGTQ4",
             "Zyphra/Zaya1-8B-MXFP4",
@@ -247,12 +245,12 @@ struct ModelProfileRegistryTests {
         ] {
             let profile = ModelProfileRegistry.profile(for: id)
             #expect(
-                profile?.displayName == ZayaRuntimeProfile.displayName,
-                "expected ZayaRuntimeProfile for \(id), got \(profile?.displayName ?? "nil")"
+                profile?.displayName == ZayaThinkingProfile.displayName,
+                "expected ZayaThinkingProfile for \(id), got \(profile?.displayName ?? "nil")"
             )
-            #expect(profile?.options.isEmpty == true)
-            #expect(profile?.defaults.isEmpty == true)
-            #expect(profile?.thinkingOption?.id == nil)
+            #expect(profile?.thinkingOption?.id == "disableThinking")
+            #expect(profile?.thinkingOption?.inverted == true)
+            #expect(profile?.defaults["disableThinking"]?.boolValue == true)
         }
 
         // Boundary-regression negatives: must NOT classify as ZAYA.
@@ -264,19 +262,25 @@ struct ModelProfileRegistryTests {
         ] {
             let profile = ModelProfileRegistry.profile(for: id)
             #expect(
-                profile?.displayName != ZayaRuntimeProfile.displayName,
+                profile?.displayName != ZayaThinkingProfile.displayName,
                 "must not classify \(id) as Zaya"
             )
         }
     }
 
-    @Test("Profile option normalization drops stale Zaya thinking preference")
-    func normalizedOptions_dropsStaleZayaThinkingPreference() {
-        let staleZaya = ModelProfileRegistry.normalizedOptions(
+    @Test("Profile option normalization preserves explicit Zaya thinking preference")
+    func normalizedOptions_preservesExplicitZayaThinkingPreference() {
+        let explicitEnabled = ModelProfileRegistry.normalizedOptions(
             for: "Zyphra/Zaya1-8B-JANGTQ4",
             persisted: ["disableThinking": .bool(false)]
         )
-        #expect(staleZaya.isEmpty)
+        #expect(explicitEnabled["disableThinking"]?.boolValue == false)
+
+        let defaults = ModelProfileRegistry.normalizedOptions(
+            for: "Zyphra/Zaya1-8B-JANGTQ4",
+            persisted: nil
+        )
+        #expect(defaults["disableThinking"]?.boolValue == true)
     }
 
     /// Mistral Medium 3.5 has no thinking toggle today (no `<think>` block

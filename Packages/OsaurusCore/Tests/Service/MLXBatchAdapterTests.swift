@@ -127,14 +127,12 @@ struct MLXBatchAdapterTests {
         }
     }
 
-    /// ZAYA1 (Zyphra; `model_type=zaya`) is served as non-reasoning per the
-    /// 2026-05-06 vmlx Osaurus runtime handoff. Even when a stale persisted
-    /// preference says `disableThinking=false`, the host short-circuit must
-    /// emit `enable_thinking=false` so the request context does NOT override
-    /// vmlx's `LLMUserInputProcessor.defaultContext` clamp (caller-wins
-    /// merge). Negative cases lock the matcher boundary so that adjacent
-    /// names like `dataset/zayasaurus` or `lazyaardvark` do NOT short-circuit.
-    @Test func additionalContext_forcesZayaThinkingOff() {
+    /// ZAYA1 (Zyphra; `model_type=zaya`) is reasoning-capable but defaults
+    /// thinking off (`think_in_template=false`). When no request option is
+    /// present, preserve the bundle/template default with
+    /// `enable_thinking=false`; when the user/API explicitly opts in via
+    /// `disableThinking=false`, pass `enable_thinking=true`.
+    @Test func additionalContext_defaultsZayaThinkingOffButHonorsExplicitOptIn() {
         let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
         let userEnabled = GenerationParameters(
             temperature: nil,
@@ -155,14 +153,14 @@ struct MLXBatchAdapterTests {
                     for: unspecified,
                     modelName: modelName
                 )["enable_thinking"] as? Bool == false,
-                "ZAYA must default enable_thinking=false: \(modelName)"
+                "ZAYA should preserve default no-thinking template mode: \(modelName)"
             )
             #expect(
                 MLXBatchAdapter.additionalContext(
                     for: userEnabled,
                     modelName: modelName
-                )["enable_thinking"] as? Bool == false,
-                "ZAYA must clamp enable_thinking=false even when host preference enables it: \(modelName)"
+                )["enable_thinking"] as? Bool == true,
+                "ZAYA must honor explicit thinking opt-in: \(modelName)"
             )
         }
 
@@ -182,5 +180,56 @@ struct MLXBatchAdapterTests {
                 "non-ZAYA substring match must NOT force thinking off: \(modelName)"
             )
         }
+    }
+
+    @Test func tokenizerTools_respectToolChoicePromptSurface() {
+        let read = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "read_file",
+                description: "Read one file",
+                parameters: .object(["type": .string("object")])
+            )
+        )
+        let write = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "write_file",
+                description: "Write one file",
+                parameters: .object(["type": .string("object")])
+            )
+        )
+        let tools = [read, write]
+
+        #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: nil)?.count == 2)
+        #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: .auto)?.count == 2)
+        #expect(ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: .none) == nil)
+
+        let selected = ModelRuntime.makeTokenizerTools(
+            tools: tools,
+            toolChoice: .function(
+                ToolChoiceOption.FunctionName(
+                    type: "function",
+                    function: ToolChoiceOption.Name(name: "write_file")
+                )
+            )
+        )
+        #expect(selected?.count == 1)
+        let function = selected?.first?["function"] as? [String: any Sendable]
+        #expect(function?["name"] as? String == "write_file")
+
+        let unknown = ModelRuntime.makeTokenizerTools(
+            tools: tools,
+            toolChoice: .function(
+                ToolChoiceOption.FunctionName(
+                    type: "function",
+                    function: ToolChoiceOption.Name(name: "delete_everything")
+                )
+            )
+        )
+        #expect(
+            unknown == nil,
+            "Unknown forced tool must not expose every schema; nil keeps the injected tool surface closed."
+        )
     }
 }

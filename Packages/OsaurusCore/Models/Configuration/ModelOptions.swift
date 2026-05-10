@@ -63,7 +63,8 @@ protocol ModelProfile: Sendable {
     static var defaults: [String: ModelOptionValue] { get }
 
     /// Mapping for a dedicated "Thinking/Reasoning" toggle in the input area.
-    /// Returns the option ID (like "disableThinking") and whether true means "Enabled".
+    /// Returns the option ID (like "disableThinking") and whether the stored
+    /// boolean is inverted (`true` means disabled, so the UI shows OFF).
     static var thinkingOption: (id: String, inverted: Bool)? { get }
 }
 
@@ -81,7 +82,7 @@ enum ModelProfileRegistry {
         NemotronThinkingProfile.self,
         LagunaThinkingProfile.self,
         LingRuntimeProfile.self,
-        ZayaRuntimeProfile.self,
+        ZayaThinkingProfile.self,
         Gemini31FlashImageProfile.self,
         GeminiProImageProfile.self,
         GeminiFlashImageProfile.self,
@@ -273,27 +274,36 @@ struct LingRuntimeProfile: ModelProfile {
     static let defaults: [String: ModelOptionValue] = [:]
 }
 
-// MARK: - Zaya Runtime Profile
+// MARK: - Zaya Thinking Profile
 
 /// ZAYA1 (Zyphra; `model_type=zaya`) — hybrid CCA-attention bundles
-/// (BF16 base + JANGTQ2 / JANGTQ4 / MXFP4 routed-expert variants). Per the
-/// 2026-05-06 vmlx Osaurus runtime handoff, ZAYA is served as non-reasoning
-/// in osaurus until the JANGTQ thinking-on path is verified to close
-/// reasoning and emit visible content. The chat template ships standard
-/// `<think>` markers and an `enable_thinking` Jinja kwarg, so without this
-/// reservation `AutoThinkingProfile` would expose a misleading Thinking
-/// toggle. `MLXBatchAdapter` separately forces `enable_thinking=false` for
-/// ZAYA at tokenization, and vmlx's `LLMUserInputProcessor.defaultContext`
-/// clamps the same value for `model_type=zaya`/`zyphra` as defense in depth.
-struct ZayaRuntimeProfile: ModelProfile {
-    static let displayName = "Zaya"
+/// (BF16 base + JANGTQ2 / JANGTQ4 / MXFP4 routed-expert variants). ZAYA is
+/// reasoning-capable, but its template default is a closed/no-thinking
+/// assistant prefix (`think_in_template=false`): callers must opt in with
+/// `enable_thinking=true` to open a reasoning block. The profile therefore
+/// exposes the standard Disable Thinking toggle and defaults it ON, while
+/// still allowing users/API callers to enable thinking per request.
+struct ZayaThinkingProfile: ModelProfile {
+    static let displayName = "Zaya Thinking"
 
     static func matches(modelId: String) -> Bool {
         ModelFamilyNames.isZayaFamily(modelId)
     }
 
-    static let options: [ModelOptionDefinition] = []
-    static let defaults: [String: ModelOptionValue] = [:]
+    static let options: [ModelOptionDefinition] = [
+        ModelOptionDefinition(
+            id: "disableThinking",
+            label: "Disable Thinking",
+            icon: "brain.head.profile",
+            kind: .toggle(default: true)
+        )
+    ]
+
+    static let defaults: [String: ModelOptionValue] = [
+        "disableThinking": .bool(true)
+    ]
+
+    static let thinkingOption: (id: String, inverted: Bool)? = ("disableThinking", true)
 }
 
 // MARK: - Auto Thinking Profile (chat-template driven)

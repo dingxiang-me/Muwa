@@ -201,10 +201,10 @@ struct GenerationEventMapperTests {
         }
     }
 
-    /// ZAYA1 (Zyphra; `model_type=zaya`) is also served as non-reasoning;
-    /// same rationale as Ling above. Locked here so a future hybrid-model
-    /// addition can't silently regress the merge policy.
-    @Test func reasoning_merges_to_tokens_for_zaya_family() async throws {
+    /// ZAYA1 (Zyphra; `model_type=zaya`) is reasoning-capable. Unlike Ling,
+    /// its `.reasoning` stream must stay on the reasoning channel so the UI
+    /// can render the Thinking panel when the user opts in.
+    @Test func reasoning_stays_separate_for_zaya_family() async throws {
         let events: [Generation] = [
             .chunk("Hello! "),
             .reasoning("(zaya hidden reasoning)"),
@@ -215,21 +215,21 @@ struct GenerationEventMapperTests {
             "Zyphra/Zaya-S-7B-Future",
         ] {
             let out = try await collect(events: events, modelName: modelName)
-            #expect(
-                !out.contains(where: { if case .reasoning = $0 { true } else { false } }),
-                "ZAYA should never emit .reasoning runtime events: \(modelName)"
-            )
             let assembled = out.compactMap {
                 if case .tokens(let s) = $0 { s } else { nil }
             }.joined()
-            #expect(assembled == "Hello! (zaya hidden reasoning)")
+            let reasoning = out.compactMap {
+                if case .reasoning(let s) = $0 { s } else { nil }
+            }
+            #expect(assembled == "Hello! ")
+            #expect(reasoning == ["(zaya hidden reasoning)"])
         }
     }
 
     /// Reasoning-capable families (Qwen3, Nemotron, OpenAI o-series, Auto)
     /// must keep the channel split so the UI can render thinking panels.
-    /// Adversarial-name guard: `lazyaardvark` and `dataset/zayasaurus` look
-    /// like ZAYA but must NOT trip the merge.
+    /// ZAYA is included here to guard the corrected policy: it is
+    /// reasoning-capable and must not trip the Ling-only merge.
     @Test func reasoning_stays_separate_for_other_families() async throws {
         let events: [Generation] = [
             .chunk("answer "),
@@ -239,6 +239,7 @@ struct GenerationEventMapperTests {
         for modelName in [
             "OsaurusAI/Qwen3.6-35B-A3B-mxfp4",
             "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
+            "Zyphra/Zaya1-8B-JANGTQ4",
             "lmstudio-community/gpt-oss-20b-MLX-8bit",
             "dataset/zayasaurus",  // ZAYA boundary regression
             "lazyaardvark",  // ZAYA boundary regression
@@ -250,7 +251,7 @@ struct GenerationEventMapperTests {
             }
             #expect(
                 reasoning == ["alpha", "beta"],
-                "non-Ling/non-ZAYA must keep reasoning channel split: \(modelName)"
+                "non-Ling families must keep reasoning channel split: \(modelName)"
             )
         }
     }

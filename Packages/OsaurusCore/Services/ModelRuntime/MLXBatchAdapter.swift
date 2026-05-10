@@ -248,13 +248,14 @@ struct MLXBatchAdapter {
         for generation: GenerationParameters,
         modelName: String
     ) -> [String: any Sendable] {
-        if ModelFamilyNames.isLingFamily(modelName)
-            || ModelFamilyNames.isZayaFamily(modelName)
-        {
+        if ModelFamilyNames.isLingFamily(modelName) {
             return ["enable_thinking": false]
         }
         if let disableThinking = generation.modelOptions["disableThinking"]?.boolValue {
             return ["enable_thinking": !disableThinking]
+        }
+        if ModelFamilyNames.isZayaFamily(modelName) {
+            return ["enable_thinking": false]
         }
         return ["enable_thinking": true]
     }
@@ -384,10 +385,13 @@ struct MLXBatchAdapter {
             // `enable_thinking` handling. Ling-2.6 Flash is served as a
             // non-reasoning model, so force it off even when a caller omits
             // model options or an older saved preference says otherwise.
-            // Other families still honor explicit `disableThinking`; when
-            // unspecified, default to `true` because thinking-capable Gemma,
-            // Qwen, and auto-detected templates rely on a present truthy
-            // kwarg to activate reasoning.
+            // ZAYA is reasoning-capable, but its template defaults to a
+            // closed/no-thinking assistant prefix; preserve that default
+            // when callers omit the option, while still honoring an explicit
+            // user/API `disableThinking=false` opt-in. Other families default
+            // to `true` because thinking-capable Gemma, Qwen, and
+            // auto-detected templates rely on a present truthy kwarg to
+            // activate reasoning.
             let additionalContext = additionalContext(for: generation, modelName: modelName)
             let userInput = MLXLMCommon.UserInput(
                 chat: chat,

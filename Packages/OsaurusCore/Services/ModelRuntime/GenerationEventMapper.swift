@@ -29,7 +29,7 @@ private let mapperLog = Logger(subsystem: "ai.osaurus", category: "Generation")
 enum GenerationEventMapper {
 
     /// True when the model family is configured as non-reasoning in osaurus
-    /// (Ling, ZAYA1). For these families, vmlx's `ReasoningParser` may still
+    /// (currently Ling). For these families, vmlx's `ReasoningParser` may still
     /// switch into reasoning mode if the model emits a `<think>` token despite
     /// `enable_thinking=false` — it has to, because the parser has no idea
     /// whether the host has clamped thinking off. The 2026-05-07 production
@@ -42,7 +42,6 @@ enum GenerationEventMapper {
     /// streaming text and the EOS doesn't gate the entire answer.
     static func treatReasoningAsContent(modelName: String) -> Bool {
         ModelFamilyNames.isLingFamily(modelName)
-            || ModelFamilyNames.isZayaFamily(modelName)
     }
 
     /// Map a `Generation` stream into the typed `ModelRuntimeEvent` stream
@@ -93,7 +92,7 @@ enum GenerationEventMapper {
                             InferenceProgressManager.shared.prefillDidFinishAsync()
                         }
                         if mergeReasoning {
-                            // Ling / ZAYA — non-reasoning families. vmlx
+                            // Ling — non-reasoning family. vmlx
                             // already stripped the `<think>` / `</think>`
                             // markers; the inner text is plain content the
                             // user should see in real time.
