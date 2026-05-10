@@ -1078,7 +1078,8 @@ public actor ModelRuntime {
         topP: Float,
         topK: Int = 0,
         repetitionPenalty: Float?,
-        stopSequences: [String] = []
+        stopSequences: [String] = [],
+        enableCompiledBatchDecode: Bool = true
     ) -> MLXLMCommon.GenerateParameters {
         MLXLMCommon.GenerateParameters(
             maxTokens: maxTokens,
@@ -1087,7 +1088,8 @@ public actor ModelRuntime {
             topK: topK,
             repetitionPenalty: repetitionPenalty,
             repetitionContextSize: 20,
-            extraStopStrings: stopSequences
+            extraStopStrings: stopSequences,
+            enableCompiledBatchDecode: enableCompiledBatchDecode
         )
     }
 

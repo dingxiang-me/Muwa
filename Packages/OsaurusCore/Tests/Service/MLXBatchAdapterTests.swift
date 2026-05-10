@@ -54,6 +54,32 @@ struct MLXBatchAdapterTests {
         #expect(InferenceFeatureFlags.mlxBatchEngineMaxBatchSize == 1)
     }
 
+    @Test func generateParameters_enableCompiledBatchDecodeForSoloDefault() {
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0,
+            maxTokens: 16,
+            topP: 1,
+            repetitionPenalty: nil
+        )
+
+        #expect(
+            params.enableCompiledBatchDecode,
+            "Osaurus default maxBatchSize=1 path must opt into vmlx BatchEngine compiled decode; leaving this false is the observed half-speed path"
+        )
+    }
+
+    @Test func generateParameters_canDisableCompiledBatchDecodeForMultiSlotServerMode() {
+        let params = ModelRuntime.makeGenerateParameters(
+            temperature: 0,
+            maxTokens: 16,
+            topP: 1,
+            repetitionPenalty: nil,
+            enableCompiledBatchDecode: false
+        )
+
+        #expect(!params.enableCompiledBatchDecode)
+    }
+
     @Test func registry_shutdownNonexistentIsNoop() async {
         // Calling shutdown on a name that was never registered should not
         // throw or crash — important because `ModelRuntime.unload` always

@@ -307,7 +307,8 @@ struct MLXBatchAdapter {
             topP: generation.topPOverride ?? modelDefaults.topP ?? runtime.topP,
             topK: modelDefaults.topK ?? 0,
             repetitionPenalty: generation.repetitionPenalty ?? modelDefaults.repetitionPenalty,
-            stopSequences: stopSequences
+            stopSequences: stopSequences,
+            enableCompiledBatchDecode: maxBatchSize == 1
         )
 
         // Best-effort per-request determinism: seed the MLX global random
