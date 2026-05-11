@@ -173,7 +173,7 @@ struct DashboardAddWidgetSheet: View {
         VStack(alignment: .leading, spacing: 12) {
             stepHeading(
                 "What do you want to see?",
-                subtitle: "Pick a data source. Try \"calendar\", \"weather\", or \"news\"."
+                subtitle: "Pick a plugin. Try \"calendar\", \"weather\", or \"news\"."
             )
             DashboardToolPicker(selectedTool: $selectedTool)
                 .background(

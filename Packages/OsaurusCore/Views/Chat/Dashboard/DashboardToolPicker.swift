@@ -59,7 +59,12 @@ enum DashboardToolCatalog {
 
     static func buildCatalog() -> [PickableTool] {
         let registry = ToolRegistry.shared
-        let entries = registry.listTools().filter { $0.enabled }
+        // hide built-in agent-loop tools (`complete`, `clarify`, `capabilities_*`, etc.) —
+        // they're chat infrastructure, not user-facing data sources
+        let builtInNames = registry.builtInToolNames
+        let entries = registry.listTools().filter {
+            $0.enabled && !builtInNames.contains($0.name)
+        }
 
         // map provider display name → MCPProvider so we can detect connection state per tool
         let mcpManager = MCPProviderManager.shared
