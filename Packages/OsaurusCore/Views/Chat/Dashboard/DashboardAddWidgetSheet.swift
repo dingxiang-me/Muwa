@@ -5,13 +5,31 @@
 
 import SwiftUI
 
+// MARK: - Wizard step
+
+enum WidgetWizardStep: Int, CaseIterable {
+    case source = 0
+    case configure = 1
+    case style = 2
+    case schedule = 3
+
+    var title: String {
+        switch self {
+        case .source: return "Pick a source"
+        case .configure: return "Set it up"
+        case .style: return "Pick a look"
+        case .schedule: return "Set updates"
+        }
+    }
+}
+
+// MARK: - Sheet
+
 struct DashboardAddWidgetSheet: View {
     @Environment(\.theme) private var theme
     @ObservedObject private var agentManager = AgentManager.shared
 
-    /// non-nil = edit mode (save updates instead of appends)
     let editing: DashboardWidget?
-    /// pre-fill from external surfaces (e.g. chat's "Pin to Dashboard"); exclusive with `editing`
     let prefill: DashboardPinRequest?
     let onSave: (DashboardWidget) -> Void
     let onCancel: () -> Void
@@ -40,9 +58,9 @@ struct DashboardAddWidgetSheet: View {
     @State private var agentOverride: UUID? = nil
     @State private var showAdvanced: Bool = false
 
-    // preview state machine
+    // preview
     @State private var previewResult: WidgetResult = .idle
-    /// last successful payload; renderer/mapping tweaks re-render from this without re-executing
+    /// last successful payload; style tweaks re-render from this without re-executing
     @State private var cachedPayload: JSONValue?
 
     @State private var showSaveAnywayConfirm: Bool = false
@@ -50,160 +68,485 @@ struct DashboardAddWidgetSheet: View {
     /// suppresses `onToolChanged`'s reset during initial seed so it doesn't wipe pre-filled args
     @State private var didApplyInitial: Bool = false
 
+    // wizard
+    @State private var step: WidgetWizardStep = .source
+    /// tracks transition direction for asymmetric slide
+    @State private var stepDirection: Int = 1
+
     var body: some View {
         VStack(spacing: 0) {
             header
+            stepIndicator
             Divider().opacity(0.4)
-            HStack(spacing: 0) {
-                configurationPane
-                    .frame(maxWidth: 380)
-                Divider().opacity(0.4)
-                previewPane
-                    .frame(minWidth: 320)
-            }
+            stepBody
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
             Divider().opacity(0.4)
             footer
         }
-        .frame(width: 880, height: 620)
+        .frame(width: 720, height: 620)
         .background(theme.primaryBackground)
         .onAppear { applyEditingState() }
         .onChange(of: selectedTool?.id) { _, _ in onToolChanged() }
         .onChange(of: arguments) { _, _ in onArgumentsChanged() }
     }
 
-    // MARK: Header
+    // MARK: Header + progress
 
     private var header: some View {
         HStack(spacing: 12) {
-            Text(editing == nil ? "Add Widget" : "Edit Widget")
-                .font(.system(size: 16, weight: .semibold))
-                .foregroundColor(theme.primaryText)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(editing == nil ? "Add Widget" : "Edit Widget")
+                    .font(.system(size: 17, weight: .bold, design: .rounded))
+                    .foregroundColor(theme.primaryText)
+                Text(step.title)
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.secondaryText)
+            }
             Spacer()
+            Button(action: onCancel) {
+                Image(systemName: "xmark")
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(theme.secondaryText)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(theme.tertiaryBackground))
+            }
+            .buttonStyle(.plain)
         }
         .padding(.horizontal, 20)
         .padding(.vertical, 14)
         .background(theme.secondaryBackground)
     }
 
-    // MARK: Configuration pane
-
-    private var configurationPane: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 16) {
-                sectionLabel("Tool")
-                DashboardToolPicker(selectedTool: $selectedTool)
-                    .frame(height: 200)
-                    .background(
-                        RoundedRectangle(cornerRadius: 8).fill(theme.secondaryBackground)
+    private var stepIndicator: some View {
+        HStack(spacing: 6) {
+            ForEach(WidgetWizardStep.allCases, id: \.self) { s in
+                Capsule()
+                    .fill(
+                        s.rawValue <= step.rawValue
+                            ? theme.accentColor
+                            : theme.tertiaryBackground
                     )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 8)
-                            .stroke(theme.cardBorder, lineWidth: 1)
-                    )
-
-                if selectedTool != nil {
-                    titleField
-                    sectionLabel("Arguments")
-                    DashboardArgsForm(
-                        parameters: selectedTool?.parameters,
-                        arguments: $arguments
-                    )
-                }
-
-                sectionLabel("Rendering")
-                rendererPicker
-                sizePicker
-                fieldMappingForm
-
-                sectionLabel("Refresh")
-                refreshControls
-
-                advancedToggle
-                if showAdvanced {
-                    sectionLabel("Advanced")
-                    agentOverrideControl
-                }
+                    .frame(height: 4)
+                    .frame(maxWidth: .infinity)
             }
-            .padding(16)
         }
+        .padding(.horizontal, 20)
+        .padding(.vertical, 10)
+        .background(theme.secondaryBackground)
     }
 
-    private var titleField: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Text("title")
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(theme.primaryText)
-                Text("required")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(.orange)
+    // MARK: Step body
+
+    @ViewBuilder
+    private var stepBody: some View {
+        ZStack {
+            switch step {
+            case .source:
+                sourceStep
+                    .transition(slideTransition)
+            case .configure:
+                configureStep
+                    .transition(slideTransition)
+            case .style:
+                styleStep
+                    .transition(slideTransition)
+            case .schedule:
+                scheduleStep
+                    .transition(slideTransition)
             }
-            TextField("Card title", text: $title)
-                .textFieldStyle(.plain)
-                .font(.system(size: 12))
-                .foregroundColor(theme.primaryText)
-                .padding(.horizontal, 8)
-                .padding(.vertical, 6)
+        }
+        .animation(.easeInOut(duration: 0.22), value: step)
+    }
+
+    private var slideTransition: AnyTransition {
+        let edge: Edge = stepDirection > 0 ? .trailing : .leading
+        let oppositeEdge: Edge = stepDirection > 0 ? .leading : .trailing
+        return .asymmetric(
+            insertion: .move(edge: edge).combined(with: .opacity),
+            removal: .move(edge: oppositeEdge).combined(with: .opacity)
+        )
+    }
+
+    // MARK: Step 1 — Source
+
+    private var sourceStep: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            stepHeading(
+                "What do you want to see?",
+                subtitle: "Pick a data source. Try \"calendar\", \"weather\", or \"news\"."
+            )
+            DashboardToolPicker(selectedTool: $selectedTool)
                 .background(
-                    RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                    RoundedRectangle(cornerRadius: 10).fill(theme.secondaryBackground)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10).stroke(theme.cardBorder, lineWidth: 1)
                 )
         }
+        .padding(20)
     }
 
-    private var rendererPicker: some View {
+    // MARK: Step 2 — Configure
+
+    private var configureStep: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 18) {
+                stepHeading(
+                    "Set it up",
+                    subtitle: "Name your widget and fill in any details it needs."
+                )
+
+                fieldGroup("Widget name") {
+                    TextField("e.g. Today's weather", text: $title)
+                        .textFieldStyle(.plain)
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.primaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 8)
+                        .background(
+                            RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
+                        )
+                }
+
+                if hasParameters {
+                    fieldGroup("Details") {
+                        DashboardArgsForm(
+                            parameters: selectedTool?.parameters,
+                            arguments: $arguments
+                        )
+                    }
+                } else {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill")
+                            .foregroundColor(.green)
+                        Text("This widget doesn't need any extra details.")
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.secondaryText)
+                        Spacer()
+                    }
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground.opacity(0.4))
+                    )
+                }
+            }
+            .padding(20)
+        }
+    }
+
+    // MARK: Step 3 — Style
+
+    private var styleStep: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            stepHeading(
+                "How should it look?",
+                subtitle: "We'll show you a live preview. Pick what fits best."
+            )
+
+            HStack(alignment: .top, spacing: 16) {
+                // preview column
+                VStack(spacing: 10) {
+                    previewArea
+                    Button {
+                        Task { await runPreview() }
+                    } label: {
+                        HStack(spacing: 6) {
+                            Image(systemName: cachedPayload == nil ? "play.fill" : "arrow.clockwise")
+                                .font(.system(size: 10))
+                            Text(cachedPayload == nil ? "Load preview" : "Reload")
+                                .font(.system(size: 12, weight: .semibold))
+                        }
+                        .foregroundColor(theme.accentColor)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6).fill(theme.accentColor.opacity(0.12))
+                        )
+                    }
+                    .buttonStyle(.plain)
+                    .disabled(isLoading || selectedTool == nil)
+                }
+                .frame(maxWidth: 340)
+
+                // chooser column
+                VStack(alignment: .leading, spacing: 14) {
+                    Text("Display style")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(theme.tertiaryText)
+                    rendererChips
+
+                    Text("Size")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(theme.tertiaryText)
+                        .padding(.top, 6)
+                    sizeChips
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
+        }
+        .padding(20)
+    }
+
+    private var previewArea: some View {
+        Group {
+            if selectedTool == nil {
+                previewPlaceholder
+            } else {
+                WidgetCard(
+                    widget: previewWidget,
+                    result: previewResult,
+                    onRefresh: { Task { await runPreview() } },
+                    onRemove: {}
+                )
+                .allowsHitTesting(false)
+            }
+        }
+    }
+
+    private var previewPlaceholder: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "rectangle.dashed")
+                .font(.system(size: 26, weight: .light))
+                .foregroundColor(theme.tertiaryText)
+            Text("Preview will appear here")
+                .font(.system(size: 11))
+                .foregroundColor(theme.tertiaryText)
+        }
+        .frame(maxWidth: .infinity, minHeight: 200)
+        .background(
+            RoundedRectangle(cornerRadius: 10).fill(theme.secondaryBackground)
+        )
+    }
+
+    private var rendererChips: some View {
+        VStack(spacing: 6) {
+            ForEach(consumerRenderers, id: \.self) { r in
+                rendererChip(r)
+            }
+        }
+    }
+
+    private func rendererChip(_ r: WidgetRenderer) -> some View {
+        let isSelected = renderer == r
+        let info = rendererInfo(r)
+        return Button {
+            renderer = r
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: info.icon)
+                    .font(.system(size: 13))
+                    .foregroundColor(isSelected ? theme.accentColor : theme.secondaryText)
+                    .frame(width: 22)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text(info.title)
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(theme.primaryText)
+                    Text(info.description)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.tertiaryText)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                if isSelected {
+                    Image(systemName: "checkmark")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundColor(theme.accentColor)
+                }
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? theme.accentColor.opacity(0.1) : theme.secondaryBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isSelected ? theme.accentColor.opacity(0.5) : theme.cardBorder,
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var sizeChips: some View {
+        HStack(spacing: 8) {
+            ForEach([WidgetSize.small, .medium, .large], id: \.self) { s in
+                sizeChip(s)
+            }
+        }
+    }
+
+    private func sizeChip(_ s: WidgetSize) -> some View {
+        let isSelected = size == s
+        return Button {
+            size = s
+        } label: {
+            VStack(spacing: 4) {
+                Image(systemName: sizeIcon(s))
+                    .font(.system(size: 14))
+                Text(sizeLabel(s))
+                    .font(.system(size: 11, weight: .semibold))
+            }
+            .foregroundColor(isSelected ? theme.accentColor : theme.secondaryText)
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? theme.accentColor.opacity(0.1) : theme.secondaryBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isSelected ? theme.accentColor.opacity(0.5) : theme.cardBorder,
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    // MARK: Step 4 — Schedule
+
+    private var scheduleStep: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 16) {
+                stepHeading(
+                    "Keep it fresh",
+                    subtitle: "Choose how often the widget should update on its own."
+                )
+
+                fieldGroup("Update frequency") {
+                    VStack(spacing: 6) {
+                        ForEach(RefreshInterval.allCases, id: \.self) { interval in
+                            frequencyRow(interval)
+                        }
+                    }
+                }
+
+                Toggle(isOn: $refreshInBackground) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Keep updating while app is in background")
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(theme.primaryText)
+                        Text("Off by default to save battery.")
+                            .font(.system(size: 10))
+                            .foregroundColor(theme.tertiaryText)
+                    }
+                }
+                .toggleStyle(.switch)
+                .disabled(refreshInterval == .manual)
+                .opacity(refreshInterval == .manual ? 0.5 : 1)
+
+                Divider().padding(.vertical, 4)
+
+                DisclosureGroup(isExpanded: $showAdvanced) {
+                    VStack(alignment: .leading, spacing: 12) {
+                        agentOverrideControl
+                        if shouldShowMapping {
+                            fieldMappingControls
+                        }
+                    }
+                    .padding(.top, 8)
+                } label: {
+                    Text("Advanced options")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(theme.secondaryText)
+                }
+            }
+            .padding(20)
+        }
+    }
+
+    private func frequencyRow(_ interval: RefreshInterval) -> some View {
+        let isSelected = refreshInterval == interval
+        return Button {
+            refreshInterval = interval
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: isSelected ? "largecircle.fill.circle" : "circle")
+                    .font(.system(size: 14))
+                    .foregroundColor(isSelected ? theme.accentColor : theme.tertiaryText)
+                Text(interval.displayName)
+                    .font(.system(size: 12, weight: isSelected ? .semibold : .regular))
+                    .foregroundColor(theme.primaryText)
+                Spacer()
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(isSelected ? theme.accentColor.opacity(0.08) : theme.secondaryBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isSelected ? theme.accentColor.opacity(0.4) : theme.cardBorder,
+                        lineWidth: 1
+                    )
+            )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private var agentOverrideControl: some View {
         HStack {
-            Text("Renderer")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(theme.secondaryText)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Use a specific agent")
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(theme.primaryText)
+                Text("Defaults to your usual agent.")
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.tertiaryText)
+            }
             Spacer()
-            Picker("", selection: $renderer) {
-                ForEach(WidgetRenderer.allCases, id: \.self) { r in
-                    Text(rendererLabel(r)).tag(r)
+            Picker("", selection: agentSelectionBinding) {
+                Text("Default").tag(UUID?.none)
+                ForEach(agentManager.agents) { agent in
+                    Text(agent.name).tag(Optional(agent.id))
                 }
             }
             .pickerStyle(.menu)
             .labelsHidden()
+            .frame(width: 160)
         }
     }
 
-    private var sizePicker: some View {
-        HStack {
-            Text("Size")
-                .font(.system(size: 11, weight: .medium))
-                .foregroundColor(theme.secondaryText)
-            Spacer()
-            Picker("", selection: $size) {
-                Text("Small").tag(WidgetSize.small)
-                Text("Medium").tag(WidgetSize.medium)
-                Text("Large").tag(WidgetSize.large)
-            }
-            .pickerStyle(.segmented)
-            .labelsHidden()
-            .frame(width: 200)
-        }
+    private var agentSelectionBinding: Binding<UUID?> {
+        Binding(get: { agentOverride }, set: { agentOverride = $0 })
     }
 
     @ViewBuilder
-    private var fieldMappingForm: some View {
-        switch renderer {
-        case .stat:
-            mappingTextField("Value key", binding: mappingBinding(\.valueKey))
-            mappingTextField("Label key", binding: mappingBinding(\.titleKey))
-        case .list:
-            mappingTextField("Title key", binding: mappingBinding(\.titleKey))
-            mappingTextField("Subtitle key", binding: mappingBinding(\.subtitleKey))
-        case .table:
-            mappingTextField("Primary column", binding: mappingBinding(\.titleKey))
-            mappingTextField("Secondary column", binding: mappingBinding(\.subtitleKey))
-        case .chart:
-            mappingTextField("X-axis key", binding: mappingBinding(\.xKey))
-            mappingTextField("Y-axis key", binding: mappingBinding(\.yKey))
-        case .keyValue, .markdown, .raw:
-            EmptyView()
+    private var fieldMappingControls: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Which fields to show")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(theme.tertiaryText)
+            Text("Use these only if the preview is showing the wrong field for each row.")
+                .font(.system(size: 10))
+                .foregroundColor(theme.tertiaryText)
+                .padding(.bottom, 4)
+            switch renderer {
+            case .stat:
+                mappingField("Value field", binding: mappingBinding(\.valueKey))
+                mappingField("Label field", binding: mappingBinding(\.titleKey))
+            case .list:
+                mappingField("Title field", binding: mappingBinding(\.titleKey))
+                mappingField("Subtitle field", binding: mappingBinding(\.subtitleKey))
+            case .table:
+                mappingField("Primary column", binding: mappingBinding(\.titleKey))
+                mappingField("Secondary column", binding: mappingBinding(\.subtitleKey))
+            case .chart:
+                mappingField("X-axis field", binding: mappingBinding(\.xKey))
+                mappingField("Y-axis field", binding: mappingBinding(\.yKey))
+            default:
+                EmptyView()
+            }
         }
     }
 
-    private func mappingTextField(_ label: String, binding: Binding<String>) -> some View {
+    private func mappingField(_ label: String, binding: Binding<String>) -> some View {
         HStack(spacing: 8) {
             Text(label)
                 .font(.system(size: 11))
@@ -228,191 +571,120 @@ struct DashboardAddWidgetSheet: View {
         )
     }
 
-    private var refreshControls: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack {
-                Text("Interval")
-                    .font(.system(size: 11))
-                    .foregroundColor(theme.tertiaryText)
-                Spacer()
-                Picker("", selection: $refreshInterval) {
-                    ForEach(RefreshInterval.allCases, id: \.self) { interval in
-                        Text(interval.displayName).tag(interval)
-                    }
-                }
-                .pickerStyle(.menu)
-                .labelsHidden()
-            }
-            HStack(spacing: 8) {
-                Toggle(isOn: $refreshInBackground) { EmptyView() }
-                    .toggleStyle(.switch)
-                    .labelsHidden()
-                    .disabled(refreshInterval == .manual)
-                Text("Refresh while app is in background")
-                    .font(.system(size: 11))
-                    .foregroundColor(
-                        refreshInterval == .manual ? theme.tertiaryText : theme.secondaryText
-                    )
-                Spacer()
-            }
-        }
-    }
-
-    private var advancedToggle: some View {
-        Button {
-            withAnimation { showAdvanced.toggle() }
-        } label: {
-            HStack(spacing: 6) {
-                Image(systemName: showAdvanced ? "chevron.down" : "chevron.right")
-                    .font(.system(size: 9, weight: .semibold))
-                Text("Advanced")
-                    .font(.system(size: 11, weight: .semibold))
-            }
-            .foregroundColor(theme.secondaryText)
-        }
-        .buttonStyle(.plain)
-    }
-
-    private var agentOverrideControl: some View {
-        HStack {
-            Text("Agent")
-                .font(.system(size: 11))
-                .foregroundColor(theme.tertiaryText)
-            Spacer()
-            Picker("", selection: agentSelectionBinding) {
-                Text("Default").tag(UUID?.none)
-                ForEach(agentManager.agents) { agent in
-                    Text(agent.name).tag(Optional(agent.id))
-                }
-            }
-            .pickerStyle(.menu)
-            .labelsHidden()
-        }
-    }
-
-    private var agentSelectionBinding: Binding<UUID?> {
-        Binding(get: { agentOverride }, set: { agentOverride = $0 })
-    }
-
-    // MARK: Preview pane
-
-    private var previewPane: some View {
-        VStack(spacing: 12) {
-            HStack {
-                Text("Preview")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(theme.tertiaryText)
-                Spacer()
-                if selectedTool != nil {
-                    Button {
-                        Task { await runPreview() }
-                    } label: {
-                        HStack(spacing: 4) {
-                            Image(systemName: "play.fill").font(.system(size: 9))
-                            Text(cachedPayload == nil ? "Run preview" : "Run again")
-                                .font(.system(size: 11, weight: .semibold))
-                        }
-                        .foregroundColor(theme.accentColor)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 5)
-                        .background(
-                            RoundedRectangle(cornerRadius: 6)
-                                .fill(theme.accentColor.opacity(0.12))
-                        )
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isLoading)
-                }
-            }
-            previewCard
-            Spacer()
-        }
-        .padding(16)
-    }
-
-    @ViewBuilder
-    private var previewCard: some View {
-        if selectedTool == nil {
-            previewPlaceholder(
-                icon: "rectangle.grid.3x1.fill",
-                message: "Pick a tool to see a live preview."
-            )
-        } else {
-            WidgetCard(
-                widget: previewWidget,
-                result: previewResult,
-                onRefresh: { Task { await runPreview() } },
-                onRemove: {}
-            )
-            .frame(maxWidth: 360)
-            // preview is read-only; menus would be misleading
-            .allowsHitTesting(false)
-            if case .idle = previewResult {
-                HStack(spacing: 4) {
-                    Image(systemName: "info.circle").font(.system(size: 10))
-                    Text("Run the preview to fetch real data, then tweak the renderer below.")
-                        .font(.system(size: 10))
-                        .foregroundColor(theme.tertiaryText)
-                }
-            }
-        }
-    }
-
-    private func previewPlaceholder(icon: String, message: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 28, weight: .light))
-                .foregroundColor(theme.tertiaryText)
-            Text(message)
-                .font(.system(size: 11))
-                .foregroundColor(theme.tertiaryText)
-                .multilineTextAlignment(.center)
-        }
-        .frame(maxWidth: .infinity, minHeight: 200)
-    }
-
     // MARK: Footer
 
     private var footer: some View {
-        HStack {
-            Spacer()
-            Button("Cancel", action: onCancel)
+        HStack(spacing: 10) {
+            if step != .source {
+                Button(action: goBack) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "chevron.left").font(.system(size: 11, weight: .semibold))
+                        Text("Back").font(.system(size: 12, weight: .medium))
+                    }
+                    .foregroundColor(theme.secondaryText)
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                    )
+                }
                 .buttonStyle(.plain)
-                .foregroundColor(theme.secondaryText)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 8)
-            Button {
-                attemptSave()
-            } label: {
-                Text(editing == nil ? "Add Widget" : "Save")
-                    .font(.system(size: 12, weight: .semibold))
+            }
+
+            Spacer()
+
+            if step == .schedule {
+                Button { attemptSave() } label: {
+                    HStack(spacing: 6) {
+                        Image(systemName: "checkmark.circle.fill").font(.system(size: 12))
+                        Text(editing == nil ? "Add to Dashboard" : "Save Changes")
+                            .font(.system(size: 12, weight: .semibold))
+                    }
                     .foregroundColor(.white)
-                    .padding(.horizontal, 16)
+                    .padding(.horizontal, 18)
                     .padding(.vertical, 8)
                     .background(
                         RoundedRectangle(cornerRadius: 6)
                             .fill(canSave ? theme.accentColor : theme.tertiaryText)
                     )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canSave)
+            } else {
+                Button(action: goNext) {
+                    HStack(spacing: 6) {
+                        Text("Continue").font(.system(size: 12, weight: .semibold))
+                        Image(systemName: "chevron.right").font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 18)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(canAdvance ? theme.accentColor : theme.tertiaryText)
+                    )
+                }
+                .buttonStyle(.plain)
+                .disabled(!canAdvance)
             }
-            .buttonStyle(.plain)
-            .disabled(!canSave)
         }
-        .padding(.horizontal, 16)
-        .padding(.vertical, 10)
+        .padding(.horizontal, 20)
+        .padding(.vertical, 12)
         .background(theme.secondaryBackground)
         .alert(
-            "Tool refresh failed",
+            "Preview returned an error",
             isPresented: $showSaveAnywayConfirm,
             actions: {
                 Button("Save anyway") { commitSave() }
                 Button("Cancel", role: .cancel) {}
             },
             message: {
-                Text(
-                    "The preview returned an error. Save the widget anyway — the next refresh may succeed."
-                )
+                Text("The preview hit an error. Save anyway — the next refresh may succeed.")
             }
         )
+    }
+
+    // MARK: - Navigation
+
+    private func goNext() {
+        guard let next = WidgetWizardStep(rawValue: step.rawValue + 1) else { return }
+        stepDirection = 1
+        // when leaving step 2 with no preview yet, fire one so step 3 already has data
+        if step == .configure, cachedPayload == nil, selectedTool != nil {
+            Task { await runPreview() }
+        }
+        withAnimation { step = next }
+    }
+
+    private func goBack() {
+        guard let prev = WidgetWizardStep(rawValue: step.rawValue - 1) else { return }
+        stepDirection = -1
+        withAnimation { step = prev }
+    }
+
+    private var canAdvance: Bool {
+        switch step {
+        case .source:
+            return selectedTool != nil
+        case .configure:
+            return !title.trimmingCharacters(in: .whitespaces).isEmpty
+        case .style:
+            return true
+        case .schedule:
+            return canSave
+        }
+    }
+
+    private var canSave: Bool {
+        guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+        guard selectedTool != nil else { return false }
+        if editing != nil, !isLoading { return true }
+        switch previewResult {
+        case .success, .error: return true
+        // allow saving when the user opted to skip preview entirely; we won't error out on idle
+        case .idle: return true
+        case .loading: return false
+        }
     }
 
     // MARK: - Derived
@@ -436,13 +708,27 @@ struct DashboardAddWidgetSheet: View {
         return false
     }
 
-    private var canSave: Bool {
-        guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
-        guard selectedTool != nil else { return false }
-        // edit mode skips the "must run preview" gate so title-only tweaks save instantly
-        if editing != nil, !isLoading { return true }
-        switch previewResult {
-        case .success, .error: return true
+    private var hasParameters: Bool {
+        guard let params = selectedTool?.parameters else { return false }
+        if case .object(let dict) = params,
+            case .object(let props) = dict["properties"] ?? .null,
+            !props.isEmpty
+        {
+            return true
+        }
+        return false
+    }
+
+    /// hides `.raw` from the consumer chip list (still selectable via existing widget on edit)
+    private var consumerRenderers: [WidgetRenderer] {
+        var out: [WidgetRenderer] = [.stat, .keyValue, .list, .table, .markdown, .chart]
+        if renderer == .raw { out.append(.raw) }
+        return out
+    }
+
+    private var shouldShowMapping: Bool {
+        switch renderer {
+        case .stat, .list, .table, .chart: return true
         default: return false
         }
     }
@@ -478,9 +764,7 @@ struct DashboardAddWidgetSheet: View {
     }
 
     private func onToolChanged() {
-        // ignore the assignment fired by `applyEditingState` so it doesn't wipe seeded state
         guard didApplyInitial else { return }
-
         previewResult = .idle
         cachedPayload = nil
         inferenceApplied = false
@@ -492,7 +776,7 @@ struct DashboardAddWidgetSheet: View {
         }
     }
 
-    /// invalidate cached preview when args change; user must hit "Run preview" again
+    /// invalidate cached preview when args change; user must hit "Reload" again
     /// (prevents hammering MCP servers per keystroke)
     private func onArgumentsChanged() {
         guard cachedPayload != nil else { return }
@@ -555,22 +839,62 @@ struct DashboardAddWidgetSheet: View {
 
     // MARK: - Helpers
 
-    private func sectionLabel(_ text: String) -> some View {
-        Text(text)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(theme.tertiaryText)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    private func stepHeading(_ title: String, subtitle: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title)
+                .font(.system(size: 18, weight: .semibold, design: .rounded))
+                .foregroundColor(theme.primaryText)
+            Text(subtitle)
+                .font(.system(size: 12))
+                .foregroundColor(theme.secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
     }
 
-    private func rendererLabel(_ renderer: WidgetRenderer) -> String {
-        switch renderer {
-        case .stat: return "Stat"
-        case .keyValue: return "Key/Value"
-        case .list: return "List"
-        case .table: return "Table"
-        case .markdown: return "Markdown"
-        case .chart: return "Chart"
-        case .raw: return "Raw JSON"
+    private func fieldGroup<Content: View>(
+        _ title: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text(title)
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(theme.tertiaryText)
+            content()
+        }
+    }
+
+    private func rendererInfo(_ r: WidgetRenderer) -> (title: String, description: String, icon: String) {
+        switch r {
+        case .stat:
+            return ("Big number", "Show a single value", "number.circle.fill")
+        case .keyValue:
+            return ("Details", "Show labels with values", "list.bullet.rectangle")
+        case .list:
+            return ("List", "One item per row", "list.bullet")
+        case .table:
+            return ("Table", "Multiple columns of data", "tablecells")
+        case .markdown:
+            return ("Article", "Formatted text or summary", "doc.text")
+        case .chart:
+            return ("Chart", "Visualize numbers as a graph", "chart.bar.fill")
+        case .raw:
+            return ("Raw data", "Show the underlying response", "curlybraces")
+        }
+    }
+
+    private func sizeIcon(_ s: WidgetSize) -> String {
+        switch s {
+        case .small: return "rectangle.compress.vertical"
+        case .medium: return "rectangle"
+        case .large: return "rectangle.expand.vertical"
+        }
+    }
+
+    private func sizeLabel(_ s: WidgetSize) -> String {
+        switch s {
+        case .small: return "Small"
+        case .medium: return "Medium"
+        case .large: return "Large"
         }
     }
 
@@ -586,9 +910,7 @@ struct DashboardAddWidgetSheet: View {
     /// duplicates `DashboardViewModel.parseEnvelope` so preview state stays local to the sheet
     private func parseEnvelope(_ raw: String) -> WidgetResult {
         if ToolEnvelope.isError(raw) {
-            let message = ToolEnvelope.failureMessage(raw)
-            let kind = extractKind(raw)
-            return .error(message: message, kind: kind)
+            return .error(message: ToolEnvelope.failureMessage(raw), kind: extractKind(raw))
         }
         if ToolEnvelope.isSuccess(raw) {
             guard let payload = ToolEnvelope.successPayload(raw) else {
@@ -626,7 +948,7 @@ struct DashboardAddWidgetSheet: View {
     }
 }
 
-// MARK: - Refresh interval helper
+// MARK: - Refresh interval
 
 enum RefreshInterval: Int, CaseIterable, Hashable {
     case manual = 0
@@ -641,11 +963,11 @@ enum RefreshInterval: Int, CaseIterable, Hashable {
 
     var displayName: String {
         switch self {
-        case .manual: return "Manual"
-        case .oneMinute: return "Every 1 min"
-        case .fiveMinutes: return "Every 5 min"
-        case .fifteenMinutes: return "Every 15 min"
-        case .oneHour: return "Every 1 hour"
+        case .manual: return "Only when I refresh"
+        case .oneMinute: return "Every minute"
+        case .fiveMinutes: return "Every 5 minutes"
+        case .fifteenMinutes: return "Every 15 minutes"
+        case .oneHour: return "Every hour"
         }
     }
 

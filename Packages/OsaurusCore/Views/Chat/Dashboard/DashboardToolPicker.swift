@@ -25,9 +25,9 @@ struct PickableTool: Identifiable, Equatable {
         var displayName: String {
             switch self {
             case .builtIn: return "Built-in"
-            case .plugin(let id): return "Plugin · \(id)"
-            case .mcp(let provider, _): return "MCP · \(provider)"
-            case .sandboxPlugin(let id): return "Sandbox · \(id)"
+            case .plugin(let id): return id
+            case .mcp(let provider, _): return provider
+            case .sandboxPlugin(let id): return id
             }
         }
 
@@ -157,7 +157,7 @@ struct DashboardToolPicker: View {
             Image(systemName: "magnifyingglass")
                 .font(.system(size: 11))
                 .foregroundColor(theme.tertiaryText)
-            TextField("Search tools", text: $searchText)
+            TextField("Search", text: $searchText)
                 .textFieldStyle(.plain)
                 .font(.system(size: 12))
                 .foregroundColor(theme.primaryText)
