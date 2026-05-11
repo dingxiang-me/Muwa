@@ -39,10 +39,16 @@ public struct RegistryCapabilities: Codable, Equatable, Sendable {
     public struct ToolSummary: Codable, Equatable, Sendable {
         public let name: String
         public let description: String
+        /// optional dashboard renderer hint; string-typed so this package stays UI-free
+        /// and older clients tolerate values they don't understand.
+        /// recognised values mirror `WidgetRenderer`: "stat", "keyValue", "list",
+        /// "table", "markdown", "chart", "raw"; unknown values are ignored.
+        public let defaultRender: String?
 
-        public init(name: String, description: String) {
+        public init(name: String, description: String, defaultRender: String? = nil) {
             self.name = name
             self.description = description
+            self.defaultRender = defaultRender
         }
     }
     public struct SkillSummary: Codable, Equatable, Sendable {

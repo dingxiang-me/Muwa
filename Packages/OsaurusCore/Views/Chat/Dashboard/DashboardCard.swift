@@ -1,0 +1,567 @@
+//
+//  DashboardCard.swift
+//  OsaurusCore
+//
+
+import SwiftUI
+
+// MARK: - WidgetCard
+
+struct WidgetCard: View {
+    @Environment(\.theme) private var theme
+
+    let widget: DashboardWidget
+    let result: WidgetResult
+    let onRefresh: () -> Void
+    let onRemove: () -> Void
+    /// nil disables the "Edit" menu entry (preview-mode cards)
+    var onEdit: (() -> Void)? = nil
+
+    @State private var isHovered: Bool = false
+
+    /// `WidgetSize` differentiates vertically only — LazyVGrid can't span columns without a custom layout
+    private var minHeight: CGFloat {
+        switch widget.size {
+        case .small: return 140
+        case .medium: return 200
+        case .large: return 320
+        }
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            header
+            Divider().opacity(0.4)
+            bodyContent
+                .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 0)
+            footer
+        }
+        .padding(16)
+        .frame(minHeight: minHeight, maxHeight: .infinity, alignment: .top)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(theme.cardBackground)
+        )
+        .overlay(
+            RoundedRectangle(cornerRadius: 12)
+                .strokeBorder(
+                    isHovered ? theme.accentColor.opacity(0.25) : theme.cardBorder,
+                    lineWidth: isHovered ? 1.5 : 1
+                )
+        )
+        .shadow(
+            color: Color.black.opacity(isHovered ? 0.08 : 0.04),
+            radius: isHovered ? 10 : 5,
+            x: 0,
+            y: isHovered ? 3 : 2
+        )
+        .animation(.spring(response: 0.3, dampingFraction: 0.7), value: isHovered)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) { isHovered = hovering }
+        }
+    }
+
+    // MARK: Header
+
+    private var header: some View {
+        HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(widget.title)
+                    .font(.system(size: 14, weight: .semibold))
+                    .foregroundColor(theme.primaryText)
+                    .lineLimit(1)
+                Text(widget.toolName)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(theme.tertiaryText)
+                    .lineLimit(1)
+            }
+
+            Spacer(minLength: 8)
+
+            if case .loading = result {
+                ProgressView().scaleEffect(0.6).frame(width: 24, height: 24)
+            }
+
+            Menu {
+                Button(action: onRefresh) {
+                    Label("Refresh", systemImage: "arrow.clockwise")
+                }
+                if let onEdit {
+                    Button(action: onEdit) {
+                        Label("Edit", systemImage: "slider.horizontal.3")
+                    }
+                }
+                Divider()
+                Button(role: .destructive, action: onRemove) {
+                    Label("Remove", systemImage: "trash")
+                }
+            } label: {
+                Image(systemName: "ellipsis")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(theme.secondaryText)
+                    .frame(width: 24, height: 24)
+                    .background(Circle().fill(theme.tertiaryBackground))
+            }
+            .menuStyle(.borderlessButton)
+            .menuIndicator(.hidden)
+            .frame(width: 24)
+        }
+    }
+
+    // MARK: Body
+
+    @ViewBuilder
+    private var bodyContent: some View {
+        switch result {
+        case .idle, .loading:
+            idleState
+        case .error(let message, _):
+            errorState(message)
+        case .success(let payload, _):
+            WidgetRendererView(
+                renderer: widget.renderConfig.renderer,
+                mapping: widget.renderConfig.mapping,
+                payload: payload
+            )
+        }
+    }
+
+    private var idleState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "ellipsis.circle")
+                .font(.system(size: 22))
+                .foregroundColor(theme.tertiaryText)
+            Text("Waiting for first refresh")
+                .font(.system(size: 12))
+                .foregroundColor(theme.tertiaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 16)
+    }
+
+    private func errorState(_ message: String) -> some View {
+        HStack(alignment: .top, spacing: 8) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 12))
+                .foregroundColor(.orange)
+            Text(message)
+                .font(.system(size: 12))
+                .foregroundColor(theme.secondaryText)
+                .lineLimit(4)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .padding(10)
+        .background(
+            RoundedRectangle(cornerRadius: 6)
+                .fill(Color.orange.opacity(0.08))
+        )
+    }
+
+    // MARK: Footer
+
+    @ViewBuilder
+    private var footer: some View {
+        HStack(spacing: 6) {
+            if let timestamp = lastUpdatedLabel {
+                Image(systemName: "clock")
+                    .font(.system(size: 9))
+                    .foregroundColor(theme.tertiaryText)
+                Text(timestamp)
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.tertiaryText)
+            }
+            Spacer()
+            if widget.refreshInBackground {
+                Image(systemName: "moon.fill")
+                    .font(.system(size: 9))
+                    .foregroundColor(theme.tertiaryText)
+                    .help("Refreshes in background")
+            }
+        }
+    }
+
+    private var lastUpdatedLabel: String? {
+        if case let .success(_, fetchedAt) = result {
+            let formatter = RelativeDateTimeFormatter()
+            formatter.unitsStyle = .abbreviated
+            return formatter.localizedString(for: fetchedAt, relativeTo: Date())
+        }
+        return nil
+    }
+}
+
+// MARK: - Renderer dispatcher
+
+struct WidgetRendererView: View {
+    let renderer: WidgetRenderer
+    let mapping: WidgetFieldMapping
+    let payload: JSONValue
+
+    var body: some View {
+        switch renderer {
+        case .stat:
+            StatRenderer(payload: payload, mapping: mapping)
+        case .keyValue:
+            KeyValueRenderer(payload: payload)
+        case .list:
+            ListRenderer(payload: payload, mapping: mapping)
+        case .table:
+            TableRenderer(payload: payload, mapping: mapping)
+        case .markdown:
+            MarkdownRenderer(payload: payload)
+        case .chart:
+            ChartRenderer(payload: payload, mapping: mapping)
+        case .raw:
+            RawRenderer(payload: payload)
+        }
+    }
+}
+
+// MARK: - .chart
+
+private struct ChartRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+    let mapping: WidgetFieldMapping
+
+    var body: some View {
+        if let spec = DashboardChartBuilder.buildSpec(
+            payload: payload,
+            mapping: mapping,
+            title: nil
+        ) {
+            DashboardChartView(spec: spec, theme: theme)
+                .frame(minHeight: 160)
+        } else {
+            EmptyRendererState(message: "No chartable data")
+        }
+    }
+}
+
+// MARK: - .stat
+
+private struct StatRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+    let mapping: WidgetFieldMapping
+
+    var body: some View {
+        let pair = extract()
+        VStack(alignment: .leading, spacing: 4) {
+            Text(pair.value)
+                .font(.system(size: 34, weight: .bold, design: .rounded))
+                .foregroundColor(theme.primaryText)
+                .lineLimit(1)
+                .minimumScaleFactor(0.5)
+            if let label = pair.label, !label.isEmpty {
+                Text(label)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(theme.tertiaryText)
+                    .lineLimit(1)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    private func extract() -> (value: String, label: String?) {
+        switch payload {
+        case .number(let n):
+            return (formatNumber(n), nil)
+        case .string(let s):
+            return (s, nil)
+        case .bool(let b):
+            return (b ? "Yes" : "No", nil)
+        case .object(let dict):
+            // explicit mapping first; otherwise fall back to "value"/"count" or first numeric field
+            let valueKey =
+                mapping.valueKey
+                ?? ["value", "count", "total", "amount"].first(where: { dict[$0] != nil })
+                ?? dict.first(where: { if case .number = $0.value { return true } else { return false } })?.key
+            let labelKey =
+                mapping.titleKey
+                ?? ["label", "title", "name"].first(where: { dict[$0] != nil })
+
+            let valueStr = valueKey.flatMap { dict[$0] }.flatMap { scalarString($0) } ?? "—"
+            let labelStr = labelKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
+            return (valueStr, labelStr)
+        default:
+            return ("—", nil)
+        }
+    }
+}
+
+// MARK: - .table
+
+private struct TableRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+    let mapping: WidgetFieldMapping
+
+    var body: some View {
+        let (columns, rows) = build()
+        if rows.isEmpty {
+            EmptyRendererState(message: "No rows")
+        } else {
+            VStack(alignment: .leading, spacing: 0) {
+                HStack(spacing: 8) {
+                    ForEach(columns, id: \.self) { col in
+                        Text(col)
+                            .font(.system(size: 10, weight: .semibold))
+                            .foregroundColor(theme.tertiaryText)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                }
+                .padding(.vertical, 4)
+                Divider().opacity(0.4)
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(spacing: 8) {
+                        ForEach(columns, id: \.self) { col in
+                            Text(row[col] ?? "—")
+                                .font(.system(size: 11))
+                                .foregroundColor(theme.primaryText)
+                                .lineLimit(1)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                    .padding(.vertical, 4)
+                }
+            }
+        }
+    }
+
+    /// caps at five columns to keep wide rows from overflowing the card
+    private func build() -> (columns: [String], rows: [[String: String]]) {
+        guard case .array(let items) = payload, !items.isEmpty else {
+            return ([], [])
+        }
+        let objs: [[String: JSONValue]] = items.compactMap {
+            if case .object(let d) = $0 { return d }
+            return nil
+        }
+        guard let first = objs.first else { return ([], []) }
+
+        var cols: [String] = []
+        if let t = mapping.titleKey, first[t] != nil { cols.append(t) }
+        if let s = mapping.subtitleKey, first[s] != nil, !cols.contains(s) { cols.append(s) }
+        for key in first.keys.sorted() where !cols.contains(key) {
+            cols.append(key)
+            if cols.count >= 5 { break }
+        }
+
+        let rows: [[String: String]] = objs.map { dict in
+            var row: [String: String] = [:]
+            for col in cols {
+                row[col] = dict[col].flatMap { scalarString($0) }
+            }
+            return row
+        }
+        return (cols, rows)
+    }
+}
+
+// MARK: - .keyValue
+
+private struct KeyValueRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+
+    var body: some View {
+        let entries = flatten(payload)
+        if entries.isEmpty {
+            EmptyRendererState(message: "No data")
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                ForEach(entries, id: \.key) { entry in
+                    HStack(alignment: .firstTextBaseline) {
+                        Text(entry.key)
+                            .font(.system(size: 11, weight: .medium))
+                            .foregroundColor(theme.secondaryText)
+                        Spacer(minLength: 8)
+                        Text(entry.value)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(theme.primaryText)
+                            .multilineTextAlignment(.trailing)
+                            .lineLimit(2)
+                    }
+                }
+            }
+        }
+    }
+
+    /// nested objects/arrays are skipped — inference should have routed them elsewhere
+    private func flatten(_ value: JSONValue) -> [(key: String, value: String)] {
+        guard case .object(let dict) = value else { return [] }
+        return dict.keys.sorted().compactMap { key in
+            guard let v = dict[key], let str = scalarString(v) else { return nil }
+            return (key, str)
+        }
+    }
+}
+
+// MARK: - .list
+
+private struct ListRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+    let mapping: WidgetFieldMapping
+
+    var body: some View {
+        let rows = buildRows()
+        if rows.isEmpty {
+            EmptyRendererState(message: "No items")
+        } else {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                    HStack(alignment: .firstTextBaseline, spacing: 6) {
+                        Circle()
+                            .fill(theme.accentColor.opacity(0.7))
+                            .frame(width: 5, height: 5)
+                            .offset(y: -1)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(row.title)
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(theme.primaryText)
+                                .lineLimit(2)
+                            if let subtitle = row.subtitle, !subtitle.isEmpty {
+                                Text(subtitle)
+                                    .font(.system(size: 10))
+                                    .foregroundColor(theme.tertiaryText)
+                                    .lineLimit(2)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    private struct Row {
+        let title: String
+        let subtitle: String?
+    }
+
+    private func buildRows() -> [Row] {
+        guard case .array(let items) = payload else { return [] }
+        let titleKey = mapping.titleKey
+        let subtitleKey = mapping.subtitleKey
+        return items.compactMap { item -> Row? in
+            switch item {
+            case .string(let s):
+                return Row(title: s, subtitle: nil)
+            case .number(let n):
+                return Row(title: formatNumber(n), subtitle: nil)
+            case .bool(let b):
+                return Row(title: b ? "true" : "false", subtitle: nil)
+            case .object(let dict):
+                let title = pickValue(dict, key: titleKey)
+                    ?? DashboardInference.preferredTitleKey(in: dict).flatMap { pickValue(dict, key: $0) }
+                    ?? "—"
+                let subtitle = pickValue(dict, key: subtitleKey)
+                    ?? DashboardInference.preferredSubtitleKey(in: dict, excluding: titleKey)
+                        .flatMap { pickValue(dict, key: $0) }
+                return Row(title: title, subtitle: subtitle)
+            case .array, .null:
+                return nil
+            }
+        }
+    }
+
+    private func pickValue(_ dict: [String: JSONValue], key: String?) -> String? {
+        guard let key, let value = dict[key] else { return nil }
+        return scalarString(value)
+    }
+}
+
+// MARK: - .markdown
+
+private struct MarkdownRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+
+    var body: some View {
+        if let text = extractText(), !text.isEmpty {
+            MarkdownMessageView(text: text, baseWidth: 400)
+                .frame(maxWidth: .infinity, alignment: .leading)
+        } else {
+            EmptyRendererState(message: "No content")
+        }
+    }
+
+    /// accepts top-level strings and `{text: ...}` / `{markdown: ...}` envelope shapes
+    private func extractText() -> String? {
+        switch payload {
+        case .string(let s): return s
+        case .object(let dict):
+            if case .string(let s) = dict["text"] ?? .null { return s }
+            if case .string(let s) = dict["markdown"] ?? .null { return s }
+            return nil
+        default: return nil
+        }
+    }
+}
+
+// MARK: - .raw
+
+private struct RawRenderer: View {
+    @Environment(\.theme) private var theme
+    let payload: JSONValue
+
+    var body: some View {
+        ScrollView {
+            Text(prettyJSON(payload))
+                .font(.system(size: 11, design: .monospaced))
+                .foregroundColor(theme.secondaryText)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .textSelection(.enabled)
+        }
+        .frame(maxHeight: 200)
+    }
+
+    private func prettyJSON(_ value: JSONValue) -> String {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        guard let data = try? encoder.encode(value),
+            let s = String(data: data, encoding: .utf8)
+        else { return "<unencodable>" }
+        return s
+    }
+}
+
+// MARK: - Helpers
+
+private struct EmptyRendererState: View {
+    @Environment(\.theme) private var theme
+    let message: String
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "tray")
+                .font(.system(size: 18))
+                .foregroundColor(theme.tertiaryText)
+            Text(message)
+                .font(.system(size: 11))
+                .foregroundColor(theme.tertiaryText)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 12)
+    }
+}
+
+/// returns nil for arrays/objects so callers can fall back to placeholder text
+private func scalarString(_ value: JSONValue) -> String? {
+    switch value {
+    case .string(let s): return s
+    case .number(let n): return formatNumber(n)
+    case .bool(let b): return b ? "true" : "false"
+    case .null: return "—"
+    case .array, .object: return nil
+    }
+}
+
+private func formatNumber(_ n: Double) -> String {
+    if n.rounded() == n && abs(n) < 1e15 {
+        return String(Int64(n))
+    }
+    return String(n)
+}

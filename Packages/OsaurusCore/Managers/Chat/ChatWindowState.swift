@@ -22,7 +22,7 @@ final class ChatWindowState: ObservableObject {
 
     // MARK: - View State
 
-    @Published var mode: ChatMode = .chat
+    @Published var mode: ChatMode = .dashboard
     @Published var showSidebar: Bool = false
 
     // MARK: - Agent State
@@ -417,6 +417,16 @@ final class ChatWindowState: ObservableObject {
                 object: nil,
                 queue: .main
             ) { [weak self] _ in Task { @MainActor in self?.refreshAgents() } }
+        )
+        // auto-switch to dashboard so the pre-filled sheet is visible after a chat-side pin
+        notificationObservers.append(
+            NotificationCenter.default.addObserver(
+                forName: .dashboardPinRequested,
+                object: nil,
+                queue: .main
+            ) { [weak self] _ in
+                Task { @MainActor in self?.switchMode(to: .dashboard) }
+            }
         )
         // Note: .chatOverlayActivated intentionally not observed here
         // State is loaded in init(), refreshAll() would cause excessive re-renders

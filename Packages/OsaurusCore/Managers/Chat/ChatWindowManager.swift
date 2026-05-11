@@ -722,13 +722,28 @@ private struct ChatToolbarActionView: View {
     }
 }
 
-/// Pin button. Observes windowState for reactive theme updates.
+/// pin on chat tab, `+ Add Widget` on dashboard tab
 private struct ChatToolbarPinView: View {
     @ObservedObject var windowState: ChatWindowState
 
     var body: some View {
-        PinButton(windowId: windowState.windowId)
-            .environment(\.theme, windowState.theme)
+        Group {
+            if windowState.mode == .dashboard {
+                HeaderActionButton(
+                    icon: "plus",
+                    help: "Add widget",
+                    action: {
+                        NotificationCenter.default.post(
+                            name: .dashboardAddWidgetRequested,
+                            object: nil
+                        )
+                    }
+                )
+            } else {
+                PinButton(windowId: windowState.windowId)
+            }
+        }
+        .environment(\.theme, windowState.theme)
     }
 }
 

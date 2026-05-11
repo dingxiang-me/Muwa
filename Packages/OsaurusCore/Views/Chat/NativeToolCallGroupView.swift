@@ -1204,4 +1204,36 @@ final class NativeToolCallRowView: NSView {
     }
 
     @objc private func tapped() { onToggle?() }
+
+    // MARK: - Right-click "Pin to Dashboard"
+
+    override func menu(for event: NSEvent) -> NSMenu? {
+        guard let item = currentItem else { return nil }
+        let menu = NSMenu()
+        let pinItem = NSMenuItem(
+            title: "Pin to Dashboard",
+            action: #selector(pinToDashboard),
+            keyEquivalent: ""
+        )
+        pinItem.target = self
+        pinItem.image = NSImage(
+            systemSymbolName: "rectangle.grid.3x1.fill",
+            accessibilityDescription: nil
+        )
+        pinItem.representedObject = item
+        menu.addItem(pinItem)
+        return menu
+    }
+
+    @objc private func pinToDashboard(_ sender: NSMenuItem) {
+        guard let item = sender.representedObject as? ToolCallItem else { return }
+        NotificationCenter.default.post(
+            name: .dashboardPinRequested,
+            object: nil,
+            userInfo: [
+                "toolName": item.call.function.name,
+                "argumentsJSON": item.call.function.arguments,
+            ]
+        )
+    }
 }
