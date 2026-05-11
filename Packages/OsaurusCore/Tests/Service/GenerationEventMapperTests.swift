@@ -118,7 +118,7 @@ struct GenerationEventMapperTests {
         )
     }
 
-    @Test func info_suppresses_unclosedReasoning_for_minimax_reasoningOnlyContent() async throws {
+    @Test func info_propagates_unclosedReasoning_for_minimax_thinkingRail() async throws {
         let info = GenerateCompletionInfo(
             promptTokenCount: 11,
             generationTokenCount: 32,
@@ -136,8 +136,8 @@ struct GenerationEventMapperTests {
             return
         }
         #expect(
-            unclosed == false,
-            "MiniMax answers are reasoning-rail completions; once promoted to visible content this is not a hidden trapped-thinking diagnostic."
+            unclosed == true,
+            "MiniMax thinking-on output must stay on the reasoning rail and preserve trapped-thinking diagnostics."
         )
     }
 
@@ -225,10 +225,12 @@ struct GenerationEventMapperTests {
     }
 
     /// MiniMax M2/M2.7 opens `<think>` directly in the assistant generation
-    /// prompt. Unlike Qwen/ZAYA/Hy3, a normal MiniMax answer can stay on
-    /// vmlx's `.reasoning` rail until EOS. Promote that rail to visible text
-    /// so chat/API callers do not see an empty assistant answer.
-    @Test func reasoning_merges_to_tokens_for_minimax_family() async throws {
+    /// prompt when Thinking is enabled. That output must remain on the
+    /// reasoning rail so ChatView renders the Thinking block and can surface
+    /// `unclosedReasoning` if the model never emits `</think>`. Thinking-off
+    /// MiniMax uses vmlx's corrected template branch and should arrive as
+    /// `.chunk`, not via this merge workaround.
+    @Test func reasoning_stays_separate_for_minimax_family() async throws {
         let events: [Generation] = [
             .reasoning("The user is straightforward greeting. "),
             .reasoning("I should answer briefly."),
@@ -241,15 +243,15 @@ struct GenerationEventMapperTests {
         ] {
             let out = try await collect(events: events, modelName: modelName)
             #expect(
-                !out.contains(where: { if case .reasoning = $0 { true } else { false } }),
-                "MiniMax reasoning-only deltas must not stay hidden: \(modelName)"
+                !out.contains(where: { if case .tokens = $0 { true } else { false } }),
+                "MiniMax thinking-on deltas must not be promoted to content: \(modelName)"
             )
-            let assembled = out.compactMap {
-                if case .tokens(let s) = $0 { s } else { nil }
+            let reasoning = out.compactMap {
+                if case .reasoning(let s) = $0 { s } else { nil }
             }.joined()
             #expect(
-                assembled == "The user is straightforward greeting. I should answer briefly.",
-                "MiniMax reasoning rail must surface as visible content: \(modelName)"
+                reasoning == "The user is straightforward greeting. I should answer briefly.",
+                "MiniMax reasoning rail must remain renderable in the Thinking block: \(modelName)"
             )
         }
     }
