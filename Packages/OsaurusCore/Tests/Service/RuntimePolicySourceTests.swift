@@ -89,7 +89,7 @@ struct RuntimePolicySourceTests {
         let contributing = try Self.source("../../docs/CONTRIBUTING.md")
 
         #expect(manifest.contains("https://github.com/osaurus-ai/swift-transformers"))
-        #expect(manifest.contains("b4a094b34b997167549c7f45bde16c80f18ed5a8"))
+        #expect(manifest.contains("087a66b17e482220b94909c5cf98688383ae481a"))
         #expect(manifest.contains("https://github.com/osaurus-ai/Jinja.git"))
         #expect(manifest.contains("58d21aa5b69fdd9eb7e23ce2c3730f47db8e0c9d"))
         #expect(manifest.contains(".product(name: \"Jinja\", package: \"jinja\")"))
@@ -349,6 +349,22 @@ struct RuntimePolicySourceTests {
             !runtime.contains("loadModelContainer(\n                from: localURL,\n                using: tokenizerLoader\n            )"),
             "ModelRuntime must not use the plain local-directory load overload; it bypasses vmlx LoadConfiguration.default, including load-time memory caps, mmap safetensors, and JANGTQ prestack/alignment"
         )
+    }
+
+    @Test("ModelRuntime post-load warmup is limited to Hy3 no-think first-forward materialization")
+    func modelRuntimeHy3WarmupIsNarrowAndRealGeneration() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(runtime.contains("runPostLoadWarmupIfNeeded("))
+        #expect(
+            runtime.contains("guard !isVLM, Hy3ReasoningProfile.matches(modelId: modelName) else"),
+            "post-load warmup must stay limited to non-VL Hy3; broad warmups would hide model-family regressions behind load time"
+        )
+        #expect(runtime.contains("input.additionalContext = [\"reasoning_effort\": \"no_think\"]"))
+        #expect(runtime.contains("maxTokens: 1"))
+        #expect(runtime.contains("temperature: 0"))
+        #expect(runtime.contains("let stream = try MLXLMCommon.generate("))
+        #expect(runtime.contains("loadContainer: post-load warmup completed"))
     }
 
     @Test("Inference docs match max-batch hot-resize semantics")

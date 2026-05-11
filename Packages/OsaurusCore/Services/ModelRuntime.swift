@@ -401,6 +401,11 @@ public actor ModelRuntime {
                 loadConfiguration: .default
             )
             let isVLM = await container.isVLM
+            await Self.runPostLoadWarmupIfNeeded(
+                modelName: name,
+                container: container,
+                isVLM: isVLM
+            )
             let weightsBytes = Self.computeWeightsSizeBytes(at: localURL)
             return SessionHolder(
                 name: name,
@@ -425,6 +430,58 @@ public actor ModelRuntime {
             }
             supersededLoadingTaskIDs.remove(loadID)
             throw error
+        }
+    }
+
+    /// Hy3's first forward is materially more expensive than subsequent
+    /// requests because the large untied lm_head and routed-MoE graphs are
+    /// first materialized on that pass. Pay that cost during load so the
+    /// session is only considered ready once the real generation path is warm.
+    private nonisolated static func runPostLoadWarmupIfNeeded(
+        modelName: String,
+        container: ModelContainer,
+        isVLM: Bool
+    ) async {
+        guard !isVLM, Hy3ReasoningProfile.matches(modelId: modelName) else {
+            return
+        }
+
+        let started = CFAbsoluteTimeGetCurrent()
+        do {
+            let generated = try await container.perform { context -> Int in
+                var input = MLXLMCommon.UserInput(chat: [.user("hi")])
+                input.additionalContext = ["reasoning_effort": "no_think"]
+                let prepared = try await context.processor.prepare(input: input)
+                let params = GenerateParameters(
+                    maxTokens: 1,
+                    temperature: 0,
+                    prefillStepSize: 512
+                )
+                let stream = try MLXLMCommon.generate(
+                    input: prepared,
+                    parameters: params,
+                    context: context
+                )
+                var count = 0
+                for await event in stream {
+                    switch event {
+                    case .chunk, .reasoning, .toolCall:
+                        count += 1
+                    case .info:
+                        break
+                    }
+                }
+                return count
+            }
+            let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - started) * 1000)
+            genLog.info(
+                "loadContainer: post-load warmup completed for \(modelName, privacy: .public) elapsedMs=\(elapsedMs, privacy: .public) events=\(generated, privacy: .public)"
+            )
+        } catch {
+            let elapsedMs = Int((CFAbsoluteTimeGetCurrent() - started) * 1000)
+            genLog.error(
+                "loadContainer: post-load warmup failed for \(modelName, privacy: .public) elapsedMs=\(elapsedMs, privacy: .public) error=\(String(describing: error), privacy: .public)"
+            )
         }
     }
 
