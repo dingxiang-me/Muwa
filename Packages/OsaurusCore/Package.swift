@@ -246,7 +246,7 @@ let package = Package(
         // disk L2 longest-prefix hits for growing chat prompts after unload.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "495ac32b24cced84128279ef1ecd2aa247dd6644"
+            revision: "34a8639879e74fd3bb848c177030079b23bd9fb8"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
