@@ -397,7 +397,8 @@ public actor ModelRuntime {
             let tokenizerLoader = SwiftTransformersTokenizerLoader()
             let container = try await loadModelContainer(
                 from: localURL,
-                using: tokenizerLoader
+                using: tokenizerLoader,
+                loadConfiguration: .default
             )
             let isVLM = await container.isVLM
             let weightsBytes = Self.computeWeightsSizeBytes(at: localURL)

@@ -340,6 +340,17 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    @Test("ModelRuntime uses typed vmlx load configuration")
+    func modelRuntimeUsesTypedVMLXLoadConfiguration() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(runtime.contains("loadConfiguration: .default"))
+        #expect(
+            !runtime.contains("loadModelContainer(\n                from: localURL,\n                using: tokenizerLoader\n            )"),
+            "ModelRuntime must not use the plain local-directory load overload; it bypasses vmlx LoadConfiguration.default, including load-time memory caps, mmap safetensors, and JANGTQ prestack/alignment"
+        )
+    }
+
     @Test("Inference docs match max-batch hot-resize semantics")
     func inferenceDocsDescribeMaxBatchDefaultsAndHotResize() throws {
         let flags = try Self.source("Services/ModelRuntime/InferenceFeatureFlags.swift")
