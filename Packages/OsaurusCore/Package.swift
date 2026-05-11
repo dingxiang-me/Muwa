@@ -240,7 +240,7 @@ let package = Package(
         // so BatchEngine doesn't fall through to the protocol fatalError.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "7223ebb497906d69c152a0c65cc43f38bb6a8e41"
+            revision: "21adfc896adcbba0bebcd53aea763c78cf0807ab"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

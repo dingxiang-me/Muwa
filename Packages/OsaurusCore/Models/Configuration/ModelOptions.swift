@@ -292,6 +292,19 @@ struct Hy3ReasoningProfile: ModelProfile {
     static let defaults: [String: ModelOptionValue] = [
         "reasoningEffort": .string("no_think")
     ]
+
+    static func normalizedEffort(_ value: String) -> String {
+        switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
+        case "no_think", "none", "off", "disabled", "false":
+            return "no_think"
+        case "low":
+            return "low"
+        case "high", "medium", "max", "maximum":
+            return "high"
+        default:
+            return "no_think"
+        }
+    }
 }
 
 // MARK: - Ling Runtime Profile

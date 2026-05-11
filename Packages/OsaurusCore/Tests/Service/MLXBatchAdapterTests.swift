@@ -80,6 +80,29 @@ struct MLXBatchAdapterTests {
         #expect(!params.enableCompiledBatchDecode)
     }
 
+    @Test func compiledBatchDecodeDisabledForHy3EvenWhenSolo() {
+        #expect(
+            !MLXBatchAdapter.shouldEnableCompiledBatchDecode(
+                modelName: "JANGQ-AI/Hy3-preview-JANGTQ",
+                maxBatchSize: 1
+            ),
+            "Hy3 is coherent on the uncompiled path but diverges on the B=1 compiled trace; Osaurus must not request that path"
+        )
+        #expect(
+            MLXBatchAdapter.shouldEnableCompiledBatchDecode(
+                modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ_K",
+                maxBatchSize: 1
+            ),
+            "MiniMax keeps the verified single-slot speed path"
+        )
+        #expect(
+            !MLXBatchAdapter.shouldEnableCompiledBatchDecode(
+                modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ_K",
+                maxBatchSize: 8
+            )
+        )
+    }
+
     @Test func registry_shutdownNonexistentIsNoop() async {
         // Calling shutdown on a name that was never registered should not
         // throw or crash — important because `ModelRuntime.unload` always
@@ -206,6 +229,26 @@ struct MLXBatchAdapterTests {
         )
         #expect(legacyContext["reasoning_effort"] as? String == "high")
         #expect(legacyContext["enable_thinking"] == nil)
+    }
+
+    @Test func additionalContext_normalizesHy3ReasoningEffortAliases() {
+        for (input, expected) in [
+            ("medium", "high"),
+            ("max", "high"),
+            ("off", "no_think"),
+            ("unknown", "no_think"),
+        ] {
+            let params = GenerationParameters(
+                temperature: nil,
+                maxTokens: 16,
+                modelOptions: ["reasoningEffort": .string(input)]
+            )
+            let context = MLXBatchAdapter.additionalContext(
+                for: params,
+                modelName: "JANGQ-AI/Hy3-preview-JANGTQ"
+            )
+            #expect(context["reasoning_effort"] as? String == expected)
+        }
     }
 
     @Test func additionalContext_forcesLingThinkingOff() {

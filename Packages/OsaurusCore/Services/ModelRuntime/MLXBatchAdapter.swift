@@ -307,7 +307,9 @@ struct MLXBatchAdapter {
 
         if Hy3ReasoningProfile.matches(modelId: modelName) {
             if let normalizedReasoningEffort {
-                context["reasoning_effort"] = normalizedReasoningEffort
+                context["reasoning_effort"] = Hy3ReasoningProfile.normalizedEffort(
+                    normalizedReasoningEffort
+                )
             } else if let disableThinking {
                 context["reasoning_effort"] = disableThinking ? "no_think" : "high"
             }
@@ -331,6 +333,10 @@ struct MLXBatchAdapter {
         }
         context["enable_thinking"] = true
         return context
+    }
+
+    static func shouldEnableCompiledBatchDecode(modelName: String, maxBatchSize: Int) -> Bool {
+        maxBatchSize == 1 && !Hy3ReasoningProfile.matches(modelId: modelName)
     }
 
     // MARK: - Submission
@@ -395,7 +401,10 @@ struct MLXBatchAdapter {
             topK: modelDefaults.topK ?? 0,
             repetitionPenalty: generation.repetitionPenalty ?? modelDefaults.repetitionPenalty,
             stopSequences: stopSequences,
-            enableCompiledBatchDecode: maxBatchSize == 1
+            enableCompiledBatchDecode: shouldEnableCompiledBatchDecode(
+                modelName: modelName,
+                maxBatchSize: maxBatchSize
+            )
         )
 
         // Best-effort per-request determinism: seed the MLX global random
