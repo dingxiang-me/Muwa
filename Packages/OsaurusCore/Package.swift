@@ -244,9 +244,11 @@ let package = Package(
         // reasoning/tool capability stamps so future bundles that stamp
         // `laguna` do not bypass the correct parsers. `495ac32` restores
         // disk L2 longest-prefix hits for growing chat prompts after unload.
+        // `c0d5c99` pins the swift-transformers added-token regex fix that
+        // removes ZAYA text's 30s Osaurus-sized prompt encode path.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "34a8639879e74fd3bb848c177030079b23bd9fb8"
+            revision: "c0d5c99d5cfaac1a843e025321ed0bb6f4a3a69b"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
@@ -259,7 +261,7 @@ let package = Package(
         ),
         .package(
             url: "https://github.com/osaurus-ai/swift-transformers",
-            revision: "b4a094b34b997167549c7f45bde16c80f18ed5a8"
+            revision: "087a66b17e482220b94909c5cf98688383ae481a"
         ),
         // FluidAudio 0.14.3 added a breaking `language:` parameter to TTS
         // calls that osaurus's `TTSService` doesn't pass. Pinning to the

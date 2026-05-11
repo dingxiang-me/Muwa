@@ -1,5 +1,5 @@
 {
-  "originHash" : "2b8c51e0f4bb988e1f78ce77703b6f6665e22a502866c002632abf979f47e522",
+  "originHash" : "629225fe260a135ebcc19e899052bcdc2afe4fb2802db1925b27b601d123523c",
   "pins" : [
     {
       "identity" : "aachartkit-swift",
@@ -391,7 +391,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/osaurus-ai/swift-transformers",
       "state" : {
-        "revision" : "b4a094b34b997167549c7f45bde16c80f18ed5a8"
+        "revision" : "087a66b17e482220b94909c5cf98688383ae481a"
       }
     },
     {
@@ -416,7 +416,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/osaurus-ai/vmlx-swift-lm",
       "state" : {
-        "revision" : "34a8639879e74fd3bb848c177030079b23bd9fb8"
+        "revision" : "c0d5c99d5cfaac1a843e025321ed0bb6f4a3a69b"
       }
     },
     {
