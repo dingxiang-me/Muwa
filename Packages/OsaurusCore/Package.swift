@@ -213,7 +213,7 @@ let package = Package(
         // the paged tier; DSV4 chat-template context strips
         // `reasoning_effort` when `enable_thinking=false`.
         //
-        // 2026-05-10 follow-up (`a5a0e37` → `be839aa`) restores MiniMax M2.7
+        // 2026-05-10 follow-up (`a5a0e37` → `7e160fa`) restores MiniMax M2.7
         // JANGTQ single-slot decode speed on the Osaurus path. It adds a
         // cache-safe B=1 `BatchEngine.generate` fast path, restores the
         // JANGTQ Hadamard `newv[8]` + cached-meta kernel optimization, and fixes
@@ -221,10 +221,16 @@ let package = Package(
         // out of the VLM registry so `model_type=zaya` routes through MLXLLM.
         // The latest pin also closes the solo lifecycle stream-completion race,
         // indexes pre-stacked JANGTQ streaming experts, and advances Qwen3.5-VL
-        // gated-delta Mamba cache offsets.
+        // gated-delta Mamba cache offsets. It routes MiniMax tool-call wrappers
+        // through the tool parser even while inside `<think>` reasoning, preserves
+        // visible text around tagged calls, and keeps the fallback MiniMax Jinja
+        // template aligned with tool schemas, assistant tool calls, and tool
+        // result turns. It also synthesizes terminal `.info` if the lower token
+        // stream closes early, so reasoning-only completions still surface
+        // `unclosedReasoning` and final stats to the UI/API layers.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "be839aa091d786c992be8a86ac4296a2188d2f69"
+            revision: "7e160fa57cd0a4f00af52a2ba6908c1707e7a611"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

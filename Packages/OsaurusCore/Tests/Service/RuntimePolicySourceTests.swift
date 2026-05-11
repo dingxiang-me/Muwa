@@ -53,7 +53,7 @@ struct RuntimePolicySourceTests {
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
 
-        // Bumped 2026-05-10 from b9da180 to be839aa. This keeps the
+        // Bumped 2026-05-10 from b9da180 to 7e160fa. This keeps the
         // 2026-05-07 Bailing/ZAYA/Gemma4/Ling hardening and adds the
         // Osaurus readiness wave: Hy3 native runtime, native ZAYA1-VL
         // image/text generation with disk-backed CCA cache restore,
@@ -62,8 +62,11 @@ struct RuntimePolicySourceTests {
         // the MiniMax B=1 BatchEngine speed restoration. It also keeps bare
         // `zaya` out of the VLM registry so text bundles stay on MLXLLM, closes
         // the solo lifecycle completion race, indexes pre-stacked streaming
-        // experts, and advances Qwen3.5-VL gated-delta cache offsets.
-        #expect(manifest.contains("be839aa091d786c992be8a86ac4296a2188d2f69"))
+        // experts, advances Qwen3.5-VL gated-delta cache offsets, and routes
+        // MiniMax tool-call wrappers correctly through reasoning streams. It
+        // also synthesizes terminal `.info` on early token-stream close so
+        // reasoning-only completions preserve final stats and `unclosedReasoning`.
+        #expect(manifest.contains("7e160fa"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }

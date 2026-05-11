@@ -28,20 +28,19 @@ private let mapperLog = Logger(subsystem: "ai.osaurus", category: "Generation")
 
 enum GenerationEventMapper {
 
-    /// True when the model family is configured as non-reasoning in osaurus
-    /// (currently Ling). For these families, vmlx's `ReasoningParser` may still
-    /// switch into reasoning mode if the model emits a `<think>` token despite
-    /// `enable_thinking=false` — it has to, because the parser has no idea
-    /// whether the host has clamped thinking off. The 2026-05-07 production
-    /// repro showed Ling 2.6 Flash emitting a runaway hidden reasoning block
-    /// after a tiny visible greeting, surfacing in the chat UI as
-    /// "greeting → 30s freeze → end" because reasoning deltas land on a
-    /// channel the visible-text view doesn't render. For non-reasoning
-    /// families we therefore promote `.reasoning` deltas (markers already
-    /// stripped by the parser) to visible `.tokens` so the user always sees
-    /// streaming text and the EOS doesn't gate the entire answer.
+    /// True when `.reasoning` deltas are the user-visible answer, not a hidden
+    /// chain-of-thought side channel.
+    ///
+    /// Ling is configured as a non-reasoning family in osaurus; if it leaks
+    /// `<think>`, the stripped inner text is still visible answer text.
+    /// MiniMax M2/M2.7 is the opposite shape: it is an always-reasoning
+    /// family whose template opens `<think>` as the assistant prefix. A valid
+    /// MiniMax answer can therefore arrive entirely on vmlx's `.reasoning`
+    /// rail. Keeping that rail hidden makes the UI look frozen and leaves the
+    /// assistant with no visible response.
     static func treatReasoningAsContent(modelName: String) -> Bool {
         ModelFamilyNames.isLingFamily(modelName)
+            || ModelFamilyNames.isMiniMaxFamily(modelName)
     }
 
     /// Map a `Generation` stream into the typed `ModelRuntimeEvent` stream
@@ -74,7 +73,7 @@ enum GenerationEventMapper {
                             .completionInfo(
                                 tokenCount: info.generationTokenCount,
                                 tokensPerSecond: info.tokensPerSecond,
-                                unclosedReasoning: info.unclosedReasoning
+                                unclosedReasoning: mergeReasoning ? false : info.unclosedReasoning
                             )
                         )
                         continue
@@ -105,10 +104,9 @@ enum GenerationEventMapper {
                             InferenceProgressManager.shared.prefillDidFinishAsync()
                         }
                         if mergeReasoning {
-                            // Ling — non-reasoning family. vmlx
-                            // already stripped the `<think>` / `</think>`
-                            // markers; the inner text is plain content the
-                            // user should see in real time.
+                            // vmlx already stripped the family-specific
+                            // reasoning markers; for merge families the inner
+                            // text is plain visible content.
                             continuation.yield(.tokens(text))
                         } else {
                             continuation.yield(.reasoning(text))

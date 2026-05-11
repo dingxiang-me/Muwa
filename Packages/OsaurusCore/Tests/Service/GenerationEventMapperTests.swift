@@ -118,6 +118,29 @@ struct GenerationEventMapperTests {
         )
     }
 
+    @Test func info_suppresses_unclosedReasoning_for_minimax_reasoning_only_content() async throws {
+        let info = GenerateCompletionInfo(
+            promptTokenCount: 11,
+            generationTokenCount: 32,
+            promptTime: 0.1,
+            generationTime: 2.0,
+            stopReason: .stop,
+            unclosedReasoning: true
+        )
+        let out = try await collect(
+            events: [.reasoning("The user is straightforward greeting"), .info(info)],
+            modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ"
+        )
+        guard case .completionInfo(_, _, let unclosed) = out.last else {
+            Issue.record("expected completionInfo at end, got \(String(describing: out.last))")
+            return
+        }
+        #expect(
+            unclosed == false,
+            "MiniMax answers can be reasoning-only; once reasoning is promoted to visible content, this is not a trapped hidden-thinking diagnostic."
+        )
+    }
+
     @Test func empty_chunks_are_ignored() async throws {
         let events: [Generation] = [.chunk(""), .chunk("text"), .chunk("")]
         let out = try await collect(events: events)
@@ -201,6 +224,37 @@ struct GenerationEventMapperTests {
         }
     }
 
+    /// MiniMax M2/M2.7 opens `<think>` directly in the generation prompt.
+    /// Unlike Qwen/ZAYA/Hy3, a normal MiniMax answer can stay on vmlx's
+    /// `.reasoning` rail until EOS. The bridge must promote those deltas to
+    /// visible tokens so the chat UI/API do not appear stuck on a Thinking
+    /// panel with no answer.
+    @Test func reasoning_merges_to_tokens_for_minimax_family() async throws {
+        let events: [Generation] = [
+            .reasoning("The user is straightforward greeting. "),
+            .reasoning("I should answer briefly."),
+        ]
+        for modelName in [
+            "MiniMax-M2.7-JANGTQ",
+            "JANGQ-AI/MiniMax-M2.7-JANGTQ",
+            "OsaurusAI/MiniMax-M2.7-JANGTQ4",
+            "minimax_m2",
+        ] {
+            let out = try await collect(events: events, modelName: modelName)
+            #expect(
+                !out.contains(where: { if case .reasoning = $0 { true } else { false } }),
+                "MiniMax reasoning-only deltas must not stay hidden: \(modelName)"
+            )
+            let assembled = out.compactMap {
+                if case .tokens(let s) = $0 { s } else { nil }
+            }.joined()
+            #expect(
+                assembled == "The user is straightforward greeting. I should answer briefly.",
+                "MiniMax reasoning rail must surface as visible content: \(modelName)"
+            )
+        }
+    }
+
     /// ZAYA1 (Zyphra; `model_type=zaya`) is reasoning-capable. Unlike Ling,
     /// its `.reasoning` stream must stay on the reasoning channel so the UI
     /// can render the Thinking panel when the user opts in.
@@ -239,10 +293,10 @@ struct GenerationEventMapperTests {
         for modelName in [
             "OsaurusAI/Qwen3.6-35B-A3B-mxfp4",
             "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
-            "MiniMax-M2.7-JANGTQ",
-            "JANGQ-AI/MiniMax-M2.7-JANGTQ",
             "Zyphra/Zaya1-8B-JANGTQ4",
             "lmstudio-community/gpt-oss-20b-MLX-8bit",
+            "dataset/notminimax_m2",
+            "not-minimaxed",
             "dataset/zayasaurus",  // ZAYA boundary regression
             "lazyaardvark",  // ZAYA boundary regression
             "",  // empty — default branch
