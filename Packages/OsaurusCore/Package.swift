@@ -236,9 +236,11 @@ let package = Package(
         // being buffered until a closing wrapper that may never arrive.
         // `ac60b5d` widens defensive EOS tokens for Laguna / wide-pipe
         // DeepSeek-style bundles across BatchEngine and synchronous generate.
+        // `7223ebb` adds ZAYA's exact LanguageModel array-forward overload
+        // so BatchEngine doesn't fall through to the protocol fatalError.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "ac60b5dab1e044cc024af8d3f1b9027b94f22979"
+            revision: "7223ebb497906d69c152a0c65cc43f38bb6a8e41"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
