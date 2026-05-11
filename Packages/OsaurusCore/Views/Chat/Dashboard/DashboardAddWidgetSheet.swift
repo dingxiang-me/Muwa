@@ -83,7 +83,7 @@ struct DashboardAddWidgetSheet: View {
             Divider().opacity(0.4)
             footer
         }
-        .frame(width: 720, height: 620)
+        .frame(width: 720, height: 720)
         .background(theme.primaryBackground)
         .onAppear { applyEditingState() }
         .onChange(of: selectedTool?.id) { _, _ in onToolChanged() }
@@ -237,14 +237,29 @@ struct DashboardAddWidgetSheet: View {
     // MARK: Step 3 — Style
 
     private var styleStep: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: 12) {
             stepHeading(
                 "How should it look?",
                 subtitle: "We'll show you a live preview. Pick what fits best."
             )
 
-            HStack(alignment: .top, spacing: 16) {
-                // preview column
+            HStack(alignment: .top, spacing: 20) {
+                // options on the left
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("Display style")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(theme.tertiaryText)
+                    rendererChips
+
+                    Text("Size")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(theme.tertiaryText)
+                        .padding(.top, 6)
+                    sizeChips
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+
+                // preview on the right
                 VStack(spacing: 10) {
                     previewArea
                     Button {
@@ -265,24 +280,11 @@ struct DashboardAddWidgetSheet: View {
                     }
                     .buttonStyle(.plain)
                     .disabled(isLoading || selectedTool == nil)
+                    Spacer(minLength: 0)
                 }
-                .frame(maxWidth: 340)
-
-                // chooser column
-                VStack(alignment: .leading, spacing: 14) {
-                    Text("Display style")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(theme.tertiaryText)
-                    rendererChips
-
-                    Text("Size")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(theme.tertiaryText)
-                        .padding(.top, 6)
-                    sizeChips
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
+                .frame(width: 280)
             }
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
         }
         .padding(20)
     }
@@ -296,11 +298,13 @@ struct DashboardAddWidgetSheet: View {
                     widget: previewWidget,
                     result: previewResult,
                     onRefresh: { Task { await runPreview() } },
-                    onRemove: {}
+                    onRemove: {},
+                    minHeightOverride: previewMinHeight
                 )
                 .allowsHitTesting(false)
             }
         }
+        .animation(.easeInOut(duration: 0.18), value: size)
     }
 
     private var previewPlaceholder: some View {
@@ -390,7 +394,8 @@ struct DashboardAddWidgetSheet: View {
                     .font(.system(size: 11, weight: .semibold))
             }
             .foregroundColor(isSelected ? theme.accentColor : theme.secondaryText)
-            .frame(maxWidth: .infinity)
+            .frame(maxWidth: .infinity, minHeight: 56)
+            .padding(.horizontal, 6)
             .padding(.vertical, 10)
             .background(
                 RoundedRectangle(cornerRadius: 8)
@@ -403,6 +408,7 @@ struct DashboardAddWidgetSheet: View {
                         lineWidth: 1
                     )
             )
+            .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
     }
@@ -425,7 +431,7 @@ struct DashboardAddWidgetSheet: View {
                     }
                 }
 
-                Toggle(isOn: $refreshInBackground) {
+                HStack(alignment: .center, spacing: 12) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text("Keep updating while app is in background")
                             .font(.system(size: 12, weight: .medium))
@@ -434,8 +440,11 @@ struct DashboardAddWidgetSheet: View {
                             .font(.system(size: 10))
                             .foregroundColor(theme.tertiaryText)
                     }
+                    Spacer()
+                    Toggle("", isOn: $refreshInBackground)
+                        .toggleStyle(.switch)
+                        .labelsHidden()
                 }
-                .toggleStyle(.switch)
                 .disabled(refreshInterval == .manual)
                 .opacity(refreshInterval == .manual ? 0.5 : 1)
 
@@ -701,6 +710,16 @@ struct DashboardAddWidgetSheet: View {
             renderConfig: RenderConfig(renderer: renderer, mapping: mapping),
             size: size
         )
+    }
+
+    /// scaled-down minHeight per size so the preview shows relative differences
+    /// without the `.large` (320pt) value blowing past the wizard's preview slot
+    private var previewMinHeight: CGFloat {
+        switch size {
+        case .small: return 160
+        case .medium: return 210
+        case .large: return 260
+        }
     }
 
     private var isLoading: Bool {

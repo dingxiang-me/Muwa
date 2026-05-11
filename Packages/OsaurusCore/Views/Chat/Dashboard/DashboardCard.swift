@@ -16,11 +16,14 @@ struct WidgetCard: View {
     let onRemove: () -> Void
     /// nil disables the "Edit" menu entry (preview-mode cards)
     var onEdit: (() -> Void)? = nil
+    /// preview-mode override; bypasses the `WidgetSize`-based default
+    var minHeightOverride: CGFloat? = nil
 
     @State private var isHovered: Bool = false
 
     /// `WidgetSize` differentiates vertically only — LazyVGrid can't span columns without a custom layout
     private var minHeight: CGFloat {
+        if let minHeightOverride { return minHeightOverride }
         switch widget.size {
         case .small: return 140
         case .medium: return 200
@@ -38,7 +41,13 @@ struct WidgetCard: View {
             footer
         }
         .padding(16)
-        .frame(minHeight: minHeight, maxHeight: .infinity, alignment: .top)
+        // preview mode pins exact height; grid mode keeps the flexible min/max so cards
+        // expand to whatever the LazyVGrid row decides
+        .frame(
+            minHeight: minHeightOverride ?? minHeight,
+            maxHeight: minHeightOverride ?? .infinity,
+            alignment: .top
+        )
         .background(
             RoundedRectangle(cornerRadius: 12)
                 .fill(theme.cardBackground)
