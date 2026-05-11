@@ -137,7 +137,7 @@ struct GenerationEventMapperTests {
         }
         #expect(
             unclosed == true,
-            "MiniMax thinking-on output must stay on the reasoning rail and preserve trapped-thinking diagnostics."
+            "MiniMax thinking-on output must preserve trapped-thinking diagnostics on the reasoning rail."
         )
     }
 
@@ -226,10 +226,8 @@ struct GenerationEventMapperTests {
 
     /// MiniMax M2/M2.7 opens `<think>` directly in the assistant generation
     /// prompt when Thinking is enabled. That output must remain on the
-    /// reasoning rail so ChatView renders the Thinking block and can surface
-    /// `unclosedReasoning` if the model never emits `</think>`. Thinking-off
-    /// MiniMax uses vmlx's corrected template branch and should arrive as
-    /// `.chunk`, not via this merge workaround.
+    /// reasoning rail so ChatView renders the Thinking block and can switch to
+    /// visible content only after vmlx observes `</think>`.
     @Test func reasoning_stays_separate_for_minimax_family() async throws {
         let events: [Generation] = [
             .reasoning("The user is straightforward greeting. "),
@@ -244,16 +242,32 @@ struct GenerationEventMapperTests {
             let out = try await collect(events: events, modelName: modelName)
             #expect(
                 !out.contains(where: { if case .tokens = $0 { true } else { false } }),
-                "MiniMax thinking-on deltas must not be promoted to content: \(modelName)"
+                "MiniMax thinking-on deltas must not be promoted to content before `</think>`: \(modelName)"
             )
             let reasoning = out.compactMap {
                 if case .reasoning(let s) = $0 { s } else { nil }
             }.joined()
             #expect(
                 reasoning == "The user is straightforward greeting. I should answer briefly.",
-                "MiniMax reasoning rail must remain renderable in the Thinking block: \(modelName)"
+                "MiniMax thinking-on deltas must remain renderable in the Thinking block: \(modelName)"
             )
         }
+    }
+
+    @Test func missing_terminal_info_synthesizes_completion_for_reasoning_only_stream() async throws {
+        let out = try await collect(
+            events: [
+                .reasoning("The user is straightforward greeting. "),
+                .reasoning("I should answer briefly."),
+            ],
+            modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ"
+        )
+        guard case .completionInfo(let count, _, let unclosed) = out.last else {
+            Issue.record("expected synthesized completionInfo at end, got \(String(describing: out.last))")
+            return
+        }
+        #expect(count > 0)
+        #expect(unclosed == true)
     }
 
     /// ZAYA1 (Zyphra; `model_type=zaya`) is reasoning-capable. Unlike Ling,

@@ -486,13 +486,34 @@ struct MLXBatchAdapter {
     ) async throws -> PreparedInput {
         // Heap-allocated outbox so the throwing closure can hand a value back
         // across the actor boundary.
-        final class OutBox: @unchecked Sendable { var result: PreparedInput? }
+        final class OutBox: @unchecked Sendable {
+            var result: PreparedInput?
+            var performEnteredAt: CFAbsoluteTime?
+            var chatBuiltAt: CFAbsoluteTime?
+            var toolsBuiltAt: CFAbsoluteTime?
+            var contextBuiltAt: CFAbsoluteTime?
+            var processorDoneAt: CFAbsoluteTime?
+            var tokenArrayDoneAt: CFAbsoluteTime?
+            var chatCount = 0
+            var toolCount = 0
+            var imageCount = 0
+            var contextKeys: [String] = []
+            var contextSummary = ""
+            var promptTokenCount = 0
+        }
         let box = OutBox()
+        let prepareStartedAt = CFAbsoluteTimeGetCurrent()
 
         try await container.perform { (context: MLXLMCommon.ModelContext) in
+            box.performEnteredAt = CFAbsoluteTimeGetCurrent()
             trace?.mark("batch_container_perform_entered")
             let chat = preprocessImages(in: buildChat())
+            box.chatBuiltAt = CFAbsoluteTimeGetCurrent()
+            box.chatCount = chat.count
+            box.imageCount = chat.reduce(0) { $0 + $1.images.count }
             let toolsSpec = buildToolsSpec()
+            box.toolsBuiltAt = CFAbsoluteTimeGetCurrent()
+            box.toolCount = toolsSpec?.count ?? 0
 
             // Reasoning template context. Hy3 uses `reasoning_effort`
             // instead of the generic boolean; Ling is force-off; ZAYA is
@@ -500,6 +521,9 @@ struct MLXBatchAdapter {
             // Other thinking-capable families default to a truthy
             // `enable_thinking` kwarg.
             let additionalContext = additionalContext(for: generation, modelName: modelName)
+            box.contextBuiltAt = CFAbsoluteTimeGetCurrent()
+            box.contextKeys = additionalContext.keys.sorted()
+            box.contextSummary = Self.safeContextSummary(additionalContext)
             let userInput = MLXLMCommon.UserInput(
                 chat: chat,
                 processing: .init(),
@@ -521,9 +545,12 @@ struct MLXBatchAdapter {
                     userInfo: [NSLocalizedDescriptionKey: "Chat template error: \(detail)"]
                 )
             }
+            box.processorDoneAt = CFAbsoluteTimeGetCurrent()
             trace?.mark("batch_tokenization_done")
 
             let tokens = lmInput.text.tokens.asArray(Int.self)
+            box.tokenArrayDoneAt = CFAbsoluteTimeGetCurrent()
+            box.promptTokenCount = tokens.count
             guard !tokens.isEmpty else {
                 throw NSError(
                     domain: "MLXBatchAdapter",
@@ -535,6 +562,16 @@ struct MLXBatchAdapter {
             box.result = PreparedInput(input: lmInput, promptTokens: tokens)
         }
 
+        let doneAt = CFAbsoluteTimeGetCurrent()
+        func ms(_ start: CFAbsoluteTime?, _ end: CFAbsoluteTime?) -> Int {
+            guard let start, let end else { return -1 }
+            return Int((end - start) * 1000)
+        }
+        let contextKeyString = box.contextKeys.joined(separator: ",")
+        batchAdapterLog.info(
+            "prepareInput: model=\(modelName, privacy: .public) totalMs=\(Int((doneAt - prepareStartedAt) * 1000), privacy: .public) waitForContainerMs=\(ms(prepareStartedAt, box.performEnteredAt), privacy: .public) chatBuildMs=\(ms(box.performEnteredAt, box.chatBuiltAt), privacy: .public) toolsBuildMs=\(ms(box.chatBuiltAt, box.toolsBuiltAt), privacy: .public) contextMs=\(ms(box.toolsBuiltAt, box.contextBuiltAt), privacy: .public) processorPrepareMs=\(ms(box.contextBuiltAt, box.processorDoneAt), privacy: .public) tokenArrayMs=\(ms(box.processorDoneAt, box.tokenArrayDoneAt), privacy: .public) chat=\(box.chatCount, privacy: .public) tools=\(box.toolCount, privacy: .public) images=\(box.imageCount, privacy: .public) promptTokens=\(box.promptTokenCount, privacy: .public) contextKeys=\(contextKeyString, privacy: .public) context=\(box.contextSummary, privacy: .public)"
+        )
+
         guard let prepared = box.result else {
             throw NSError(
                 domain: "MLXBatchAdapter",
@@ -543,5 +580,21 @@ struct MLXBatchAdapter {
             )
         }
         return prepared
+    }
+
+    private static func safeContextSummary(_ context: [String: any Sendable]) -> String {
+        context.keys.sorted().compactMap { key in
+            guard key == "enable_thinking" || key == "reasoning_effort" else {
+                return nil
+            }
+            let value = context[key]
+            if let bool = value as? Bool {
+                return "\(key)=\(bool)"
+            }
+            if let string = value as? String {
+                return "\(key)=\(string)"
+            }
+            return "\(key)=<\(type(of: value))>"
+        }.joined(separator: ",")
     }
 }
