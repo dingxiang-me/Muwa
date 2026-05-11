@@ -681,20 +681,24 @@ private struct ChatToolbarModeToggleView: View {
     }
 }
 
-/// Sidebar toggle button.
+/// Sidebar toggle button (chat tab only; the dashboard has no sidebar).
 private struct ChatToolbarSidebarView: View {
     @ObservedObject var windowState: ChatWindowState
 
     var body: some View {
-        HeaderActionButton(
-            icon: "sidebar.left",
-            help: windowState.showSidebar ? "Hide sidebar" : "Show sidebar",
-            action: {
-                withAnimation(windowState.theme.animationQuick()) {
-                    windowState.showSidebar.toggle()
-                }
+        Group {
+            if windowState.mode != .dashboard {
+                HeaderActionButton(
+                    icon: "sidebar.left",
+                    help: windowState.showSidebar ? "Hide sidebar" : "Show sidebar",
+                    action: {
+                        withAnimation(windowState.theme.animationQuick()) {
+                            windowState.showSidebar.toggle()
+                        }
+                    }
+                )
             }
-        )
+        }
         .environment(\.theme, windowState.theme)
     }
 }
