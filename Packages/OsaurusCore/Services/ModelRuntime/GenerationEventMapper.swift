@@ -33,11 +33,13 @@ enum GenerationEventMapper {
     ///
     /// Ling is configured as a non-reasoning family in osaurus; if it leaks
     /// `<think>`, the stripped inner text is still visible answer text.
-    /// Reasoning-capable families, including MiniMax M2/M2.7, must stay on
-    /// `.reasoning` so the UI can render the Thinking panel and preserve
-    /// `unclosedReasoning` diagnostics when the model never closes the thought.
+    /// MiniMax M2/M2.7 is always-reasoning at the template level: a normal
+    /// answer can stay on vmlx's `.reasoning` rail until EOS because the
+    /// prompt itself opens `<think>`. Keeping that rail hidden produces an
+    /// empty assistant answer even though the model generated text.
     static func treatReasoningAsContent(modelName: String) -> Bool {
         ModelFamilyNames.isLingFamily(modelName)
+            || ModelFamilyNames.isMiniMaxFamily(modelName)
     }
 
     /// Map a `Generation` stream into the typed `ModelRuntimeEvent` stream

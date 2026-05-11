@@ -118,7 +118,7 @@ struct GenerationEventMapperTests {
         )
     }
 
-    @Test func info_propagates_unclosedReasoning_for_minimax_family() async throws {
+    @Test func info_suppresses_unclosedReasoning_for_minimax_reasoningOnlyContent() async throws {
         let info = GenerateCompletionInfo(
             promptTokenCount: 11,
             generationTokenCount: 32,
@@ -136,8 +136,8 @@ struct GenerationEventMapperTests {
             return
         }
         #expect(
-            unclosed == true,
-            "MiniMax is reasoning-capable; trapped/unclosed reasoning must remain visible as a diagnostic instead of being suppressed."
+            unclosed == false,
+            "MiniMax answers are reasoning-rail completions; once promoted to visible content this is not a hidden trapped-thinking diagnostic."
         )
     }
 
@@ -224,10 +224,11 @@ struct GenerationEventMapperTests {
         }
     }
 
-    /// MiniMax M2/M2.7 is reasoning-capable. Its `.reasoning` rail must remain
-    /// separate from visible answer tokens; exposing it as `.tokens` leaks the
-    /// model's hidden planning text into the final assistant answer.
-    @Test func reasoning_stays_separate_for_minimax_family() async throws {
+    /// MiniMax M2/M2.7 opens `<think>` directly in the assistant generation
+    /// prompt. Unlike Qwen/ZAYA/Hy3, a normal MiniMax answer can stay on
+    /// vmlx's `.reasoning` rail until EOS. Promote that rail to visible text
+    /// so chat/API callers do not see an empty assistant answer.
+    @Test func reasoning_merges_to_tokens_for_minimax_family() async throws {
         let events: [Generation] = [
             .reasoning("The user is straightforward greeting. "),
             .reasoning("I should answer briefly."),
@@ -239,16 +240,16 @@ struct GenerationEventMapperTests {
             "minimax_m2",
         ] {
             let out = try await collect(events: events, modelName: modelName)
-            let tokens = out.compactMap {
-                if case .tokens(let s) = $0 { s } else { nil }
-            }
-            let reasoning = out.compactMap {
-                if case .reasoning(let s) = $0 { s } else { nil }
-            }
-            #expect(tokens.isEmpty, "MiniMax reasoning must not be promoted to answer tokens: \(modelName)")
             #expect(
-                reasoning == ["The user is straightforward greeting. ", "I should answer briefly."],
-                "MiniMax reasoning rail must stay separate for the Thinking panel: \(modelName)"
+                !out.contains(where: { if case .reasoning = $0 { true } else { false } }),
+                "MiniMax reasoning-only deltas must not stay hidden: \(modelName)"
+            )
+            let assembled = out.compactMap {
+                if case .tokens(let s) = $0 { s } else { nil }
+            }.joined()
+            #expect(
+                assembled == "The user is straightforward greeting. I should answer briefly.",
+                "MiniMax reasoning rail must surface as visible content: \(modelName)"
             )
         }
     }
@@ -292,7 +293,6 @@ struct GenerationEventMapperTests {
             "OsaurusAI/Qwen3.6-35B-A3B-mxfp4",
             "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
             "Zyphra/Zaya1-8B-JANGTQ4",
-            "JANGQ-AI/MiniMax-M2.7-JANGTQ",
             "lmstudio-community/gpt-oss-20b-MLX-8bit",
             "dataset/notminimax_m2",
             "not-minimaxed",
