@@ -242,10 +242,11 @@ let package = Package(
         // `174847b` compiles Laguna's router and wires runtime MoE top-k
         // override into Laguna config. `c980034` adds direct Laguna
         // reasoning/tool capability stamps so future bundles that stamp
-        // `laguna` do not bypass the correct parsers.
+        // `laguna` do not bypass the correct parsers. `495ac32` restores
+        // disk L2 longest-prefix hits for growing chat prompts after unload.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "c98003499c6667aad384ac31bbac481d1dc4e826"
+            revision: "495ac32b24cced84128279ef1ecd2aa247dd6644"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
