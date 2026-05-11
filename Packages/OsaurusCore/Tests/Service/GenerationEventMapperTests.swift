@@ -239,6 +239,8 @@ struct GenerationEventMapperTests {
         for modelName in [
             "OsaurusAI/Qwen3.6-35B-A3B-mxfp4",
             "OsaurusAI/Nemotron-3-Nano-Omni-30B-A3B-MXFP4",
+            "MiniMax-M2.7-JANGTQ",
+            "JANGQ-AI/MiniMax-M2.7-JANGTQ",
             "Zyphra/Zaya1-8B-JANGTQ4",
             "lmstudio-community/gpt-oss-20b-MLX-8bit",
             "dataset/zayasaurus",  // ZAYA boundary regression

@@ -972,6 +972,17 @@ public actor ModelRuntime {
             var scrubber = ThinkTagScrubber()
             do {
                 for try await ev in events {
+                    if case .completionInfo(let tokenCount, let tokensPerSecond, let unclosedReasoning) = ev {
+                        continuation.yield(
+                            StreamingStatsHint.encode(
+                                tokenCount: tokenCount,
+                                tokensPerSecond: tokensPerSecond,
+                                unclosedReasoning: unclosedReasoning
+                            )
+                        )
+                        continue
+                    }
+
                     if Task.isCancelled {
                         continuation.finish()
                         return
@@ -996,14 +1007,8 @@ public actor ModelRuntime {
                         pendingTools.append(
                             ServiceToolInvocation(toolName: name, jsonArguments: argsJSON)
                         )
-                    case .completionInfo(let tokenCount, let tokensPerSecond, let unclosedReasoning):
-                        continuation.yield(
-                            StreamingStatsHint.encode(
-                                tokenCount: tokenCount,
-                                tokensPerSecond: tokensPerSecond,
-                                unclosedReasoning: unclosedReasoning
-                            )
-                        )
+                    case .completionInfo:
+                        continue
                     }
                 }
                 // Drain any tail bytes the scrubber held back as a

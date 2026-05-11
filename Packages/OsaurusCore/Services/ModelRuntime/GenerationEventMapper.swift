@@ -67,6 +67,19 @@ enum GenerationEventMapper {
                 var finalTokenCount = 0
 
                 for await event in events {
+                    if case .info(let info) = event {
+                        finalTokenCount = info.generationTokenCount
+                        logCompletionInfo(info)
+                        continuation.yield(
+                            .completionInfo(
+                                tokenCount: info.generationTokenCount,
+                                tokensPerSecond: info.tokensPerSecond,
+                                unclosedReasoning: info.unclosedReasoning
+                            )
+                        )
+                        continue
+                    }
+
                     if Task.isCancelled { break }
                     switch event {
                     case .chunk(let text):
@@ -110,16 +123,8 @@ enum GenerationEventMapper {
                             .toolInvocation(name: call.function.name, argsJSON: argsJSON)
                         )
 
-                    case .info(let info):
-                        finalTokenCount = info.generationTokenCount
-                        logCompletionInfo(info)
-                        continuation.yield(
-                            .completionInfo(
-                                tokenCount: info.generationTokenCount,
-                                tokensPerSecond: info.tokensPerSecond,
-                                unclosedReasoning: info.unclosedReasoning
-                            )
-                        )
+                    case .info:
+                        continue
 
                     @unknown default:
                         // Forward-compat: unknown future cases are skipped

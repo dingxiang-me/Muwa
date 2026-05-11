@@ -420,22 +420,27 @@ struct MLXBatchAdapter {
         let (outStream, continuation) = AsyncStream<Generation>.makeStream()
         let producerTask = Task<Void, Never> {
             defer {
+                continuation.finish()
                 if let soloLease {
                     Task { await soloLease.release() }
                 }
             }
             await withTaskCancellationHandler {
                 for await event in upstream {
+                    if case .info = event {
+                        continuation.yield(event)
+                        return
+                    }
                     if Task.isCancelled { break }
                     continuation.yield(event)
                 }
-                continuation.finish()
             } onCancel: {
                 // The upstream stream is bound to a single request inside
                 // the engine; cancelling the consumer task closes it
                 // cooperatively (engine emits a final `.info(.cancelled)`
-                // and finishes the stream).
-                continuation.finish()
+                // and finishes the stream). Do not finish the wrapper from
+                // here; the operation body gets the chance to drain and
+                // forward that terminal `.info` event first.
             }
         }
 

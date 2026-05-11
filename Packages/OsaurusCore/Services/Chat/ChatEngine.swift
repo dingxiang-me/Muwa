@@ -440,6 +440,11 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
 
             do {
                 for try await delta in inner {
+                    if StreamingStatsHint.decode(delta) != nil {
+                        continuation.yield(delta)
+                        continue
+                    }
+
                     // Check for task cancellation to allow early termination
                     if Task.isCancelled {
                         print("[Osaurus][Stream] Task cancelled after \(deltaCount) deltas")
