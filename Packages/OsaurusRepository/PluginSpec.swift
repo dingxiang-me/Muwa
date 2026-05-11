@@ -39,15 +39,25 @@ public struct RegistryCapabilities: Codable, Equatable, Sendable {
     public struct ToolSummary: Codable, Equatable, Sendable {
         public let name: String
         public let description: String
+        /// opt-in flag: when true, this tool appears in the dashboard's add-widget picker.
+        /// keeps LLM-only fine-grained tools (mutations, action triggers, arg-only searches)
+        /// from cluttering the consumer-facing picker. defaults to nil (treated as false).
+        public let widget: Bool?
         /// optional dashboard renderer hint; string-typed so this package stays UI-free
         /// and older clients tolerate values they don't understand.
         /// recognised values mirror `WidgetRenderer`: "stat", "keyValue", "list",
         /// "table", "markdown", "chart", "raw"; unknown values are ignored.
         public let defaultRender: String?
 
-        public init(name: String, description: String, defaultRender: String? = nil) {
+        public init(
+            name: String,
+            description: String,
+            widget: Bool? = nil,
+            defaultRender: String? = nil
+        ) {
             self.name = name
             self.description = description
+            self.widget = widget
             self.defaultRender = defaultRender
         }
     }

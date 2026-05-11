@@ -3,6 +3,7 @@
 //  OsaurusCore
 //
 
+import OsaurusRepository
 import SwiftUI
 
 struct PickableTool: Identifiable, Equatable {
@@ -47,23 +48,35 @@ struct PickableTool: Identifiable, Equatable {
 enum DashboardToolCatalog {
     /// returns the plugin-declared renderer for a tool, if the registry catalog provided one
     static func renderHint(forTool name: String) -> WidgetRenderer? {
+        toolSummary(forTool: name)
+            .flatMap { $0.defaultRender }
+            .flatMap { WidgetRenderer(rawValue: $0) }
+    }
+
+    /// returns true if the plugin author flagged this tool as widget-ready
+    static func isWidgetReady(_ name: String) -> Bool {
+        toolSummary(forTool: name)?.widget == true
+    }
+
+    private static func toolSummary(forTool name: String) -> RegistryCapabilities.ToolSummary? {
         for plugin in PluginRepositoryService.shared.plugins {
             guard let tools = plugin.capabilities?.tools else { continue }
-            for summary in tools where summary.name == name {
-                guard let raw = summary.defaultRender else { return nil }
-                return WidgetRenderer(rawValue: raw)
-            }
+            if let match = tools.first(where: { $0.name == name }) { return match }
         }
         return nil
     }
 
-    static func buildCatalog() -> [PickableTool] {
+    /// when `showAllPluginTools` is false (default), only `widget: true`-flagged plugin tools
+    /// appear — keeps the picker curated for non-technical users. setting true is the
+    /// power-user escape hatch surfaced by the picker's "Show all plugin tools" toggle.
+    static func buildCatalog(showAllPluginTools: Bool = false) -> [PickableTool] {
         let registry = ToolRegistry.shared
         // hide built-in agent-loop tools (`complete`, `clarify`, `capabilities_*`, etc.) —
         // they're chat infrastructure, not user-facing data sources
         let builtInNames = registry.builtInToolNames
         let entries = registry.listTools().filter {
-            $0.enabled && !builtInNames.contains($0.name)
+            guard $0.enabled, !builtInNames.contains($0.name) else { return false }
+            return showAllPluginTools || isWidgetReady($0.name)
         }
 
         // map provider display name → MCPProvider so we can detect connection state per tool
@@ -129,13 +142,17 @@ struct DashboardToolPicker: View {
     @Binding var selectedTool: PickableTool?
     @State private var searchText: String = ""
     @State private var catalog: [PickableTool] = []
+    @State private var showAllPluginTools: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
-            searchBar
-                .padding(.horizontal, 12)
-                .padding(.vertical, 10)
-                .background(theme.secondaryBackground)
+            VStack(spacing: 8) {
+                searchBar
+                showAllToggle
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .background(theme.secondaryBackground)
             Divider().opacity(0.4)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
@@ -152,9 +169,17 @@ struct DashboardToolPicker: View {
                 }
                 .padding(.bottom, 8)
             }
+            if catalog.isEmpty {
+                emptyState
+            }
         }
         .background(theme.primaryBackground)
-        .onAppear { catalog = DashboardToolCatalog.buildCatalog() }
+        .onAppear { rebuildCatalog() }
+        .onChange(of: showAllPluginTools) { _, _ in rebuildCatalog() }
+    }
+
+    private func rebuildCatalog() {
+        catalog = DashboardToolCatalog.buildCatalog(showAllPluginTools: showAllPluginTools)
     }
 
     private var searchBar: some View {
@@ -173,6 +198,46 @@ struct DashboardToolPicker: View {
             RoundedRectangle(cornerRadius: 6)
                 .fill(theme.tertiaryBackground)
         )
+    }
+
+    private var showAllToggle: some View {
+        HStack(spacing: 6) {
+            Toggle("", isOn: $showAllPluginTools)
+                .toggleStyle(.switch)
+                .labelsHidden()
+                .controlSize(.mini)
+            Text("Show all plugin tools")
+                .font(.system(size: 10))
+                .foregroundColor(theme.secondaryText)
+            Spacer()
+            if showAllPluginTools {
+                Text("Advanced")
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(theme.warningColor)
+                    .padding(.horizontal, 5)
+                    .padding(.vertical, 1)
+                    .background(Capsule().fill(theme.warningColor.opacity(0.15)))
+            }
+        }
+    }
+
+    private var emptyState: some View {
+        VStack(spacing: 8) {
+            Image(systemName: "puzzlepiece.extension")
+                .font(.system(size: 22, weight: .light))
+                .foregroundColor(theme.tertiaryText)
+            Text(
+                showAllPluginTools
+                    ? "No plugin tools found. Install plugins from the Plugins tab."
+                    : "No plugins offer widgets yet. Install plugins, or flip on \"Show all plugin tools\" above."
+            )
+            .font(.system(size: 11))
+            .foregroundColor(theme.tertiaryText)
+            .multilineTextAlignment(.center)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, 20)
+        .padding(.horizontal, 16)
     }
 
     private var filteredCatalog: [PickableTool] {
