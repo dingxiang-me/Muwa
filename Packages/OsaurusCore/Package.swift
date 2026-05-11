@@ -213,7 +213,7 @@ let package = Package(
         // the paged tier; DSV4 chat-template context strips
         // `reasoning_effort` when `enable_thinking=false`.
         //
-        // 2026-05-10 follow-up (`a5a0e37` → `7e160fa`) restores MiniMax M2.7
+        // 2026-05-10 follow-up (`a5a0e37` → `ac60b5d`) restores MiniMax M2.7
         // JANGTQ single-slot decode speed on the Osaurus path. It adds a
         // cache-safe B=1 `BatchEngine.generate` fast path, restores the
         // JANGTQ Hadamard `newv[8]` + cached-meta kernel optimization, and fixes
@@ -227,10 +227,18 @@ let package = Package(
         // template aligned with tool schemas, assistant tool calls, and tool
         // result turns. It also synthesizes terminal `.info` if the lower token
         // stream closes early, so reasoning-only completions still surface
-        // `unclosedReasoning` and final stats to the UI/API layers.
+        // `unclosedReasoning` and final stats to the UI/API layers. Commit
+        // `fee2583` reverts the later MiniMax blank-content watchdog so the
+        // pin keeps the real stream-info/tool-routing fixes without a
+        // heuristic generation cutoff. `bf4087f` then makes the MiniMax
+        // tool-call parser lossless: invalid `<minimax:tool_call>` prose in
+        // reasoning is released immediately on the reasoning rail instead of
+        // being buffered until a closing wrapper that may never arrive.
+        // `ac60b5d` widens defensive EOS tokens for Laguna / wide-pipe
+        // DeepSeek-style bundles across BatchEngine and synchronous generate.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "7e160fa57cd0a4f00af52a2ba6908c1707e7a611"
+            revision: "ac60b5dab1e044cc024af8d3f1b9027b94f22979"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

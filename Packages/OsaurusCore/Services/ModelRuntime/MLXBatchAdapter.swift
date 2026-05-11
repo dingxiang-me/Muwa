@@ -263,11 +263,10 @@ struct MLXBatchAdapter {
     /// Downscale CIImage attachments to a sane upper bound before tokenization.
     /// Pre-existing `URL` / `array` cases pass through untouched.
     ///
-    /// Preserves `toolCalls` and `toolCallId` through the rebuild — dropping
-    /// them here would silently unwind the structured tool-call handoff set
-    /// up by `ModelRuntime.mapOpenAIChatToMLX`, and MiniMax (plus every other
-    /// template that reads `message.tool_calls[i]`) would fall back to the
-    /// old "no previous assistant message with a tool call" hard fail.
+    /// Preserves media plus `toolCalls` and `toolCallId` through the rebuild.
+    /// Dropping any of these fields silently unwinds the structured handoff set
+    /// up by `ModelRuntime.mapOpenAIChatToMLX`: MiniMax and other templates read
+    /// `message.tool_calls[i]`, and omni/VL processors read media arrays.
     private static func preprocessImages(in chat: [MLXLMCommon.Chat.Message]) -> [MLXLMCommon.Chat.Message] {
         chat.map { message in
             let processedImages = message.images.map { userInputImage -> UserInput.Image in
@@ -283,6 +282,7 @@ struct MLXBatchAdapter {
                 content: message.content,
                 images: processedImages,
                 videos: message.videos,
+                audios: message.audios,
                 toolCalls: message.toolCalls,
                 toolCallId: message.toolCallId
             )
@@ -431,8 +431,9 @@ struct MLXBatchAdapter {
                         continuation.yield(event)
                         return
                     }
-                    if Task.isCancelled { break }
-                    continuation.yield(event)
+                    if !Task.isCancelled {
+                        continuation.yield(event)
+                    }
                 }
             } onCancel: {
                 // The upstream stream is bound to a single request inside

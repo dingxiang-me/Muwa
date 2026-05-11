@@ -53,7 +53,7 @@ struct RuntimePolicySourceTests {
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
 
-        // Bumped 2026-05-10 from b9da180 to 7e160fa. This keeps the
+        // Bumped 2026-05-10 from b9da180 to ac60b5d. This keeps the
         // 2026-05-07 Bailing/ZAYA/Gemma4/Ling hardening and adds the
         // Osaurus readiness wave: Hy3 native runtime, native ZAYA1-VL
         // image/text generation with disk-backed CCA cache restore,
@@ -66,7 +66,13 @@ struct RuntimePolicySourceTests {
         // MiniMax tool-call wrappers correctly through reasoning streams. It
         // also synthesizes terminal `.info` on early token-stream close so
         // reasoning-only completions preserve final stats and `unclosedReasoning`.
-        #expect(manifest.contains("7e160fa"))
+        // `fee2583` reverts a later MiniMax blank-content watchdog, keeping this
+        // pin free of heuristic generation cutoffs. `bf4087f` then keeps
+        // MiniMax tool-call parsing lossless so invalid tag-looking reasoning
+        // text cannot freeze behind a missing closing wrapper. `ac60b5d` also
+        // widens defensive EOS token coverage for Laguna / wide-pipe
+        // DeepSeek-style bundles in both generation paths.
+        #expect(manifest.contains("ac60b5d"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }
@@ -198,6 +204,10 @@ struct RuntimePolicySourceTests {
             "MLXBatchAdapter must preserve upstream `.info` before honoring cancellation, otherwise vmlx's final cancelled/length/stop event is dropped"
         )
         #expect(
+            adapter.contains("if !Task.isCancelled {\n                        continuation.yield(event)\n                    }"),
+            "MLXBatchAdapter must keep draining cancelled upstream streams until `.info`, while suppressing only non-terminal deltas after cancellation"
+        )
+        #expect(
             !adapter.contains("onCancel: {\n                // The upstream stream is bound to a single request inside\n                // the engine; cancelling the consumer task closes it\n                // cooperatively (engine emits a final `.info(.cancelled)`\n                // and finishes the stream).\n                continuation.finish()\n            }"),
             "MLXBatchAdapter's cancellation handler must not immediately finish the wrapper stream while its producer can still drain vmlx's terminal `.info`"
         )
@@ -209,6 +219,26 @@ struct RuntimePolicySourceTests {
             !chatEngine.contains("for try await delta in inner {\n                    // Check for task cancellation to allow early termination\n                    if Task.isCancelled"),
             "ChatEngine stream logging wrapper must pass StreamingStatsHint through before honoring cancellation"
         )
+    }
+
+    @Test("MLXBatchAdapter image preprocessing preserves all media and tool metadata")
+    func mlxBatchAdapterPreprocessingPreservesMediaAndToolMetadata() throws {
+        let adapter = try Self.source("Services/ModelRuntime/MLXBatchAdapter.swift")
+        guard let rebuildRange = adapter.range(of: "return MLXLMCommon.Chat.Message(") else {
+            Issue.record("Could not find Chat.Message rebuild in MLXBatchAdapter.preprocessImages")
+            return
+        }
+        let rebuild = adapter[rebuildRange.lowerBound...]
+            .prefix(while: { $0 != ")" })
+
+        #expect(rebuild.contains("images: processedImages"))
+        #expect(rebuild.contains("videos: message.videos"))
+        #expect(
+            rebuild.contains("audios: message.audios"),
+            "preprocessImages must not drop audio inputs before vmlx omni/audio tokenization"
+        )
+        #expect(rebuild.contains("toolCalls: message.toolCalls"))
+        #expect(rebuild.contains("toolCallId: message.toolCallId"))
     }
 
     @Test("HTTP streams preserve stats hints before generic sentinel filters")
