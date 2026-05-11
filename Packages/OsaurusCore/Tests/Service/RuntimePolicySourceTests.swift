@@ -208,6 +208,25 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    @Test("HTTP streams preserve stats hints before generic sentinel filters")
+    func httpStreamsPreserveStatsHintsBeforeGenericSentinelFilters() throws {
+        let handler = try Self.source("Networking/HTTPHandler.swift")
+
+        let segments = handler.components(separatedBy: "StreamingToolHint.isSentinel(delta)")
+
+        #expect(
+            segments.count == 6,
+            "HTTPHandler should have five generic StreamingToolHint sentinel filters; update this guard when adding another HTTP stream writer"
+        )
+
+        for segment in segments.dropLast() {
+            #expect(
+                segment.contains("StreamingStatsHint.decode(delta)"),
+                "Each HTTP stream writer must decode StreamingStatsHint before the generic U+FFFE sentinel filter, otherwise API usage stats and unclosedReasoning are dropped"
+            )
+        }
+    }
+
     /// Lock the removal of the `activeGenerationTask?.value` gate at
     /// the entry of `generateEventStream`. The gate was serializing
     /// every same-model overlapping request before vmlx's `BatchEngine`

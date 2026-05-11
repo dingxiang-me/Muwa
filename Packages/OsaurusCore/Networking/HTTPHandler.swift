@@ -2603,6 +2603,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             }
                             continue
                         }
+                        if StreamingStatsHint.decode(delta) != nil { continue }
                         if StreamingToolHint.isSentinel(delta) { continue }
                         responseContent += delta
                         hop {
@@ -3403,6 +3404,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
                     let stream = try await chatEngine.streamChat(request: enrichedReq)
                     var accumulatedContent = ""
+                    var authoritativeCompletionTokens: Int?
                     for try await delta in stream {
                         if let reasoning = StreamingReasoningHint.decode(delta) {
                             hop {
@@ -3414,6 +3416,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                                     context: ctx.value
                                 )
                             }
+                            continue
+                        }
+                        if let stats = StreamingStatsHint.decode(delta) {
+                            authoritativeCompletionTokens = stats.tokenCount
                             continue
                         }
                         if StreamingToolHint.isSentinel(delta) { continue }
@@ -3430,7 +3436,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     }
                     let includeUsage = req.stream_options?.include_usage == true
                     let promptTokens = Self.estimatePromptTokens(enrichedReq.messages)
-                    let completionTokens = TokenEstimator.estimate(accumulatedContent)
+                    let completionTokens =
+                        authoritativeCompletionTokens ?? TokenEstimator.estimate(accumulatedContent)
                     hop {
                         writerBound.value.writeFinish(
                             model,
@@ -3813,6 +3820,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     // assistant content. Add a `thinking` field on the
                     // NDJSON response shape (and decode reasoning here
                     // first) when an upstream client requests it.
+                    if StreamingStatsHint.decode(delta) != nil { continue }
                     if StreamingToolHint.isSentinel(delta) { continue }
                     hop {
                         writerBound.value.writeContent(
@@ -4826,6 +4834,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         }
                         continue
                     }
+                    if let stats = StreamingStatsHint.decode(delta) {
+                        hop {
+                            writerBound.value.setOutputTokens(stats.tokenCount)
+                        }
+                        continue
+                    }
                     if StreamingToolHint.isSentinel(delta) { continue }
                     hop {
                         writerBound.value.writeTextDelta(delta, context: ctx.value)
@@ -5465,6 +5479,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                                 itemId: reasoningItemId,
                                 context: ctx.value
                             )
+                        }
+                        continue
+                    }
+                    if let stats = StreamingStatsHint.decode(delta) {
+                        hop {
+                            writerBound.value.setOutputTokens(stats.tokenCount)
                         }
                         continue
                     }
