@@ -71,8 +71,10 @@ struct RuntimePolicySourceTests {
         // MiniMax tool-call parsing lossless so invalid tag-looking reasoning
         // text cannot freeze behind a missing closing wrapper. `ac60b5d` also
         // widens defensive EOS token coverage for Laguna / wide-pipe
-        // DeepSeek-style bundles in both generation paths.
-        #expect(manifest.contains("ac60b5d"))
+        // DeepSeek-style bundles in both generation paths. `d8c2bb2` keeps
+        // TokenIterator's B=1 disk-cache restore materialization aligned with
+        // BatchEngine.
+        #expect(manifest.contains("d8c2bb2"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
     }

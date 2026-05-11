@@ -245,10 +245,12 @@ let package = Package(
         // `laguna` do not bypass the correct parsers. `495ac32` restores
         // disk L2 longest-prefix hits for growing chat prompts after unload.
         // `c0d5c99` pins the swift-transformers added-token regex fix that
-        // removes ZAYA text's 30s Osaurus-sized prompt encode path.
+        // removes ZAYA text's 30s Osaurus-sized prompt encode path. `d8c2bb2`
+        // materializes TokenIterator disk restores before B=1 prefill, keeping
+        // Osaurus's single-slot path aligned with BatchEngine's cache safety.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "c0d5c99d5cfaac1a843e025321ed0bb6f4a3a69b"
+            revision: "d8c2bb228fd9b7829cea4e862886fc8789378d00"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
