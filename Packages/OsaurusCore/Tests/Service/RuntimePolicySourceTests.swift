@@ -221,6 +221,29 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    /// Preflight tool selection is a background prompt-ranking call, not the user's
+    /// answer. It can fall back to the active chat model, so reasoning families
+    /// must be forced onto their short non-thinking path or they can monopolize
+    /// the single B=1 engine slot before the real chat request starts.
+    @Test("Preflight fallback LLM forces no-think model options")
+    func preflightFallbackLLMForcesNoThinkOptions() throws {
+        let coreModel = try Self.source("Services/Inference/CoreModelService.swift")
+        let preflight = try Self.source("Services/Context/PreflightCapabilitySearch.swift")
+
+        #expect(
+            coreModel.contains("modelOptions: [String: ModelOptionValue]"),
+            "CoreModelService.generate must provide an internal per-call modelOptions path so background callers can choose non-thinking rails without exposing internal option types as public API"
+        )
+        #expect(
+            coreModel.contains("modelOptions: modelOptions"),
+            "CoreModelService.generate must thread modelOptions into GenerationParameters before routing to MLX/remote services"
+        )
+        #expect(
+            preflight.contains("modelOptions: [\"reasoningEffort\": .string(\"no_think\")]"),
+            "PreflightCapabilitySearch.defaultLLM must force no_think so Hy3/ZAYA/Qwen-style reasoning templates do not spend the tool-ranking timeout generating long reasoning traces"
+        )
+    }
+
     @Test("MLXBatchAdapter image preprocessing preserves all media and tool metadata")
     func mlxBatchAdapterPreprocessingPreservesMediaAndToolMetadata() throws {
         let adapter = try Self.source("Services/ModelRuntime/MLXBatchAdapter.swift")
