@@ -238,9 +238,14 @@ let package = Package(
         // DeepSeek-style bundles across BatchEngine and synchronous generate.
         // `7223ebb` adds ZAYA's exact LanguageModel array-forward overload
         // so BatchEngine doesn't fall through to the protocol fatalError.
+        // `21adfc8` keeps Hy3 off the unsafe compiled batch decode path.
+        // `174847b` compiles Laguna's router and wires runtime MoE top-k
+        // override into Laguna config. `c980034` adds direct Laguna
+        // reasoning/tool capability stamps so future bundles that stamp
+        // `laguna` do not bypass the correct parsers.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "21adfc896adcbba0bebcd53aea763c78cf0807ab"
+            revision: "c98003499c6667aad384ac31bbac481d1dc4e826"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
