@@ -108,8 +108,40 @@ struct DashboardView: View {
 
     // MARK: - Grid
 
+    private static let greetingNouns = [
+        "stranger", "explorer", "human", "sunshine", "legend",
+        "captain", "champ", "chief", "boss", "wanderer", "night owl",
+    ]
+
+    private var greetingText: String {
+        let hour = Calendar.current.component(.hour, from: Date())
+        let period: String
+        switch hour {
+        case 5..<12: period = "Good morning"
+        case 12..<17: period = "Good afternoon"
+        case 17..<22: period = "Good evening"
+        default: period = "Hello"
+        }
+        let noun = Self.greetingNouns.randomElement() ?? "stranger"
+        return "\(period), \(noun)"
+    }
+
+    private var greetingHeader: some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(greetingText)
+                .font(.system(size: 26, weight: .semibold))
+                .foregroundColor(theme.primaryText)
+            Text(Date.now.formatted(date: .complete, time: .omitted))
+                .font(.system(size: 12))
+                .foregroundColor(theme.secondaryText)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
     private var grid: some View {
         ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+            greetingHeader
             LazyVGrid(
                 columns: [
                     GridItem(.flexible(minimum: 280), spacing: 20),
@@ -146,7 +178,10 @@ struct DashboardView: View {
                     }
                 }
             }
+            }
             .padding(24)
+            .frame(maxWidth: 1100)
+            .frame(maxWidth: .infinity)
         }
     }
 }

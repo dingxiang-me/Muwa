@@ -83,7 +83,7 @@ struct DashboardAddWidgetSheet: View {
             Divider().opacity(0.4)
             footer
         }
-        .frame(width: 720, height: 720)
+        .frame(width: 900, height: 720)
         .background(theme.primaryBackground)
         .onAppear { applyEditingState() }
         .onChange(of: selectedTool?.id) { _, _ in onToolChanged() }

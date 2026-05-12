@@ -50,12 +50,16 @@ final class DashboardViewModel: ObservableObject {
     func addWidget(_ widget: DashboardWidget) {
         widgets.append(widget)
         DashboardStore.save(widgets)
-        scheduleIfNeeded(widget)
         // skip immediate refresh for unknown tools so a `tool_not_found` envelope
         // doesn't clobber a seeded result; the scheduled timer (if any) still recovers
         // when the tool registers later
         let known = Set(ToolRegistry.shared.listTools().map { $0.name })
-        if known.contains(widget.toolName) {
+        // scheduleIfNeeded already kicks off an immediate refresh when a timer
+        // interval is set — only fall back to a one-off refresh when no schedule will run,
+        // otherwise we double-fire and spawn two permission prompts that fight each other.
+        let scheduled = (widget.refreshSeconds ?? 0) > 0
+        scheduleIfNeeded(widget)
+        if known.contains(widget.toolName) && !scheduled {
             Task { await refresh(id: widget.id) }
         }
     }
@@ -88,8 +92,12 @@ final class DashboardViewModel: ObservableObject {
         DashboardStore.save(widgets)
         refreshTasks[widget.id]?.cancel()
         refreshTasks.removeValue(forKey: widget.id)
+        let scheduled = (widget.refreshSeconds ?? 0) > 0
         scheduleIfNeeded(widget)
-        Task { await refresh(id: widget.id) }
+        // same double-prompt avoidance as addWidget
+        if !scheduled {
+            Task { await refresh(id: widget.id) }
+        }
     }
 
     // MARK: - Scene phase

@@ -69,6 +69,20 @@ struct WidgetCard: View {
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) { isHovered = hovering }
         }
+        .contextMenu {
+            Button(action: onRefresh) {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            if let onEdit {
+                Button(action: onEdit) {
+                    Label("Edit", systemImage: "slider.horizontal.3")
+                }
+            }
+            Divider()
+            Button(role: .destructive, action: onRemove) {
+                Label("Remove", systemImage: "trash")
+            }
+        }
     }
 
     // MARK: Header
