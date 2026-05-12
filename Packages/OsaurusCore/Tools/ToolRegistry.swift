@@ -8,13 +8,15 @@
 import Foundation
 import Combine
 
+private let toolBodyTimeoutQueue = DispatchQueue(label: "ai.osaurus.tool-registry.timeout")
+
 private final class ToolBodyRaceState: @unchecked Sendable {
     private let lock = NSLock()
     private var didResume = false
     private var pendingResult: String?
     private var continuation: CheckedContinuation<String, Never>?
     private var bodyTask: Task<Void, Never>?
-    private var timeoutTask: Task<Void, Never>?
+    private var timeoutTimer: DispatchSourceTimer?
 
     func install(continuation: CheckedContinuation<String, Never>) {
         lock.lock()
@@ -28,16 +30,16 @@ private final class ToolBodyRaceState: @unchecked Sendable {
         lock.unlock()
     }
 
-    func setTasks(bodyTask: Task<Void, Never>, timeoutTask: Task<Void, Never>) {
+    func setTasks(bodyTask: Task<Void, Never>, timeoutTimer: DispatchSourceTimer) {
         lock.lock()
         if didResume {
             lock.unlock()
             bodyTask.cancel()
-            timeoutTask.cancel()
+            timeoutTimer.cancel()
             return
         }
         self.bodyTask = bodyTask
-        self.timeoutTask = timeoutTask
+        self.timeoutTimer = timeoutTimer
         lock.unlock()
     }
 
@@ -54,13 +56,13 @@ private final class ToolBodyRaceState: @unchecked Sendable {
         }
         self.continuation = nil
         let bodyTask = self.bodyTask
-        let timeoutTask = self.timeoutTask
+        let timeoutTimer = self.timeoutTimer
         self.bodyTask = nil
-        self.timeoutTask = nil
+        self.timeoutTimer = nil
         lock.unlock()
 
         bodyTask?.cancel()
-        timeoutTask?.cancel()
+        timeoutTimer?.cancel()
         continuation?.resume(returning: result)
     }
 }
@@ -488,9 +490,9 @@ final class ToolRegistry: ObservableObject {
     /// This intentionally does not use `withTaskGroup`: structured child
     /// groups must drain before returning, so a non-cooperative tool body
     /// that ignores cancellation can still hold the caller until it exits.
-    /// A registry timeout is a wall-clock safety net; the caller must get
-    /// the timeout envelope even when the losing body task needs longer to
-    /// unwind.
+    /// The timeout branch also uses a dedicated GCD timer queue rather than
+    /// `Task.sleep`, because a saturated Swift executor can otherwise delay
+    /// the "wall-clock" timeout behind unrelated async work.
     internal nonisolated static func runToolBody(
         _ tool: OsaurusTool,
         argumentsJSON: String,
@@ -515,6 +517,14 @@ final class ToolRegistry: ObservableObject {
         return await withTaskCancellationHandler {
             await withCheckedContinuation { continuation in
                 race.install(continuation: continuation)
+                let timeoutTimer = DispatchSource.makeTimerSource(queue: toolBodyTimeoutQueue)
+                let timeoutNanoseconds = max(0, Int(timeoutSeconds * 1_000_000_000))
+                timeoutTimer.schedule(deadline: .now() + .nanoseconds(timeoutNanoseconds))
+                timeoutTimer.setEventHandler {
+                    race.complete(timeoutEnvelope)
+                }
+                timeoutTimer.resume()
+
                 let bodyTask = Task {
                     do {
                         let result = try await tool.execute(argumentsJSON: argumentsJSON)
@@ -525,16 +535,7 @@ final class ToolRegistry: ObservableObject {
                         race.complete(ToolEnvelope.fromError(error, tool: toolName))
                     }
                 }
-                let timeoutTask = Task {
-                    let nanos = UInt64(timeoutSeconds * 1_000_000_000)
-                    do {
-                        try await Task.sleep(nanoseconds: nanos)
-                    } catch {
-                        return
-                    }
-                    race.complete(timeoutEnvelope)
-                }
-                race.setTasks(bodyTask: bodyTask, timeoutTask: timeoutTask)
+                race.setTasks(bodyTask: bodyTask, timeoutTimer: timeoutTimer)
             }
         } onCancel: {
             race.complete(cancellationEnvelope)
