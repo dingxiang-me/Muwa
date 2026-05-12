@@ -116,6 +116,29 @@ enum ModelProfileRegistry {
         }
         return values
     }
+
+    static func boolOptionValue(
+        for modelId: String,
+        optionId: String,
+        values: [String: ModelOptionValue]
+    ) -> Bool? {
+        if let value = values[optionId]?.boolValue {
+            return value
+        }
+        return defaults(for: modelId)[optionId]?.boolValue
+    }
+
+    static func thinkingEnabled(
+        for modelId: String,
+        values: [String: ModelOptionValue]
+    ) -> Bool? {
+        guard let option = profile(for: modelId)?.thinkingOption,
+              let value = boolOptionValue(for: modelId, optionId: option.id, values: values)
+        else {
+            return nil
+        }
+        return option.inverted ? !value : value
+    }
 }
 
 // MARK: - OpenAI Reasoning Profile
@@ -339,6 +362,7 @@ struct ZayaThinkingProfile: ModelProfile {
 
     static func matches(modelId: String) -> Bool {
         ModelFamilyNames.isZayaFamily(modelId)
+            && !ModelFamilyNames.isZayaVLFamily(modelId)
     }
 
     static let options: [ModelOptionDefinition] = [

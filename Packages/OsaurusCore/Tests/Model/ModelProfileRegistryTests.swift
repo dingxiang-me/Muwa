@@ -253,8 +253,11 @@ struct ModelProfileRegistryTests {
             #expect(profile?.defaults["disableThinking"]?.boolValue == true)
         }
 
-        // Boundary-regression negatives: must NOT classify as ZAYA.
+        // Non-text ZAYA and boundary-regression negatives: must NOT classify
+        // as text ZAYA thinking profile.
         for id in [
+            "Zyphra/Zaya1-VL-8B-JANGTQ4",
+            "zaya1-vl-8b-jangtk",
             "dataset/zayasaurus",
             "zayasaurus-7b",
             "lazyaardvark",
@@ -281,6 +284,29 @@ struct ModelProfileRegistryTests {
             persisted: nil
         )
         #expect(defaults["disableThinking"]?.boolValue == true)
+    }
+
+    @Test("Thinking helpers honor Zaya default and inverted toggle semantics")
+    func thinkingHelpers_honorZayaDefaultsAndInversion() {
+        let model = "Zyphra/Zaya1-8B-JANGTQ4"
+
+        #expect(
+            ModelProfileRegistry.boolOptionValue(
+                for: model,
+                optionId: "disableThinking",
+                values: [:]
+            ) == true)
+        #expect(ModelProfileRegistry.thinkingEnabled(for: model, values: [:]) == false)
+        #expect(
+            ModelProfileRegistry.thinkingEnabled(
+                for: model,
+                values: ["disableThinking": .bool(false)]
+            ) == true)
+        #expect(
+            ModelProfileRegistry.thinkingEnabled(
+                for: model,
+                values: ["disableThinking": .bool(true)]
+            ) == false)
     }
 
     @Test("Hy3 bundles expose native reasoning_effort values")

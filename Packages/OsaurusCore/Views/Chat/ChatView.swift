@@ -88,6 +88,16 @@ final class ChatSession: ObservableObject {
     // MARK: - Memoization Cache
     private let blockMemoizer = BlockMemoizer()
     private var cachedContext: ComposedContext?
+
+    private var thinkingEnabledForCurrentModel: Bool {
+        guard let selectedModel else {
+            return activeModelOptions["disableThinking"]?.boolValue == false
+        }
+        return ModelProfileRegistry.thinkingEnabled(
+            for: selectedModel,
+            values: activeModelOptions
+        ) ?? false
+    }
     /// Estimated memory-section token cost for the next send. Populated by
     /// `refreshMemoryTokens` and surfaced through `estimatedContextBreakdown`
     /// so the Context Budget popover shows a "Memory" line even before the
@@ -423,7 +433,7 @@ final class ChatSession: ObservableObject {
                 from: mockTurns,
                 streamingTurnId: nil,
                 agentName: displayName,
-                thinkingEnabled: activeModelOptions["disableThinking"]?.boolValue == false
+                thinkingEnabled: thinkingEnabledForCurrentModel
             )
             let newHeaderMap = blockMemoizer.groupHeaderMap
             withAnimation(.none) {
@@ -437,7 +447,7 @@ final class ChatSession: ObservableObject {
             from: turns,
             streamingTurnId: streamingTurnId,
             agentName: displayName,
-            thinkingEnabled: activeModelOptions["disableThinking"]?.boolValue == false
+            thinkingEnabled: thinkingEnabledForCurrentModel
         )
         let newHeaderMap = blockMemoizer.groupHeaderMap
 

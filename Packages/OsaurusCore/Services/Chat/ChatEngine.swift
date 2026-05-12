@@ -133,6 +133,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         let params = GenerationParameters(
             temperature: temperature,
             maxTokens: maxTokens,
+            maxTokensExplicit: request.max_tokens != nil,
             topPOverride: request.top_p,
             repetitionPenalty: repPenalty,
             frequencyPenalty: request.frequency_penalty,

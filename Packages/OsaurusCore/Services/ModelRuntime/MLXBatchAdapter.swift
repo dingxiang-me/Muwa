@@ -43,6 +43,46 @@ struct MLXBatchAdapter {
         let genTask: Task<Void, Never>
     }
 
+    struct EffectiveGenerationSettings: Equatable, Sendable {
+        let temperature: Float
+        let maxTokens: Int
+        let topP: Float
+        let topK: Int
+        let minP: Float
+        let repetitionPenalty: Float?
+        let compiledBatchDecode: Bool
+    }
+
+    static func effectiveGenerationSettings(
+        modelName: String,
+        generation: GenerationParameters,
+        runtimeTopP: Float,
+        maxBatchSize: Int,
+        modelDefaults: LocalGenerationDefaults.Defaults
+    ) -> EffectiveGenerationSettings {
+        let defaultTemperature: Float? = {
+            if modelDefaults.doSample == false {
+                return 0
+            }
+            return modelDefaults.temperature
+        }()
+
+        return EffectiveGenerationSettings(
+            temperature: generation.temperature ?? defaultTemperature ?? 0.7,
+            maxTokens: generation.maxTokensExplicit
+                ? generation.maxTokens
+                : (modelDefaults.maxTokens ?? generation.maxTokens),
+            topP: generation.topPOverride ?? modelDefaults.topP ?? runtimeTopP,
+            topK: modelDefaults.topK ?? 0,
+            minP: generation.minPOverride ?? modelDefaults.minP ?? 0,
+            repetitionPenalty: generation.repetitionPenalty ?? modelDefaults.repetitionPenalty,
+            compiledBatchDecode: shouldEnableCompiledBatchDecode(
+                modelName: modelName,
+                maxBatchSize: maxBatchSize
+            )
+        )
+    }
+
     /// Same-model gate for the single-slot runtime path. With
     /// `maxBatchSize == 1`, vmlx can route through its TokenIterator-backed
     /// solo fast path. There is no batching upside to overlapping a second
@@ -263,10 +303,12 @@ struct MLXBatchAdapter {
     /// Downscale CIImage attachments to a sane upper bound before tokenization.
     /// Pre-existing `URL` / `array` cases pass through untouched.
     ///
-    /// Preserves media plus `toolCalls` and `toolCallId` through the rebuild.
-    /// Dropping any of these fields silently unwinds the structured handoff set
-    /// up by `ModelRuntime.mapOpenAIChatToMLX`: MiniMax and other templates read
-    /// `message.tool_calls[i]`, and omni/VL processors read media arrays.
+    /// Preserves media plus `reasoningContent`, `toolCalls`, and `toolCallId`
+    /// through the rebuild. Dropping any of these fields silently unwinds the
+    /// structured handoff set up by `ModelRuntime.mapOpenAIChatToMLX`: ZAYA,
+    /// Nemotron-H/Omni, MiniMax, and DSV4 templates read
+    /// `message.reasoning_content`; MiniMax and other templates read
+    /// `message.tool_calls[i]`; omni/VL processors read media arrays.
     private static func preprocessImages(in chat: [MLXLMCommon.Chat.Message]) -> [MLXLMCommon.Chat.Message] {
         chat.map { message in
             let processedImages = message.images.map { userInputImage -> UserInput.Image in
@@ -283,6 +325,7 @@ struct MLXBatchAdapter {
                 images: processedImages,
                 videos: message.videos,
                 audios: message.audios,
+                reasoningContent: message.reasoningContent,
                 toolCalls: message.toolCalls,
                 toolCallId: message.toolCallId
             )
@@ -316,6 +359,10 @@ struct MLXBatchAdapter {
             return context
         }
 
+        if ModelFamilyNames.isZayaVLFamily(modelName) {
+            return context
+        }
+
         if let normalizedReasoningEffort {
             context["reasoning_effort"] = normalizedReasoningEffort
         }
@@ -336,7 +383,9 @@ struct MLXBatchAdapter {
     }
 
     static func shouldEnableCompiledBatchDecode(modelName: String, maxBatchSize: Int) -> Bool {
-        maxBatchSize == 1 && !Hy3ReasoningProfile.matches(modelId: modelName)
+        maxBatchSize == 1
+            && !Hy3ReasoningProfile.matches(modelId: modelName)
+            && !ModelFamilyNames.isMiniMaxFamily(modelName)
     }
 
     // MARK: - Submission
@@ -386,25 +435,27 @@ struct MLXBatchAdapter {
             maxBatchSize: maxBatchSize
         )
 
-        // Honor the model's shipped sampling defaults (Hugging Face
-        // `generation_config.json`) when the OpenAI-wire request omits a
-        // field. Without this overlay osaurus served, e.g., Qwen 3.5 397B
-        // at 0.7 temperature when its recipe specifies 0.6, and Gemma-4
-        // 26B-A4B with top_k disabled when the recipe specifies top_k=64.
-        // Explicit client values still win — the `?? modelDefaults`
-        // ordering only applies when `generation.*` is nil.
+        // Honor the model's shipped generation defaults when the OpenAI-wire
+        // request omits a field. This mirrors vmlx's direct-engine
+        // `GenerateParameters(generationConfig:fallback:)` behavior for the
+        // local app path instead of inventing osaurus-specific defaults.
         let modelDefaults = LocalGenerationDefaults.defaults(forModelId: modelName)
+        let effective = Self.effectiveGenerationSettings(
+            modelName: modelName,
+            generation: generation,
+            runtimeTopP: runtime.topP,
+            maxBatchSize: maxBatchSize,
+            modelDefaults: modelDefaults
+        )
         let mlxParams = ModelRuntime.makeGenerateParameters(
-            temperature: generation.temperature ?? modelDefaults.temperature ?? 0.7,
-            maxTokens: generation.maxTokens,
-            topP: generation.topPOverride ?? modelDefaults.topP ?? runtime.topP,
-            topK: modelDefaults.topK ?? 0,
-            repetitionPenalty: generation.repetitionPenalty ?? modelDefaults.repetitionPenalty,
+            temperature: effective.temperature,
+            maxTokens: effective.maxTokens,
+            topP: effective.topP,
+            topK: effective.topK,
+            minP: effective.minP,
+            repetitionPenalty: effective.repetitionPenalty,
             stopSequences: stopSequences,
-            enableCompiledBatchDecode: shouldEnableCompiledBatchDecode(
-                modelName: modelName,
-                maxBatchSize: maxBatchSize
-            )
+            enableCompiledBatchDecode: effective.compiledBatchDecode
         )
 
         // Best-effort per-request determinism: seed the MLX global random
@@ -459,7 +510,7 @@ struct MLXBatchAdapter {
         }
 
         batchAdapterLog.info(
-            "submit: model=\(modelName, privacy: .public) promptTokens=\(prepared.promptTokens.count, privacy: .public)"
+            "submit: model=\(modelName, privacy: .public) promptTokens=\(prepared.promptTokens.count, privacy: .public) temperature=\(effective.temperature, privacy: .public) topP=\(effective.topP, privacy: .public) topK=\(effective.topK, privacy: .public) minP=\(effective.minP, privacy: .public) maxTokens=\(effective.maxTokens, privacy: .public) compiledBatchDecode=\(effective.compiledBatchDecode, privacy: .public)"
         )
 
         return PreparedStream(

@@ -52,6 +52,12 @@ struct RuntimePolicySourceTests {
     @Test("vmlx pin includes Ling multi-turn + ZAYA hardening commit")
     func vmlxPinIncludesRuntimeHardening() throws {
         let manifest = try Self.source("Package.swift")
+        let workspaceResolved = try Self.source(
+            "../../osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+        )
+        let appResolved = try Self.source(
+            "../../App/osaurus.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved"
+        )
 
         // Bumped 2026-05-10 from b9da180 to ac60b5d. This keeps the
         // 2026-05-07 Bailing/ZAYA/Gemma4/Ling hardening and adds the
@@ -73,7 +79,19 @@ struct RuntimePolicySourceTests {
         // widens defensive EOS token coverage for Laguna / wide-pipe
         // DeepSeek-style bundles in both generation paths. `d8c2bb2` keeps
         // TokenIterator's B=1 disk-cache restore materialization aligned with
-        // BatchEngine.
+        // BatchEngine. `541b380` hardens MiniMax close-token detection and
+        // removes Hy3's per-token fp32 dequantized lm_head hot path. `78cf6ac`
+        // adds Gemma4 PLE-off config tolerance, process-wide safetensors disk
+        // cache IO serialization, MiniMax compile denial / forced-close removal,
+        // B=1 full-cache-hit trimming, `reasoning_content` plumbing, ZAYA
+        // reasoning stamps, and JangPress overlay load hygiene.
+        #expect(manifest.contains("78cf6ac9dd1742c51a8f737bd4abe6c68282072e"))
+        #expect(workspaceResolved.contains("78cf6ac9dd1742c51a8f737bd4abe6c68282072e"))
+        #expect(appResolved.contains("78cf6ac9dd1742c51a8f737bd4abe6c68282072e"))
+        #expect(!workspaceResolved.contains("541b380784f812eef9098f370eebaea2ae4948c9"))
+        #expect(!appResolved.contains("541b380784f812eef9098f370eebaea2ae4948c9"))
+        #expect(!workspaceResolved.contains("f07214428be2a6ab742a992075c844f2c78dabaf"))
+        #expect(!appResolved.contains("f07214428be2a6ab742a992075c844f2c78dabaf"))
         #expect(manifest.contains("d8c2bb2"))
         #expect(manifest.contains("DeepseekV4Cache"))
         #expect(manifest.contains("Laguna include-only bundles"))
@@ -131,6 +149,18 @@ struct RuntimePolicySourceTests {
             runtime.contains("enableSSMReDerive: false"),
             "ModelRuntime.buildCacheCoordinatorConfig must opt out of vmlx's default SSM re-derive — osaurus's mutating-system-prefix chat workload doesn't amortize the cost across turns"
         )
+    }
+
+    @Test("Flexible model residency respects load-time memory budget")
+    func flexibleModelResidencyEvictsBeforeOversizedLoads() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(runtime.contains("flexibleResidentBudgetBytes"))
+        #expect(runtime.contains("ProcessInfo.processInfo.physicalMemory) * 0.70"))
+        #expect(runtime.contains("unloadForFlexibleResidentBudget"))
+        #expect(runtime.contains("policy == .manualMultiModel"))
+        #expect(runtime.contains("flexible budget eviction"))
+        #expect(runtime.contains("incomingWeightsSizeBytes"))
     }
 
     /// Lock the `.engineShutdown` evict-and-rebuild path. If
@@ -246,8 +276,8 @@ struct RuntimePolicySourceTests {
         )
     }
 
-    @Test("MLXBatchAdapter image preprocessing preserves all media and tool metadata")
-    func mlxBatchAdapterPreprocessingPreservesMediaAndToolMetadata() throws {
+    @Test("MLXBatchAdapter image preprocessing preserves media, reasoning, and tool metadata")
+    func mlxBatchAdapterPreprocessingPreservesMediaReasoningAndToolMetadata() throws {
         let adapter = try Self.source("Services/ModelRuntime/MLXBatchAdapter.swift")
         guard let rebuildRange = adapter.range(of: "return MLXLMCommon.Chat.Message(") else {
             Issue.record("Could not find Chat.Message rebuild in MLXBatchAdapter.preprocessImages")
@@ -261,6 +291,10 @@ struct RuntimePolicySourceTests {
         #expect(
             rebuild.contains("audios: message.audios"),
             "preprocessImages must not drop audio inputs before vmlx omni/audio tokenization"
+        )
+        #expect(
+            rebuild.contains("reasoningContent: message.reasoningContent"),
+            "preprocessImages must not drop assistant reasoning history before vmlx Jinja templates render message.reasoning_content"
         )
         #expect(rebuild.contains("toolCalls: message.toolCalls"))
         #expect(rebuild.contains("toolCallId: message.toolCallId"))
@@ -315,8 +349,16 @@ struct RuntimePolicySourceTests {
         // The cancelActiveGeneration helper still legitimately awaits
         // the task; that's fine and remains in the file.
         #expect(
-            runtime.contains("private func cancelActiveGeneration() async {"),
+            runtime.contains("private func cancelActiveGeneration(for modelName: String? = nil) async {"),
             "cancelActiveGeneration() must still exist for shutdown / clearAll cancellation paths"
+        )
+        #expect(
+            runtime.contains("if let modelName, record.modelName != modelName { return }"),
+            "ModelRuntime.unload(name:) must not cancel a generation belonging to a different model"
+        )
+        #expect(
+            runtime.contains("await cancelActiveGeneration(for: name)"),
+            "ModelRuntime.unload(name:) must scope defensive cancellation to the model being unloaded"
         )
     }
 
@@ -353,20 +395,16 @@ struct RuntimePolicySourceTests {
         )
     }
 
-    @Test("ModelRuntime post-load warmup is limited to Hy3 no-think first-forward materialization")
-    func modelRuntimeHy3WarmupIsNarrowAndRealGeneration() throws {
+    @Test("ModelRuntime does not block model-ready on hidden Hy3 warmup generation")
+    func modelRuntimeDoesNotBlockModelReadyOnHy3WarmupGeneration() throws {
         let runtime = try Self.source("Services/ModelRuntime.swift")
 
-        #expect(runtime.contains("runPostLoadWarmupIfNeeded("))
         #expect(
-            runtime.contains("guard !isVLM, Hy3ReasoningProfile.matches(modelId: modelName) else"),
-            "post-load warmup must stay limited to non-VL Hy3; broad warmups would hide model-family regressions behind load time"
+            !runtime.contains("runPostLoadWarmupIfNeeded("),
+            "ModelRuntime must not await a hidden Hy3 generation inside loadContainer; it makes the UI report first-forward materialization as model loading / TTFT"
         )
-        #expect(runtime.contains("input.additionalContext = [\"reasoning_effort\": \"no_think\"]"))
-        #expect(runtime.contains("maxTokens: 1"))
-        #expect(runtime.contains("temperature: 0"))
-        #expect(runtime.contains("let stream = try MLXLMCommon.generate("))
-        #expect(runtime.contains("loadContainer: post-load warmup completed"))
+        #expect(!runtime.contains("loadContainer: post-load warmup completed"))
+        #expect(!runtime.contains("input.additionalContext = [\"reasoning_effort\": \"no_think\"]"))
     }
 
     @Test("Inference docs match max-batch hot-resize semantics")

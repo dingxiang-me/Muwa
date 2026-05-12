@@ -248,11 +248,16 @@ let package = Package(
         // removes ZAYA text's 30s Osaurus-sized prompt encode path. `d8c2bb2`
         // materializes TokenIterator disk restores before B=1 prefill, keeping
         // Osaurus's single-slot path aligned with BatchEngine's cache safety.
-        // `f072144` adds the MiniMax reasoning close-token correction on both
-        // BatchEngine and TokenIterator paths.
+        // `78cf6ac` adds Gemma4 PLE-off config tolerance, serializes
+        // safetensors disk-cache IO across resident models, keeps MiniMax off
+        // the unsafe compiled decode path while removing automatic forced
+        // close-token injection, trims B=1 full-cache hits before seed prefill,
+        // preserves assistant `reasoning_content`, adds ZAYA reasoning stamps,
+        // and skips per-expert source tensors when a JangPress prestacked
+        // overlay is present.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "f07214428be2a6ab742a992075c844f2c78dabaf"
+            revision: "78cf6ac9dd1742c51a8f737bd4abe6c68282072e"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

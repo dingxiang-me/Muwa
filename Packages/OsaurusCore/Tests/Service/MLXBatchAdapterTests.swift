@@ -73,14 +73,125 @@ struct MLXBatchAdapterTests {
             temperature: 0,
             maxTokens: 16,
             topP: 1,
+            minP: 0.02,
             repetitionPenalty: nil,
             enableCompiledBatchDecode: false
         )
 
         #expect(!params.enableCompiledBatchDecode)
+        #expect(params.minP == 0.02)
     }
 
-    @Test func compiledBatchDecodeDisabledForHy3EvenWhenSolo() {
+    @Test func effectiveGenerationSettings_honorsBundleDefaultsWhenRequestOmitted() {
+        let generation = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16_384,
+            maxTokensExplicit: false,
+            topPOverride: nil,
+            minPOverride: nil,
+            repetitionPenalty: nil
+        )
+        let defaults = LocalGenerationDefaults.Defaults(
+            maxTokens: 300,
+            temperature: 1.0,
+            topP: 0.95,
+            topK: 40,
+            minP: 0.03,
+            repetitionPenalty: 1.05,
+            doSample: true
+        )
+
+        let effective = MLXBatchAdapter.effectiveGenerationSettings(
+            modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ",
+            generation: generation,
+            runtimeTopP: 1,
+            maxBatchSize: 1,
+            modelDefaults: defaults
+        )
+
+        #expect(effective.temperature == 1.0)
+        #expect(effective.maxTokens == 300)
+        #expect(effective.topP == 0.95)
+        #expect(effective.topK == 40)
+        #expect(effective.minP == 0.03)
+        #expect(effective.repetitionPenalty == 1.05)
+        #expect(!effective.compiledBatchDecode)
+    }
+
+    @Test func effectiveGenerationSettings_explicitRequestWinsOverBundleDefaults() {
+        let generation = GenerationParameters(
+            temperature: 0.2,
+            maxTokens: 128,
+            maxTokensExplicit: true,
+            topPOverride: 0.5,
+            minPOverride: 0.01,
+            repetitionPenalty: 1.02
+        )
+        let defaults = LocalGenerationDefaults.Defaults(
+            maxTokens: 300,
+            temperature: 1.0,
+            topP: 0.95,
+            topK: 40,
+            minP: 0.03,
+            repetitionPenalty: 1.05,
+            doSample: true
+        )
+
+        let effective = MLXBatchAdapter.effectiveGenerationSettings(
+            modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ",
+            generation: generation,
+            runtimeTopP: 1,
+            maxBatchSize: 1,
+            modelDefaults: defaults
+        )
+
+        #expect(effective.temperature == 0.2)
+        #expect(effective.maxTokens == 128)
+        #expect(effective.topP == 0.5)
+        #expect(effective.topK == 40)
+        #expect(effective.minP == 0.01)
+        #expect(effective.repetitionPenalty == 1.02)
+    }
+
+    @Test func effectiveGenerationSettings_doSampleFalseForcesGreedyOnlyWhenTemperatureOmitted() {
+        let defaults = LocalGenerationDefaults.Defaults(
+            maxTokens: nil,
+            temperature: 0.7,
+            topP: nil,
+            topK: nil,
+            minP: nil,
+            repetitionPenalty: nil,
+            doSample: false
+        )
+
+        let omittedTemperature = MLXBatchAdapter.effectiveGenerationSettings(
+            modelName: "local/dense-model",
+            generation: GenerationParameters(
+                temperature: nil,
+                maxTokens: 64,
+                maxTokensExplicit: true
+            ),
+            runtimeTopP: 1,
+            maxBatchSize: 1,
+            modelDefaults: defaults
+        )
+        #expect(omittedTemperature.temperature == 0)
+
+        let explicitTemperature = MLXBatchAdapter.effectiveGenerationSettings(
+            modelName: "local/dense-model",
+            generation: GenerationParameters(
+                temperature: 0.4,
+                maxTokens: 64,
+                maxTokensExplicit: true
+            ),
+            runtimeTopP: 1,
+            maxBatchSize: 1,
+            modelDefaults: defaults
+        )
+        #expect(explicitTemperature.temperature == 0.4)
+    }
+
+    @Test func compiledBatchDecodeDisabledForKnownUnsafeSoloModels() {
         #expect(
             !MLXBatchAdapter.shouldEnableCompiledBatchDecode(
                 modelName: "JANGQ-AI/Hy3-preview-JANGTQ",
@@ -89,11 +200,11 @@ struct MLXBatchAdapterTests {
             "Hy3 is coherent on the uncompiled path but diverges on the B=1 compiled trace; Osaurus must not request that path"
         )
         #expect(
-            MLXBatchAdapter.shouldEnableCompiledBatchDecode(
+            !MLXBatchAdapter.shouldEnableCompiledBatchDecode(
                 modelName: "JANGQ-AI/MiniMax-M2.7-JANGTQ_K",
                 maxBatchSize: 1
             ),
-            "MiniMax keeps the verified single-slot speed path"
+            "MiniMax closes reasoning and stops coherently on the uncompiled path but repeats/length-stops on the B=1 compiled trace"
         )
         #expect(
             !MLXBatchAdapter.shouldEnableCompiledBatchDecode(
@@ -341,6 +452,27 @@ struct MLXBatchAdapterTests {
                 )["enable_thinking"] as? Bool == true,
                 "non-ZAYA substring match must NOT force thinking off: \(modelName)"
             )
+        }
+    }
+
+    @Test func additionalContext_doesNotSendThinkingKwargForZayaVLTemplateSidecar() {
+        let userEnabled = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(false)]
+        )
+
+        for modelName in [
+            "Zyphra/Zaya1-VL-8B-JANGTQ4",
+            "Zaya1-VL-8B-JANGTK",
+            "zaya1_vl_8b_mxfp4",
+        ] {
+            let context = MLXBatchAdapter.additionalContext(
+                for: userEnabled,
+                modelName: modelName
+            )
+            #expect(context["enable_thinking"] == nil)
+            #expect(context["reasoning_effort"] == nil)
         }
     }
 
