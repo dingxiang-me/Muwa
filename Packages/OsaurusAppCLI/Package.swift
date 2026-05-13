@@ -2,11 +2,11 @@
 import PackageDescription
 
 let package = Package(
-    name: "OsaurusCLI",
+    name: "OsaurusAppCLI",
     platforms: [.macOS(.v15)],
     products: [
-        .executable(name: "osaurus-cli", targets: ["OsaurusCLI"]),
-        .library(name: "OsaurusCLICore", targets: ["OsaurusCLICore"]),
+        .executable(name: "osaurus-cli", targets: ["OsaurusAppCLI"]),
+        .library(name: "OsaurusAppCLICore", targets: ["OsaurusAppCLICore"]),
     ],
     dependencies: [
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.0"),
@@ -14,21 +14,21 @@ let package = Package(
     ],
     targets: [
         .executableTarget(
-            name: "OsaurusCLI",
+            name: "OsaurusAppCLI",
             dependencies: [
-                "OsaurusCLICore"
+                "OsaurusAppCLICore"
             ]
         ),
         .target(
-            name: "OsaurusCLICore",
+            name: "OsaurusAppCLICore",
             dependencies: [
                 .product(name: "MCP", package: "swift-sdk"),
                 .product(name: "OsaurusRepository", package: "OsaurusRepository"),
             ]
         ),
         .testTarget(
-            name: "OsaurusCLITests",
-            dependencies: ["OsaurusCLICore"]
+            name: "OsaurusAppCLITests",
+            dependencies: ["OsaurusAppCLICore"]
         ),
     ]
 )

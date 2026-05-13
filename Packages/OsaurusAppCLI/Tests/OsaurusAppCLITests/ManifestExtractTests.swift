@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import OsaurusCLICore
+@testable import OsaurusAppCLICore
 
 final class ManifestExtractTests: XCTestCase {
     private var tempDir: URL!

@@ -6,7 +6,7 @@
 //
 
 import XCTest
-@testable import OsaurusCLICore
+@testable import OsaurusAppCLICore
 
 final class ToolsCreateTests: XCTestCase {
     private var tempDir: URL!

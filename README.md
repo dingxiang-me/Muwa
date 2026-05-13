@@ -253,7 +253,7 @@ osaurus/
 │   │   ├── Folder/               # Working-folder context, file ops, batch tool
 │   │   ├── Utils/                # Cross-cutting utilities
 │   │   └── Tests/                # Unit and integration tests
-│   ├── OsaurusCLI/               # CLI (osaurus command)
+│   ├── OsaurusAppCLI/            # CLI shim (osaurus command — drives the GUI app)
 │   └── OsaurusRepository/        # Plugin registry and installation
 ├── docs/                         # Feature guides and documentation
 ├── scripts/                      # Build, release, and benchmark scripts

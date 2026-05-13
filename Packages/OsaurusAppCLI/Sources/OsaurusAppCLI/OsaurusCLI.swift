@@ -6,7 +6,7 @@
 //
 
 import Foundation
-import OsaurusCLICore
+import OsaurusAppCLICore
 
 @main
 struct OsaurusCLI {

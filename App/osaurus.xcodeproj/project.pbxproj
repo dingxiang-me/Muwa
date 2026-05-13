@@ -231,7 +231,7 @@
 			minimizedProjectReferenceProxies = 1;
 			packageReferences = (
 				F0F4E2992ED1209200BEFA4D /* XCLocalSwiftPackageReference "../Packages/OsaurusRepository" */,
-				F0AA7F342ED20D2E00672B07 /* XCLocalSwiftPackageReference "../Packages/OsaurusCLI" */,
+				F0AA7F342ED20D2E00672B07 /* XCLocalSwiftPackageReference "../Packages/OsaurusAppCLI" */,
 				F0AA7F3B2ED20DA700672B07 /* XCLocalSwiftPackageReference "../Packages/OsaurusCore" */,
 			);
 			preferredProjectObjectVersion = 77;
@@ -672,9 +672,9 @@
 /* End XCConfigurationList section */
 
 /* Begin XCLocalSwiftPackageReference section */
-		F0AA7F342ED20D2E00672B07 /* XCLocalSwiftPackageReference "../Packages/OsaurusCLI" */ = {
+		F0AA7F342ED20D2E00672B07 /* XCLocalSwiftPackageReference "../Packages/OsaurusAppCLI" */ = {
 			isa = XCLocalSwiftPackageReference;
-			relativePath = ../Packages/OsaurusCLI;
+			relativePath = ../Packages/OsaurusAppCLI;
 		};
 		F0AA7F3B2ED20DA700672B07 /* XCLocalSwiftPackageReference "../Packages/OsaurusCore" */ = {
 			isa = XCLocalSwiftPackageReference;

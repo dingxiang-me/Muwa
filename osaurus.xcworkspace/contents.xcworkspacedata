@@ -8,9 +8,9 @@
       location = "group:Packages/OsaurusCore">
    </FileRef>
    <FileRef
-      location = "group:Packages/OsaurusCLI">
+      location = "group:Packages/OsaurusRepository">
    </FileRef>
    <FileRef
-      location = "group:Packages/OsaurusRepository">
+      location = "group:Packages/OsaurusAppCLI">
    </FileRef>
 </Workspace>

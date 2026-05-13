@@ -12,7 +12,7 @@
 //
 
 import XCTest
-@testable import OsaurusCLICore
+@testable import OsaurusAppCLICore
 
 final class ManifestValidateTests: XCTestCase {
 

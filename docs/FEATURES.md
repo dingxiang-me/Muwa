@@ -40,7 +40,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 | Transcription Mode               | Stable    | "Voice Input"      | VOICE_INPUT.md                | Services/Voice/TranscriptionModeService.swift, Views/Voice/TranscriptionOverlayView.swift         |
 | Sandbox                          | macOS 26+ | "Sandbox"          | SANDBOX.md                    | Services/Sandbox/SandboxManager.swift, Tools/BuiltinSandboxTools.swift, Managers/Plugin/SandboxPluginManager.swift, Views/Sandbox/SandboxView.swift |
 | Storage Encryption               | Stable    | -                  | STORAGE.md                    | Identity/StorageKeyManager.swift, Storage/StorageMigrator.swift, Storage/EncryptedSQLiteOpener.swift, Storage/EncryptedFileStore.swift, Storage/AttachmentBlobStore.swift, Storage/StorageMaintenance.swift, Views/Storage/StorageMigrationOverlay.swift, Views/Settings/StorageSettingsView.swift, SQLCipher/ |
-| CLI                              | Stable    | "CLI Reference"    | (in README)                   | Packages/OsaurusCLI/                                                                  |
+| CLI                              | Stable    | "CLI Reference"    | (in README)                   | Packages/OsaurusAppCLI/                                                               |
 
 ---
 
@@ -140,7 +140,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 │  ├── Router (Request routing)                                            │
 │  └── HTTPHandler (OpenAI/Anthropic/Ollama API handlers)                  │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  CLI (OsaurusCLI Package)                                                │
+│  CLI (OsaurusAppCLI Package)                                             │
 │  └── Commands: serve, stop, status, ui, list, show, run, mcp, tools (install, dev, ...), version │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
