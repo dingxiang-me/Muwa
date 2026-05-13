@@ -345,7 +345,7 @@ public actor ModelRuntime {
     }
 
     private func loadContainer(id: String, name: String) async throws -> SessionHolder {
-        let policy = await ServerConfigurationStore.load()?.modelEvictionPolicy ?? .strictSingleModel
+        let policy = await InferenceServices.serverConfig.load()?.modelEvictionPolicy ?? .strictSingleModel
         let loadStartedAt = CFAbsoluteTimeGetCurrent()
         genLog.info(
             "loadContainer: begin model=\(name, privacy: .public) id=\(id, privacy: .public) policy=\(policy.rawValue, privacy: .public)"
@@ -431,8 +431,9 @@ public actor ModelRuntime {
             "loadContainer: local directory model=\(name, privacy: .public) path=\(localURL.path, privacy: .public)"
         )
 
-        let probe = MLXModel(id: id, name: name, description: "", downloadURL: "")
-        await ModelDownloadService.ensureComplete(for: probe, directory: localURL)
+        await InferenceServices.downloadVerifier.ensureComplete(
+            modelId: id, name: name, directory: localURL
+        )
 
         // Preflight: JANGTQ/TurboQuant variants need a `jangtq_runtime.safetensors`
         // sidecar (signs + codebook arrays for the Metal kernels). vmlx's
@@ -1512,7 +1513,10 @@ public actor ModelRuntime {
     }
 
     private static func findLocalDirectory(forModelId id: String) -> URL? {
-        return resolveLocalModelDirectory(forModelId: id, in: DirectoryPickerService.effectiveModelsDirectory())
+        return resolveLocalModelDirectory(
+            forModelId: id,
+            in: InferenceServices.modelDirectory.effectiveModelsDirectory()
+        )
     }
 
     /// Preflight check for JANGTQ-routed models. Reads `jang_config.json`
@@ -1645,7 +1649,7 @@ public actor ModelRuntime {
             var lastTriedRepo: String?
             for repoId in candidates {
                 guard
-                    let url = ModelDownloadService.resolveURL(
+                    let url = InferenceServices.downloadVerifier.resolveURL(
                         repoId: repoId,
                         path: "jangtq_runtime.safetensors"
                     ),

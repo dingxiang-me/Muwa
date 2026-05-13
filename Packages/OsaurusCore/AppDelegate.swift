@@ -45,8 +45,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         // the specific crash class this prevents.
         MLXErrorRecovery.installGlobalHandler()
 
-        // Must run before any model load — engine reads this synchronously.
+        // Must run before any model load — engine reads these synchronously.
         InferenceServices.register(progressReporter: AppProgressReporter())
+        InferenceServices.register(serverConfig: AppServerConfigurationProvider())
+        InferenceServices.register(modelDirectory: AppModelDirectoryProvider())
+        InferenceServices.register(downloadVerifier: AppDownloadVerifier())
 
         // Register in-tree document format adapters before any file-ingress
         // path can run. Idempotent; safe if a future migration moves this.
