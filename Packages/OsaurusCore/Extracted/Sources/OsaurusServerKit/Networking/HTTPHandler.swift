@@ -168,7 +168,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     isPreflight: true,
                     isLoopback: isLoopbackConnection(context)
                 )
-                sendResponse(
+                Self.sendResponse(
                     context: context,
                     version: head.version,
                     status: .noContent,
@@ -215,7 +215,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: stateRef.value.corsHeaders)
                     let errorBody = #"{"error":{"message":"\#(message)","type":"authentication_error"}}"#
-                    sendResponse(
+                    Self.sendResponse(
                         context: context,
                         version: head.version,
                         status: .unauthorized,
@@ -245,7 +245,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             if head.method == .HEAD && !path.hasPrefix("/plugins/") {
                 var headers = [("Content-Type", "text/plain; charset=utf-8")]
                 headers.append(contentsOf: stateRef.value.corsHeaders)
-                sendResponse(
+                Self.sendResponse(
                     context: context,
                     version: head.version,
                     status: .noContent,
@@ -269,7 +269,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 var headers = [("Content-Type", "text/plain; charset=utf-8")]
                 headers.append(contentsOf: stateRef.value.corsHeaders)
                 let rootBody = "Osaurus Server is running! 🦕"
-                sendResponse(
+                Self.sendResponse(
                     context: context,
                     version: head.version,
                     status: .ok,
@@ -308,7 +308,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: stateRef.value.corsHeaders)
                 let mcpHealthBody = #"{"status":"ok"}"#
-                sendResponse(
+                Self.sendResponse(
                     context: context,
                     version: head.version,
                     status: .ok,
@@ -410,7 +410,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 var headers = [("Content-Type", "text/plain; charset=utf-8")]
                 headers.append(contentsOf: stateRef.value.corsHeaders)
                 let notFoundBody = "Not Found"
-                sendResponse(
+                Self.sendResponse(
                     context: context,
                     version: head.version,
                     status: .notFound,
@@ -957,7 +957,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         var headers = [("Content-Type", "application/json; charset=utf-8")]
         headers.append(contentsOf: corsHeaders)
         let body = #"{"error":{"message":"\#(message)"}}"#
-        sendResponse(context: context, version: head.version, status: status, headers: headers, body: body)
+        Self.sendResponse(context: context, version: head.version, status: status, headers: headers, body: body)
         logRequest(
             method: method,
             path: path,
@@ -1361,7 +1361,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     }
 
     private func sendBadRequest(context: ChannelHandlerContext) {
-        sendResponse(
+        Self.sendResponse(
             context: context,
             version: HTTPVersion(major: 1, minor: 1),
             status: .badRequest,
@@ -1400,7 +1400,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             #"{"error":{"message":"Request body too large (\#(declaredLength) > \#(limit) bytes)","type":"payload_too_large"}}"#
         var headers = [("Content-Type", "application/json; charset=utf-8")]
         headers.append(contentsOf: stateRef.value.corsHeaders)
-        sendResponse(
+        Self.sendResponse(
             context: context,
             version: head.version,
             status: .payloadTooLarge,
@@ -1416,45 +1416,6 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             responseStatus: 413,
             startTime: stateRef.value.requestStartTime
         )
-    }
-
-    private func sendResponse(
-        context: ChannelHandlerContext,
-        version: HTTPVersion,
-        status: HTTPResponseStatus,
-        headers: [(String, String)],
-        body: String
-    ) {
-        let loop = context.eventLoop
-        let ctx = NIOLoopBound(context, eventLoop: loop)
-        let bodyCopy = body
-        let headersCopy = headers
-        executeOnLoop(loop) {
-            let context = ctx.value
-            // Create response head
-            var responseHead = HTTPResponseHead(version: version, status: status)
-
-            // Create body buffer
-            var buffer = context.channel.allocator.buffer(capacity: bodyCopy.utf8.count)
-            buffer.writeString(bodyCopy)
-
-            // Build headers
-            var nioHeaders = HTTPHeaders()
-            for (name, value) in headersCopy {
-                nioHeaders.add(name: name, value: value)
-            }
-            nioHeaders.add(name: "Content-Length", value: String(buffer.readableBytes))
-            nioHeaders.add(name: "Connection", value: "close")
-            responseHead.headers = nioHeaders
-
-            // Send response
-            context.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
-            context.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
-            context.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil as HTTPHeaders?))).whenComplete {
-                _ in
-                ctx.value.close(promise: nil)
-            }
-        }
     }
 
     func errorCaught(context: ChannelHandlerContext, error: Error) {
@@ -1611,7 +1572,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         guard let req = try? JSONDecoder().decode(MemoryIngestRequest.self, from: data) else {
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -1789,7 +1750,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             var headers = [("Content-Type", "application/json; charset=utf-8")]
             headers.append(contentsOf: stateRef.value.corsHeaders)
             let body = #"{"error":"Invalid pairing request"}"#
-            sendResponse(context: context, version: head.version, status: .badRequest, headers: headers, body: body)
+            Self.sendResponse(context: context, version: head.version, status: .badRequest, headers: headers, body: body)
             logRequest(
                 method: "POST",
                 path: "/pair",
@@ -1830,7 +1791,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
                     let body = #"{"error":"Signature verification failed"}"#
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .unauthorized,
@@ -1860,7 +1821,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
                     let body = #"{"error":"Agent not found or not available for pairing"}"#
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .notFound,
@@ -1891,7 +1852,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
                     let body = #"{"error":"Pairing denied"}"#
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .forbidden,
@@ -1930,7 +1891,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
                     let body = #"{"error":"Agent is missing a derived key index"}"#
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .internalServerError,
@@ -1961,7 +1922,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
                     let body = #"{"error":"Failed to generate access key"}"#
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .internalServerError,
@@ -2007,7 +1968,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(context: ctx.value, version: head.version, status: .ok, headers: headers, body: json)
+                Self.sendResponse(context: ctx.value, version: head.version, status: .ok, headers: headers, body: json)
                 logSelf.logRequest(
                     method: "POST",
                     path: "/pair",
@@ -2075,7 +2036,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: status,
@@ -2193,7 +2154,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .ok,
@@ -2281,7 +2242,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .ok,
@@ -2326,7 +2287,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -2342,7 +2303,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .notFound,
@@ -2380,7 +2341,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .ok,
@@ -2426,7 +2387,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         guard let req = try? JSONDecoder().decode(ChatCompletionRequest.self, from: data) else {
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -2448,7 +2409,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         // Extract agent ID: /agents/{id}/run
         let pathComponents = path.split(separator: "/")
         guard pathComponents.count >= 2, let agentId = UUID(uuidString: String(pathComponents[1])) else {
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -2775,7 +2736,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -2794,7 +2755,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .notFound,
@@ -2811,7 +2772,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .badRequest,
@@ -2828,7 +2789,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .badRequest,
@@ -2879,7 +2840,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: status,
@@ -2923,7 +2884,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -2946,7 +2907,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: status,
@@ -2989,7 +2950,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -3006,7 +2967,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             }
 
             hop {
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .noContent,
@@ -3062,7 +3023,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -3080,7 +3041,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .badRequest,
@@ -3102,7 +3063,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .gone,
@@ -3150,7 +3111,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 ollamaFormat
                 ? #"{"error":"invalid request body"}"#
                 : #"{"error":{"message":"Invalid request body","type":"invalid_request_error","code":"invalid_body"}}"#
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -3201,7 +3162,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .ok,
@@ -3227,7 +3188,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .internalServerError,
@@ -3269,7 +3230,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         guard let req = try? JSONDecoder().decode(ChatCompletionRequest.self, from: data) else {
             let body = Self.errorBody(.openai(type: "invalid_request_error"), message: "Invalid request format")
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -3296,7 +3257,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 .openai(type: "invalid_request_error"),
                 message: unsupported
             )
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -3757,7 +3718,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         guard let req = try? JSONDecoder().decode(ChatCompletionRequest.self, from: data) else {
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -4032,7 +3993,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 + cors
 
             hop {
-                logSelf.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: version,
                     status: .ok,
@@ -4085,7 +4046,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .ok,
@@ -4184,7 +4145,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .ok,
@@ -4244,7 +4205,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             headers.append(contentsOf: stateRef.value.corsHeaders)
             let errorBody =
                 #"{"error":{"message":"Invalid request: expected {\"model\": \"<model_id>\"}","type":"invalid_request_error"}}"#
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -4300,7 +4261,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     hop {
                         var headers = [("Content-Type", "application/json; charset=utf-8")]
                         headers.append(contentsOf: cors)
-                        self.sendResponse(
+                        Self.sendResponse(
                             context: ctx.value,
                             version: head.version,
                             status: .ok,
@@ -4325,7 +4286,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     hop {
                         var headers = [("Content-Type", "application/json; charset=utf-8")]
                         headers.append(contentsOf: cors)
-                        self.sendResponse(
+                        Self.sendResponse(
                             context: ctx.value,
                             version: head.version,
                             status: .notFound,
@@ -4354,7 +4315,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .notFound,
@@ -4382,7 +4343,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .ok,
@@ -4436,7 +4397,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .ok,
@@ -4515,7 +4476,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         guard let req = try? JSONDecoder().decode(CallBody.self, from: data) else {
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -4572,7 +4533,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         hop {
                             var headers = [("Content-Type", "application/json; charset=utf-8")]
                             headers.append(contentsOf: cors)
-                            self.sendResponse(
+                            Self.sendResponse(
                                 context: ctx.value,
                                 version: head.version,
                                 status: .ok,
@@ -4610,7 +4571,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .ok,
@@ -4644,7 +4605,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .ok,
@@ -4701,7 +4662,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 ?? #"{"type":"error","error":{"type":"invalid_request_error","message":"Invalid request format"}}"#
             var headers = [("Content-Type", "application/json; charset=utf-8")]
             headers.append(contentsOf: stateRef.value.corsHeaders)
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,
@@ -5151,7 +5112,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -5180,7 +5141,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
-                self.sendResponse(
+                Self.sendResponse(
                     context: ctx.value,
                     version: head.version,
                     status: .badRequest,
@@ -5248,7 +5209,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         headers = [("Content-Type", "application/json; charset=utf-8")]
                     }
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .ok,
@@ -5272,7 +5233,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
                     headers.append(contentsOf: cors)
-                    self.sendResponse(
+                    Self.sendResponse(
                         context: ctx.value,
                         version: head.version,
                         status: .internalServerError,
@@ -5322,7 +5283,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 ?? #"{"error":{"type":"error","code":"invalid_request_error","message":"Invalid request format"}}"#
             var headers = [("Content-Type", "application/json; charset=utf-8")]
             headers.append(contentsOf: stateRef.value.corsHeaders)
-            sendResponse(
+            Self.sendResponse(
                 context: context,
                 version: head.version,
                 status: .badRequest,

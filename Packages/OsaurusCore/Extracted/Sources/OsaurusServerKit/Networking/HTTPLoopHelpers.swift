@@ -65,6 +65,41 @@ extension HTTPHandler {
         }
     }
 
+    /// Single-shot HTTP response writer. Hops onto the channel's event
+    /// loop, writes head + body + end, closes the connection. Replaces
+    /// the previous private instance method on `HTTPHandler` so other
+    /// handlers (`AppHTTPHandler`) can share it.
+    static func sendResponse(
+        context: ChannelHandlerContext,
+        version: HTTPVersion,
+        status: HTTPResponseStatus,
+        headers: [(String, String)],
+        body: String
+    ) {
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let bodyCopy = body
+        let headersCopy = headers
+        let block: @Sendable () -> Void = {
+            let c = ctx.value
+            guard c.channel.isActive else { return }
+            var responseHead = HTTPResponseHead(version: version, status: status)
+            var buffer = c.channel.allocator.buffer(capacity: bodyCopy.utf8.count)
+            buffer.writeString(bodyCopy)
+            var nioHeaders = HTTPHeaders()
+            for (name, value) in headersCopy { nioHeaders.add(name: name, value: value) }
+            nioHeaders.add(name: "Content-Length", value: String(buffer.readableBytes))
+            nioHeaders.add(name: "Connection", value: "close")
+            responseHead.headers = nioHeaders
+            c.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
+            c.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+            c.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil as HTTPHeaders?))).whenComplete { _ in
+                ctx.value.close(promise: nil)
+            }
+        }
+        if loop.inEventLoop { block() } else { loop.execute(block) }
+    }
+
     /// Write a single-shot JSON response (non-streaming) and close the
     /// connection. Centralizes the boilerplate around `Content-Type` /
     /// `Content-Length` / `Connection: close` so each non-streaming
