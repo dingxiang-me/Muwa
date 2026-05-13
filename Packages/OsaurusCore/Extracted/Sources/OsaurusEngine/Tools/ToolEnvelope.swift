@@ -122,93 +122,13 @@ public enum ToolEnvelope {
         success(tool: tool, result: ["text": text], warnings: warnings)
     }
 
-    /// Map any thrown error (or generic NSError from registry rejection)
-    /// to a structured failure envelope. Used by the chat / HTTP / plugin
-    /// tool-call catch sites so the model gets a meaningful `kind` instead
-    /// of `executionError`-for-everything.
-    ///
-    /// Recognised input domains:
-    ///   - `FolderToolError`            -> mapped per case (invalid_args /
-    ///                                     execution_error)
-    ///   - Registry permission NSError  -> `userDenied` (interactive deny)
-    ///                                     or `rejected` (policy deny)
-    ///   - Anything else                -> `executionError` with the
-    ///                                     localizedDescription as message
+    /// Generic catch-all: any thrown `Error` becomes an
+    /// `.executionError` envelope. Hosts that need richer per-domain
+    /// mapping (e.g. FolderToolError, ToolRegistry permission codes)
+    /// catch those at the executor adapter before they reach this
+    /// fallback. See `AppToolExecutor` for the Mac app's mapping.
     public static func fromError(_ error: Error, tool: String? = nil) -> String {
-        // Folder tool errors come with rich enum cases — preserve them.
-        if let folderErr = error as? FolderToolError {
-            switch folderErr {
-            case .invalidArguments(let msg):
-                return failure(
-                    kind: .invalidArgs,
-                    message: msg,
-                    tool: tool
-                )
-            case .pathOutsideRoot(let path):
-                return failure(
-                    kind: .invalidArgs,
-                    message:
-                        "Path '\(path)' is outside the working directory. "
-                        + "Use a relative path under the working folder, e.g. `src/app.py`.",
-                    field: "path",
-                    expected: "relative path under the working folder",
-                    tool: tool
-                )
-            case .fileNotFound(let path):
-                return failure(
-                    kind: .executionError,
-                    message: "File not found: \(path)",
-                    tool: tool,
-                    retryable: false
-                )
-            case .directoryNotFound(let path):
-                return failure(
-                    kind: .executionError,
-                    message: "Directory not found: \(path)",
-                    tool: tool,
-                    retryable: false
-                )
-            case .operationFailed(let msg):
-                return failure(
-                    kind: .executionError,
-                    message: msg,
-                    tool: tool
-                )
-            }
-        }
-
-        // Registry permission errors carry their reason in NSError.localizedDescription
-        // and a stable code in the `ToolRegistry` NSError domain.
-        let nserr = error as NSError
-        if nserr.domain == "ToolRegistry" {
-            switch nserr.code {
-            case 4:  // user denied via interactive approval
-                return failure(
-                    kind: .userDenied,
-                    message: nserr.localizedDescription,
-                    tool: tool,
-                    retryable: false
-                )
-            case 3, 6:  // policy deny
-                return failure(
-                    kind: .rejected,
-                    message: nserr.localizedDescription,
-                    tool: tool,
-                    retryable: false
-                )
-            case 7:  // missing system permissions
-                return failure(
-                    kind: .unavailable,
-                    message: nserr.localizedDescription,
-                    tool: tool,
-                    retryable: false
-                )
-            default:
-                break
-            }
-        }
-
-        return failure(
+        failure(
             kind: .executionError,
             message: error.localizedDescription,
             tool: tool

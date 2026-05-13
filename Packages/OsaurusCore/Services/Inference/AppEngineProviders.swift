@@ -84,8 +84,69 @@ struct AppToolExecutor: ToolExecutor {
     func parameters(forTool name: String) async -> JSONValue? {
         await MainActor.run { ToolRegistry.shared.parametersForTool(name: name) }
     }
+
+    /// Catches app-specific errors (FolderToolError, ToolRegistry NSError
+    /// permission codes) and returns rich envelope JSON inline so the
+    /// engine's generic fallback never sees them.
     func execute(name: String, argumentsJSON: String) async throws -> String {
-        try await ToolRegistry.shared.execute(name: name, argumentsJSON: argumentsJSON)
+        do {
+            return try await ToolRegistry.shared.execute(name: name, argumentsJSON: argumentsJSON)
+        } catch let folderErr as FolderToolError {
+            return Self.envelope(for: folderErr, tool: name)
+        } catch let nserr as NSError where nserr.domain == "ToolRegistry" {
+            if let env = Self.envelope(forToolRegistryNSError: nserr, tool: name) { return env }
+            throw nserr
+        }
+    }
+
+    private static func envelope(for folderErr: FolderToolError, tool: String) -> String {
+        switch folderErr {
+        case .invalidArguments(let msg):
+            return ToolEnvelope.failure(kind: .invalidArgs, message: msg, tool: tool)
+        case .pathOutsideRoot(let path):
+            return ToolEnvelope.failure(
+                kind: .invalidArgs,
+                message: "Path '\(path)' is outside the working directory. "
+                    + "Use a relative path under the working folder, e.g. `src/app.py`.",
+                field: "path",
+                expected: "relative path under the working folder",
+                tool: tool
+            )
+        case .fileNotFound(let path):
+            return ToolEnvelope.failure(
+                kind: .executionError, message: "File not found: \(path)",
+                tool: tool, retryable: false
+            )
+        case .directoryNotFound(let path):
+            return ToolEnvelope.failure(
+                kind: .executionError, message: "Directory not found: \(path)",
+                tool: tool, retryable: false
+            )
+        case .operationFailed(let msg):
+            return ToolEnvelope.failure(kind: .executionError, message: msg, tool: tool)
+        }
+    }
+
+    private static func envelope(forToolRegistryNSError nserr: NSError, tool: String) -> String? {
+        switch nserr.code {
+        case 4:  // user denied via interactive approval
+            return ToolEnvelope.failure(
+                kind: .userDenied, message: nserr.localizedDescription,
+                tool: tool, retryable: false
+            )
+        case 3, 6:  // policy deny
+            return ToolEnvelope.failure(
+                kind: .rejected, message: nserr.localizedDescription,
+                tool: tool, retryable: false
+            )
+        case 7:  // missing system permissions
+            return ToolEnvelope.failure(
+                kind: .unavailable, message: nserr.localizedDescription,
+                tool: tool, retryable: false
+            )
+        default:
+            return nil
+        }
     }
 }
 
