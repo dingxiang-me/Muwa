@@ -802,11 +802,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             let serverPort = self.configuration.port
             let localBaseURL = "http://127.0.0.1:\(serverPort)"
 
-            // Second (and last) MainActor hop: resolve tunnel URL and agent address
-            let (agentAddress, tunnelURL) = await MainActor.run {
-                let address = AgentManager.shared.agent(for: agentUUID)?.agentAddress ?? ""
-                let tunnel = Self.resolveTunnelBaseURL(for: agentUUID)
-                return (address, tunnel)
+            let tunnelURL = await InferenceServices.tunnelResolver.tunnelBaseURL(for: agentUUID)
+            let agentAddress = await MainActor.run {
+                AgentManager.shared.agent(for: agentUUID)?.agentAddress ?? ""
             }
 
             let baseURL = tunnelURL ?? localBaseURL
@@ -1336,15 +1334,6 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
     }
 
-    /// Resolves the tunnel base URL for a specific agent from RelayTunnelManager.
-    @MainActor
-    private static func resolveTunnelBaseURL(for agentId: UUID) -> String? {
-        if case .connected(let url) = RelayTunnelManager.shared.agentStatuses[agentId] {
-            return url
-        }
-        return nil
-    }
-
     // MARK: - Private Helpers
 
     private func extractPath(from uri: String) -> String {
@@ -1651,7 +1640,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         let logRequestBody = requestBodyString
 
         Task(priority: .userInitiated) {
-            let db = MemoryDatabase.shared
+            let db = InferenceServices.memory
 
             let skipExtraction = req.skip_extraction ?? false
 
@@ -2249,7 +2238,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         Task(priority: .userInitiated) {
             let agents = await MainActor.run { AgentManager.shared.agents }
 
-            let db = MemoryDatabase.shared
+            let db = InferenceServices.memory
             var memoryCounts: [String: Int] = [:]
             if db.isOpen, let counts = try? db.agentIdsWithPinnedFacts() {
                 for (agentId, count) in counts {
@@ -2490,7 +2479,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             // Resolve model: client sends "default" when no specific model was known
             let model: String
             if req.model.isEmpty || req.model == "default" {
-                let agentModel = await MainActor.run { AgentManager.shared.effectiveModel(for: agentId) }
+                let agentModel = await InferenceServices.agents.effectiveModel(for: agentId)
                 model = agentModel ?? req.model
             } else {
                 model = req.model
@@ -2513,14 +2502,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             //      function name, client wins on conflicts) so callers can
             //      ship custom function definitions without losing the
             //      agent surface.
-            let baseTools = await MainActor.run {
-                let autonomousEnabled = AgentManager.shared.effectiveAutonomousExec(for: agentId)?.enabled == true
-                let mode = ToolRegistry.shared.resolveExecutionMode(
-                    folderContext: nil,
-                    autonomousEnabled: autonomousEnabled
-                )
-                return ToolRegistry.shared.alwaysLoadedSpecs(mode: mode)
-            }
+            let autonomousEnabled = await InferenceServices.agents.autonomousExecEnabled(for: agentId)
+            let baseTools = await InferenceServices.tools.alwaysLoadedSpecs(
+                autonomousEnabled: autonomousEnabled
+            )
             let tools: [Tool] = {
                 guard let clientTools = req.tools, !clientTools.isEmpty else { return baseTools }
                 let clientNames = Set(clientTools.map { $0.function.name })
@@ -2804,7 +2789,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         Task(priority: .userInitiated) {
             // Resolve identifier: try UUID first, then crypto address
-            guard let agentId = await MainActor.run(body: { AgentManager.shared.resolveAgentId(agentIdentifier) })
+            guard let agentId = await InferenceServices.agents.resolveAgentId(agentIdentifier)
             else {
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -3940,7 +3925,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     do {
                         result = try await ChatExecutionContext.$currentSessionId.withValue(requestId) {
                             try await ChatExecutionContext.$currentAgentId.withValue(agentId) {
-                                try await ToolRegistry.shared.execute(
+                                try await InferenceServices.tools.execute(
                                     name: call.invocation.toolName,
                                     argumentsJSON: call.invocation.jsonArguments
                                 )
@@ -4434,9 +4419,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         let logUserAgent = userAgent
         let logSelf = self
         Task(priority: .userInitiated) {
-            let entries = await MainActor.run {
-                ToolRegistry.shared.listTools().filter { $0.enabled }
-            }
+            let entries = await InferenceServices.tools.listEnabledTools()
             let tools = entries.map { e in
                 var obj: [String: Any] = [
                     "name": e.name,
@@ -4574,7 +4557,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             let toolCallStartTime = Date()
             do {
                 // Validate against schema if available
-                if let schema = await MainActor.run(body: { ToolRegistry.shared.parametersForTool(name: toolName) }) {
+                if let schema = await InferenceServices.tools.parameters(forTool: toolName) {
                     let argsObject: Any =
                         (try? JSONSerialization.jsonObject(with: Data(argsJSON.utf8))) as? [String: Any] ?? [:]
                     let res = SchemaValidator.validate(arguments: argsObject, against: schema)
@@ -4617,7 +4600,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     }
                 }
 
-                let result = try await ToolRegistry.shared.execute(name: toolName, argumentsJSON: argsJSON)
+                let result = try await InferenceServices.tools.execute(name: toolName, argumentsJSON: argsJSON)
                 let payload: [String: Any] = [
                     "content": [["type": "text", "text": result]],
                     "isError": false,

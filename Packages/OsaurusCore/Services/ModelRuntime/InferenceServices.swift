@@ -19,6 +19,14 @@ enum InferenceServices {
         = NoOpModelListProvider()
     nonisolated(unsafe) private static var _telemetry: any Telemetry
         = NoOpTelemetry()
+    nonisolated(unsafe) private static var _tunnelResolver: any TunnelResolver
+        = NoOpTunnelResolver()
+    nonisolated(unsafe) private static var _memory: any MemoryProvider
+        = NoOpMemoryProvider()
+    nonisolated(unsafe) private static var _tools: any ToolExecutor
+        = NoOpToolExecutor()
+    nonisolated(unsafe) private static var _agents: any AgentProvider
+        = NoOpAgentProvider()
 
     static var progressReporter: any ProgressReporter {
         lock.withLock { _progressReporter }
@@ -41,6 +49,18 @@ enum InferenceServices {
     static var telemetry: any Telemetry {
         lock.withLock { _telemetry }
     }
+    static var tunnelResolver: any TunnelResolver {
+        lock.withLock { _tunnelResolver }
+    }
+    static var memory: any MemoryProvider {
+        lock.withLock { _memory }
+    }
+    static var tools: any ToolExecutor {
+        lock.withLock { _tools }
+    }
+    static var agents: any AgentProvider {
+        lock.withLock { _agents }
+    }
 
     static func register(progressReporter: any ProgressReporter) {
         lock.withLock { _progressReporter = progressReporter }
@@ -62,6 +82,18 @@ enum InferenceServices {
     }
     static func register(telemetry: any Telemetry) {
         lock.withLock { _telemetry = telemetry }
+    }
+    static func register(tunnelResolver: any TunnelResolver) {
+        lock.withLock { _tunnelResolver = tunnelResolver }
+    }
+    static func register(memory: any MemoryProvider) {
+        lock.withLock { _memory = memory }
+    }
+    static func register(tools: any ToolExecutor) {
+        lock.withLock { _tools = tools }
+    }
+    static func register(agents: any AgentProvider) {
+        lock.withLock { _agents = agents }
     }
 }
 
