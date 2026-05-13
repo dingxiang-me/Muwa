@@ -4086,14 +4086,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         Task(priority: .userInitiated) {
             // Get local models
             var models = MLXService.getAvailableModels().map { OpenAIModel(modelName: $0) }
-            if FoundationModelService.isDefaultModelAvailable() {
+            if InferenceServices.modelList.isFoundationModelAvailable() {
                 models.insert(OpenAIModel(modelName: "foundation"), at: 0)
             }
 
             // Get remote provider models
-            let remoteModels = await MainActor.run {
-                RemoteProviderManager.shared.getOpenAIModels()
-            }
+            let remoteModels = await InferenceServices.modelList.availableRemoteModels()
             models.append(contentsOf: remoteModels)
 
             let response = ModelsResponse(data: models)
@@ -4158,7 +4156,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 return m
             }
 
-            if FoundationModelService.isDefaultModelAvailable() {
+            if InferenceServices.modelList.isFoundationModelAvailable() {
                 var fm = OpenAIModel(modelName: "foundation")
                 fm.name = "foundation"
                 fm.model = "foundation"
@@ -4177,9 +4175,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             }
 
             // Get remote provider models
-            let remoteModels = await MainActor.run {
-                RemoteProviderManager.shared.getOpenAIModels()
-            }
+            let remoteModels = await InferenceServices.modelList.availableRemoteModels()
             for var remoteModel in remoteModels {
                 remoteModel.modified_at = now
                 remoteModel.size = 0
@@ -4296,7 +4292,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         Task(priority: .userInitiated) {
             // Handle "foundation" model specially
             if modelName.lowercased() == "foundation" || modelName.lowercased() == "default" {
-                if FoundationModelService.isDefaultModelAvailable() {
+                if InferenceServices.modelList.isFoundationModelAvailable() {
                     let response: [String: Any] = [
                         "modelfile": "",
                         "parameters": "",
@@ -6032,7 +6028,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
     // MARK: - Request Logging
 
-    /// Log a completed request to InsightsService
+    /// Log a completed request via the injected Telemetry seam.
     private func logRequest(
         method: String,
         path: String,
@@ -6051,7 +6047,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         errorMessage: String? = nil
     ) {
         let durationMs = Date().timeIntervalSince(startTime) * 1000
-        InsightsService.logAsync(
+        InferenceServices.telemetry.logRequest(
             method: method,
             path: path,
             userAgent: userAgent,

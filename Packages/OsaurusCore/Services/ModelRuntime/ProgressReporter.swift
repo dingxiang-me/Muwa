@@ -2,7 +2,7 @@ import Foundation
 
 /// Host-supplied progress signal. Fire-and-forget — implementations must
 /// be non-blocking; hop to MainActor internally if needed.
-public protocol ProgressReporter: Sendable {
+protocol ProgressReporter: Sendable {
     /// Pair with exactly one `modelLoadDidFinish()` on every exit path.
     /// Refcount-friendly: concurrent loads from multiple windows must not
     /// corrupt each other.
@@ -15,10 +15,9 @@ public protocol ProgressReporter: Sendable {
     func prefillDidFinish()
 }
 
-public struct NoOpProgressReporter: ProgressReporter {
-    public init() {}
-    public func modelLoadWillStart() {}
-    public func modelLoadDidFinish() {}
-    public func prefillWillStart(tokenCount: Int) {}
-    public func prefillDidFinish() {}
+struct NoOpProgressReporter: ProgressReporter {
+    func modelLoadWillStart() {}
+    func modelLoadDidFinish() {}
+    func prefillWillStart(tokenCount: Int) {}
+    func prefillDidFinish() {}
 }

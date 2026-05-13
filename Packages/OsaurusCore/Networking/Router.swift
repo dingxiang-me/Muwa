@@ -128,7 +128,7 @@ public struct Router {
         }
 
         // Expose the system default Foundation model when available
-        if FoundationModelService.isDefaultModelAvailable() {
+        if InferenceServices.modelList.isFoundationModelAvailable() {
             let foundation = OpenAIModel(modelName: "foundation")
             // Prepend so clients see a usable choice even with no local models
             models.insert(foundation, at: 0)
@@ -164,7 +164,7 @@ public struct Router {
         }
 
         // Expose the system default Foundation model when available for Ollama-compatible /tags
-        if FoundationModelService.isDefaultModelAvailable() {
+        if InferenceServices.modelList.isFoundationModelAvailable() {
             var foundation = OpenAIModel(modelName: "foundation")
             foundation.name = "foundation"
             foundation.model = "foundation"
@@ -215,7 +215,7 @@ public struct Router {
     private func handleShowRequest(modelName: String) -> (HTTPResponseStatus, [(String, String)], String) {
         // Handle "foundation" model specially
         if modelName.lowercased() == "foundation" || modelName.lowercased() == "default" {
-            if FoundationModelService.isDefaultModelAvailable() {
+            if InferenceServices.modelList.isFoundationModelAvailable() {
                 let response = ShowResponse(
                     modelfile: "",
                     parameters: "",

@@ -5,7 +5,6 @@
 //  Migrated to Swift 6 actors; delegates runtime state to ModelManager/ModelRuntime.
 //
 
-import Combine
 import Foundation
 
 /// Lightweight reference to a local MLX model (name + repo id)
@@ -33,14 +32,14 @@ actor MLXService: ToolCapableService {
         return Self.findModel(named: trimmed) != nil
     }
 
-    // MARK: - Static discovery wrappers (delegate to ModelManager)
+    // MARK: - Static discovery wrappers (delegate to injected locator)
 
     nonisolated static func getAvailableModels() -> [String] {
-        return ModelManager.installedModelNames()
+        return InferenceServices.modelLocator.installedModelNames()
     }
 
     fileprivate nonisolated static func findModel(named name: String) -> LocalModelRef? {
-        if let found = ModelManager.findInstalledModel(named: name) {
+        if let found = InferenceServices.modelLocator.findInstalledModel(named: name) {
             return LocalModelRef(name: found.name, modelId: found.id)
         }
         return nil

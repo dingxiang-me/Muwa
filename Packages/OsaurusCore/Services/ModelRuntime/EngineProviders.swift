@@ -1,34 +1,82 @@
 import Foundation
 
-public protocol ServerConfigurationProvider: Sendable {
+protocol ServerConfigurationProvider: Sendable {
     func load() async -> ServerConfiguration?
 }
 
-public protocol ModelDirectoryProvider: Sendable {
+protocol ModelDirectoryProvider: Sendable {
     func effectiveModelsDirectory() -> URL
 }
 
-public protocol DownloadVerifier: Sendable {
+protocol ModelLocator: Sendable {
+    func installedModelNames() -> [String]
+    func findInstalledModel(named name: String) -> (name: String, id: String)?
+}
+
+protocol ModelListProvider: Sendable {
+    func isFoundationModelAvailable() -> Bool
+    func availableRemoteModels() async -> [OpenAIModel]
+}
+
+protocol Telemetry: Sendable {
+    func logRequest(
+        method: String,
+        path: String,
+        userAgent: String?,
+        requestBody: String?,
+        responseBody: String?,
+        responseStatus: Int,
+        durationMs: Double,
+        model: String?,
+        tokensInput: Int?,
+        tokensOutput: Int?,
+        temperature: Float?,
+        maxTokens: Int?,
+        toolCalls: [ToolCallLog]?,
+        finishReason: RequestLog.FinishReason?,
+        errorMessage: String?
+    )
+}
+
+protocol DownloadVerifier: Sendable {
     func ensureComplete(modelId: String, name: String, directory: URL) async
     func resolveURL(repoId: String, path: String) -> URL?
 }
 
-public struct DefaultServerConfigurationProvider: ServerConfigurationProvider {
-    public init() {}
-    public func load() async -> ServerConfiguration? { nil }
+struct DefaultServerConfigurationProvider: ServerConfigurationProvider {
+    func load() async -> ServerConfiguration? { nil }
 }
 
 /// Defaults to `~/.osaurus/models`. CLI overrides via `--model-dir`.
-public struct DefaultModelDirectoryProvider: ModelDirectoryProvider {
-    public init() {}
-    public func effectiveModelsDirectory() -> URL {
+struct DefaultModelDirectoryProvider: ModelDirectoryProvider {
+    func effectiveModelsDirectory() -> URL {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".osaurus/models", isDirectory: true)
     }
 }
 
-public struct NoOpDownloadVerifier: DownloadVerifier {
-    public init() {}
-    public func ensureComplete(modelId: String, name: String, directory: URL) async {}
-    public func resolveURL(repoId: String, path: String) -> URL? { nil }
+struct NoOpModelLocator: ModelLocator {
+    func installedModelNames() -> [String] { [] }
+    func findInstalledModel(named name: String) -> (name: String, id: String)? { nil }
+}
+
+struct NoOpModelListProvider: ModelListProvider {
+    func isFoundationModelAvailable() -> Bool { false }
+    func availableRemoteModels() async -> [OpenAIModel] { [] }
+}
+
+struct NoOpTelemetry: Telemetry {
+    func logRequest(
+        method: String, path: String, userAgent: String?,
+        requestBody: String?, responseBody: String?,
+        responseStatus: Int, durationMs: Double, model: String?,
+        tokensInput: Int?, tokensOutput: Int?, temperature: Float?,
+        maxTokens: Int?, toolCalls: [ToolCallLog]?,
+        finishReason: RequestLog.FinishReason?, errorMessage: String?
+    ) {}
+}
+
+struct NoOpDownloadVerifier: DownloadVerifier {
+    func ensureComplete(modelId: String, name: String, directory: URL) async {}
+    func resolveURL(repoId: String, path: String) -> URL? { nil }
 }

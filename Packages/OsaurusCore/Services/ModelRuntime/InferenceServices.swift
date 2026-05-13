@@ -2,7 +2,7 @@ import Foundation
 
 /// Process-wide registry of host-supplied engine seams. CLI keeps the
 /// defaults; Mac app registers real adapters at startup.
-public enum InferenceServices {
+enum InferenceServices {
     private static let lock = NSLock()
 
     nonisolated(unsafe) private static var _progressReporter: any ProgressReporter
@@ -13,31 +13,55 @@ public enum InferenceServices {
         = DefaultModelDirectoryProvider()
     nonisolated(unsafe) private static var _downloadVerifier: any DownloadVerifier
         = NoOpDownloadVerifier()
+    nonisolated(unsafe) private static var _modelLocator: any ModelLocator
+        = NoOpModelLocator()
+    nonisolated(unsafe) private static var _modelList: any ModelListProvider
+        = NoOpModelListProvider()
+    nonisolated(unsafe) private static var _telemetry: any Telemetry
+        = NoOpTelemetry()
 
-    public static var progressReporter: any ProgressReporter {
+    static var progressReporter: any ProgressReporter {
         lock.withLock { _progressReporter }
     }
-    public static var serverConfig: any ServerConfigurationProvider {
+    static var serverConfig: any ServerConfigurationProvider {
         lock.withLock { _serverConfig }
     }
-    public static var modelDirectory: any ModelDirectoryProvider {
+    static var modelDirectory: any ModelDirectoryProvider {
         lock.withLock { _modelDirectory }
     }
-    public static var downloadVerifier: any DownloadVerifier {
+    static var downloadVerifier: any DownloadVerifier {
         lock.withLock { _downloadVerifier }
     }
+    static var modelLocator: any ModelLocator {
+        lock.withLock { _modelLocator }
+    }
+    static var modelList: any ModelListProvider {
+        lock.withLock { _modelList }
+    }
+    static var telemetry: any Telemetry {
+        lock.withLock { _telemetry }
+    }
 
-    public static func register(progressReporter: any ProgressReporter) {
+    static func register(progressReporter: any ProgressReporter) {
         lock.withLock { _progressReporter = progressReporter }
     }
-    public static func register(serverConfig: any ServerConfigurationProvider) {
+    static func register(serverConfig: any ServerConfigurationProvider) {
         lock.withLock { _serverConfig = serverConfig }
     }
-    public static func register(modelDirectory: any ModelDirectoryProvider) {
+    static func register(modelDirectory: any ModelDirectoryProvider) {
         lock.withLock { _modelDirectory = modelDirectory }
     }
-    public static func register(downloadVerifier: any DownloadVerifier) {
+    static func register(downloadVerifier: any DownloadVerifier) {
         lock.withLock { _downloadVerifier = downloadVerifier }
+    }
+    static func register(modelLocator: any ModelLocator) {
+        lock.withLock { _modelLocator = modelLocator }
+    }
+    static func register(modelList: any ModelListProvider) {
+        lock.withLock { _modelList = modelList }
+    }
+    static func register(telemetry: any Telemetry) {
+        lock.withLock { _telemetry = telemetry }
     }
 }
 

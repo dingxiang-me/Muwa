@@ -50,6 +50,9 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         InferenceServices.register(serverConfig: AppServerConfigurationProvider())
         InferenceServices.register(modelDirectory: AppModelDirectoryProvider())
         InferenceServices.register(downloadVerifier: AppDownloadVerifier())
+        InferenceServices.register(modelLocator: AppModelLocator())
+        InferenceServices.register(modelList: AppModelListProvider())
+        InferenceServices.register(telemetry: AppTelemetry())
 
         // Register in-tree document format adapters before any file-ingress
         // path can run. Idempotent; safe if a future migration moves this.

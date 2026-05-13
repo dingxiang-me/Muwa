@@ -6,23 +6,29 @@
 //
 
 import Foundation
-import LocalAuthentication
 import NIOCore
 import NIOHTTP1
 import NIOPosix
+
+public typealias APIKeyValidatorFactory = @Sendable () -> APIKeyValidator
 
 public actor OsaurusServer: Sendable {
     public struct Config: Sendable {
         public var host: String
         public var port: Int
-        public var agentIndex: UInt32?
         public var trustLoopback: Bool
-        public init(host: String = "127.0.0.1", port: Int = 1337, agentIndex: UInt32? = nil, trustLoopback: Bool = true)
-        {
+        public var validatorFactory: APIKeyValidatorFactory
+
+        public init(
+            host: String = "127.0.0.1",
+            port: Int = 1337,
+            trustLoopback: Bool = true,
+            validatorFactory: @escaping APIKeyValidatorFactory = { .empty }
+        ) {
             self.host = host
             self.port = port
-            self.agentIndex = agentIndex
             self.trustLoopback = trustLoopback
+            self.validatorFactory = validatorFactory
         }
     }
 
@@ -40,7 +46,7 @@ public actor OsaurusServer: Sendable {
         let threads = ProcessInfo.processInfo.activeProcessorCount
         let group = MultiThreadedEventLoopGroup(numberOfThreads: threads)
 
-        let validator = Self.buildValidator(agentIndex: config.agentIndex)
+        let validator = config.validatorFactory()
         let trustLoopback = config.trustLoopback
 
         let bootstrap = ServerBootstrap(group: group)
@@ -81,43 +87,5 @@ public actor OsaurusServer: Sendable {
             self.group = nil
         }
         print("[Osaurus] OsaurusServer stopped")
-    }
-
-    // MARK: - Validator Construction
-
-    /// Build a validator from the current identity, whitelist, and revocation state.
-    /// Falls back to `.empty` if the account doesn't exist yet.
-    private static func buildValidator(agentIndex: UInt32?) -> APIKeyValidator {
-        guard MasterKey.exists() else { return .empty }
-
-        let context = LAContext()
-        context.touchIDAuthenticationAllowableReuseDuration = 300
-
-        do {
-            var masterKeyData = try MasterKey.getPrivateKey(context: context)
-            defer { masterKeyData.zeroOut() }
-
-            let masterAddress = try deriveOsaurusId(from: masterKeyData)
-            let agentAddress: OsaurusID =
-                if let idx = agentIndex {
-                    try AgentKey.deriveAddress(masterKey: masterKeyData, index: idx)
-                } else {
-                    masterAddress
-                }
-
-            return APIKeyValidator(
-                agentAddress: agentAddress,
-                masterAddress: masterAddress,
-                effectiveWhitelist: WhitelistStore.shared.effectiveWhitelist(
-                    forAgent: agentAddress,
-                    masterAddress: masterAddress
-                ),
-                revocationSnapshot: RevocationStore.shared.snapshot(),
-                hasKeys: !APIKeyManager.shared.listKeys().isEmpty
-            )
-        } catch {
-            print("[Osaurus] Failed to build validator: \(error). Falling back to empty validator.")
-            return .empty
-        }
     }
 }
