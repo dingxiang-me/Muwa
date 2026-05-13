@@ -89,7 +89,7 @@ enum GenerationEventMapper {
                     case .chunk(let text):
                         if firstChunk {
                             firstChunk = false
-                            InferenceProgressManager.shared.prefillDidFinishAsync()
+                            InferenceServices.progressReporter.prefillDidFinish()
                         }
                         guard !text.isEmpty else { continue }
                         estimatedTextTokens += max(1, text.count / 4)
@@ -109,7 +109,7 @@ enum GenerationEventMapper {
                         // channel.
                         if firstChunk {
                             firstChunk = false
-                            InferenceProgressManager.shared.prefillDidFinishAsync()
+                            InferenceServices.progressReporter.prefillDidFinish()
                         }
                         if mergeReasoning {
                             // vmlx already stripped the family-specific
@@ -162,7 +162,7 @@ enum GenerationEventMapper {
                 mapperLog.info(
                     "[perf] generation durationMs=\(durationMs, privacy: .public) tokenCount=\(finalTokenCount, privacy: .public)"
                 )
-                InferenceProgressManager.shared.prefillDidFinishAsync()
+                InferenceServices.progressReporter.prefillDidFinish()
                 continuation.finish()
             }
             continuation.onTermination = { @Sendable _ in

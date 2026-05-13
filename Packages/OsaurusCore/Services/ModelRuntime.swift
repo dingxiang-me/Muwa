@@ -880,22 +880,20 @@ public actor ModelRuntime {
 
         genLog.info("generateEventStream: start model=\(modelName, privacy: .public)")
 
-        // Scoped start/finish around ONLY the container load — the "loading
-        // model" UI flag flips off as soon as the container is ready. The
-        // refcount in `InferenceProgressManager` keeps concurrent loads
-        // (two chat windows starting different models) from corrupting
-        // each other.
+        // Scope refcounted progress around the container load only —
+        // the host's reporter refcounts concurrent loads from multiple windows.
         let cfg = await getConfig()
+        let progress = InferenceServices.progressReporter
         trace?.mark("load_container_start")
-        InferenceProgressManager.shared.modelLoadWillStartAsync()
+        progress.modelLoadWillStart()
         let holder: SessionHolder
         do {
             holder = try await loadContainer(id: modelId, name: modelName)
         } catch {
-            InferenceProgressManager.shared.modelLoadDidFinishAsync()
+            progress.modelLoadDidFinish()
             throw error
         }
-        InferenceProgressManager.shared.modelLoadDidFinishAsync()
+        progress.modelLoadDidFinish()
         trace?.mark("load_container_done")
 
         // Pin the model against eviction for the stream's lifetime.
@@ -911,7 +909,7 @@ public actor ModelRuntime {
             ModelRuntime.makeTokenizerTools(tools: tools, toolChoice: toolChoice)
         }
 
-        InferenceProgressManager.shared.prefillWillStartAsync(tokenCount: 0)
+        progress.prefillWillStart(tokenCount: 0)
 
         let prepared: MLXBatchAdapter.PreparedStream
         do {
@@ -926,15 +924,13 @@ public actor ModelRuntime {
                 maxBatchSize: InferenceFeatureFlags.mlxBatchEngineMaxBatchSize
             )
         } catch {
-            InferenceProgressManager.shared.prefillDidFinishAsync()
+            progress.prefillDidFinish()
             await ModelLease.shared.release(modelName)
             throw error
         }
 
         trace?.set("promptTokens", prepared.promptTokens.count)
-        InferenceProgressManager.shared.prefillWillStartAsync(
-            tokenCount: prepared.promptTokens.count
-        )
+        progress.prefillWillStart(tokenCount: prepared.promptTokens.count)
         genLog.info(
             "generateEventStream: stream created tokenCount=\(prepared.promptTokens.count, privacy: .public)"
         )
