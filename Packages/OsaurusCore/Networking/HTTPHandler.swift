@@ -2256,7 +2256,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             }
             let items = agents.map { agent in
                 let modelId = effectiveModels[agent.id] ?? agent.defaultModel
-                let supportsVision = modelId.map { VLMDetection.isVLM(modelId: $0) } ?? false
+                let supportsVision = modelId.map { VLMDetection.isVLM(modelId: $0, in: InferenceServices.modelDirectory.effectiveModelsDirectory()) } ?? false
                 let supportsThinking =
                     modelId.flatMap { ModelProfileRegistry.profile(for: $0)?.thinkingOption } != nil
                 return AgentListItem(
@@ -2358,7 +2358,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 await MainActor.run {
                     AgentManager.shared.effectiveModel(for: agent.id)
                 } ?? agent.defaultModel
-            let supportsVision = effectiveModelId.map { VLMDetection.isVLM(modelId: $0) } ?? false
+            let supportsVision = effectiveModelId.map { VLMDetection.isVLM(modelId: $0, in: InferenceServices.modelDirectory.effectiveModelsDirectory()) } ?? false
             let supportsThinking =
                 effectiveModelId.flatMap { ModelProfileRegistry.profile(for: $0)?.thinkingOption } != nil
             let item = AgentListItem(

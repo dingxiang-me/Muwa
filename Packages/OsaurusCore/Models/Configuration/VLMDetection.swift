@@ -31,8 +31,9 @@ enum VLMDetection {
 
     /// Best-effort check for a model by its Hugging Face repo ID.
     /// Returns false if the model is not downloaded locally.
-    static func isVLM(modelId: String) -> Bool {
-        guard let dir = findLocalModelDirectory(forModelId: modelId) else { return false }
+    static func isVLM(modelId: String, in baseDirectory: URL) -> Bool {
+        guard let dir = findLocalModelDirectory(forModelId: modelId, in: baseDirectory)
+        else { return false }
         return isVLM(at: dir)
     }
 
@@ -51,10 +52,9 @@ enum VLMDetection {
         return json
     }
 
-    private static func findLocalModelDirectory(forModelId id: String) -> URL? {
+    private static func findLocalModelDirectory(forModelId id: String, in baseDirectory: URL) -> URL? {
         let parts = id.split(separator: "/").map(String.init)
-        let base = DirectoryPickerService.effectiveModelsDirectory()
-        let url = parts.reduce(base) { $0.appendingPathComponent($1, isDirectory: true) }
+        let url = parts.reduce(baseDirectory) { $0.appendingPathComponent($1, isDirectory: true) }
         guard FileManager.default.fileExists(atPath: url.appendingPathComponent("config.json").path)
         else { return nil }
         return url

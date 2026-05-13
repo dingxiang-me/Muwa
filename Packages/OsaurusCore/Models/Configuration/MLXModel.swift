@@ -191,7 +191,10 @@ struct MLXModel: Identifiable, Codable {
     var isVLM: Bool {
         if isDownloaded { return VLMDetection.isVLM(at: localDirectory) }
         if let mt = modelType { return VLMDetection.isVLM(modelType: mt) }
-        return VLMDetection.isVLM(modelId: id)
+        return VLMDetection.isVLM(
+            modelId: id,
+            in: InferenceServices.modelDirectory.effectiveModelsDirectory()
+        )
     }
 
     /// Extracts the model family from the name/id (e.g., "Llama", "Qwen", "Gemma", "Phi")
