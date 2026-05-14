@@ -148,11 +148,11 @@ enum LocalGenerationDefaults {
     }
 
     private static func localDirectory(forModelId modelId: String) -> URL? {
-        guard let found = ModelManager.findInstalledModel(named: modelId) else {
+        guard let found = InferenceServices.modelLocator.findInstalledModel(named: modelId) else {
             return nil
         }
         let parts = found.id.split(separator: "/").map(String.init)
-        let base = DirectoryPickerService.effectiveModelsDirectory()
+        let base = InferenceServices.modelDirectory.effectiveModelsDirectory()
         return parts.reduce(base) { $0.appendingPathComponent($1, isDirectory: true) }
     }
 
