@@ -4,11 +4,11 @@ protocol ServerConfigurationProvider: Sendable {
     func load() async -> ServerConfiguration?
 }
 
-protocol ModelDirectoryProvider: Sendable {
+public protocol ModelDirectoryProvider: Sendable {
     func effectiveModelsDirectory() -> URL
 }
 
-protocol ModelLocator: Sendable {
+public protocol ModelLocator: Sendable {
     func installedModelNames() -> [String]
     func findInstalledModel(named name: String) -> (name: String, id: String)?
 }
@@ -124,7 +124,7 @@ protocol SpeechProvider: Sendable {
 /// Engine-side outcome for `APIKeyValidating.validate`. Mirrors the
 /// Mac app's `AccessKeyValidationResult` cases (minus the issuer
 /// payload) so the engine HTTP layer can react uniformly across hosts.
-enum APIKeyValidationOutcome: Sendable {
+public enum APIKeyValidationOutcome: Sendable {
     case valid
     case expired
     case revoked
@@ -133,7 +133,7 @@ enum APIKeyValidationOutcome: Sendable {
 
 /// Validates incoming API keys. Mac app's struct conforms via a
 /// thin shim; CLI uses `NoOpAPIKeyValidator` and accepts any token.
-protocol APIKeyValidating: Sendable {
+public protocol APIKeyValidating: Sendable {
     var hasKeys: Bool { get }
     /// Renamed to avoid clashing with app-side `APIKeyValidator.validate`
     /// which returns the richer `AccessKeyValidationResult`. Engine callers
@@ -278,7 +278,8 @@ struct NoOpSpeechProvider: SpeechProvider {
     }
 }
 
-struct NoOpAPIKeyValidator: APIKeyValidating {
+public struct NoOpAPIKeyValidator: APIKeyValidating {
+    public init() {}
     public let hasKeys = false
     public func validateKey(rawKey: String) -> APIKeyValidationOutcome { .valid }
 }

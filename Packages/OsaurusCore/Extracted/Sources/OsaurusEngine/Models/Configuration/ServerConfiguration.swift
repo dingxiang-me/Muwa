@@ -23,7 +23,7 @@ public enum AppearanceMode: String, Codable, CaseIterable, Sendable {
 }
 
 /// Configuration settings for the server
-struct ServerConfiguration: Codable, Equatable, Sendable {
+public struct ServerConfiguration: Codable, Equatable, Sendable {
     /// Server port (1-65535)
     public var port: Int
 
@@ -183,7 +183,7 @@ struct ServerConfiguration: Codable, Equatable, Sendable {
 }
 
 /// Policy for managing model eviction from memory
-enum ModelEvictionPolicy: String, Codable, CaseIterable, Sendable {
+public enum ModelEvictionPolicy: String, Codable, CaseIterable, Sendable {
     /// Strictly keep only one model loaded at a time (safest for memory)
     case strictSingleModel = "Strict (One Model)"
     /// Allow multiple models (best for high RAM systems or rapid switching)

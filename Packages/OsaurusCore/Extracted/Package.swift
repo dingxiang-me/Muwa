@@ -6,10 +6,12 @@ let package = Package(
     platforms: [.macOS(.v15)],
     products: [
         .library(name: "Osaurus", targets: ["Osaurus"]),
+        .executable(name: "osaurus-cli", targets: ["osaurus-cli"]),
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.88.0"),
         .package(url: "https://github.com/orlandos-nl/IkigaJSON", from: "2.3.2"),
+        .package(url: "https://github.com/apple/swift-argument-parser", from: "1.5.0"),
         // Pins match osaurus's Packages/OsaurusCore/Package.swift. Bump in
         // lockstep with osaurus when validating a new upstream commit.
         .package(
@@ -46,7 +48,16 @@ let package = Package(
                 .product(name: "NIOPosix", package: "swift-nio"),
             ],
             path: "Sources",
+            exclude: ["osaurus-cli"],
             resources: [.process("OsaurusEngine/Resources")]
+        ),
+        .executableTarget(
+            name: "osaurus-cli",
+            dependencies: [
+                "Osaurus",
+                .product(name: "ArgumentParser", package: "swift-argument-parser"),
+            ],
+            path: "Sources/osaurus-cli"
         ),
         .testTarget(
             name: "OsaurusEngineTests",

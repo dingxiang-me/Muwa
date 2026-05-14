@@ -2,7 +2,7 @@ import Foundation
 
 /// Process-wide registry of host-supplied engine seams. CLI keeps the
 /// defaults; Mac app registers real adapters at startup.
-enum InferenceServices {
+public enum InferenceServices {
     private static let lock = NSLock()
 
     nonisolated(unsafe) private static var _progressReporter: any ProgressReporter
@@ -98,13 +98,13 @@ enum InferenceServices {
     static func register(serverConfig: any ServerConfigurationProvider) {
         lock.withLock { _serverConfig = serverConfig }
     }
-    static func register(modelDirectory: any ModelDirectoryProvider) {
+    public static func register(modelDirectory: any ModelDirectoryProvider) {
         lock.withLock { _modelDirectory = modelDirectory }
     }
     static func register(downloadVerifier: any DownloadVerifier) {
         lock.withLock { _downloadVerifier = downloadVerifier }
     }
-    static func register(modelLocator: any ModelLocator) {
+    public static func register(modelLocator: any ModelLocator) {
         lock.withLock { _modelLocator = modelLocator }
     }
     static func register(modelList: any ModelListProvider) {

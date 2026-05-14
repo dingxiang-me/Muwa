@@ -423,6 +423,7 @@ let package = Package(
             exclude: [
                 "Tests", "SQLCipher", "Extracted/Tests",
                 "Extracted/Package.swift", "Extracted/.gitignore",
+                "Extracted/Sources/osaurus-cli",
             ],
             resources: [
                 .process("Resources"),
