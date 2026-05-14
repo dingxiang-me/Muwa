@@ -26,7 +26,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     typealias OutboundOut = HTTPServerResponsePart
 
     private let configuration: ServerConfiguration
-    private let apiKeyValidator: APIKeyValidator
+    private let apiKeyValidator: any APIKeyValidating
     private let chatEngine: ChatEngineProtocol
     private let trustLoopback: Bool
     private let _isChannelActive = SendableBool(false)
@@ -55,7 +55,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
     init(
         configuration: ServerConfiguration,
-        apiKeyValidator: APIKeyValidator = .empty,
+        apiKeyValidator: any APIKeyValidating = NoOpAPIKeyValidator(),
         eventLoop: EventLoop,
         chatEngine: ChatEngineProtocol? = nil,
         trustLoopback: Bool = true
@@ -196,7 +196,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 if !apiKeyValidator.hasKeys {
                     message = "No access keys configured. Create one in Osaurus settings."
                 } else {
-                    let result = apiKeyValidator.validate(rawKey: token)
+                    let result = apiKeyValidator.validateKey(rawKey: token)
                     switch result {
                     case .valid:
                         message = ""

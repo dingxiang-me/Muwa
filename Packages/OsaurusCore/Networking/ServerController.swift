@@ -117,7 +117,7 @@ final class ServerController: ObservableObject {
                     preHandlerFactory: { config, validator, trustLoopback in
                         AppHTTPHandler(
                             configuration: config,
-                            apiKeyValidator: validator,
+                            apiKeyValidator: (validator as? APIKeyValidator) ?? .empty,
                             trustLoopback: trustLoopback
                         )
                     }

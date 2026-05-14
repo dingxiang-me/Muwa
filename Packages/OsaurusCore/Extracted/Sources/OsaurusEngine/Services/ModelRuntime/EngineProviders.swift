@@ -121,6 +121,26 @@ protocol SpeechProvider: Sendable {
     func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?)
 }
 
+/// Engine-side outcome for `APIKeyValidating.validate`. Mirrors the
+/// Mac app's `AccessKeyValidationResult` cases (minus the issuer
+/// payload) so the engine HTTP layer can react uniformly across hosts.
+enum APIKeyValidationOutcome: Sendable {
+    case valid
+    case expired
+    case revoked
+    case invalid(reason: String)
+}
+
+/// Validates incoming API keys. Mac app's struct conforms via a
+/// thin shim; CLI uses `NoOpAPIKeyValidator` and accepts any token.
+protocol APIKeyValidating: Sendable {
+    var hasKeys: Bool { get }
+    /// Renamed to avoid clashing with app-side `APIKeyValidator.validate`
+    /// which returns the richer `AccessKeyValidationResult`. Engine callers
+    /// use this one; app callers keep using the original.
+    func validateKey(rawKey: String) -> APIKeyValidationOutcome
+}
+
 /// Provides the chat-completion brain (model routing + service dispatch).
 /// Mac app registers the full `ChatEngine` with `RemoteProviderManager`
 /// + `InsightsService`; CLI registers a slimmer engine that only knows
@@ -256,6 +276,11 @@ struct NoOpSpeechProvider: SpeechProvider {
             userInfo: [NSLocalizedDescriptionKey: "No speech provider registered"]
         )
     }
+}
+
+struct NoOpAPIKeyValidator: APIKeyValidating {
+    public let hasKeys = false
+    public func validateKey(rawKey: String) -> APIKeyValidationOutcome { .valid }
 }
 
 struct NoOpChatEngine: ChatEngineProtocol {

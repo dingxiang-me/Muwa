@@ -10,14 +10,14 @@ import NIOCore
 import NIOHTTP1
 import NIOPosix
 
-typealias APIKeyValidatorFactory = @Sendable () -> APIKeyValidator
+typealias APIKeyValidatorFactory = @Sendable () -> any APIKeyValidating
 
 /// Host-supplied factory for an extra `ChannelHandler` inserted ahead of
 /// the engine `HTTPHandler` in the NIO pipeline. Used by the Mac app to
 /// install routes that touch app-only singletons; the CLI leaves it nil.
 typealias PreHandlerFactory = @Sendable (
     _ configuration: ServerConfiguration,
-    _ apiKeyValidator: APIKeyValidator,
+    _ apiKeyValidator: any APIKeyValidating,
     _ trustLoopback: Bool
 ) -> ChannelHandler
 
@@ -33,7 +33,7 @@ actor OsaurusServer: Sendable {
             host: String = "127.0.0.1",
             port: Int = 1337,
             trustLoopback: Bool = true,
-            validatorFactory: @escaping APIKeyValidatorFactory = { .empty },
+            validatorFactory: @escaping APIKeyValidatorFactory = { NoOpAPIKeyValidator() },
             preHandlerFactory: PreHandlerFactory? = nil
         ) {
             self.host = host

@@ -9,7 +9,20 @@
 
 import Foundation
 
-public struct APIKeyValidator: Sendable {
+public struct APIKeyValidator: APIKeyValidating, Sendable {
+
+    /// Bridges the app's richer `AccessKeyValidationResult` to the
+    /// engine seam's `APIKeyValidationOutcome` (drops the issuer).
+    func validateKey(rawKey: String) -> APIKeyValidationOutcome {
+        let result: AccessKeyValidationResult = validate(rawKey: rawKey)
+        switch result {
+        case .valid: return .valid
+        case .expired: return .expired
+        case .revoked: return .revoked
+        case .invalid(let reason): return .invalid(reason: reason)
+        }
+    }
+
     private let agentAddress: String
     private let masterAddress: String
     private let whitelist: Set<String>
