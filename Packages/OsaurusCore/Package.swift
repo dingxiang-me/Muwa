@@ -420,7 +420,7 @@ let package = Package(
                 .product(name: "AAInfographics", package: "AAChartKit-Swift"),
             ],
             path: ".",
-            exclude: ["Tests", "SQLCipher"],
+            exclude: ["Tests", "SQLCipher", "Extracted/Tests"],
             resources: [.process("Resources")]
         ),
         .testTarget(
@@ -433,6 +433,25 @@ let package = Package(
                 .product(name: "VecturaKit", package: "VecturaKit"),
             ],
             path: "Tests"
+        ),
+        .testTarget(
+            name: "OsaurusEngineTests",
+            dependencies: [
+                "OsaurusCore",
+                .product(name: "MLXLMCommon", package: "vmlx-swift-lm"),
+            ],
+            path: "Extracted/Tests/OsaurusEngineTests"
+        ),
+        .testTarget(
+            name: "OsaurusServerKitTests",
+            dependencies: [
+                "OsaurusCore",
+                .product(name: "NIOCore", package: "swift-nio"),
+                .product(name: "NIOHTTP1", package: "swift-nio"),
+                .product(name: "NIOPosix", package: "swift-nio"),
+                .product(name: "NIOEmbedded", package: "swift-nio"),
+            ],
+            path: "Extracted/Tests/OsaurusServerKitTests"
         ),
     ]
 )
