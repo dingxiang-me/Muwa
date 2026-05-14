@@ -37,6 +37,8 @@ enum InferenceServices {
         = NoOpSpeechProvider()
     nonisolated(unsafe) private static var _backgroundTasks: any BackgroundTaskService
         = NoOpBackgroundTaskService()
+    nonisolated(unsafe) private static var _chatEngine: any ChatEngineProvider
+        = NoOpChatEngineProvider()
 
     static var progressReporter: any ProgressReporter {
         lock.withLock { _progressReporter }
@@ -86,6 +88,9 @@ enum InferenceServices {
     static var backgroundTasks: any BackgroundTaskService {
         lock.withLock { _backgroundTasks }
     }
+    static var chatEngine: any ChatEngineProvider {
+        lock.withLock { _chatEngine }
+    }
 
     static func register(progressReporter: any ProgressReporter) {
         lock.withLock { _progressReporter = progressReporter }
@@ -134,6 +139,9 @@ enum InferenceServices {
     }
     static func register(backgroundTasks: any BackgroundTaskService) {
         lock.withLock { _backgroundTasks = backgroundTasks }
+    }
+    static func register(chatEngine: any ChatEngineProvider) {
+        lock.withLock { _chatEngine = chatEngine }
     }
 }
 

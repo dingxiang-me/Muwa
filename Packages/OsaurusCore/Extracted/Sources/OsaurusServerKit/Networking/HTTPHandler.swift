@@ -57,12 +57,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         configuration: ServerConfiguration,
         apiKeyValidator: APIKeyValidator = .empty,
         eventLoop: EventLoop,
-        chatEngine: ChatEngineProtocol = ChatEngine(),
+        chatEngine: ChatEngineProtocol? = nil,
         trustLoopback: Bool = true
     ) {
         self.configuration = configuration
         self.apiKeyValidator = apiKeyValidator
-        self.chatEngine = chatEngine
+        self.chatEngine = chatEngine ?? InferenceServices.chatEngine.makeChatEngine()
         self.trustLoopback = trustLoopback
         self.stateRef = NIOLoopBound(RequestState(), eventLoop: eventLoop)
     }
@@ -1877,7 +1877,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     let status: HTTPResponseStatus
                     let errorType: String
                     let message: String
-                    if let engineError = error as? ChatEngine.EngineError {
+                    if let engineError = error as? ChatEngineError {
                         status = HTTPResponseStatus(statusCode: engineError.httpStatus)
                         errorType =
                             engineError.httpStatus == 404

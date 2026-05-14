@@ -228,6 +228,10 @@ struct AppEmbeddingProvider: EmbeddingProvider {
     }
 }
 
+struct AppChatEngineProvider: ChatEngineProvider {
+    func makeChatEngine() -> any ChatEngineProtocol { ChatEngine() }
+}
+
 struct AppBackgroundTaskService: BackgroundTaskService {
     func dispatchHTTPTask(
         requestId: UUID,

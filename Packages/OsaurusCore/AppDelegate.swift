@@ -62,6 +62,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         InferenceServices.register(embedding: AppEmbeddingProvider())
         InferenceServices.register(speech: AppSpeechProvider())
         InferenceServices.register(backgroundTasks: AppBackgroundTaskService())
+        InferenceServices.register(chatEngine: AppChatEngineProvider())
 
         // Register in-tree document format adapters before any file-ingress
         // path can run. Idempotent; safe if a future migration moves this.

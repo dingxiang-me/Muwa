@@ -121,6 +121,15 @@ protocol SpeechProvider: Sendable {
     func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?)
 }
 
+/// Provides the chat-completion brain (model routing + service dispatch).
+/// Mac app registers the full `ChatEngine` with `RemoteProviderManager`
+/// + `InsightsService`; CLI registers a slimmer engine that only knows
+/// about MLX. Engine HTTPHandler reads from the seam when no explicit
+/// engine was passed to its init.
+protocol ChatEngineProvider: Sendable {
+    func makeChatEngine() -> any ChatEngineProtocol
+}
+
 /// Backs `/agents/{id}/dispatch`, `GET /tasks/{id}`, `DELETE /tasks/{id}`.
 /// Mac app implements via `TaskDispatcher`/`BackgroundTaskManager`; CLI
 /// uses the no-op default and these endpoints return errors.
@@ -247,6 +256,19 @@ struct NoOpSpeechProvider: SpeechProvider {
             userInfo: [NSLocalizedDescriptionKey: "No speech provider registered"]
         )
     }
+}
+
+struct NoOpChatEngine: ChatEngineProtocol {
+    public func streamChat(request: ChatCompletionRequest) async throws -> AsyncThrowingStream<String, Error> {
+        throw ChatEngineError(kind: .noServiceAvailable(requested: request.model))
+    }
+    public func completeChat(request: ChatCompletionRequest) async throws -> ChatCompletionResponse {
+        throw ChatEngineError(kind: .noServiceAvailable(requested: request.model))
+    }
+}
+
+struct NoOpChatEngineProvider: ChatEngineProvider {
+    public func makeChatEngine() -> any ChatEngineProtocol { NoOpChatEngine() }
 }
 
 struct NoOpBackgroundTaskService: BackgroundTaskService {
