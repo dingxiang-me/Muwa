@@ -64,7 +64,7 @@ import Foundation
 /// observations. Thread-safety: `RollingTokenRate` is a value type holding
 /// a fixed-capacity ring buffer. Each chat turn owns its own instance so
 /// concurrent reads are not a concern; the type itself is `Sendable`.
-struct RollingTokenRate: Sendable {
+public struct RollingTokenRate: Sendable {
 
     // MARK: - Tunables (static so tests can override + comment block above
     // documents the rationale for each default).

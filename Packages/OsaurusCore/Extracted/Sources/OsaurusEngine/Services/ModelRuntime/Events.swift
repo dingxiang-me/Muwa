@@ -7,7 +7,7 @@
 
 import Foundation
 
-enum ModelRuntimeEvent: Sendable {
+public enum ModelRuntimeEvent: Sendable {
     case tokens(String)
     /// Reasoning text (thinking / chain-of-thought). Translated by
     /// `GenerationEventMapper` from vmlx-swift-lm's `Generation.reasoning(String)`

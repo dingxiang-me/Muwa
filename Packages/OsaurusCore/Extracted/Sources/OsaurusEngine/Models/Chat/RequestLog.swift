@@ -8,7 +8,7 @@
 import Foundation
 
 /// Represents a logged tool call within an inference
-struct ToolCallLog: Identifiable, Sendable {
+public struct ToolCallLog: Identifiable, Sendable {
     let id: UUID
     let name: String
     let arguments: String
@@ -34,7 +34,7 @@ struct ToolCallLog: Identifiable, Sendable {
 }
 
 /// Source of the request
-enum RequestSource: String, Sendable, CaseIterable {
+public enum RequestSource: String, Sendable, CaseIterable {
     case chatUI = "Chat UI"
     case httpAPI = "HTTP API"
     case plugin = "Plugin"
@@ -49,7 +49,7 @@ enum RequestSource: String, Sendable, CaseIterable {
 }
 
 /// Represents a single request log entry with optional inference data
-struct RequestLog: Identifiable, Sendable {
+public struct RequestLog: Identifiable, Sendable {
     let id: UUID
     let timestamp: Date
     let source: RequestSource
@@ -248,7 +248,7 @@ struct RequestLog: Identifiable, Sendable {
 }
 
 /// Pending inference metadata captured at start
-struct PendingInference: Sendable {
+public struct PendingInference: Sendable {
     let id: UUID
     let startTime: Date
     let source: RequestSource

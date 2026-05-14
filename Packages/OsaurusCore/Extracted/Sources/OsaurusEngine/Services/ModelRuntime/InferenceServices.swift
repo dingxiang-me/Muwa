@@ -2,7 +2,7 @@ import Foundation
 
 /// Process-wide registry of host-supplied engine seams. CLI keeps the
 /// defaults; Mac app registers real adapters at startup.
-enum InferenceServices {
+public enum InferenceServices {
     private static let lock = NSLock()
 
     nonisolated(unsafe) private static var _progressReporter: any ProgressReporter

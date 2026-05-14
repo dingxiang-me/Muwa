@@ -5,6 +5,9 @@
 //  Created by Terence on 8/17/25.
 //
 
+#if canImport(OsaurusEngine)
+import OsaurusEngine
+#endif
 import Foundation
 import IkigaJSON
 import NIOCore

@@ -26,7 +26,7 @@ import os.log
 private let mapperSignposter = OSSignposter(subsystem: "ai.osaurus", category: "Generation")
 private let mapperLog = Logger(subsystem: "ai.osaurus", category: "Generation")
 
-enum GenerationEventMapper {
+public enum GenerationEventMapper {
 
     /// True when `.reasoning` deltas are the user-visible answer, not a hidden
     /// chain-of-thought side channel.

@@ -13,7 +13,7 @@ private struct LocalModelRef {
     let modelId: String
 }
 
-actor MLXService: ToolCapableService {
+public actor MLXService: ToolCapableService {
 
     /// Shared instance for convenience (actor is stateless, delegates to ModelRuntime.shared)
     static let shared = MLXService()

@@ -17,7 +17,7 @@
 
 import Foundation
 
-enum LocalReasoningCapability {
+public enum LocalReasoningCapability {
     struct Capability: Sendable {
         /// Template references `<think>` or `</think>` tags.
         let supportsThinking: Bool

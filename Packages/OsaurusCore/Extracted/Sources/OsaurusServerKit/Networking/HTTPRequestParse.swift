@@ -9,6 +9,9 @@
 //  read the body and the logged string in two lines instead of seven.
 //
 
+#if canImport(OsaurusEngine)
+import OsaurusEngine
+#endif
 import Foundation
 import NIOCore
 

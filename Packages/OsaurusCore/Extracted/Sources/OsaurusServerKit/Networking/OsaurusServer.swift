@@ -5,6 +5,9 @@
 //  Actor-owned NIO server lifecycle (start / stop).
 //
 
+#if canImport(OsaurusEngine)
+import OsaurusEngine
+#endif
 import Foundation
 import NIOCore
 import NIOHTTP1

@@ -17,7 +17,7 @@
 
 import Foundation
 
-final class TTFTTrace: @unchecked Sendable {
+public final class TTFTTrace: @unchecked Sendable {
 
     private struct Mark {
         let name: String

@@ -10,7 +10,7 @@ import Foundation
 // MARK: - OpenAI API Compatible Structures
 
 /// OpenAI-compatible model object
-struct OpenAIModel: Codable, Sendable {
+public struct OpenAIModel: Codable, Sendable {
     let id: String
     var object: String = "model"
     var created: Int = 0
@@ -90,7 +90,7 @@ struct OpenAIModel: Codable, Sendable {
 }
 
 /// Model permission object (OpenAI format)
-struct ModelPermission: Codable, Sendable {
+public struct ModelPermission: Codable, Sendable {
     var id: String?
     var object: String?
     var created: Int?
@@ -105,7 +105,7 @@ struct ModelPermission: Codable, Sendable {
     var is_blocking: Bool?
 }
 
-struct ModelDetails: Codable, Sendable {
+public struct ModelDetails: Codable, Sendable {
     let parent_model: String?
     let format: String?
     let family: String?
@@ -115,7 +115,7 @@ struct ModelDetails: Codable, Sendable {
 }
 
 /// Response for /models endpoint
-struct ModelsResponse: Codable, Sendable {
+public struct ModelsResponse: Codable, Sendable {
     var object: String = "list"
     let data: [OpenAIModel]
 
@@ -159,7 +159,7 @@ struct ModelsResponse: Codable, Sendable {
 ///   - `video_url` — `{url}`. Mirrors the convention adopted by LM Studio / Ollama
 ///     for video inputs since OpenAI hasn't published a canonical chat-completions
 ///     video shape. URL may be `data:video/...;base64,...` or `https://...`.
-enum MessageContentPart: Codable, Sendable {
+public enum MessageContentPart: Codable, Sendable {
     case text(String)
     case imageUrl(url: String, detail: String?)
     case audioInput(data: String, format: String)
@@ -240,7 +240,7 @@ enum MessageContentPart: Codable, Sendable {
 }
 
 /// Chat message in OpenAI format
-struct ChatMessage: Codable, Sendable {
+public struct ChatMessage: Codable, Sendable {
     let role: String
     let content: String?
     /// Multimodal content parts (images, text) - populated when content is an array
@@ -476,7 +476,7 @@ extension ChatMessage {
 }
 
 /// Chat completion request
-struct ChatCompletionRequest: Codable, Sendable {
+public struct ChatCompletionRequest: Codable, Sendable {
     let model: String
     var messages: [ChatMessage]
     let temperature: Float?
@@ -559,31 +559,31 @@ struct ChatCompletionRequest: Codable, Sendable {
 /// OpenAI `response_format`. We only act on `json_object`; other kinds
 /// (`text`, `json_schema`) flow through unchanged so the request
 /// validator can accept or reject them with a clear, specific error.
-struct ResponseFormat: Codable, Sendable, Equatable {
+public struct ResponseFormat: Codable, Sendable, Equatable {
     let type: String
 }
 
 /// OpenAI `stream_options` shape. Today we only honor `include_usage`.
-struct StreamOptions: Codable, Sendable, Equatable {
+public struct StreamOptions: Codable, Sendable, Equatable {
     let include_usage: Bool?
 }
 
 /// Chat completion choice
-struct ChatChoice: Codable, Sendable {
+public struct ChatChoice: Codable, Sendable {
     let index: Int
     let message: ChatMessage
     let finish_reason: String
 }
 
 /// Token usage information
-struct Usage: Codable, Sendable {
+public struct Usage: Codable, Sendable {
     let prompt_tokens: Int
     let completion_tokens: Int
     let total_tokens: Int
 }
 
 /// Chat completion response
-struct ChatCompletionResponse: Codable, Sendable {
+public struct ChatCompletionResponse: Codable, Sendable {
     let id: String
     var object: String = "chat.completion"
     let created: Int
@@ -601,7 +601,7 @@ struct ChatCompletionResponse: Codable, Sendable {
 // MARK: - Streaming Response Structures
 
 /// Delta content for streaming
-struct DeltaContent: Codable, Sendable {
+public struct DeltaContent: Codable, Sendable {
     let role: String?
     let content: String?
     let refusal: String?
@@ -629,14 +629,14 @@ struct DeltaContent: Codable, Sendable {
 }
 
 /// Streaming choice
-struct StreamChoice: Codable, Sendable {
+public struct StreamChoice: Codable, Sendable {
     let index: Int
     let delta: DeltaContent
     let finish_reason: String?
 }
 
 /// Chat completion chunk for streaming
-struct ChatCompletionChunk: Codable, Sendable {
+public struct ChatCompletionChunk: Codable, Sendable {
     let id: String
     var object: String = "chat.completion.chunk"
     let created: Int
@@ -653,7 +653,7 @@ struct ChatCompletionChunk: Codable, Sendable {
 // MARK: - Error Response
 
 /// OpenAI-compatible error response
-struct OpenAIError: Codable, Error, Sendable {
+public struct OpenAIError: Codable, Error, Sendable {
     let error: ErrorDetail
 
     struct ErrorDetail: Codable, Sendable {
@@ -694,12 +694,12 @@ extension OpenAIModel {
 // MARK: - Tools: Request/Response Models
 
 /// Tool definition (currently only type=="function")
-struct Tool: Codable, Sendable {
+public struct Tool: Codable, Sendable {
     let type: String  // "function"
     let function: ToolFunction
 }
 
-struct ToolFunction: Codable, Sendable {
+public struct ToolFunction: Codable, Sendable {
     let name: String
     let description: String?
     let parameters: JSONValue?
@@ -718,7 +718,7 @@ struct ToolFunction: Codable, Sendable {
 }
 
 /// tool_choice option
-enum ToolChoiceOption: Codable, Sendable {
+public enum ToolChoiceOption: Codable, Sendable {
     case auto
     case none
     case function(FunctionName)
@@ -789,14 +789,14 @@ public struct ToolCallFunction: Codable, Sendable {
 }
 
 // Streaming deltas for tool calls
-struct DeltaToolCall: Codable, Sendable {
+public struct DeltaToolCall: Codable, Sendable {
     let index: Int?
     let id: String?
     let type: String?
     let function: DeltaToolCallFunction?
 }
 
-struct DeltaToolCallFunction: Codable, Sendable {
+public struct DeltaToolCallFunction: Codable, Sendable {
     let name: String?
     let arguments: String?
 }

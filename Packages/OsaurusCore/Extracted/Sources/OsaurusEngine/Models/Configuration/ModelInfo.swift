@@ -8,7 +8,7 @@
 import Foundation
 
 /// Detailed model information extracted from config files
-struct ModelInfo: Codable, Sendable {
+public struct ModelInfo: Codable, Sendable {
     /// Model name/identifier
     let name: String
 
@@ -279,7 +279,7 @@ extension ModelInfo {
 // MARK: - Ollama-compatible response format
 
 /// Request body for /api/show endpoint
-struct ShowRequest: Decodable, Sendable {
+public struct ShowRequest: Decodable, Sendable {
     let model: String
 
     init(from decoder: any Decoder) throws {
@@ -298,7 +298,7 @@ struct ShowRequest: Decodable, Sendable {
 }
 
 /// Response body for /api/show endpoint (Ollama-compatible)
-struct ShowResponse: Codable, Sendable {
+public struct ShowResponse: Codable, Sendable {
     let modelfile: String
     let parameters: String
     let template: String
@@ -333,7 +333,7 @@ struct ShowResponse: Codable, Sendable {
 }
 
 /// Type-erased Codable wrapper for heterogeneous JSON values
-struct AnyCodable: Codable, @unchecked Sendable {
+public struct AnyCodable: Codable, @unchecked Sendable {
     let value: Any
 
     init(_ value: Any) {

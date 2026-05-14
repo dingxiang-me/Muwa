@@ -37,7 +37,7 @@ import Foundation
 /// split is owned by vmlx; this is a defensive layer that catches
 /// orphan-tag leakage from low-bit MoE checkpoints whose token stream
 /// confuses the parser's state machine.
-struct ThinkTagScrubber {
+public struct ThinkTagScrubber {
 
     private static let openTag = "<think>"
     private static let closeTag = "</think>"

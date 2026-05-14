@@ -5,6 +5,9 @@
 //  Created by Terence on 8/17/25.
 //
 
+#if canImport(OsaurusEngine)
+import OsaurusEngine
+#endif
 import Foundation
 import NIOCore
 import NIOHTTP1
@@ -21,7 +24,7 @@ private final class SendableBool: @unchecked Sendable {
 }
 
 /// SwiftNIO HTTP request handler
-final class HTTPHandler: ChannelInboundHandler, Sendable {
+public final class HTTPHandler: ChannelInboundHandler, Sendable {
     typealias InboundIn = HTTPServerRequestPart
     typealias OutboundOut = HTTPServerResponsePart
 

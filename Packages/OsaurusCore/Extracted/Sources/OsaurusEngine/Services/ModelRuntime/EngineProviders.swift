@@ -1,24 +1,24 @@
 import Foundation
 
-protocol ServerConfigurationProvider: Sendable {
+public protocol ServerConfigurationProvider: Sendable {
     func load() async -> ServerConfiguration?
 }
 
-protocol ModelDirectoryProvider: Sendable {
+public protocol ModelDirectoryProvider: Sendable {
     func effectiveModelsDirectory() -> URL
 }
 
-protocol ModelLocator: Sendable {
+public protocol ModelLocator: Sendable {
     func installedModelNames() -> [String]
     func findInstalledModel(named name: String) -> (name: String, id: String)?
 }
 
-protocol ModelListProvider: Sendable {
+public protocol ModelListProvider: Sendable {
     func isFoundationModelAvailable() -> Bool
     func availableRemoteModels() async -> [OpenAIModel]
 }
 
-protocol Telemetry: Sendable {
+public protocol Telemetry: Sendable {
     func logRequest(
         method: String,
         path: String,
@@ -43,13 +43,13 @@ protocol Telemetry: Sendable {
 /// invites, listing, per-agent crypto keys) is app-specific and
 /// stays on `AgentManager` directly in HTTPHandler endpoints that
 /// will relocate out of the engine in a later phase.
-protocol AgentProvider: Sendable {
+public protocol AgentProvider: Sendable {
     func effectiveModel(for agentId: UUID) async -> String?
     func autonomousExecEnabled(for agentId: UUID) async -> Bool
     func resolveAgentId(_ identifier: String) async -> UUID?
 }
 
-struct ToolListEntry: Sendable {
+public struct ToolListEntry: Sendable {
     let name: String
     let description: String
     let parameters: JSONValue?
@@ -58,7 +58,7 @@ struct ToolListEntry: Sendable {
 /// Host-supplied tool registry used by HTTPHandler. The "always-loaded
 /// specs" call resolves capability/folder filters internally — the
 /// engine just passes the `autonomousEnabled` agent flag through.
-protocol ToolExecutor: Sendable {
+public protocol ToolExecutor: Sendable {
     func alwaysLoadedSpecs(autonomousEnabled: Bool) async -> [Tool]
     func listEnabledTools() async -> [ToolListEntry]
     func parameters(forTool name: String) async -> JSONValue?
@@ -69,7 +69,7 @@ protocol ToolExecutor: Sendable {
 /// endpoints need. Standalone CLI uses the no-op default; this entire
 /// endpoint group is app-specific and will likely move out of
 /// HTTPHandler in a later refactor.
-protocol MemoryProvider: Sendable {
+public protocol MemoryProvider: Sendable {
     var isOpen: Bool { get }
     func deleteTranscriptForConversation(_ conversationId: String) throws
     func insertTranscriptTurn(
@@ -83,42 +83,42 @@ protocol MemoryProvider: Sendable {
 /// (system prompt + memory section) before it hits the engine. Host
 /// resolves agent id → agent record → prompt composer; CLI uses the
 /// no-op default and passes the request through unchanged.
-protocol AgentEnricher: Sendable {
+public protocol AgentEnricher: Sendable {
     func enrich(_ request: ChatCompletionRequest, agentId: String) async -> ChatCompletionRequest
 }
 
-protocol TunnelResolver: Sendable {
+public protocol TunnelResolver: Sendable {
     func tunnelBaseURL(for agentId: UUID) async -> String?
 }
 
-protocol DownloadVerifier: Sendable {
+public protocol DownloadVerifier: Sendable {
     func ensureComplete(modelId: String, name: String, directory: URL) async
     func resolveURL(repoId: String, path: String) -> URL?
 }
 
-struct DefaultServerConfigurationProvider: ServerConfigurationProvider {
+public struct DefaultServerConfigurationProvider: ServerConfigurationProvider {
     func load() async -> ServerConfiguration? { nil }
 }
 
 /// Defaults to `~/.osaurus/models`. CLI overrides via `--model-dir`.
-struct DefaultModelDirectoryProvider: ModelDirectoryProvider {
+public struct DefaultModelDirectoryProvider: ModelDirectoryProvider {
     func effectiveModelsDirectory() -> URL {
         URL(fileURLWithPath: NSHomeDirectory())
             .appendingPathComponent(".osaurus/models", isDirectory: true)
     }
 }
 
-struct NoOpModelLocator: ModelLocator {
+public struct NoOpModelLocator: ModelLocator {
     func installedModelNames() -> [String] { [] }
     func findInstalledModel(named name: String) -> (name: String, id: String)? { nil }
 }
 
-struct NoOpModelListProvider: ModelListProvider {
+public struct NoOpModelListProvider: ModelListProvider {
     func isFoundationModelAvailable() -> Bool { false }
     func availableRemoteModels() async -> [OpenAIModel] { [] }
 }
 
-struct NoOpTelemetry: Telemetry {
+public struct NoOpTelemetry: Telemetry {
     func logRequest(
         method: String, path: String, userAgent: String?,
         requestBody: String?, responseBody: String?,
@@ -129,13 +129,13 @@ struct NoOpTelemetry: Telemetry {
     ) {}
 }
 
-struct NoOpAgentProvider: AgentProvider {
+public struct NoOpAgentProvider: AgentProvider {
     func effectiveModel(for agentId: UUID) async -> String? { nil }
     func autonomousExecEnabled(for agentId: UUID) async -> Bool { false }
     func resolveAgentId(_ identifier: String) async -> UUID? { nil }
 }
 
-struct NoOpToolExecutor: ToolExecutor {
+public struct NoOpToolExecutor: ToolExecutor {
     func alwaysLoadedSpecs(autonomousEnabled: Bool) async -> [Tool] { [] }
     func listEnabledTools() async -> [ToolListEntry] { [] }
     func parameters(forTool name: String) async -> JSONValue? { nil }
@@ -147,7 +147,7 @@ struct NoOpToolExecutor: ToolExecutor {
     }
 }
 
-struct NoOpMemoryProvider: MemoryProvider {
+public struct NoOpMemoryProvider: MemoryProvider {
     var isOpen: Bool { false }
     func deleteTranscriptForConversation(_ conversationId: String) throws {}
     func insertTranscriptTurn(
@@ -157,17 +157,17 @@ struct NoOpMemoryProvider: MemoryProvider {
     func agentIdsWithPinnedFacts() throws -> [(agentId: String, count: Int)] { [] }
 }
 
-struct NoOpAgentEnricher: AgentEnricher {
+public struct NoOpAgentEnricher: AgentEnricher {
     func enrich(_ request: ChatCompletionRequest, agentId: String) async -> ChatCompletionRequest {
         request
     }
 }
 
-struct NoOpTunnelResolver: TunnelResolver {
+public struct NoOpTunnelResolver: TunnelResolver {
     func tunnelBaseURL(for agentId: UUID) async -> String? { nil }
 }
 
-struct NoOpDownloadVerifier: DownloadVerifier {
+public struct NoOpDownloadVerifier: DownloadVerifier {
     func ensureComplete(modelId: String, name: String, directory: URL) async {}
     func resolveURL(repoId: String, path: String) -> URL? { nil }
 }

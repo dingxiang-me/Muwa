@@ -47,7 +47,7 @@
 
 import Foundation
 
-enum LocalGenerationDefaults {
+public enum LocalGenerationDefaults {
 
     struct Defaults: Sendable, Equatable {
         var maxTokens: Int?
