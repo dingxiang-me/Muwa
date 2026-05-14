@@ -17,7 +17,7 @@ struct RuntimeConfig: Sendable {
 
     /// Captures a generation config snapshot from `ServerConfiguration`.
     static func snapshot() async -> RuntimeConfig {
-        let cfg = await ServerController.sharedConfiguration()
+        let cfg = await InferenceServices.serverConfig.load()
         return RuntimeConfig(topP: cfg?.genTopP ?? 1.0)
     }
 }

@@ -421,7 +421,10 @@ let package = Package(
             ],
             path: ".",
             exclude: ["Tests", "SQLCipher", "Extracted/Tests"],
-            resources: [.process("Resources")]
+            resources: [
+                .process("Resources"),
+                .process("Extracted/Sources/OsaurusEngine/Resources"),
+            ]
         ),
         .testTarget(
             name: "OsaurusCoreTests",
