@@ -96,6 +96,31 @@ protocol DownloadVerifier: Sendable {
     func resolveURL(repoId: String, path: String) -> URL?
 }
 
+/// Persists a completed chat-completion round. Engine HTTPHandler invokes
+/// this after streaming finishes; Mac app writes to ChatHistoryDatabase,
+/// CLI uses the no-op default.
+protocol ChatHistoryPersister: Sendable {
+    func persist(
+        sourceTag: String,
+        sourcePluginId: String?,
+        agentId: UUID?,
+        externalKey: String?,
+        finalMessages: [ChatMessage],
+        model: String
+    ) async
+}
+
+/// Computes vector embeddings for /v1/embeddings.
+protocol EmbeddingProvider: Sendable {
+    var modelName: String { get }
+    func embed(texts: [String]) async throws -> [[Float]]
+}
+
+/// Handles /v1/audio/transcriptions. Returns text and optional duration.
+protocol SpeechProvider: Sendable {
+    func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?)
+}
+
 struct DefaultServerConfigurationProvider: ServerConfigurationProvider {
     public func load() async -> ServerConfiguration? { nil }
 }
@@ -170,4 +195,34 @@ struct NoOpTunnelResolver: TunnelResolver {
 struct NoOpDownloadVerifier: DownloadVerifier {
     public func ensureComplete(modelId: String, name: String, directory: URL) async {}
     public func resolveURL(repoId: String, path: String) -> URL? { nil }
+}
+
+struct NoOpChatHistoryPersister: ChatHistoryPersister {
+    public func persist(
+        sourceTag: String,
+        sourcePluginId: String?,
+        agentId: UUID?,
+        externalKey: String?,
+        finalMessages: [ChatMessage],
+        model: String
+    ) async {}
+}
+
+struct NoOpEmbeddingProvider: EmbeddingProvider {
+    public var modelName: String { "" }
+    public func embed(texts: [String]) async throws -> [[Float]] {
+        throw NSError(
+            domain: "EmbeddingProvider", code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "No embedding provider registered"]
+        )
+    }
+}
+
+struct NoOpSpeechProvider: SpeechProvider {
+    public func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?) {
+        throw NSError(
+            domain: "SpeechProvider", code: 1,
+            userInfo: [NSLocalizedDescriptionKey: "No speech provider registered"]
+        )
+    }
 }

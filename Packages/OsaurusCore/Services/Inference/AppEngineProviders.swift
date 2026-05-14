@@ -199,6 +199,43 @@ struct AppTunnelResolver: TunnelResolver {
     }
 }
 
+struct AppChatHistoryPersister: ChatHistoryPersister {
+    func persist(
+        sourceTag: String,
+        sourcePluginId: String?,
+        agentId: UUID?,
+        externalKey: String?,
+        finalMessages: [ChatMessage],
+        model: String
+    ) async {
+        let source: SessionSource =
+            sourceTag == "plugin" ? .plugin : .http
+        ChatHistoryWriter.persist(
+            source: source,
+            sourcePluginId: sourcePluginId,
+            agentId: agentId,
+            externalKey: externalKey,
+            finalMessages: finalMessages,
+            model: model
+        )
+    }
+}
+
+struct AppEmbeddingProvider: EmbeddingProvider {
+    var modelName: String { EmbeddingService.modelName }
+    func embed(texts: [String]) async throws -> [[Float]] {
+        try await EmbeddingService.shared.embed(texts: texts)
+    }
+}
+
+struct AppSpeechProvider: SpeechProvider {
+    func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?) {
+        let service = await MainActor.run { SpeechService.shared }
+        let result = try await service.transcribe(audioURL: audioURL)
+        return (text: result.text, durationSeconds: result.durationSeconds)
+    }
+}
+
 struct AppDownloadVerifier: DownloadVerifier {
     func ensureComplete(modelId: String, name: String, directory: URL) async {
         let probe = MLXModel(id: modelId, name: name, description: "", downloadURL: "")

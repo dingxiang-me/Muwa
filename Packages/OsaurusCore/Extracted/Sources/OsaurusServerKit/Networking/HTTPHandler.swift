@@ -1372,18 +1372,19 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         Task(priority: .userInitiated) {
             do {
-                let embeddings = try await EmbeddingService.shared.embed(texts: texts)
+                let embeddings = try await InferenceServices.embedding.embed(texts: texts)
+                let modelName = InferenceServices.embedding.modelName
 
                 let json: String
                 if ollamaFormat {
-                    let response = OllamaEmbedResponse(model: EmbeddingService.modelName, embeddings: embeddings)
+                    let response = OllamaEmbedResponse(model: modelName, embeddings: embeddings)
                     json = (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
                 } else {
                     let objects = embeddings.enumerated().map { OpenAIEmbeddingObject(embedding: $1, index: $0) }
                     let tokenCount = texts.reduce(0) { $0 + $1.split(separator: " ").count }
                     let response = OpenAIEmbeddingResponse(
                         data: objects,
-                        model: EmbeddingService.modelName,
+                        model: modelName,
                         usage: OpenAIEmbeddingUsage(prompt_tokens: tokenCount, total_tokens: tokenCount)
                     )
                     json = (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
@@ -1640,8 +1641,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                                 ChatMessage(role: "assistant", content: accumulatedContent)
                             )
                         }
-                        ChatHistoryWriter.persist(
-                            source: .http,
+                        await InferenceServices.chatHistory.persist(
+                            sourceTag: "http",
                             sourcePluginId: nil,
                             agentId: resolvedAgentUUID,
                             externalKey: externalSessionKey,
@@ -1814,8 +1815,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     if persistOnSuccess, let assistantMsg = resp.choices.first?.message {
                         var finalMessages = priorMessages
                         finalMessages.append(assistantMsg)
-                        ChatHistoryWriter.persist(
-                            source: .http,
+                        await InferenceServices.chatHistory.persist(
+                            sourceTag: "http",
                             sourcePluginId: nil,
                             agentId: resolvedAgentUUID,
                             externalKey: externalSessionKey,
@@ -3407,8 +3408,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 }
 
                 // Get SpeechService and transcribe
-                let service = await MainActor.run { SpeechService.shared }
-                let result = try await service.transcribe(audioURL: audioURL)
+                let result = try await InferenceServices.speech.transcribe(audioURL: audioURL)
 
                 // Format response based on response_format
                 let responseBody: String

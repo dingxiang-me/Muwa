@@ -29,6 +29,12 @@ enum InferenceServices {
         = NoOpAgentProvider()
     nonisolated(unsafe) private static var _agentEnricher: any AgentEnricher
         = NoOpAgentEnricher()
+    nonisolated(unsafe) private static var _chatHistory: any ChatHistoryPersister
+        = NoOpChatHistoryPersister()
+    nonisolated(unsafe) private static var _embedding: any EmbeddingProvider
+        = NoOpEmbeddingProvider()
+    nonisolated(unsafe) private static var _speech: any SpeechProvider
+        = NoOpSpeechProvider()
 
     static var progressReporter: any ProgressReporter {
         lock.withLock { _progressReporter }
@@ -66,6 +72,15 @@ enum InferenceServices {
     static var agentEnricher: any AgentEnricher {
         lock.withLock { _agentEnricher }
     }
+    static var chatHistory: any ChatHistoryPersister {
+        lock.withLock { _chatHistory }
+    }
+    static var embedding: any EmbeddingProvider {
+        lock.withLock { _embedding }
+    }
+    static var speech: any SpeechProvider {
+        lock.withLock { _speech }
+    }
 
     static func register(progressReporter: any ProgressReporter) {
         lock.withLock { _progressReporter = progressReporter }
@@ -102,6 +117,15 @@ enum InferenceServices {
     }
     static func register(agentEnricher: any AgentEnricher) {
         lock.withLock { _agentEnricher = agentEnricher }
+    }
+    static func register(chatHistory: any ChatHistoryPersister) {
+        lock.withLock { _chatHistory = chatHistory }
+    }
+    static func register(embedding: any EmbeddingProvider) {
+        lock.withLock { _embedding = embedding }
+    }
+    static func register(speech: any SpeechProvider) {
+        lock.withLock { _speech = speech }
     }
 }
 
