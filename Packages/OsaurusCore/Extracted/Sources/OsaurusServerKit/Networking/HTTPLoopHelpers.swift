@@ -21,7 +21,7 @@ extension HTTPHandler {
     static func makeHop(
         channel: Channel,
         loop: EventLoop
-    ) -> (@escaping @Sendable () -> Void) -> Void {
+    ) -> @Sendable (@escaping @Sendable () -> Void) -> Void {
         { block in
             guard channel.isActive else { return }
             if loop.inEventLoop { block() } else { loop.execute { block() } }
