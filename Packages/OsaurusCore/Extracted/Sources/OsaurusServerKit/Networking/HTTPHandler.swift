@@ -1036,25 +1036,20 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 json["external_session_key"] as? String
                 ?? json["session_id"] as? String
 
-            let request = DispatchRequest(
-                id: requestId,
+            let resolvedTaskId = await InferenceServices.backgroundTasks.dispatchHTTPTask(
+                requestId: requestId,
                 prompt: prompt,
                 agentId: agentId,
                 title: title,
-                showToast: true,
-                source: .http,
                 externalSessionKey: externalSessionKey
             )
-
-            let handle = await TaskDispatcher.shared.dispatch(request)
             let responseBody: String
             let status: HTTPResponseStatus
 
-            if let handle {
-                // Use the resolved task id — when an `external_session_key`
-                // matches an existing session the dispatcher reattaches and
-                // reports the existing session's id rather than `requestId`.
-                let resolvedId = handle.id.uuidString
+            if let resolvedTaskId {
+                // Resolved id may differ from requestId when the dispatcher
+                // reattaches to an existing session via `external_session_key`.
+                let resolvedId = resolvedTaskId.uuidString
                 let pollUrl = "/v1/tasks/\(resolvedId)"
                 let resp: [String: Any] = ["id": resolvedId, "status": "running", "poll_url": pollUrl]
                 responseBody =
@@ -1126,14 +1121,15 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         Task(priority: .userInitiated) {
-            let (responseBody, found) = await MainActor.run {
-                guard let state = BackgroundTaskManager.shared.taskState(for: taskId) else {
-                    return (#"{"error":"not_found","message":"Task not found"}"#, false)
-                }
-                return (PluginHostContext.serializeTaskState(id: taskId, state: state), true)
+            let responseBody: String
+            let status: HTTPResponseStatus
+            if let stateJSON = await InferenceServices.backgroundTasks.taskStateJSON(id: taskId) {
+                responseBody = stateJSON
+                status = .ok
+            } else {
+                responseBody = #"{"error":"not_found","message":"Task not found"}"#
+                status = .notFound
             }
-
-            let status: HTTPResponseStatus = found ? .ok : .notFound
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
                 headers.append(contentsOf: cors)
@@ -1192,9 +1188,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         Task(priority: .userInitiated) {
-            await MainActor.run {
-                BackgroundTaskManager.shared.cancelTask(taskId)
-            }
+            await InferenceServices.backgroundTasks.cancel(id: taskId)
 
             hop {
                 Self.sendResponse(

@@ -228,6 +228,40 @@ struct AppEmbeddingProvider: EmbeddingProvider {
     }
 }
 
+struct AppBackgroundTaskService: BackgroundTaskService {
+    func dispatchHTTPTask(
+        requestId: UUID,
+        prompt: String,
+        agentId: UUID,
+        title: String?,
+        externalSessionKey: String?
+    ) async -> UUID? {
+        let request = DispatchRequest(
+            id: requestId,
+            prompt: prompt,
+            agentId: agentId,
+            title: title,
+            showToast: true,
+            source: .http,
+            externalSessionKey: externalSessionKey
+        )
+        return await TaskDispatcher.shared.dispatch(request)?.id
+    }
+
+    func taskStateJSON(id: UUID) async -> String? {
+        await MainActor.run {
+            guard let state = BackgroundTaskManager.shared.taskState(for: id) else {
+                return nil
+            }
+            return PluginHostContext.serializeTaskState(id: id, state: state)
+        }
+    }
+
+    func cancel(id: UUID) async {
+        await MainActor.run { BackgroundTaskManager.shared.cancelTask(id) }
+    }
+}
+
 struct AppSpeechProvider: SpeechProvider {
     func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?) {
         let service = await MainActor.run { SpeechService.shared }

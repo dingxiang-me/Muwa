@@ -121,6 +121,28 @@ protocol SpeechProvider: Sendable {
     func transcribe(audioURL: URL) async throws -> (text: String, durationSeconds: TimeInterval?)
 }
 
+/// Backs `/agents/{id}/dispatch`, `GET /tasks/{id}`, `DELETE /tasks/{id}`.
+/// Mac app implements via `TaskDispatcher`/`BackgroundTaskManager`; CLI
+/// uses the no-op default and these endpoints return errors.
+protocol BackgroundTaskService: Sendable {
+    /// Returns resolved task id (may differ from requestId when the
+    /// dispatcher reattaches to an existing session), or nil if the
+    /// task limit was reached.
+    func dispatchHTTPTask(
+        requestId: UUID,
+        prompt: String,
+        agentId: UUID,
+        title: String?,
+        externalSessionKey: String?
+    ) async -> UUID?
+
+    /// Serialized task state JSON, or nil if the task is not found.
+    func taskStateJSON(id: UUID) async -> String?
+
+    /// Fire-and-forget cancel. Matches the host's existing semantics.
+    func cancel(id: UUID) async
+}
+
 struct DefaultServerConfigurationProvider: ServerConfigurationProvider {
     public func load() async -> ServerConfiguration? { nil }
 }
@@ -225,4 +247,16 @@ struct NoOpSpeechProvider: SpeechProvider {
             userInfo: [NSLocalizedDescriptionKey: "No speech provider registered"]
         )
     }
+}
+
+struct NoOpBackgroundTaskService: BackgroundTaskService {
+    public func dispatchHTTPTask(
+        requestId: UUID,
+        prompt: String,
+        agentId: UUID,
+        title: String?,
+        externalSessionKey: String?
+    ) async -> UUID? { nil }
+    public func taskStateJSON(id: UUID) async -> String? { nil }
+    public func cancel(id: UUID) async {}
 }

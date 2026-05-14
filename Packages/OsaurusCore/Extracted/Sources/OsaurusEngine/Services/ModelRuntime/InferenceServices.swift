@@ -35,6 +35,8 @@ enum InferenceServices {
         = NoOpEmbeddingProvider()
     nonisolated(unsafe) private static var _speech: any SpeechProvider
         = NoOpSpeechProvider()
+    nonisolated(unsafe) private static var _backgroundTasks: any BackgroundTaskService
+        = NoOpBackgroundTaskService()
 
     static var progressReporter: any ProgressReporter {
         lock.withLock { _progressReporter }
@@ -81,6 +83,9 @@ enum InferenceServices {
     static var speech: any SpeechProvider {
         lock.withLock { _speech }
     }
+    static var backgroundTasks: any BackgroundTaskService {
+        lock.withLock { _backgroundTasks }
+    }
 
     static func register(progressReporter: any ProgressReporter) {
         lock.withLock { _progressReporter = progressReporter }
@@ -126,6 +131,9 @@ enum InferenceServices {
     }
     static func register(speech: any SpeechProvider) {
         lock.withLock { _speech = speech }
+    }
+    static func register(backgroundTasks: any BackgroundTaskService) {
+        lock.withLock { _backgroundTasks = backgroundTasks }
     }
 }
 
