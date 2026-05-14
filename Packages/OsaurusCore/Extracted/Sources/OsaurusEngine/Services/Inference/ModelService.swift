@@ -7,7 +7,7 @@
 
 import Foundation
 
-public struct GenerationParameters: Sendable {
+struct GenerationParameters: Sendable {
     let temperature: Float?
     let maxTokens: Int
     /// Whether `maxTokens` came from an explicit client request. When false,
@@ -79,7 +79,7 @@ public struct GenerationParameters: Sendable {
     }
 }
 
-public struct ServiceToolInvocation: Error, Sendable {
+struct ServiceToolInvocation: Error, Sendable {
     let toolName: String
     let jsonArguments: String
     /// Optional tool call ID preserved from the streaming response (OpenAI format: "call_xxx")
@@ -110,7 +110,7 @@ public struct ServiceToolInvocation: Error, Sendable {
 /// ServiceToolInvocations` BEFORE `catch let inv as ServiceToolInvocation`
 /// because some provider paths still throw the single form for genuinely
 /// one-at-a-time streams (OpenAI server-side tool calls).
-public struct ServiceToolInvocations: Error, Sendable {
+struct ServiceToolInvocations: Error, Sendable {
     let invocations: [ServiceToolInvocation]
 }
 
@@ -118,7 +118,7 @@ public struct ServiceToolInvocations: Error, Sendable {
 /// The stream type is `AsyncThrowingStream<String, Error>`, so we encode the
 /// detected tool name (and argument fragments) as sentinel strings using a
 /// Unicode non-character prefix that can never appear in normal LLM output.
-public enum StreamingToolHint: Sendable {
+enum StreamingToolHint: Sendable {
     private static let sentinel: Character = "\u{FFFE}"
     private static let toolPrefix = "\u{FFFE}tool:"
     private static let argsPrefix = "\u{FFFE}args:"
@@ -179,7 +179,7 @@ public enum StreamingToolHint: Sendable {
 ///   - `RemoteProviderService` for OpenAI-compatible providers that stream
 ///     reasoning on a dedicated `reasoning_content` field (DeepSeek, Qwen,
 ///     vLLM, etc.) — replaces the previous synthetic `<think>` wrapping.
-public enum StreamingReasoningHint: Sendable {
+enum StreamingReasoningHint: Sendable {
     private static let reasoningPrefix = "\u{FFFE}reasoning:"
 
     static func encode(_ text: String) -> String { reasoningPrefix + text }
@@ -199,7 +199,7 @@ public enum StreamingReasoningHint: Sendable {
 /// today's only flag is `unclosed`, set when vmlx's
 /// `GenerateCompletionInfo.unclosedReasoning == true` (the model ended
 /// the stream still inside a `<think>` block, i.e. trapped-thinking).
-public enum StreamingStatsHint: Sendable {
+enum StreamingStatsHint: Sendable {
     private static let statsPrefix = "\u{FFFE}stats:"
     private static let posixLocale = Locale(identifier: "en_US_POSIX")
     private static let unclosedFlag = "unclosed"
@@ -233,7 +233,7 @@ public enum StreamingStatsHint: Sendable {
     }
 }
 
-public protocol ModelService: Sendable {
+protocol ModelService: Sendable {
     /// Stable identifier for the service (e.g., "foundation").
     var id: String { get }
 
@@ -260,7 +260,7 @@ public protocol ModelService: Sendable {
 }
 
 /// Optional capability for services that can natively handle OpenAI-style tools (message-based only).
-public protocol ToolCapableService: ModelService {
+protocol ToolCapableService: ModelService {
     func respondWithTools(
         messages: [ChatMessage],
         parameters: GenerationParameters,
@@ -281,12 +281,12 @@ public protocol ToolCapableService: ModelService {
 }
 
 /// Simple router that selects a service based on the request and environment.
-public enum ModelRoute {
+enum ModelRoute {
     case service(service: ModelService, effectiveModel: String)
     case none
 }
 
-public struct ModelServiceRouter {
+struct ModelServiceRouter {
     /// Decide which service should handle this request.
     /// - Parameters:
     ///   - requestedModel: Model string requested by client. "default" or empty means system default.

@@ -11,12 +11,12 @@ import Foundation
 // MARK: - Request Models
 
 /// Reasoning configuration for reasoning models.
-public struct OpenResponsesReasoningConfig: Codable, Sendable {
+struct OpenResponsesReasoningConfig: Codable, Sendable {
     public let effort: String
 }
 
 /// Open Responses API create request
-public struct OpenResponsesRequest: Codable, Sendable {
+struct OpenResponsesRequest: Codable, Sendable {
     /// Model identifier
     public let model: String
     /// Input content - can be a string or array of input items
@@ -44,7 +44,7 @@ public struct OpenResponsesRequest: Codable, Sendable {
 }
 
 /// Input can be a string or array of input items
-public enum OpenResponsesInput: Codable, Sendable {
+enum OpenResponsesInput: Codable, Sendable {
     case text(String)
     case items([OpenResponsesInputItem])
 
@@ -77,7 +77,7 @@ public enum OpenResponsesInput: Codable, Sendable {
 }
 
 /// Input item types
-public enum OpenResponsesInputItem: Codable, Sendable {
+enum OpenResponsesInputItem: Codable, Sendable {
     case message(OpenResponsesMessageItem)
     /// A prior model-issued function call included in input for multi-turn history.
     /// The Responses API requires clients to echo previous `function_call` output items
@@ -122,7 +122,7 @@ public enum OpenResponsesInputItem: Codable, Sendable {
 }
 
 /// Message input item
-public struct OpenResponsesMessageItem: Codable, Sendable {
+struct OpenResponsesMessageItem: Codable, Sendable {
     public let type: String
     public let role: String
     public let content: OpenResponsesMessageContent
@@ -135,7 +135,7 @@ public struct OpenResponsesMessageItem: Codable, Sendable {
 }
 
 /// Message content can be string or array of content parts
-public enum OpenResponsesMessageContent: Codable, Sendable {
+enum OpenResponsesMessageContent: Codable, Sendable {
     case text(String)
     case parts([OpenResponsesContentPart])
 
@@ -183,7 +183,7 @@ public enum OpenResponsesMessageContent: Codable, Sendable {
 }
 
 /// Content part types
-public enum OpenResponsesContentPart: Codable, Sendable {
+enum OpenResponsesContentPart: Codable, Sendable {
     case inputText(OpenResponsesInputTextPart)
     case inputImage(OpenResponsesInputImagePart)
 
@@ -220,7 +220,7 @@ public enum OpenResponsesContentPart: Codable, Sendable {
 }
 
 /// Text content part
-public struct OpenResponsesInputTextPart: Codable, Sendable {
+struct OpenResponsesInputTextPart: Codable, Sendable {
     public let type: String
     public let text: String
 
@@ -231,7 +231,7 @@ public struct OpenResponsesInputTextPart: Codable, Sendable {
 }
 
 /// Image content part
-public struct OpenResponsesInputImagePart: Codable, Sendable {
+struct OpenResponsesInputImagePart: Codable, Sendable {
     public let type: String
     public let image_url: String?
     public let detail: String?
@@ -244,7 +244,7 @@ public struct OpenResponsesInputImagePart: Codable, Sendable {
 }
 
 /// Function call output item (tool result)
-public struct OpenResponsesFunctionCallOutputItem: Codable, Sendable {
+struct OpenResponsesFunctionCallOutputItem: Codable, Sendable {
     public let type: String
     public let call_id: String
     public let output: String
@@ -259,7 +259,7 @@ public struct OpenResponsesFunctionCallOutputItem: Codable, Sendable {
 // MARK: - Tool Definitions
 
 /// Tool definition
-public struct OpenResponsesTool: Codable, Sendable {
+struct OpenResponsesTool: Codable, Sendable {
     public let type: String
     public let name: String
     public let description: String?
@@ -274,7 +274,7 @@ public struct OpenResponsesTool: Codable, Sendable {
 }
 
 /// Tool choice configuration
-public enum OpenResponsesToolChoice: Codable, Sendable {
+enum OpenResponsesToolChoice: Codable, Sendable {
     case auto
     case none
     case required
@@ -335,7 +335,7 @@ public enum OpenResponsesToolChoice: Codable, Sendable {
 // MARK: - Response Models
 
 /// Open Responses API response
-public struct OpenResponsesResponse: Codable, Sendable {
+struct OpenResponsesResponse: Codable, Sendable {
     public let id: String
     public let object: String
     public let created_at: Int
@@ -365,7 +365,7 @@ public struct OpenResponsesResponse: Codable, Sendable {
 }
 
 /// Response status
-public enum OpenResponsesStatus: String, Codable, Sendable {
+enum OpenResponsesStatus: String, Codable, Sendable {
     case inProgress = "in_progress"
     case completed = "completed"
     case failed = "failed"
@@ -374,7 +374,7 @@ public enum OpenResponsesStatus: String, Codable, Sendable {
 }
 
 /// Output item types
-public enum OpenResponsesOutputItem: Codable, Sendable {
+enum OpenResponsesOutputItem: Codable, Sendable {
     case message(OpenResponsesOutputMessage)
     case functionCall(OpenResponsesFunctionCall)
     case reasoning(OpenResponsesReasoningItem)
@@ -417,7 +417,7 @@ public enum OpenResponsesOutputItem: Codable, Sendable {
 
 /// Reasoning output item — opens before the message item and accumulates
 /// `summary[i].text` chunks via `response.reasoning_summary_text.delta`.
-public struct OpenResponsesReasoningItem: Codable, Sendable {
+struct OpenResponsesReasoningItem: Codable, Sendable {
     public let type: String
     public let id: String
     public let status: OpenResponsesItemStatus
@@ -433,7 +433,7 @@ public struct OpenResponsesReasoningItem: Codable, Sendable {
 
 /// Single piece of a reasoning summary — analogous to `OpenResponsesOutputText`
 /// but lives on the reasoning item's `summary` array.
-public struct OpenResponsesReasoningSummaryText: Codable, Sendable {
+struct OpenResponsesReasoningSummaryText: Codable, Sendable {
     public let type: String
     public let text: String
 
@@ -444,7 +444,7 @@ public struct OpenResponsesReasoningSummaryText: Codable, Sendable {
 }
 
 /// Output message item
-public struct OpenResponsesOutputMessage: Codable, Sendable {
+struct OpenResponsesOutputMessage: Codable, Sendable {
     public let type: String
     public let id: String
     public let status: OpenResponsesItemStatus
@@ -461,13 +461,13 @@ public struct OpenResponsesOutputMessage: Codable, Sendable {
 }
 
 /// Item status
-public enum OpenResponsesItemStatus: String, Codable, Sendable {
+enum OpenResponsesItemStatus: String, Codable, Sendable {
     case inProgress = "in_progress"
     case completed = "completed"
 }
 
 /// Output content types
-public enum OpenResponsesOutputContent: Codable, Sendable {
+enum OpenResponsesOutputContent: Codable, Sendable {
     case outputText(OpenResponsesOutputText)
 
     private enum CodingKeys: String, CodingKey {
@@ -499,7 +499,7 @@ public enum OpenResponsesOutputContent: Codable, Sendable {
 }
 
 /// Output text content
-public struct OpenResponsesOutputText: Codable, Sendable {
+struct OpenResponsesOutputText: Codable, Sendable {
     public let type: String
     public let text: String
 
@@ -510,7 +510,7 @@ public struct OpenResponsesOutputText: Codable, Sendable {
 }
 
 /// Function call output item
-public struct OpenResponsesFunctionCall: Codable, Sendable {
+struct OpenResponsesFunctionCall: Codable, Sendable {
     public let type: String
     public let id: String
     public let status: OpenResponsesItemStatus
@@ -529,7 +529,7 @@ public struct OpenResponsesFunctionCall: Codable, Sendable {
 }
 
 /// Token usage information
-public struct OpenResponsesUsage: Codable, Sendable {
+struct OpenResponsesUsage: Codable, Sendable {
     public let input_tokens: Int
     public let output_tokens: Int
     public let total_tokens: Int
@@ -544,7 +544,7 @@ public struct OpenResponsesUsage: Codable, Sendable {
 // MARK: - Streaming Event Models
 
 /// response.created event
-public struct ResponseCreatedEvent: Codable, Sendable {
+struct ResponseCreatedEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let response: OpenResponsesResponse
@@ -557,7 +557,7 @@ public struct ResponseCreatedEvent: Codable, Sendable {
 }
 
 /// response.in_progress event
-public struct ResponseInProgressEvent: Codable, Sendable {
+struct ResponseInProgressEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let response: OpenResponsesResponse
@@ -570,7 +570,7 @@ public struct ResponseInProgressEvent: Codable, Sendable {
 }
 
 /// response.output_item.added event
-public struct OutputItemAddedEvent: Codable, Sendable {
+struct OutputItemAddedEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int?  // Osaurus-specific; not sent by all providers (e.g. OpenAI)
     public let output_index: Int
@@ -585,7 +585,7 @@ public struct OutputItemAddedEvent: Codable, Sendable {
 }
 
 /// response.content_part.added event
-public struct ContentPartAddedEvent: Codable, Sendable {
+struct ContentPartAddedEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let item_id: String
@@ -610,7 +610,7 @@ public struct ContentPartAddedEvent: Codable, Sendable {
 }
 
 /// response.output_text.delta event
-public struct OutputTextDeltaEvent: Codable, Sendable {
+struct OutputTextDeltaEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let item_id: String
@@ -629,7 +629,7 @@ public struct OutputTextDeltaEvent: Codable, Sendable {
 }
 
 /// response.output_text.done event
-public struct OutputTextDoneEvent: Codable, Sendable {
+struct OutputTextDoneEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let item_id: String
@@ -649,7 +649,7 @@ public struct OutputTextDoneEvent: Codable, Sendable {
 
 /// response.reasoning_summary_text.delta event — incremental reasoning text
 /// appended to the currently-open reasoning item.
-public struct ReasoningSummaryTextDeltaEvent: Codable, Sendable {
+struct ReasoningSummaryTextDeltaEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let item_id: String
@@ -668,7 +668,7 @@ public struct ReasoningSummaryTextDeltaEvent: Codable, Sendable {
 }
 
 /// response.reasoning_summary_text.done event — final accumulated reasoning text.
-public struct ReasoningSummaryTextDoneEvent: Codable, Sendable {
+struct ReasoningSummaryTextDoneEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let item_id: String
@@ -687,7 +687,7 @@ public struct ReasoningSummaryTextDoneEvent: Codable, Sendable {
 }
 
 /// response.output_item.done event
-public struct OutputItemDoneEvent: Codable, Sendable {
+struct OutputItemDoneEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int?  // Osaurus-specific; not sent by all providers (e.g. OpenAI)
     public let output_index: Int
@@ -702,7 +702,7 @@ public struct OutputItemDoneEvent: Codable, Sendable {
 }
 
 /// response.function_call_arguments.delta event
-public struct FunctionCallArgumentsDeltaEvent: Codable, Sendable {
+struct FunctionCallArgumentsDeltaEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int?  // Osaurus-specific; not sent by all providers (e.g. OpenAI)
     public let item_id: String?  // Not present in all provider implementations
@@ -721,7 +721,7 @@ public struct FunctionCallArgumentsDeltaEvent: Codable, Sendable {
 }
 
 /// response.function_call_arguments.done event
-public struct FunctionCallArgumentsDoneEvent: Codable, Sendable {
+struct FunctionCallArgumentsDoneEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int?  // Osaurus-specific; not sent by all providers (e.g. OpenAI)
     public let item_id: String?  // Not present in all provider implementations
@@ -740,7 +740,7 @@ public struct FunctionCallArgumentsDoneEvent: Codable, Sendable {
 }
 
 /// response.completed event
-public struct ResponseCompletedEvent: Codable, Sendable {
+struct ResponseCompletedEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let response: OpenResponsesResponse
@@ -753,7 +753,7 @@ public struct ResponseCompletedEvent: Codable, Sendable {
 }
 
 /// response.failed event
-public struct ResponseFailedEvent: Codable, Sendable {
+struct ResponseFailedEvent: Codable, Sendable {
     public let type: String
     public let sequence_number: Int
     public let response: OpenResponsesResponse
@@ -770,7 +770,7 @@ public struct ResponseFailedEvent: Codable, Sendable {
 // MARK: - Error Models
 
 /// Open Responses error
-public struct OpenResponsesError: Codable, Sendable {
+struct OpenResponsesError: Codable, Sendable {
     public let type: String
     public let code: String
     public let message: String
@@ -783,7 +783,7 @@ public struct OpenResponsesError: Codable, Sendable {
 }
 
 /// Error response wrapper
-public struct OpenResponsesErrorResponse: Codable, Sendable {
+struct OpenResponsesErrorResponse: Codable, Sendable {
     public let error: OpenResponsesError
 
     public init(code: String, message: String) {

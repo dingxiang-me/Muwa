@@ -30,7 +30,7 @@ import os.log
 
 private let batchAdapterLog = Logger(subsystem: "ai.osaurus", category: "BatchAdapter")
 
-public struct MLXBatchAdapter {
+struct MLXBatchAdapter {
 
     /// Result handed back to `ModelRuntime`. The `Generation` stream is
     /// consumed by `GenerationEventMapper`, which translates the upstream

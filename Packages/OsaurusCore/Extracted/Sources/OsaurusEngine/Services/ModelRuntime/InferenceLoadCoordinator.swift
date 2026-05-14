@@ -23,7 +23,7 @@
 
 import Foundation
 
-public actor InferenceLoadCoordinator {
+actor InferenceLoadCoordinator {
     public static let shared = InferenceLoadCoordinator()
 
     private var activeChats = 0

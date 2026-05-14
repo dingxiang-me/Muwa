@@ -9,9 +9,6 @@
 //  one call instead of 6-12 lines of literal JSON construction.
 //
 
-#if canImport(OsaurusEngine)
-import OsaurusEngine
-#endif
 import Foundation
 
 extension HTTPHandler {

@@ -420,7 +420,10 @@ let package = Package(
                 .product(name: "AAInfographics", package: "AAChartKit-Swift"),
             ],
             path: ".",
-            exclude: ["Tests", "SQLCipher", "Extracted/Tests"],
+            exclude: [
+                "Tests", "SQLCipher", "Extracted/Tests",
+                "Extracted/Package.swift", "Extracted/.gitignore",
+            ],
             resources: [
                 .process("Resources"),
                 .process("Extracted/Sources/OsaurusEngine/Resources"),

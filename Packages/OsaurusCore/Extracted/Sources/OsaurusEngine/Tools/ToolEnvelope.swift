@@ -19,7 +19,7 @@ import Foundation
 /// Standard envelope returned by every tool. All members are static — there
 /// is no need to instantiate this type. Tool bodies call `success(...)` /
 /// `failure(...)` and return the resulting JSON string.
-public enum ToolEnvelope {
+enum ToolEnvelope {
 
     // MARK: - Kinds
 

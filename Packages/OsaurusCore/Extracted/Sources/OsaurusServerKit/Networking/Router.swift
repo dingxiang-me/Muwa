@@ -5,16 +5,13 @@
 //  Created by Terence on 8/17/25.
 //
 
-#if canImport(OsaurusEngine)
-import OsaurusEngine
-#endif
 import Foundation
 import IkigaJSON
 import NIOCore
 import NIOHTTP1
 
 /// Simple routing logic for HTTP requests
-public struct Router {
+struct Router {
     /// Channel context for async operations (set by HTTPHandler)
     var context: ChannelHandlerContext?
     weak var handler: HTTPHandler?

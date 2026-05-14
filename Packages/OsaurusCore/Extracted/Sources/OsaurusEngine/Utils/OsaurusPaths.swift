@@ -10,7 +10,7 @@ import Foundation
 
 /// Centralized path management for all Osaurus app data.
 /// All stores and services should use this module for path resolution.
-public enum OsaurusPaths {
+enum OsaurusPaths {
     /// Optional root directory override for tests
     /// Note: nonisolated(unsafe) since this is only set during test setup before any concurrent access
     public nonisolated(unsafe) static var overrideRoot: URL?

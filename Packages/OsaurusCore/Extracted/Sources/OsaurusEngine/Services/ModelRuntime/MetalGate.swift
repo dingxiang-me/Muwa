@@ -15,7 +15,7 @@
 
 import Foundation
 
-public actor MetalGate {
+actor MetalGate {
     public static let shared = MetalGate()
 
     private var activeEmbeddings = 0

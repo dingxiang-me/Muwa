@@ -11,7 +11,7 @@ import Foundation
 
 // MARK: - Option Value
 
-public enum ModelOptionValue: Sendable, Equatable, Hashable, Codable {
+enum ModelOptionValue: Sendable, Equatable, Hashable, Codable {
     case string(String)
     case bool(Bool)
     case int(Int)
@@ -30,12 +30,12 @@ public enum ModelOptionValue: Sendable, Equatable, Hashable, Codable {
 
 // MARK: - Option Definition
 
-public struct ModelOptionSegment: Identifiable, Sendable {
+struct ModelOptionSegment: Identifiable, Sendable {
     let id: String
     let label: String
 }
 
-public struct ModelOptionDefinition: Identifiable, Sendable {
+struct ModelOptionDefinition: Identifiable, Sendable {
     enum Kind: Sendable {
         case segmented([ModelOptionSegment])
         case toggle(default: Bool)
@@ -56,7 +56,7 @@ public struct ModelOptionDefinition: Identifiable, Sendable {
 
 // MARK: - Model Profile Protocol
 
-public protocol ModelProfile: Sendable {
+protocol ModelProfile: Sendable {
     static func matches(modelId: String) -> Bool
     static var displayName: String { get }
     static var options: [ModelOptionDefinition] { get }
@@ -74,7 +74,7 @@ extension ModelProfile {
 
 // MARK: - Registry
 
-public enum ModelProfileRegistry {
+enum ModelProfileRegistry {
     static let profiles: [any ModelProfile.Type] = [
         VeniceModelProfile.self,
         OpenAIReasoningProfile.self,
@@ -150,7 +150,7 @@ public enum ModelProfileRegistry {
 /// - instruct: closed `</think>` assistant tail, answer on content rail
 /// - reasoning: open `<think>` assistant tail, normal reasoning split
 /// - max: open `<think>` tail plus the DSV4 max-reasoning preface
-public struct DSV4ReasoningProfile: ModelProfile {
+struct DSV4ReasoningProfile: ModelProfile {
     static let displayName = "DSV4 Reasoning"
 
     static func matches(modelId: String) -> Bool {
@@ -191,7 +191,7 @@ public struct DSV4ReasoningProfile: ModelProfile {
 // MARK: - OpenAI Reasoning Profile
 
 /// OpenAI reasoning models (o-series, gpt-5+) — supports reasoning effort control.
-public struct OpenAIReasoningProfile: ModelProfile {
+struct OpenAIReasoningProfile: ModelProfile {
     static let displayName = "Reasoning"
 
     private static let reasoningModelPrefixes = ["o1", "o3", "o4", "gpt-5"]
@@ -226,7 +226,7 @@ public struct OpenAIReasoningProfile: ModelProfile {
 
 /// Qwen3 / Qwen3.5 local models — supports disabling thinking via `enable_thinking` chat template kwarg.
 /// Excludes Qwen3-Coder variants which are non-thinking only.
-public struct QwenThinkingProfile: ModelProfile {
+struct QwenThinkingProfile: ModelProfile {
     static let displayName = "Qwen Thinking"
 
     static func matches(modelId: String) -> Bool {
@@ -265,7 +265,7 @@ public struct QwenThinkingProfile: ModelProfile {
 ///
 /// Match excludes `coder` variants (none ship today, but mirroring
 /// `QwenThinkingProfile`'s shape for consistency if NVIDIA publishes one).
-public struct NemotronThinkingProfile: ModelProfile {
+struct NemotronThinkingProfile: ModelProfile {
     static let displayName = "Nemotron Thinking"
 
     static func matches(modelId: String) -> Bool {
@@ -304,7 +304,7 @@ public struct NemotronThinkingProfile: ModelProfile {
 /// variant (e.g. Laguna-S, Laguna-M) without a registry edit. There is
 /// no `coder` exclusion because Laguna IS the coder family — exclusion
 /// would be a no-op.
-public struct LagunaThinkingProfile: ModelProfile {
+struct LagunaThinkingProfile: ModelProfile {
     static let displayName = "Laguna Thinking"
 
     static func matches(modelId: String) -> Bool {
@@ -334,7 +334,7 @@ public struct LagunaThinkingProfile: ModelProfile {
 /// The shipped template defaults to `no_think` and opens `<think>` only for
 /// `low` / `high`, so expose the native effort values rather than mapping it
 /// through the generic Disable Thinking toggle.
-public struct Hy3ReasoningProfile: ModelProfile {
+struct Hy3ReasoningProfile: ModelProfile {
     static let displayName = "Hy3 Reasoning"
 
     static func matches(modelId: String) -> Bool {
@@ -384,7 +384,7 @@ public struct Hy3ReasoningProfile: ModelProfile {
 /// `AutoThinkingProfile`, so a locally installed template cannot accidentally
 /// expose the generic Thinking toggle. `MLXBatchAdapter` separately forces
 /// `enable_thinking=false` for Ling requests at tokenization time.
-public struct LingRuntimeProfile: ModelProfile {
+struct LingRuntimeProfile: ModelProfile {
     static let displayName = "Ling"
 
     static func matches(modelId: String) -> Bool {
@@ -404,7 +404,7 @@ public struct LingRuntimeProfile: ModelProfile {
 /// `enable_thinking=true` to open a reasoning block. The profile therefore
 /// exposes the standard Disable Thinking toggle and defaults it ON, while
 /// still allowing users/API callers to enable thinking per request.
-public struct ZayaThinkingProfile: ModelProfile {
+struct ZayaThinkingProfile: ModelProfile {
     static let displayName = "Zaya Thinking"
 
     static func matches(modelId: String) -> Bool {
@@ -434,7 +434,7 @@ public struct ZayaThinkingProfile: ModelProfile {
 /// template exposes an `enable_thinking` kwarg and uses thinking markers the
 /// runtime can process. Registered last so that explicit family profiles
 /// (Qwen, Venice, etc.) still win when they match.
-public struct AutoThinkingProfile: ModelProfile {
+struct AutoThinkingProfile: ModelProfile {
     static let displayName = "Thinking"
 
     static func matches(modelId: String) -> Bool {
@@ -499,7 +499,7 @@ private let geminiOutputTypeSegments: [ModelOptionSegment] = [
 // MARK: - Gemini 3.1 Flash Image Profile (Nano Banana 2)
 
 /// Gemini 3.1 Flash Image Preview — supports extended aspect ratios, resolution (512px/1K/2K/4K), and output type.
-public struct Gemini31FlashImageProfile: ModelProfile {
+struct Gemini31FlashImageProfile: ModelProfile {
     static let displayName = "Image Generation (3.1 Flash)"
 
     static func matches(modelId: String) -> Bool {
@@ -544,7 +544,7 @@ public struct Gemini31FlashImageProfile: ModelProfile {
 // MARK: - Gemini 3 Pro Image Profile (Nano Banana Pro)
 
 /// Gemini 3 Pro Image Preview — supports aspect ratio, resolution (1K/2K/4K), and output type.
-public struct GeminiProImageProfile: ModelProfile {
+struct GeminiProImageProfile: ModelProfile {
     static let displayName = "Image Generation (Pro)"
 
     static func matches(modelId: String) -> Bool {
@@ -589,7 +589,7 @@ public struct GeminiProImageProfile: ModelProfile {
 // MARK: - Gemini Flash Image Profile (Nano Banana)
 
 /// Gemini 2.5 Flash Image — supports aspect ratio and output type (no resolution control).
-public struct GeminiFlashImageProfile: ModelProfile {
+struct GeminiFlashImageProfile: ModelProfile {
     static let displayName = "Image Generation"
 
     static func matches(modelId: String) -> Bool {
@@ -622,7 +622,7 @@ public struct GeminiFlashImageProfile: ModelProfile {
 
 /// Venice AI models — supports web search, thinking control, and Venice system prompt toggle.
 /// See https://docs.venice.ai/api-reference/api-spec for venice_parameters details.
-public struct VeniceModelProfile: ModelProfile {
+struct VeniceModelProfile: ModelProfile {
     static let displayName = "Venice AI"
 
     static func matches(modelId: String) -> Bool {

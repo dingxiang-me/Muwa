@@ -27,7 +27,7 @@
 
 import Foundation
 
-public enum TokenEstimator {
+enum TokenEstimator {
 
     /// The `chars per token` heuristic. Tuned for English-ish prompts;
     /// Asian-language prompts run ~2x denser, but the chat budget pipeline

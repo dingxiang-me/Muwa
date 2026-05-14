@@ -38,7 +38,7 @@ import os.log
 
 private let recoveryLog = Logger(subsystem: "com.dinoki.osaurus", category: "MLXErrorRecovery")
 
-public enum MLXErrorRecovery {
+enum MLXErrorRecovery {
 
     /// Lock-protected slot for the most recent MLX error message. Useful for
     /// diagnostics — the handler runs on whichever thread MLX called us from,

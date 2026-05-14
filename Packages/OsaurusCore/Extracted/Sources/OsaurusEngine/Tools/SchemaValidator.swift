@@ -16,7 +16,7 @@
 
 import Foundation
 
-public struct SchemaValidator {
+struct SchemaValidator {
     public struct ValidationResult {
         public let isValid: Bool
         public let errorMessage: String?

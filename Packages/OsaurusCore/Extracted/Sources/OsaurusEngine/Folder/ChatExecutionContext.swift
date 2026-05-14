@@ -13,7 +13,7 @@ import Foundation
 /// down through tool execution. The chat engine seeds these in
 /// `ChatSession.send` (and equivalent headless paths) so any tool reading
 /// them picks up the right scope without an explicit parameter.
-public enum ChatExecutionContext {
+enum ChatExecutionContext {
     /// The current chat session id whose tool calls are running. Tools that
     /// need per-conversation state (todo store, file-op undo log, method
     /// telemetry) key off this.

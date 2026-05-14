@@ -10,12 +10,9 @@
 //  reject-with-400 logic in one place.
 //
 
-#if canImport(OsaurusEngine)
-import OsaurusEngine
-#endif
 import Foundation
 
-public enum RequestValidator {
+enum RequestValidator {
 
     /// Reasons we reject a `ChatCompletionRequest` (or its primitive
     /// equivalents) outright with HTTP 400. We only flag the cases our

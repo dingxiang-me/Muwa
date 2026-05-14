@@ -10,7 +10,7 @@ import Foundation
 import MLXLMCommon
 import Tokenizers
 
-public struct SwiftTransformersTokenizerLoader: TokenizerLoader, @unchecked Sendable {
+struct SwiftTransformersTokenizerLoader: TokenizerLoader, @unchecked Sendable {
     func load(from directory: URL) async throws -> any MLXLMCommon.Tokenizer {
         let upstream = try await AutoTokenizer.from(modelFolder: directory)
         return TokenizerBridge(upstream: upstream)

@@ -5,27 +5,24 @@
 //  Actor-owned NIO server lifecycle (start / stop).
 //
 
-#if canImport(OsaurusEngine)
-import OsaurusEngine
-#endif
 import Foundation
 import NIOCore
 import NIOHTTP1
 import NIOPosix
 
-public typealias APIKeyValidatorFactory = @Sendable () -> APIKeyValidator
+typealias APIKeyValidatorFactory = @Sendable () -> APIKeyValidator
 
 /// Host-supplied factory for an extra `ChannelHandler` inserted ahead of
 /// the engine `HTTPHandler` in the NIO pipeline. Used by the Mac app to
 /// install routes that touch app-only singletons; the CLI leaves it nil.
-public typealias PreHandlerFactory = @Sendable (
+typealias PreHandlerFactory = @Sendable (
     _ configuration: ServerConfiguration,
     _ apiKeyValidator: APIKeyValidator,
     _ trustLoopback: Bool
 ) -> ChannelHandler
 
-public actor OsaurusServer: Sendable {
-    public struct Config: Sendable {
+actor OsaurusServer: Sendable {
+    struct Config: Sendable {
         public var host: String
         public var port: Int
         public var trustLoopback: Bool

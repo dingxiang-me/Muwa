@@ -28,7 +28,7 @@ private let genLog = Logger(subsystem: "com.dinoki.osaurus", category: "Generati
 private let _vlmFactory = MLXVLM.VLMModelFactory.shared
 private let _llmFactory = MLXLLM.LLMModelFactory.shared
 
-public actor ModelRuntime {
+actor ModelRuntime {
     // MARK: - Types
 
     struct ModelCacheSummary: Sendable {

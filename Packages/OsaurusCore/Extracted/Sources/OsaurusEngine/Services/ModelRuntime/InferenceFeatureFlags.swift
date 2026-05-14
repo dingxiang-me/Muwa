@@ -13,7 +13,7 @@
 
 import Foundation
 
-public enum InferenceFeatureFlags {
+enum InferenceFeatureFlags {
     private enum Keys {
         static let mlxBatchEngineMaxSize = "ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize"
     }

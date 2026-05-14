@@ -12,7 +12,7 @@
 
 import Foundation
 
-public struct RuntimeConfig: Sendable {
+struct RuntimeConfig: Sendable {
     let topP: Float
 
     /// Captures a generation config snapshot from `ServerConfiguration`.

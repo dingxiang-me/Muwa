@@ -8,7 +8,7 @@
 
 import Foundation
 
-public enum ModelMetadataParser {
+enum ModelMetadataParser {
     /// Extracts parameter count from a repo ID (e.g., "1.7B", "7B", "270M")
     static func parameterCount(from repoId: String) -> String? {
         let text = repoId.lowercased()

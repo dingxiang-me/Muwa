@@ -10,7 +10,7 @@
 import Foundation
 import MLXVLM
 
-public enum VLMDetection {
+enum VLMDetection {
     /// Check if a downloaded model at the given directory is a VLM.
     /// Uses vision_config key presence in config.json as the definitive signal,
     /// disambiguating model types registered in both LLM and VLM factories

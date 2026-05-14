@@ -7,9 +7,6 @@
 //  the channel-handler surface.
 //
 
-#if canImport(OsaurusEngine)
-import OsaurusEngine
-#endif
 import NIOCore
 
 extension SocketAddress {

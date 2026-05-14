@@ -50,7 +50,7 @@ import Foundation
 /// `draining`. The canonicality check (`creating[key] == ourTask`)
 /// then fails (since the slot is empty), so `value(for:)` does not
 /// commit a stale entry the user just asked to remove.
-public actor TaskCoalescer<Value: Sendable> {
+actor TaskCoalescer<Value: Sendable> {
     private var values: [String: Value] = [:]
     private var creating: [String: Task<Value, Never>] = [:]
     private var draining: [String: Task<Value, Never>] = [:]

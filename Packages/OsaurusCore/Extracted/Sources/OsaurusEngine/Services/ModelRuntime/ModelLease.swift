@@ -24,7 +24,7 @@ import Foundation
 /// `unloadModelsNotIn`) MUST `await waitForZero(name)` before tearing down
 /// the model's container/buffers. Generation-side callers wrap their stream
 /// lifetime with `acquire` / `release`.
-public actor ModelLease {
+actor ModelLease {
     public static let shared = ModelLease()
 
     /// Per-model active refcount. A name is removed from the dictionary

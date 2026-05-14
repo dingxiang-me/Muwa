@@ -16,7 +16,7 @@ public enum MessageRole: String, Codable, Sendable {
 }
 
 /// Chat message structure
-public struct Message: Codable, Sendable {
+struct Message: Codable, Sendable {
     let role: MessageRole
     let content: String
 

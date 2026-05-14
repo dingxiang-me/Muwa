@@ -8,9 +8,6 @@
 //  `ChannelInboundHandler` lifecycle and the route-dispatch chain.
 //
 
-#if canImport(OsaurusEngine)
-import OsaurusEngine
-#endif
 import Foundation
 import NIOCore
 import NIOHTTP1
