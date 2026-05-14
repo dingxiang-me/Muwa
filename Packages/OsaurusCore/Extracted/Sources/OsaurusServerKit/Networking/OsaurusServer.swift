@@ -12,23 +12,35 @@ import NIOPosix
 
 public typealias APIKeyValidatorFactory = @Sendable () -> APIKeyValidator
 
+/// Host-supplied factory for an extra `ChannelHandler` inserted ahead of
+/// the engine `HTTPHandler` in the NIO pipeline. Used by the Mac app to
+/// install routes that touch app-only singletons; the CLI leaves it nil.
+public typealias PreHandlerFactory = @Sendable (
+    _ configuration: ServerConfiguration,
+    _ apiKeyValidator: APIKeyValidator,
+    _ trustLoopback: Bool
+) -> ChannelHandler
+
 public actor OsaurusServer: Sendable {
     public struct Config: Sendable {
         public var host: String
         public var port: Int
         public var trustLoopback: Bool
         public var validatorFactory: APIKeyValidatorFactory
+        public var preHandlerFactory: PreHandlerFactory?
 
         public init(
             host: String = "127.0.0.1",
             port: Int = 1337,
             trustLoopback: Bool = true,
-            validatorFactory: @escaping APIKeyValidatorFactory = { .empty }
+            validatorFactory: @escaping APIKeyValidatorFactory = { .empty },
+            preHandlerFactory: PreHandlerFactory? = nil
         ) {
             self.host = host
             self.port = port
             self.trustLoopback = trustLoopback
             self.validatorFactory = validatorFactory
+            self.preHandlerFactory = preHandlerFactory
         }
     }
 
@@ -48,20 +60,28 @@ public actor OsaurusServer: Sendable {
 
         let validator = config.validatorFactory()
         let trustLoopback = config.trustLoopback
+        let preHandlerFactory = config.preHandlerFactory
 
         let bootstrap = ServerBootstrap(group: group)
             .serverChannelOption(ChannelOptions.backlog, value: 256)
             .serverChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)
             .childChannelInitializer { channel in
                 channel.pipeline.configureHTTPServerPipeline().flatMap {
-                    channel.pipeline.addHandler(
-                        HTTPHandler(
-                            configuration: serverConfiguration,
-                            apiKeyValidator: validator,
-                            eventLoop: channel.eventLoop,
-                            trustLoopback: trustLoopback
-                        )
+                    let mainHandler = HTTPHandler(
+                        configuration: serverConfiguration,
+                        apiKeyValidator: validator,
+                        eventLoop: channel.eventLoop,
+                        trustLoopback: trustLoopback
                     )
+                    guard let preHandlerFactory else {
+                        return channel.pipeline.addHandler(mainHandler)
+                    }
+                    let preHandler = preHandlerFactory(
+                        serverConfiguration, validator, trustLoopback
+                    )
+                    return channel.pipeline.addHandler(preHandler).flatMap {
+                        channel.pipeline.addHandler(mainHandler)
+                    }
                 }
             }
             .childChannelOption(ChannelOptions.socketOption(.so_reuseaddr), value: 1)

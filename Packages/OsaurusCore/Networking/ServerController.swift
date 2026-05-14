@@ -113,7 +113,14 @@ final class ServerController: ObservableObject {
                     host: bindHost,
                     port: configuration.port,
                     trustLoopback: !configuration.exposeToNetwork,
-                    validatorFactory: { AppAPIKeyValidatorFactory.build(agentIndex: nil) }
+                    validatorFactory: { AppAPIKeyValidatorFactory.build(agentIndex: nil) },
+                    preHandlerFactory: { config, validator, trustLoopback in
+                        AppHTTPHandler(
+                            configuration: config,
+                            apiKeyValidator: validator,
+                            trustLoopback: trustLoopback
+                        )
+                    }
                 ),
                 serverConfiguration: self.configuration
             )

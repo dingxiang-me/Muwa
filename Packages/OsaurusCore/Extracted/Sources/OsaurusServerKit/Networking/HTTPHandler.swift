@@ -182,12 +182,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             }
 
             // Access key authentication gate (all data snapshotted at server start, zero locks)
-            // Plugin routes handle their own auth per-route, so skip the global gate.
             // Loopback connections (CLI / local tools) are trusted without a token.
-            let publicPaths: Set<String> = ["/", "/health", "/pair", "/pair-invite"]
-            let isPluginRoute = path.hasPrefix("/plugins/")
+            let publicPaths: Set<String> = ["/", "/health"]
             let isLoopback = isLoopbackConnection(context)
-            if !publicPaths.contains(path) && !isPluginRoute && !isLoopback {
+            if !publicPaths.contains(path) && !isLoopback {
                 let authHeader = head.headers.first(name: "Authorization") ?? ""
                 let token =
                     authHeader.hasPrefix("Bearer ")
@@ -237,11 +235,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 }
             }
 
-            // Handle simple HEAD for non-plugin paths only. Plugin routes
-            // (caught upstream by the host's plugin handler) need the same
-            // matching/auth pipeline as GET so they can return accurate
-            // Content-Type/Content-Length headers.
-            if head.method == .HEAD && !path.hasPrefix("/plugins/") {
+            if head.method == .HEAD {
                 var headers = [("Content-Type", "text/plain; charset=utf-8")]
                 headers.append(contentsOf: stateRef.value.corsHeaders)
                 Self.sendResponse(
