@@ -271,6 +271,31 @@ final class AppHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
                 head: head, body: body, cors: cors, context: context,
                 startTime: startTime, userAgent: userAgent
             )
+        case (.POST, "/memory/ingest"):
+            handleMemoryIngest(
+                head: head, body: body, cors: cors, context: context,
+                startTime: startTime, userAgent: userAgent
+            )
+        case (.GET, "/agents"):
+            handleListAgents(
+                head: head, cors: cors, context: context,
+                startTime: startTime, userAgent: userAgent
+            )
+        case (.GET, let p) where p.hasPrefix("/agents/")
+            && !p.dropFirst("/agents/".count).contains("/"):
+            handleGetAgent(
+                head: head, path: p, cors: cors, context: context,
+                startTime: startTime, userAgent: userAgent
+            )
+        case (_, let p) where p.hasPrefix("/plugins/"):
+            let router = AppPluginRouter(
+                configuration: configuration, apiKeyValidator: apiKeyValidator
+            )
+            router.handle(
+                head: head, body: body, path: p, corsHeaders: cors,
+                context: context, startTime: startTime,
+                userAgent: userAgent, isLoopback: loopback
+            )
         default:
             var headers: [(String, String)] = [("Content-Type", "application/json; charset=utf-8")]
             headers.append(contentsOf: cors)
@@ -683,6 +708,320 @@ final class AppHTTPHandler: ChannelInboundHandler, @unchecked Sendable {
                 }
                 reply(.internalServerError, #"{"error":"Failed to mint access key"}"#, 500)
             }
+        }
+    }
+
+    // MARK: - /memory/ingest
+
+    private struct MemoryIngestRequest: Codable {
+        let agent_id: String
+        let conversation_id: String
+        let turns: [MemoryIngestTurn]
+        let session_date: String?
+        let skip_extraction: Bool?
+    }
+
+    private struct MemoryIngestTurn: Codable {
+        let user: String
+        let assistant: String
+        let date: String?
+    }
+
+    /// Bulk-ingest conversation turns into the memory system.
+    private func handleMemoryIngest(
+        head: HTTPRequestHead,
+        body: ByteBuffer?,
+        cors: [(String, String)],
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?
+    ) {
+        let data: Data
+        let requestBodyString: String?
+        if var bodyCopy = body {
+            let bytes = bodyCopy.readBytes(length: bodyCopy.readableBytes) ?? []
+            data = Data(bytes)
+            requestBodyString = String(decoding: data, as: UTF8.self)
+        } else {
+            data = Data()
+            requestBodyString = nil
+        }
+
+        guard let req = try? JSONDecoder().decode(MemoryIngestRequest.self, from: data) else {
+            HTTPHandler.sendResponse(
+                context: context, version: head.version,
+                status: .badRequest,
+                headers: [("Content-Type", "text/plain; charset=utf-8")],
+                body: "Invalid request format. Expected {agent_id, conversation_id, turns: [{user, assistant}]}"
+            )
+            logRequest(
+                method: "POST", path: "/memory/ingest", userAgent: userAgent,
+                requestBody: requestBodyString,
+                responseStatus: 400, startTime: startTime,
+                errorMessage: "Invalid request format"
+            )
+            return
+        }
+
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let hop: @Sendable (@escaping @Sendable () -> Void) -> Void
+            = HTTPHandler.makeHop(channel: context.channel, loop: loop)
+        let logStartTime = startTime
+        let logUserAgent = userAgent
+        let logRequestBody = requestBodyString
+
+        Task(priority: .userInitiated) { [self] in
+            let db = InferenceServices.memory
+
+            let skipExtraction = req.skip_extraction ?? false
+
+            try? db.deleteTranscriptForConversation(req.conversation_id)
+
+            for (i, turn) in req.turns.enumerated() {
+                let turnDate = turn.date ?? req.session_date
+
+                let pairs: [(role: String, content: String, index: Int)] = [
+                    ("user", turn.user, i * 2),
+                    ("assistant", turn.assistant, i * 2 + 1),
+                ]
+                for (role, content, chunkIndex) in pairs {
+                    let tokens = TokenEstimator.estimate(content)
+                    let storedTurn = TranscriptTurn(
+                        conversationId: req.conversation_id,
+                        chunkIndex: chunkIndex,
+                        role: role,
+                        content: content,
+                        tokenCount: tokens,
+                        agentId: req.agent_id
+                    )
+                    try? db.insertTranscriptTurn(
+                        agentId: req.agent_id,
+                        conversationId: req.conversation_id,
+                        chunkIndex: chunkIndex,
+                        role: role,
+                        content: content,
+                        tokenCount: tokens,
+                        createdAt: turnDate
+                    )
+                    await MemorySearchService.shared.indexTranscriptTurn(storedTurn)
+                }
+
+                if !skipExtraction {
+                    await MemoryService.shared.bufferTurn(
+                        userMessage: turn.user,
+                        assistantMessage: turn.assistant,
+                        agentId: req.agent_id,
+                        conversationId: req.conversation_id,
+                        sessionDate: turnDate
+                    )
+                }
+            }
+
+            // Ingestion always implies "I'm done with this conversation
+            // batch": flush distillation immediately so callers don't have
+            // to wait for the debounce.
+            if !skipExtraction {
+                await MemoryService.shared.flushSession(
+                    agentId: req.agent_id, conversationId: req.conversation_id
+                )
+            }
+
+            let responseBody = "{\"status\":\"ok\",\"turns_ingested\":\(req.turns.count)}"
+            let headers: [(String, String)] = [("Content-Type", "application/json")] + cors
+            hop {
+                HTTPHandler.sendResponse(
+                    context: ctx.value, version: head.version,
+                    status: .ok, headers: headers, body: responseBody
+                )
+            }
+            self.logRequest(
+                method: "POST", path: "/memory/ingest", userAgent: logUserAgent,
+                requestBody: logRequestBody, responseBody: responseBody,
+                responseStatus: 200, startTime: logStartTime
+            )
+        }
+    }
+
+    // MARK: - /agents
+
+    private struct AgentListItem: Codable {
+        let id: String
+        let name: String
+        let description: String
+        let default_model: String?
+        let effective_model: String?
+        let supports_thinking: Bool
+        let supports_vision: Bool
+        let is_built_in: Bool
+        let memory_entry_count: Int
+        let created_at: String
+        let updated_at: String
+    }
+
+    private struct AgentListResponse: Codable {
+        let agents: [AgentListItem]
+    }
+
+    /// GET /agents — list all agents with resolved model/capability info.
+    private func handleListAgents(
+        head: HTTPRequestHead,
+        cors: [(String, String)],
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?
+    ) {
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let hop: @Sendable (@escaping @Sendable () -> Void) -> Void
+            = HTTPHandler.makeHop(channel: context.channel, loop: loop)
+        let logStartTime = startTime
+        let logUserAgent = userAgent
+
+        Task(priority: .userInitiated) { [self] in
+            let agents = await MainActor.run { AgentManager.shared.agents }
+
+            let db = InferenceServices.memory
+            var memoryCounts: [String: Int] = [:]
+            if db.isOpen, let counts = try? db.agentIdsWithPinnedFacts() {
+                for (agentId, count) in counts {
+                    memoryCounts[agentId] = count
+                }
+            }
+
+            let formatter = ISO8601DateFormatter()
+            let effectiveModels = await MainActor.run {
+                Dictionary(
+                    uniqueKeysWithValues: agents.map {
+                        ($0.id, AgentManager.shared.effectiveModel(for: $0.id))
+                    }
+                )
+            }
+            let modelsDir = InferenceServices.modelDirectory.effectiveModelsDirectory()
+            let items = agents.map { agent in
+                let modelId = effectiveModels[agent.id] ?? agent.defaultModel
+                let supportsVision = modelId.map { VLMDetection.isVLM(modelId: $0, in: modelsDir) } ?? false
+                let supportsThinking =
+                    modelId.flatMap { ModelProfileRegistry.profile(for: $0)?.thinkingOption } != nil
+                return AgentListItem(
+                    id: agent.id.uuidString,
+                    name: agent.name,
+                    description: agent.description,
+                    default_model: agent.defaultModel,
+                    effective_model: modelId,
+                    supports_thinking: supportsThinking,
+                    supports_vision: supportsVision,
+                    is_built_in: agent.isBuiltIn,
+                    memory_entry_count: memoryCounts[agent.id.uuidString] ?? 0,
+                    created_at: formatter.string(from: agent.createdAt),
+                    updated_at: formatter.string(from: agent.updatedAt)
+                )
+            }
+
+            let response = AgentListResponse(agents: items)
+            let json =
+                (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) }
+                ?? #"{"agents":[]}"#
+
+            hop {
+                var headers = [("Content-Type", "application/json; charset=utf-8")]
+                headers.append(contentsOf: cors)
+                HTTPHandler.sendResponse(
+                    context: ctx.value, version: head.version,
+                    status: .ok, headers: headers, body: json
+                )
+            }
+            self.logRequest(
+                method: "GET", path: "/agents", userAgent: logUserAgent,
+                requestBody: nil, responseBody: json,
+                responseStatus: 200, startTime: logStartTime
+            )
+        }
+    }
+
+    /// GET /agents/{id} — return info for a single agent.
+    private func handleGetAgent(
+        head: HTTPRequestHead,
+        path: String,
+        cors: [(String, String)],
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?
+    ) {
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let hop: @Sendable (@escaping @Sendable () -> Void) -> Void
+            = HTTPHandler.makeHop(channel: context.channel, loop: loop)
+        let logStartTime = startTime
+        let logUserAgent = userAgent
+
+        let components = path.split(separator: "/")
+        guard components.count == 2, components[0] == "agents",
+            let agentId = UUID(uuidString: String(components[1]))
+        else {
+            hop {
+                var headers = [("Content-Type", "application/json; charset=utf-8")]
+                headers.append(contentsOf: cors)
+                HTTPHandler.sendResponse(
+                    context: ctx.value, version: head.version,
+                    status: .badRequest, headers: headers,
+                    body: #"{"error":"invalid_agent_id","message":"Invalid agent UUID in path"}"#
+                )
+            }
+            return
+        }
+
+        Task(priority: .userInitiated) { [self] in
+            guard let agent = await MainActor.run(body: { AgentManager.shared.agent(for: agentId) }) else {
+                hop {
+                    var headers = [("Content-Type", "application/json; charset=utf-8")]
+                    headers.append(contentsOf: cors)
+                    HTTPHandler.sendResponse(
+                        context: ctx.value, version: head.version,
+                        status: .notFound, headers: headers,
+                        body: #"{"error":"agent_not_found","message":"No agent found for the given ID"}"#
+                    )
+                }
+                return
+            }
+
+            let formatter = ISO8601DateFormatter()
+            let effectiveModelId =
+                await MainActor.run { AgentManager.shared.effectiveModel(for: agent.id) }
+                ?? agent.defaultModel
+            let modelsDir = InferenceServices.modelDirectory.effectiveModelsDirectory()
+            let supportsVision = effectiveModelId.map { VLMDetection.isVLM(modelId: $0, in: modelsDir) } ?? false
+            let supportsThinking =
+                effectiveModelId.flatMap { ModelProfileRegistry.profile(for: $0)?.thinkingOption } != nil
+            let item = AgentListItem(
+                id: agent.id.uuidString,
+                name: agent.name,
+                description: agent.description,
+                default_model: agent.defaultModel,
+                effective_model: effectiveModelId,
+                supports_thinking: supportsThinking,
+                supports_vision: supportsVision,
+                is_built_in: agent.isBuiltIn,
+                memory_entry_count: 0,
+                created_at: formatter.string(from: agent.createdAt),
+                updated_at: formatter.string(from: agent.updatedAt)
+            )
+            let json =
+                (try? JSONEncoder().encode(item)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+
+            hop {
+                var headers = [("Content-Type", "application/json; charset=utf-8")]
+                headers.append(contentsOf: cors)
+                HTTPHandler.sendResponse(
+                    context: ctx.value, version: head.version,
+                    status: .ok, headers: headers, body: json
+                )
+            }
+            self.logRequest(
+                method: "GET", path: path, userAgent: logUserAgent,
+                requestBody: nil, responseBody: json,
+                responseStatus: 200, startTime: logStartTime
+            )
         }
     }
 }
