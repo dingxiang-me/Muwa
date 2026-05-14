@@ -57,6 +57,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         InferenceServices.register(memory: AppMemoryProvider())
         InferenceServices.register(tools: AppToolExecutor())
         InferenceServices.register(agents: AppAgentProvider())
+        InferenceServices.register(agentEnricher: AppAgentEnricher())
 
         // Register in-tree document format adapters before any file-ingress
         // path can run. Idempotent; safe if a future migration moves this.

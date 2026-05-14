@@ -1865,10 +1865,9 @@ public actor ModelRuntime {
     static var sidecarFetcherForTests: (@Sendable (_ url: URL, _ dest: URL) async throws -> Void)? = nil
 
     /// Pure, testable sibling of `findLocalDirectory` that takes the root
-    /// explicitly. Exposed at module scope so the symlink-resolution
-    /// behavior (the reason `findLocalDirectory` doesn't silently disagree
-    /// with `ModelManager.scanLocalModels` anymore) can be covered by a
-    /// unit test without standing up an `actor` or a bookmarked picker dir.
+    /// explicitly. Exposed at module scope so symlink-resolution
+    /// behavior can be unit-tested without standing up an `actor` or a
+    /// bookmarked picker dir.
     static func resolveLocalModelDirectory(forModelId id: String, in base: URL) -> URL? {
         let parts = id.split(separator: "/").map(String.init)
         let url = parts.reduce(base) { partial, component in

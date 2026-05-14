@@ -585,23 +585,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         _ request: ChatCompletionRequest,
         agentId: String?
     ) async -> ChatCompletionRequest {
-        guard let agentId, !agentId.isEmpty,
-            let agentUUID = UUID(uuidString: agentId)
-        else { return request }
-
-        var enriched = request
-        let query = request.messages.last(where: { $0.role == "user" })?.content ?? ""
-        let composed = await SystemPromptComposer.composeChatContext(
-            agentId: agentUUID,
-            executionMode: .none,
-            query: query,
-            messages: enriched.messages
-        )
-        if !composed.prompt.isEmpty {
-            SystemPromptComposer.injectSystemContent(composed.prompt, into: &enriched.messages)
-        }
-        SystemPromptComposer.injectMemoryPrefix(composed.memorySection, into: &enriched.messages)
-        return enriched
+        guard let agentId, !agentId.isEmpty else { return request }
+        return await InferenceServices.agentEnricher.enrich(request, agentId: agentId)
     }
 
 

@@ -79,6 +79,14 @@ protocol MemoryProvider: Sendable {
     func agentIdsWithPinnedFacts() throws -> [(agentId: String, count: Int)]
 }
 
+/// Enriches a chat completion request with agent-scoped context
+/// (system prompt + memory section) before it hits the engine. Host
+/// resolves agent id → agent record → prompt composer; CLI uses the
+/// no-op default and passes the request through unchanged.
+protocol AgentEnricher: Sendable {
+    func enrich(_ request: ChatCompletionRequest, agentId: String) async -> ChatCompletionRequest
+}
+
 protocol TunnelResolver: Sendable {
     func tunnelBaseURL(for agentId: UUID) async -> String?
 }
@@ -147,6 +155,12 @@ struct NoOpMemoryProvider: MemoryProvider {
         role: String, content: String, tokenCount: Int, createdAt: String?
     ) throws {}
     func agentIdsWithPinnedFacts() throws -> [(agentId: String, count: Int)] { [] }
+}
+
+struct NoOpAgentEnricher: AgentEnricher {
+    func enrich(_ request: ChatCompletionRequest, agentId: String) async -> ChatCompletionRequest {
+        request
+    }
 }
 
 struct NoOpTunnelResolver: TunnelResolver {

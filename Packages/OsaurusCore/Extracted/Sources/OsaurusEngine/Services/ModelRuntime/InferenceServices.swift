@@ -27,6 +27,8 @@ enum InferenceServices {
         = NoOpToolExecutor()
     nonisolated(unsafe) private static var _agents: any AgentProvider
         = NoOpAgentProvider()
+    nonisolated(unsafe) private static var _agentEnricher: any AgentEnricher
+        = NoOpAgentEnricher()
 
     static var progressReporter: any ProgressReporter {
         lock.withLock { _progressReporter }
@@ -61,6 +63,9 @@ enum InferenceServices {
     static var agents: any AgentProvider {
         lock.withLock { _agents }
     }
+    static var agentEnricher: any AgentEnricher {
+        lock.withLock { _agentEnricher }
+    }
 
     static func register(progressReporter: any ProgressReporter) {
         lock.withLock { _progressReporter = progressReporter }
@@ -94,6 +99,9 @@ enum InferenceServices {
     }
     static func register(agents: any AgentProvider) {
         lock.withLock { _agents = agents }
+    }
+    static func register(agentEnricher: any AgentEnricher) {
+        lock.withLock { _agentEnricher = agentEnricher }
     }
 }
 

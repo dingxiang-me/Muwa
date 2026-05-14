@@ -121,7 +121,7 @@ extension ModelInfo {
         let trimmed = modelId.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return nil }
 
-        let root = DirectoryPickerService.effectiveModelsDirectory()
+        let root = InferenceServices.modelDirectory.effectiveModelsDirectory()
         let fm = FileManager.default
 
         // If modelId contains "/", try as full path (org/repo)
