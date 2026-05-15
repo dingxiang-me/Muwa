@@ -101,13 +101,33 @@ Required GitHub checks:
 - Before this checklist commit, GitHub status was all required checks passed
   and merge state was `CLEAN`.
 - Local Osaurus full suite: `2129 tests in 278 suites` passed.
-- Local pinned `vmlx-swift-lm` parser/cache/template suite:
-  `128 tests in 13 suites` passed.
+- Local pinned `vmlx-swift-lm` template/defaults/JANGTQ/Omni slice:
+  `39` XCTest cases passed, including DSV4 fallback templates,
+  generation-config defaults, JANGTQ kernels, Parakeet encoder,
+  pre-encoded audio embedding preservation, and RADIO shape coverage.
+- Local pinned `vmlx-swift-lm` parser/source/VL slice:
+  `184 tests in 23 suites` passed, covering DSV4 DSML parsing, reasoning
+  no-leak behavior, ZAYA/ZAYA1-VL parser stamps, cache-scope salt propagation,
+  QwenVL finite image extents, Hy3 routing, and MiniMax template/source
+  coverage.
+- Local pinned `vmlx-swift-lm` isolated Metal/cache slice:
+  `25 tests in 3 suites` passed with one SwiftPM worker, covering DSV4 disk
+  round-trip, path-dependent cache detection, and TurboQuant batch-slot caches.
+- After the MiniMax continuous-stream test-harness correction, the pinned
+  `vmlx-swift-lm` revision `c90898fb41955578d546cf8936acc813a53b0294`
+  passed focused MiniMax tool-call tests without changing the runtime parser.
+  Broad all-in-one Swift Testing execution can still overlap Metal suites and
+  trip MLX command-buffer assertions; release proof uses isolated Metal/cache
+  slices for that reason.
 - Local memory/skills/context/tooling subset: `147 tests in 13 suites` passed.
-- Live high-reasoning DSV4 smoke: four turns passed with clean `stop` reasons,
-  expected answers, positive token/s, and no unclosed reasoning.
-- Live DSV4 tool prompt smoke: reached terminal stats without unsupported-tool
-  failure; tokenizer and parser tests cover schema injection and DSML parsing.
+- Live high-reasoning DSV4 smoke on this pin: four turns passed with clean
+  `stop` reasons, expected answers, positive token/s, and no unclosed
+  reasoning.
+- Live DSV4 tool prompt smoke on this pin: reached terminal stats without
+  unsupported-tool failure; it still stopped by length with repetitive visible
+  text and no extracted tool call, so tokenizer and parser tests are the proof
+  for schema injection and DSML parsing, not a claim of prompt-level tool-call
+  quality.
 
 ## Release wording allowed
 

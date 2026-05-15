@@ -19,7 +19,7 @@ resolved_files = [
 expected = {
     "vmlx-swift-lm": (
         "https://github.com/osaurus-ai/vmlx-swift-lm",
-        "4546a5d720e7013adffdbddd728c6106e4f9e637",
+        "c90898fb41955578d546cf8936acc813a53b0294",
     ),
     "mlx-swift": (
         "https://github.com/osaurus-ai/mlx-swift",

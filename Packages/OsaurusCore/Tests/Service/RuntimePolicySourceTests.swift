@@ -108,9 +108,11 @@ struct RuntimePolicySourceTests {
         // preserves DSV4's ratio-4 overlap-compressor state across decode
         // calls, preventing the previous complete pool window from being
         // zeroed after a single-token generation boundary. `e1280c3` fixes a
-        // clean-checkout build issue, and `4546a5d` restores DSML tool schemas
-        // in the DSV4 canonical no-chat-template path used by Flash bundles.
-        let currentVmlxRevision = "4546a5d720e7013adffdbddd728c6106e4f9e637"
+        // clean-checkout build issue, `4546a5d` restores DSML tool schemas
+        // in the DSV4 canonical no-chat-template path used by Flash bundles,
+        // and `c90898f` keeps the MiniMax streaming tool-call harness on one
+        // continuous stream across split chunks.
+        let currentVmlxRevision = "c90898fb41955578d546cf8936acc813a53b0294"
         #expect(manifest.contains(currentVmlxRevision))
         #expect(workspaceResolved.contains(currentVmlxRevision))
         #expect(appResolved.contains(currentVmlxRevision))

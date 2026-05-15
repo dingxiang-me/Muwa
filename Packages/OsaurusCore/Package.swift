@@ -286,9 +286,12 @@ let package = Package(
         // main. `4546a5d` restores DSML tool schemas in the DSV4 canonical
         // no-chat-template path and removes the ignored RunBench target so
         // clean SwiftPM resolver/tests do not fail before exercising DSV4.
+        // `c90898f` keeps the MiniMax continuous-stream tool-call regression
+        // test open across chunks instead of accidentally ending the stream
+        // between prefix and suffix.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "4546a5d720e7013adffdbddd728c6106e4f9e637"
+            revision: "c90898fb41955578d546cf8936acc813a53b0294"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
