@@ -13,7 +13,7 @@ public struct APIKeyValidator: APIKeyValidating, Sendable {
 
     /// Bridges the app's richer `AccessKeyValidationResult` to the
     /// engine seam's `APIKeyValidationOutcome` (drops the issuer).
-    func validateKey(rawKey: String) -> APIKeyValidationOutcome {
+    public func validateKey(rawKey: String) -> APIKeyValidationOutcome {
         let result: AccessKeyValidationResult = validate(rawKey: rawKey)
         switch result {
         case .valid: return .valid
