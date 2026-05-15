@@ -121,4 +121,45 @@ struct SwiftTransformersTokenizerLoaderTests {
             "DSV4 canonical template path must not use the generic tool dialect. Decoded: \(decoded)"
         )
     }
+
+    @Test func dsv4LocalTokenizerPreservesRawMaxPromptPath() async throws {
+        let defaultPath = "/Users/eric/models/JANGQ/DeepSeek-V4-Flash-JANGTQ-K"
+        let modelPath = ProcessInfo.processInfo.environment["OSAURUS_DSV4_TEST_MODEL"] ?? defaultPath
+        let modelURL = URL(fileURLWithPath: modelPath)
+        guard
+            FileManager.default.fileExists(
+                atPath: modelURL.appendingPathComponent("tokenizer.json").path
+            )
+        else {
+            return
+        }
+
+        let tokenizer = try await SwiftTransformersTokenizerLoader().load(from: modelURL)
+        let maxTokenIds = try tokenizer.applyChatTemplate(
+            messages: [["role": "user", "content": "Return 42."]],
+            tools: nil,
+            additionalContext: ["enable_thinking": true, "reasoning_effort": "max"]
+        )
+        let maxDecoded = tokenizer.decode(tokenIds: maxTokenIds, skipSpecialTokens: false)
+
+        #expect(
+            maxDecoded.contains("Reasoning Effort: Absolute maximum"),
+            "DSV4 raw max must preserve the canonical max-effort preface. Decoded: \(maxDecoded)"
+        )
+        #expect(
+            maxDecoded.hasSuffix("<\u{FF5C}Assistant\u{FF5C}><think>"),
+            "DSV4 raw max must leave the assistant thinking block open. Decoded: \(maxDecoded)"
+        )
+
+        let highTokenIds = try tokenizer.applyChatTemplate(
+            messages: [["role": "user", "content": "Return 42."]],
+            tools: nil,
+            additionalContext: ["enable_thinking": true, "reasoning_effort": "high"]
+        )
+        let highDecoded = tokenizer.decode(tokenIds: highTokenIds, skipSpecialTokens: false)
+        #expect(
+            !highDecoded.contains("Reasoning Effort: Absolute maximum"),
+            "DSV4 high reasoning must not receive the raw max preface. Decoded: \(highDecoded)"
+        )
+    }
 }

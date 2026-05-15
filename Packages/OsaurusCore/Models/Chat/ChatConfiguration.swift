@@ -198,7 +198,7 @@ public struct ChatConfiguration: Codable, Equatable, Sendable {
             hotkey: Hotkey(keyCode: key, carbonModifiers: mods, displayString: display),
             systemPrompt: "",
             temperature: nil,
-            maxTokens: 16384,
+            maxTokens: nil,
             contextLength: 128000,
             topPOverride: nil,
             maxToolAttempts: 15,

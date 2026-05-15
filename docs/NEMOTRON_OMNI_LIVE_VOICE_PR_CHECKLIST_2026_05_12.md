@@ -121,35 +121,33 @@ tool-schema fixes. Omni audio support is gated by
   resolved files; the Osaurus-resolved checkout also contains the same encoder
   functions, docs, DSV4 causal top-k/overlap-compressor helpers, and canonical
   DSML tool-schema template fix.
-- DSV4 Flash Osaurus runtime smoke passed on the local
-  `DeepSeek-V4-Flash-JANGTQ-K` bundle through
-  `MLXService -> ModelRuntime -> MLXBatchAdapter`:
-  - UI Max rail (`reasoningEffort=max`, raw max disabled): four AIME-style
-    turns returned visible answers containing `42`, `29`, `42`, `12`, each
-    with `stop=stop`, `unclosed=false`, and about `4.87-5.02 tok/s`.
-  - Raw max diagnostic (`OSAURUS_DSV4_RAW_MAX=1`): the same four-turn smoke
-    returned visible answers `42`, `29`, `42`, `12`, each with `stop=stop`,
-    `unclosed=false`, and about `4.90-4.94 tok/s`.
-  - Tool-bearing live request completed without the previous unsupported-tool
-    failure and reported terminal stats (`54` tokens, about `4.99 tok/s`);
-    the local model produced visible text saying it would call `get_weather` but
-    did not emit a parsed invocation. A stricter forced-tool diagnostic with
-    model-default sampling reached the reasoning rail and said it must invoke
-    `get_weather`, then stopped without a parsed DSML invocation (`67` tokens,
-    about `4.90 tok/s`). Therefore this PR does not claim live DSV4 Flash
-    tool-call behavior from this local bundle; the proven pieces are Osaurus
-    tool-schema injection, DSML prompt rendering, DSML parser routing, and no
-    runtime unsupported-tool rejection.
-  - Long-context smoke crossed the reported 3-4k degradation boundary through
-    the same Osaurus stack. The committed opt-in test builds a tokenizer-measured
-    `4,753` token prompt and asks for the late sentinel `ORCHID-7291`.
-    UI Max rail returned the sentinel with `stop=stop`, `unclosed=false`, and
-    about `4.73 tok/s`; raw max diagnostic mode
-    (`OSAURUS_DSV4_RAW_MAX=1`) also returned the sentinel with `stop=stop`,
-    `unclosed=false`, and about `4.37 tok/s`. An earlier heavier local probe at
-    `10,993` prompt tokens also returned the same sentinel with `stop=stop`,
-    `unclosed=false`, and about `3.41 tok/s`; the smaller fixture is committed
-    to keep repeat runs practical.
+- DSV4 Flash Osaurus runtime status is intentionally split into proven release
+  gates versus raw-max diagnostics:
+  - The no-load contract path is covered by tests for DSV4 family matching,
+    canonical no-chat-template encoding, DSML tool-schema rendering,
+    `think_xml` reasoning separation, DSML tool-call parser routing, and
+    Osaurus-vmlx pin integrity.
+  - The local live `DeepSeek-V4-Flash-JANGTQ-K` high-reasoning rail passed the
+    four-turn AIME-style Osaurus stack smoke on 2026-05-15 through
+    `MLXService -> ModelRuntime -> MLXBatchAdapter`: visible answers contained
+    `42`, `29`, `42`, `12`; each turn ended with `stop=stop`,
+    `unclosed=false`, and about `4.90-4.95 tok/s`.
+  - Tool-bearing live requests no longer hit the prior unsupported-tool failure;
+    the 2026-05-15 smoke completed with `54` tokens, `stop=stop`,
+    `unclosed=false`, and about `4.93 tok/s`. The local model produced visible
+    text saying it would call `get_weather` but did not emit a parsed
+    invocation on that prompt. Therefore this PR claims Osaurus tool-schema
+    injection, DSML prompt rendering, DSML parser routing, and no runtime
+    unsupported-tool rejection, not guaranteed live DSV4 Flash tool calling from
+    this local bundle.
+  - Raw `reasoning_effort=max` is not currently a release-ready path. Repeated
+    live diagnostics showed inconsistent behavior around the 4k-token boundary:
+    `thinking` repetition loops, early stop after a few reasoning tokens,
+    and length-stops even when the sentinel appeared. The raw-max long-context
+    test remains in source as a disabled diagnostic, not as a green release
+    gate. Do not replace this with a hidden high-rail fallback or a sampler
+    shim; fix the real runtime/template/decode layer before advertising raw
+    max as stable.
 - Focused UI/API attachment regression tests passed:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
   --filter 'ChatAttachmentSecurityTests|MultimodalContentPartTests'`.
