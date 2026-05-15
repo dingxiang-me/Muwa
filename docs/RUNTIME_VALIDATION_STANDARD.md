@@ -311,17 +311,20 @@ calling it a cache miss.
 
 ## Recommended next tooling
 
-Add these scripts as follow-up work:
+Add or maintain these scripts:
 
+- `scripts/ci/check-runtime-pins.sh`: verifies the runtime-critical
+  `vmlx-swift-lm`, `mlx-swift`, `Jinja`, and `swift-transformers` revisions
+  and fork URLs across tracked resolver files.
 - `scripts/runtime-matrix/run_osaurus_matrix.sh`: runs the live app/API matrix
   and writes `runs.jsonl`.
 - `scripts/runtime-matrix/collect_logs.sh`: extracts structured Osaurus and
   vmlx logs for one run window.
 - `scripts/runtime-matrix/compare_runs.py`: compares two validation folders and
   flags speed, stop-reason, parser, or cache regressions.
-- `scripts/ci/check-package-pins.sh`: enforces remote pins and org fork URLs.
 - `scripts/ci/check-runtime-policy-tests.sh`: runs the no-load tests above.
 
-Also extend `MLXBatchAdapter.prepareInput` logs to include `videos`, `audios`,
-and media salt. Existing logs include images, tool count, prompt tokens, and
-context keys; audio/video need equal visibility for future omni/VL debugging.
+Keep `MLXBatchAdapter.prepareInput` logs aligned with the media surface:
+current logs include chat, tools, images, videos, audios, prompt tokens,
+context keys, and the reasoning-context summary. Media salt should remain a
+first-class log field whenever the upstream processor exposes it.
