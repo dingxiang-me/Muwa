@@ -17,6 +17,24 @@ private let dsv4FlashLiveSmokeEnabled: Bool = {
     }
 }()
 
+private let dsv4FlashRawMaxLiveSmokeEnabled: Bool = {
+    switch ProcessInfo.processInfo.environment["OSAURUS_DSV4_RAW_MAX_LIVE_SMOKE"]?.lowercased() {
+    case "1", "true", "yes", "on":
+        return true
+    default:
+        return false
+    }
+}()
+
+private let dsv4FlashStrictToolLiveSmokeEnabled: Bool = {
+    switch ProcessInfo.processInfo.environment["OSAURUS_DSV4_STRICT_TOOL_LIVE_SMOKE"]?.lowercased() {
+    case "1", "true", "yes", "on":
+        return true
+    default:
+        return false
+    }
+}()
+
 @Suite("DSV4 Flash live Osaurus smoke", .serialized, .enabled(if: dsv4FlashLiveSmokeEnabled))
 struct DSV4FlashLiveSmokeTests {
     private struct TurnResult {
@@ -112,21 +130,7 @@ struct DSV4FlashLiveSmokeTests {
             "Set OSU_MODELS_DIR to the local model root or OSAURUS_DSV4_LIVE_MODEL to an installed DSV4 Flash repo name."
         )
 
-        let tool = Self.weatherTool()
-
-        let stream = try await MLXService.shared.streamWithTools(
-            messages: [
-                ChatMessage(
-                    role: "user",
-                    content: "Use the get_weather tool for Paris. If you call it, use location exactly Paris."
-                )
-            ],
-            parameters: Self.parameters(reasoningEffort: "instruct", maxTokens: 96),
-            stopSequences: [],
-            tools: [tool],
-            toolChoice: .auto,
-            requestedModel: Self.requestedModel
-        )
+        let stream = try await Self.streamSearchToolPrompt()
 
         do {
             let result = try await Self.drain(stream)
@@ -138,19 +142,48 @@ struct DSV4FlashLiveSmokeTests {
             }
         } catch let invocations as ServiceToolInvocations {
             print("DSV4 live tool invocations: \(invocations.invocations.map(\.toolName))")
-            #expect(invocations.invocations.contains { $0.toolName == "get_weather" })
+            #expect(invocations.invocations.contains { $0.toolName == "search" })
         } catch let invocation as ServiceToolInvocation {
             print("DSV4 live tool invocation: \(invocation.toolName) \(invocation.jsonArguments)")
-            #expect(invocation.toolName == "get_weather")
-            #expect(invocation.jsonArguments.contains("Paris"))
+            #expect(invocation.toolName == "search")
+            #expect(invocation.jsonArguments.contains("Paris weather"))
         }
     }
 
     @Test(
-        "raw max 4k-context DSV4 diagnostic",
-        .disabled(
-            "Raw reasoning_effort=max is not a release gate until repeated live runs stop cleanly without thinking-loop or length-stop degeneration."
+        "strict live DSV4 DSML tool invocation gate",
+        .enabled(if: dsv4FlashStrictToolLiveSmokeEnabled)
+    )
+    func strictToolPromptEmitsDSMLInvocation() async throws {
+        try #require(
+            MLXService.shared.handles(requestedModel: Self.requestedModel),
+            "Set OSU_MODELS_DIR to the local model root or OSAURUS_DSV4_LIVE_MODEL to an installed DSV4 Flash repo name."
         )
+
+        let stream = try await Self.streamSearchToolPrompt()
+
+        do {
+            let result = try await Self.drain(stream)
+            print(Self.summaryLine(turn: 1, result: result))
+            #expect(
+                result.toolNames.contains("search"),
+                "DSV4 strict live tool gate completed without a search tool invocation. This is not a supported-tool proof."
+            )
+            #expect(result.toolArgs.contains("Paris weather"))
+        } catch let invocations as ServiceToolInvocations {
+            print("DSV4 strict live tool invocations: \(invocations.invocations.map(\.toolName))")
+            #expect(invocations.invocations.contains { $0.toolName == "search" })
+            #expect(invocations.invocations.contains { $0.jsonArguments.contains("Paris weather") })
+        } catch let invocation as ServiceToolInvocation {
+            print("DSV4 strict live tool invocation: \(invocation.toolName) \(invocation.jsonArguments)")
+            #expect(invocation.toolName == "search")
+            #expect(invocation.jsonArguments.contains("Paris weather"))
+        }
+    }
+
+    @Test(
+        "raw max 4k-context DSV4 live gate",
+        .enabled(if: dsv4FlashRawMaxLiveSmokeEnabled)
     )
     func rawMaxLongContextDiagnostic() async throws {
         try #require(
@@ -166,46 +199,54 @@ struct DSV4FlashLiveSmokeTests {
             "DSV4 long-context smoke must actually cross the 4k-token boundary."
         )
 
-        let stream = try await MLXService.shared.streamDeltas(
-            messages: [ChatMessage(role: "user", content: prompt)],
-            parameters: Self.parameters(
-                reasoningEffort: "max",
-                maxTokens: 384,
-                temperature: 0.6,
-                topPOverride: 0.95,
-                seed: nil
-            ),
-            requestedModel: Self.requestedModel,
-            stopSequences: []
-        )
-        let result = try await Self.drain(stream)
-        print(Self.summaryLine(turn: 1, result: result))
+        for (index, seed) in [1_234, 5_678, 9_101].enumerated() {
+            let stream = try await MLXService.shared.streamDeltas(
+                messages: [ChatMessage(role: "user", content: prompt)],
+                parameters: Self.parameters(
+                    reasoningEffort: "max",
+                    maxTokens: 384,
+                    temperature: 0.6,
+                    topPOverride: 0.95,
+                    seed: UInt64(seed)
+                ),
+                requestedModel: Self.requestedModel,
+                stopSequences: []
+            )
+            let result = try await Self.drain(stream)
+            print(Self.summaryLine(turn: index + 1, result: result))
 
-        #expect(result.stopReason != "error", "DSV4 long-context smoke ended with an error stop reason.")
-        #expect(
-            result.stopReason == "stop",
-            "DSV4 long-context smoke did not stop cleanly: \(result.stopReason ?? "nil")"
-        )
-        #expect(!result.unclosedReasoning, "DSV4 long-context smoke ended inside an unclosed reasoning block.")
-        if let tps = result.tokensPerSecond {
-            #expect(tps > 0, "DSV4 long-context smoke reported non-positive tok/s: \(tps)")
+            #expect(
+                result.stopReason != "error",
+                "DSV4 long-context run \(index + 1) ended with an error stop reason."
+            )
+            #expect(
+                result.stopReason == "stop",
+                "DSV4 long-context run \(index + 1) did not stop cleanly: \(result.stopReason ?? "nil")"
+            )
+            #expect(
+                !result.unclosedReasoning,
+                "DSV4 long-context run \(index + 1) ended inside an unclosed reasoning block."
+            )
+            if let tps = result.tokensPerSecond {
+                #expect(tps > 0, "DSV4 long-context run \(index + 1) reported non-positive tok/s: \(tps)")
+            }
+
+            let visible = result.visible.trimmingCharacters(in: .whitespacesAndNewlines)
+            let reasoning = result.reasoning.trimmingCharacters(in: .whitespacesAndNewlines)
+            let semantic = [visible, reasoning].joined(separator: "\n")
+            #expect(
+                semantic.contains(Self.longContextSentinel),
+                "DSV4 long-context run \(index + 1) must retain the late sentinel \(Self.longContextSentinel). Visible: \(visible) Reasoning: \(reasoning)"
+            )
+            #expect(
+                !Self.hasDegenerateRepetition(visible),
+                "DSV4 long-context run \(index + 1) shows obvious repetition degeneration. Visible: \(visible)"
+            )
+            #expect(
+                !visible.contains("<think>") && !visible.contains("</think>") && !visible.contains("<｜DSML｜"),
+                "DSV4 visible output leaked reasoning or DSML markup. Visible: \(visible)"
+            )
         }
-
-        let visible = result.visible.trimmingCharacters(in: .whitespacesAndNewlines)
-        let reasoning = result.reasoning.trimmingCharacters(in: .whitespacesAndNewlines)
-        let semantic = [visible, reasoning].joined(separator: "\n")
-        #expect(
-            semantic.contains(Self.longContextSentinel),
-            "DSV4 long-context answer must retain the late sentinel \(Self.longContextSentinel). Visible: \(visible) Reasoning: \(reasoning)"
-        )
-        #expect(
-            !Self.hasDegenerateRepetition(visible),
-            "DSV4 long-context answer shows obvious repetition degeneration. Visible: \(visible)"
-        )
-        #expect(
-            !visible.contains("<think>") && !visible.contains("</think>") && !visible.contains("<｜DSML｜"),
-            "DSV4 visible output leaked reasoning or DSML markup. Visible: \(visible)"
-        )
     }
 
     private static func parameters(
@@ -229,20 +270,41 @@ struct DSV4FlashLiveSmokeTests {
 
     private static let longContextSentinel = "ORCHID-7291"
 
-    private static func weatherTool() -> Tool {
+    private static func searchTool() -> Tool {
         Tool(
             type: "function",
             function: ToolFunction(
-                name: "get_weather",
-                description: "Get weather for a city.",
+                name: "search",
+                description: "Web search. Split multiple queries with '||'.",
                 parameters: .object([
                     "type": .string("object"),
                     "properties": .object([
-                        "location": .object(["type": .string("string")])
+                        "queries": .object(["type": .string("string")])
                     ]),
-                    "required": .array([.string("location")]),
+                    "required": .array([.string("queries")]),
                 ])
             )
+        )
+    }
+
+    private static func streamSearchToolPrompt() async throws -> AsyncThrowingStream<String, Error> {
+        try await MLXService.shared.streamWithTools(
+            messages: [
+                ChatMessage(
+                    role: "user",
+                    content: "Search for current Paris weather. You must call the search tool with queries exactly Paris weather. Do not answer with plain text."
+                )
+            ],
+            parameters: Self.parameters(
+                reasoningEffort: "high",
+                maxTokens: 192,
+                temperature: 0,
+                topPOverride: 1
+            ),
+            stopSequences: [],
+            tools: [Self.searchTool()],
+            toolChoice: .auto,
+            requestedModel: Self.requestedModel
         )
     }
 

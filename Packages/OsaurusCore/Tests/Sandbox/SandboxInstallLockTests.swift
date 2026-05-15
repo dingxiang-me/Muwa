@@ -18,35 +18,35 @@ import Testing
 struct SandboxInstallLockTests {
 
     /// Two `serialize(agentName:)` calls on the same key run one after
-    /// the other: the second body must not start before the first
-    /// finishes. We assert that by recording the pre/post timestamps
-    /// of each body and checking the second's start is ≥ the first's
-    /// end.
+    /// the other. The runtime does not guarantee that `async let first`
+    /// reaches the actor before `async let second`, so the test pins the
+    /// actual contract: same-key bodies must never overlap.
     @Test
     func sameAgent_runsSequentially() async throws {
         let lock = SandboxInstallLock()
-        let timeline = ActorTimeline()
+        let observer = OverlapObserver()
         let agentName = "agent-A"
 
         // Kick off two operations concurrently. Both want the same lock.
-        // The second one MUST wait for the first to finish.
+        // Exactly one body may be inside the serialized section at a time.
         async let first: Void = lock.serialize(agentName: agentName) {
-            await timeline.markStart("first")
+            await observer.enter()
             try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
-            await timeline.markEnd("first")
+            await observer.exit()
         }
         async let second: Void = lock.serialize(agentName: agentName) {
-            await timeline.markStart("second")
+            await observer.enter()
             try? await Task.sleep(nanoseconds: 10_000_000)  // 10ms
-            await timeline.markEnd("second")
+            await observer.exit()
         }
         _ = try await (first, second)
 
-        let firstEnd = try #require(await timeline.endOf("first"))
-        let secondStart = try #require(await timeline.startOf("second"))
+        let entries = await observer.totalEntries
+        let peak = await observer.peakConcurrent
+        #expect(entries == 2, "expected both same-agent bodies to run, entries=\(entries)")
         #expect(
-            secondStart >= firstEnd,
-            "second op started before first finished — serialization broken"
+            peak == 1,
+            "same-agent ops overlapped inside the install lock (peak=\(peak))"
         )
     }
 
@@ -120,19 +120,6 @@ struct SandboxInstallLockTests {
 
 // MARK: - Test helpers
 
-/// Tiny actor that records start/end Dates for named operations. Lets
-/// the sequential-ordering assertion above check the timeline without
-/// fighting Sendable semantics on a mutable struct.
-private actor ActorTimeline {
-    private var starts: [String: Date] = [:]
-    private var ends: [String: Date] = [:]
-
-    func markStart(_ key: String) { starts[key] = Date() }
-    func markEnd(_ key: String) { ends[key] = Date() }
-    func startOf(_ key: String) -> Date? { starts[key] }
-    func endOf(_ key: String) -> Date? { ends[key] }
-}
-
 /// One-shot Sendable bool flag. Lets a `@Sendable` closure mark
 /// completion without tripping the captured-var concurrency checker.
 private actor ActorFlag {
@@ -146,9 +133,11 @@ private actor ActorFlag {
 /// prove the lock didn't serialize across keys.
 private actor OverlapObserver {
     private(set) var peakConcurrent: Int = 0
+    private(set) var totalEntries: Int = 0
     private var current: Int = 0
 
     func enter() {
+        totalEntries += 1
         current += 1
         if current > peakConcurrent { peakConcurrent = current }
     }
