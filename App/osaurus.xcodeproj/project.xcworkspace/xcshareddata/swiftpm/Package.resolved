@@ -1,5 +1,5 @@
 {
-  "originHash" : "78bf1831237aba77bd64606b67d185ed63b4df4735104f9b5a157d27501977b1",
+  "originHash" : "2b8c51e0f4bb988e1f78ce77703b6f6665e22a502866c002632abf979f47e522",
   "pins" : [
     {
       "identity" : "aachartkit-swift",
@@ -94,10 +94,9 @@
     {
       "identity" : "jinja",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-jinja",
+      "location" : "https://github.com/osaurus-ai/Jinja.git",
       "state" : {
-        "revision" : "0aeefadec459ce8e11a333769950fb86183aca43",
-        "version" : "2.3.5"
+        "revision" : "58d21aa5b69fdd9eb7e23ce2c3730f47db8e0c9d"
       }
     },
     {
@@ -390,7 +389,7 @@
     {
       "identity" : "swift-transformers",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/huggingface/swift-transformers.git",
+      "location" : "https://github.com/osaurus-ai/swift-transformers",
       "state" : {
         "revision" : "087a66b17e482220b94909c5cf98688383ae481a"
       }
@@ -417,7 +416,7 @@
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/osaurus-ai/vmlx-swift-lm",
       "state" : {
-        "revision" : "e1280c3978d68e9204006923e922e62cb2ea5628"
+        "revision" : "4546a5d720e7013adffdbddd728c6106e4f9e637"
       }
     },
     {

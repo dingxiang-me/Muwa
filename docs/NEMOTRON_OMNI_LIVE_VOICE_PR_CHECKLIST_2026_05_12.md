@@ -3,15 +3,16 @@
 ## Scope
 
 This checklist tracks the Osaurus side of live voice input for Nemotron Omni
-models. This branch pins `vmlx-swift-lm` to `6561a72`, which can consume
+models. This branch pins `vmlx-swift-lm` to `4546a5d`, which can consume
 `UserInput.Audio`, preserves pre-encoded Parakeet/audio embeddings, exposes a
 reusable retained live PCM buffer with a streaming cursor for VAD/call-mode
 polling, adds tracked Omni audio latency and chunk-stability benches, and keeps
 media-placeholder cache restore token-aware. The pin also carries the refreshed
 Parakeet/RADIO host-integration docs, the current proof that independently
 encoded Parakeet chunks are not safe to concatenate, and the DSV4 Flash
-long-prompt HSA top-k plus overlap-compressor state fixes. Omni audio support
-is gated by `ModelMediaCapabilities.supportsAudio`.
+long-prompt HSA top-k, overlap-compressor state, and canonical DSML
+tool-schema fixes. Omni audio support is gated by
+`ModelMediaCapabilities.supportsAudio`.
 
 ## Current Hookups
 
@@ -52,12 +53,13 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `UserInput.Audio` sources to `.preEncoded` audio embeddings before
   `processor.prepare(input:)`. Existing `.preEncoded` audio is preserved, which
   is the handoff point for a future live Parakeet/sound-projection component.
-- `Packages/OsaurusCore/Package.swift` pins `vmlx-swift-lm` to `6561a72` so
+- `Packages/OsaurusCore/Package.swift` pins `vmlx-swift-lm` to `4546a5d` so
   the app consumes the Swift live-voice handoff, live PCM streaming cursor,
   tracked `OmniAudioLatencyBench` and `OmniAudioChunkStabilityBench`
   harnesses, and media-placeholder-aware cache restore guard, plus current
   Parakeet/RADIO integration documentation and the DSV4 Flash causal HSA
-  indexer plus ratio-4 overlap-compressor state fixes.
+  indexer, ratio-4 overlap-compressor state, and canonical DSML tool-schema
+  fixes.
 - Parakeet/RADIO source, function, and documentation verification is an
   explicit release guard: the source repo must contain the encoder functions
   and bench/docs, the live remote must contain the pinned commit, Osaurus must
@@ -90,10 +92,12 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `fb8fb3959ac97598c6b4ddeba0516f01d84ddf0e`. The follow-up `b57fe98` pin
   adds the refreshed Parakeet/RADIO integration docs, the `81c8ef7` pin adds
   the Parakeet chunk-stability bench, and the `f728718` pin adds the DSV4
-  Flash causal HSA top-k fix. The current `6561a72` pin also preserves DSV4
-  ratio-4 overlap-compressor state across single-token decode calls. Re-run
-  after the Nemotron Omni no-thinking default/profile fix also passed under
-  Xcode's Swift toolchain.
+  Flash causal HSA top-k fix. The current `4546a5d` pin also preserves DSV4
+  ratio-4 overlap-compressor state across single-token decode calls, restores
+  DSML tool schemas in the DSV4 canonical no-chat-template path, and keeps
+  clean SwiftPM resolver/tests from failing on the ignored RunBench target.
+  Re-run after the Nemotron Omni no-thinking default/profile fix also passed
+  under Xcode's Swift toolchain.
 - Focused Xcode-toolchain regression tests passed:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
   --filter 'ModelProfileRegistryTests/nemotron3_matchesNemotronProfile|MLXBatchAdapterTests/additionalContext_defaultsNemotronOmniThinkingOffButHonorsExplicitOptIn'`.
@@ -107,7 +111,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
 - Parakeet/RADIO source/push/doc checks have passed repeatedly for the live
   library pin:
   `git ls-remote origin refs/heads/main` for `vmlx-swift-lm` returns
-  `6561a72f93d6cd5e0202e8067b53fed5cf21a660`; `git grep` against the committed
+  `4546a5d720e7013adffdbddd728c6106e4f9e637`; `git grep` against the committed
   `vmlx-swift-lm` tree confirms `NemotronHParakeetEncoder`,
   `remapParakeetWeights`, `NemotronHRADIOVisionModel`,
   `remapRadioWeights`, `OmniAudioChunkStabilityBench`,
@@ -115,7 +119,37 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `docs/benchmarks/omni-audio-chunk-stability-2026-05-13.md`; Osaurus pins the
   same revision in `Packages/OsaurusCore/Package.swift` and the tracked
   resolved files; the Osaurus-resolved checkout also contains the same encoder
-  functions, docs, and DSV4 causal top-k/overlap-compressor helpers.
+  functions, docs, DSV4 causal top-k/overlap-compressor helpers, and canonical
+  DSML tool-schema template fix.
+- DSV4 Flash Osaurus runtime smoke passed on the local
+  `DeepSeek-V4-Flash-JANGTQ-K` bundle through
+  `MLXService -> ModelRuntime -> MLXBatchAdapter`:
+  - UI Max rail (`reasoningEffort=max`, raw max disabled): four AIME-style
+    turns returned visible answers containing `42`, `29`, `42`, `12`, each
+    with `stop=stop`, `unclosed=false`, and about `4.87-5.02 tok/s`.
+  - Raw max diagnostic (`OSAURUS_DSV4_RAW_MAX=1`): the same four-turn smoke
+    returned visible answers `42`, `29`, `42`, `12`, each with `stop=stop`,
+    `unclosed=false`, and about `4.90-4.94 tok/s`.
+  - Tool-bearing live request completed without the previous unsupported-tool
+    failure and reported terminal stats (`54` tokens, about `4.99 tok/s`);
+    the local model produced visible text saying it would call `get_weather` but
+    did not emit a parsed invocation. A stricter forced-tool diagnostic with
+    model-default sampling reached the reasoning rail and said it must invoke
+    `get_weather`, then stopped without a parsed DSML invocation (`67` tokens,
+    about `4.90 tok/s`). Therefore this PR does not claim live DSV4 Flash
+    tool-call behavior from this local bundle; the proven pieces are Osaurus
+    tool-schema injection, DSML prompt rendering, DSML parser routing, and no
+    runtime unsupported-tool rejection.
+  - Long-context smoke crossed the reported 3-4k degradation boundary through
+    the same Osaurus stack. The committed opt-in test builds a tokenizer-measured
+    `4,753` token prompt and asks for the late sentinel `ORCHID-7291`.
+    UI Max rail returned the sentinel with `stop=stop`, `unclosed=false`, and
+    about `4.73 tok/s`; raw max diagnostic mode
+    (`OSAURUS_DSV4_RAW_MAX=1`) also returned the sentinel with `stop=stop`,
+    `unclosed=false`, and about `4.37 tok/s`. An earlier heavier local probe at
+    `10,993` prompt tokens also returned the same sentinel with `stop=stop`,
+    `unclosed=false`, and about `3.41 tok/s`; the smaller fixture is committed
+    to keep repeat runs practical.
 - Focused UI/API attachment regression tests passed:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
   --filter 'ChatAttachmentSecurityTests|MultimodalContentPartTests'`.
@@ -226,7 +260,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= build`.
   Re-run after the `fb8fb39` pin bump passed with the workspace resolver
   checking out `vmlx-swift-lm @ fb8fb39`; the current dependency pin is
-  `vmlx-swift-lm @ 6561a72`. Re-run after the Nemotron Omni
+  `vmlx-swift-lm @ 4546a5d`. Re-run after the Nemotron Omni
   no-thinking default/profile fix passed.
   Xcode still reports the local CoreSimulator framework mismatch, but the macOS
   app build succeeds.
@@ -328,13 +362,13 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   3. Confirm no audio attachment is appended; only cleaned transcript text is
      sent.
 - Repeated Parakeet/RADIO source verification before merge:
-  1. Confirm `vmlx-swift-lm` live remote `main` contains commit `6561a72`.
+  1. Confirm `vmlx-swift-lm` live remote `main` contains commit `4546a5d`.
   2. Confirm source contains `NemotronHParakeetEncoder`,
      `NemotronHRADIOVisionModel`, `extractAudioEmbeds`, `extractImageEmbeds`,
      and `OmniAudioChunkStabilityBench`.
   3. Confirm Osaurus `Package.swift` plus workspace, app project, and
      `OsaurusCore` `Package.resolved` files pin full revision
-     `6561a72f93d6cd5e0202e8067b53fed5cf21a660`.
+     `4546a5d720e7013adffdbddd728c6106e4f9e637`.
   4. Confirm the Osaurus-resolved checkout contains the same Parakeet/RADIO
      functions and docs after dependency resolution.
 

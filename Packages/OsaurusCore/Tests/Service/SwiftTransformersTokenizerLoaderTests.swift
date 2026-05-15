@@ -10,7 +10,7 @@ import Testing
 
 @Suite(.serialized)
 struct SwiftTransformersTokenizerLoaderTests {
-    @Test func dsv4LocalTokenizerUsesVmlxFallback() async throws {
+    @Test func dsv4LocalTokenizerUsesCanonicalNoChatTemplatePath() async throws {
         let defaultPath = "/Users/eric/models/JANGQ/DeepSeek-V4-Flash-JANGTQ-K"
         let modelPath = ProcessInfo.processInfo.environment["OSAURUS_DSV4_TEST_MODEL"] ?? defaultPath
         let modelURL = URL(fileURLWithPath: modelPath)
@@ -32,7 +32,7 @@ struct SwiftTransformersTokenizerLoaderTests {
 
         #expect(
             decoded.hasPrefix("<\u{FF5C}begin\u{2581}of\u{2581}sentence\u{FF5C}>"),
-            "DSV4 bundles have no tokenizer chat_template; Osaurus must route through vmlx's DSV4 fallback. Decoded: \(decoded)"
+            "DSV4 bundles have no tokenizer chat_template; Osaurus must route through vmlx's canonical DSV4 encoder path. Decoded: \(decoded)"
         )
         #expect(
             decoded.hasSuffix("<\u{FF5C}Assistant\u{FF5C}></think>"),
@@ -63,6 +63,62 @@ struct SwiftTransformersTokenizerLoaderTests {
                 "<\u{FF5C}User\u{FF5C}>Turn 2.<\u{FF5C}Assistant\u{FF5C}></think>"
             ),
             "DSV4 final instruct tail must be closed-thinking. Decoded: \(multiTurnDecoded)"
+        )
+    }
+
+    @Test func dsv4LocalTokenizerRendersDSMLToolsFromOsaurusToolSpec() async throws {
+        let defaultPath = "/Users/eric/models/JANGQ/DeepSeek-V4-Flash-JANGTQ-K"
+        let modelPath = ProcessInfo.processInfo.environment["OSAURUS_DSV4_TEST_MODEL"] ?? defaultPath
+        let modelURL = URL(fileURLWithPath: modelPath)
+        guard
+            FileManager.default.fileExists(
+                atPath: modelURL.appendingPathComponent("tokenizer.json").path
+            )
+        else {
+            return
+        }
+
+        let tokenizer = try await SwiftTransformersTokenizerLoader().load(from: modelURL)
+        let tool = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "get_weather",
+                description: "Get weather for a city.",
+                parameters: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "location": .object(["type": .string("string")])
+                    ]),
+                    "required": .array([.string("location")]),
+                ])
+            )
+        )
+        let tokenIds = try tokenizer.applyChatTemplate(
+            messages: [
+                ["role": "system", "content": "Helpful assistant."],
+                ["role": "user", "content": "Weather in Paris?"],
+            ],
+            tools: [tool.toTokenizerToolSpec()],
+            additionalContext: ["enable_thinking": false]
+        )
+        let decoded = tokenizer.decode(tokenIds: tokenIds, skipSpecialTokens: false)
+
+        #expect(decoded.contains("## Tools"), "DSV4 canonical template path must render tools. Decoded: \(decoded)")
+        #expect(
+            decoded.contains("<\u{FF5C}DSML\u{FF5C}tool_calls>"),
+            "DSV4 canonical template path must use DSML tool-call blocks. Decoded: \(decoded)"
+        )
+        #expect(
+            decoded.contains("<\u{FF5C}DSML\u{FF5C}invoke name=\"$TOOL_NAME\">"),
+            "DSV4 canonical template path must teach DSML invocation syntax. Decoded: \(decoded)"
+        )
+        #expect(
+            decoded.contains("\"name\":\"get_weather\""),
+            "DSV4 canonical template path must include the Osaurus-provided tool schema. Decoded: \(decoded)"
+        )
+        #expect(
+            !decoded.contains("<available_tools>"),
+            "DSV4 canonical template path must not use the generic tool dialect. Decoded: \(decoded)"
         )
     }
 }

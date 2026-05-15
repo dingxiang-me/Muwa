@@ -9,10 +9,7 @@ let package = Package(
     ],
     dependencies: [
         .package(url: "https://github.com/apple/swift-nio.git", from: "2.88.0"),
-        // Keep package-local SwiftPM builds aligned with the workspace
-        // lockfiles. Containerization 0.32.x changed Process.kill's signal
-        // parameter type while the app CI graph is still pinned to 0.31.x.
-        .package(url: "https://github.com/apple/containerization.git", .upToNextMinor(from: "0.31.0")),
+        .package(url: "https://github.com/apple/containerization.git", from: "0.26.0"),
         .package(url: "https://github.com/modelcontextprotocol/swift-sdk.git", from: "0.12.0"),
         .package(url: "https://github.com/orlandos-nl/IkigaJSON", from: "2.3.2"),
         .package(url: "https://github.com/sparkle-project/Sparkle", from: "2.7.0"),
@@ -261,7 +258,7 @@ let package = Package(
         // expert layer bit plans, keeps routed bit-plan metadata out of
         // generic affine quantization overrides, and wires DSV4 routed MoE
         // top-k into the existing lower-only override path. `6de602c`
-        // makes the DSV4 tokenizer fallback match the canonical multi-turn
+        // makes the DSV4 no-chat-template path match the canonical multi-turn
         // chat encoder so generated cache boundaries can be reused. `ad1d231`
         // synchronizes before and after safetensors disk writes so
         // post-answer cache storage cannot crash after generation. `c0f8b3b`
@@ -285,9 +282,13 @@ let package = Package(
         // future compressed pool chunks before indexer top-k. `6561a72`
         // preserves ratio-4 overlap-compressor state across decode calls so
         // long-tail DSV4 generation keeps the previous complete pool window.
+        // `e1280c3` fixes a build-blocking nested ternary expression on clean
+        // main. `4546a5d` restores DSML tool schemas in the DSV4 canonical
+        // no-chat-template path and removes the ignored RunBench target so
+        // clean SwiftPM resolver/tests do not fail before exercising DSV4.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "e1280c3978d68e9204006923e922e62cb2ea5628"
+            revision: "4546a5d720e7013adffdbddd728c6106e4f9e637"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

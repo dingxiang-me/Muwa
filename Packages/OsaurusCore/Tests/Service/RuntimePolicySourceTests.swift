@@ -88,7 +88,7 @@ struct RuntimePolicySourceTests {
         // preserves DSV4 JANGTQ-K routed expert layer bit plans, skips routed
         // bit-plan metadata in generic quantization decoding, and wires DSV4
         // routed MoE top-k into the lower-only runtime override path.
-        // `6de602c` makes DSV4's fallback chat template byte-match the
+        // `6de602c` makes DSV4's no-chat-template path byte-match the
         // canonical multi-turn encoder so UI-generated cache boundaries can
         // be reused on growing chat prompts. `ad1d231` synchronizes before and
         // after safetensors disk writes against the GPU stream after generation.
@@ -107,14 +107,15 @@ struct RuntimePolicySourceTests {
         // future compressed-pool chunks before indexer top-k. `6561a72`
         // preserves DSV4's ratio-4 overlap-compressor state across decode
         // calls, preventing the previous complete pool window from being
-        // zeroed after a single-token generation boundary. `e1280c3` is a
-        // build-time fix that breaks up a nested ternary + four-level `??`
-        // chain in LLMModelFactory.swift that the Swift type checker could
-        // not solve within its time budget; runtime behavior is unchanged.
-        let currentVmlxRevision = "e1280c3978d68e9204006923e922e62cb2ea5628"
+        // zeroed after a single-token generation boundary. `e1280c3` fixes a
+        // clean-checkout build issue, and `4546a5d` restores DSML tool schemas
+        // in the DSV4 canonical no-chat-template path used by Flash bundles.
+        let currentVmlxRevision = "4546a5d720e7013adffdbddd728c6106e4f9e637"
         #expect(manifest.contains(currentVmlxRevision))
         #expect(workspaceResolved.contains(currentVmlxRevision))
         #expect(appResolved.contains(currentVmlxRevision))
+        #expect(!workspaceResolved.contains("6561a72f93d6cd5e0202e8067b53fed5cf21a660"))
+        #expect(!appResolved.contains("6561a72f93d6cd5e0202e8067b53fed5cf21a660"))
         #expect(!workspaceResolved.contains("b57fe98845bd1f678bd8f722dc50dba56f11d029"))
         #expect(!appResolved.contains("b57fe98845bd1f678bd8f722dc50dba56f11d029"))
         #expect(!appResolved.contains("fb8fb3959ac97598c6b4ddeba0516f01d84ddf0e"))
