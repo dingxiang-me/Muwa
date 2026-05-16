@@ -291,7 +291,7 @@ let package = Package(
         // between prefix and suffix.
         .package(
             url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "c90898fb41955578d546cf8936acc813a53b0294"
+            revision: "2cc64dd30f9faa877d4c5ecced63ab4ac9467df4"
         ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-

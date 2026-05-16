@@ -110,9 +110,11 @@ struct RuntimePolicySourceTests {
         // zeroed after a single-token generation boundary. `e1280c3` fixes a
         // clean-checkout build issue, `4546a5d` restores DSML tool schemas
         // in the DSV4 canonical no-chat-template path used by Flash bundles,
-        // and `c90898f` keeps the MiniMax streaming tool-call harness on one
-        // continuous stream across split chunks.
-        let currentVmlxRevision = "c90898fb41955578d546cf8936acc813a53b0294"
+        // `c90898f` keeps the MiniMax streaming tool-call harness on one
+        // continuous stream across split chunks, and `2cc64dd` wires the
+        // generated tokenizer bridge through the native DSV4 Swift encoder
+        // instead of the legacy minimal fallback.
+        let currentVmlxRevision = "2cc64dd30f9faa877d4c5ecced63ab4ac9467df4"
         #expect(manifest.contains(currentVmlxRevision))
         #expect(workspaceResolved.contains(currentVmlxRevision))
         #expect(appResolved.contains(currentVmlxRevision))

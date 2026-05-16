@@ -160,7 +160,7 @@ struct DSV4FlashLiveSmokeTests {
             "Set OSU_MODELS_DIR to the local model root or OSAURUS_DSV4_LIVE_MODEL to an installed DSV4 Flash repo name."
         )
 
-        let stream = try await Self.streamSearchToolPrompt()
+        let stream = try await Self.streamSearchToolPrompt(reasoningEffort: "high")
 
         do {
             let result = try await Self.drain(stream)
@@ -169,14 +169,51 @@ struct DSV4FlashLiveSmokeTests {
                 result.toolNames.contains("search"),
                 "DSV4 strict live tool gate completed without a search tool invocation. This is not a supported-tool proof."
             )
+            #expect(result.toolArgs.contains("\"query\""))
             #expect(result.toolArgs.contains("Paris weather"))
         } catch let invocations as ServiceToolInvocations {
             print("DSV4 strict live tool invocations: \(invocations.invocations.map(\.toolName))")
             #expect(invocations.invocations.contains { $0.toolName == "search" })
+            #expect(invocations.invocations.contains { $0.jsonArguments.contains("\"query\"") })
             #expect(invocations.invocations.contains { $0.jsonArguments.contains("Paris weather") })
         } catch let invocation as ServiceToolInvocation {
             print("DSV4 strict live tool invocation: \(invocation.toolName) \(invocation.jsonArguments)")
             #expect(invocation.toolName == "search")
+            #expect(invocation.jsonArguments.contains("\"query\""))
+            #expect(invocation.jsonArguments.contains("Paris weather"))
+        }
+    }
+
+    @Test(
+        "strict live DSV4 DSML tool invocation gate in instruct mode",
+        .enabled(if: dsv4FlashStrictToolLiveSmokeEnabled)
+    )
+    func strictToolPromptEmitsDSMLInvocationInInstructMode() async throws {
+        try #require(
+            MLXService.shared.handles(requestedModel: Self.requestedModel),
+            "Set OSU_MODELS_DIR to the local model root or OSAURUS_DSV4_LIVE_MODEL to an installed DSV4 Flash repo name."
+        )
+
+        let stream = try await Self.streamSearchToolPrompt(reasoningEffort: "instruct")
+
+        do {
+            let result = try await Self.drain(stream)
+            print(Self.summaryLine(turn: 1, result: result))
+            #expect(
+                result.toolNames.contains("search"),
+                "DSV4 strict live tool gate completed without a search tool invocation. This is not a supported-tool proof."
+            )
+            #expect(result.toolArgs.contains("\"query\""))
+            #expect(result.toolArgs.contains("Paris weather"))
+        } catch let invocations as ServiceToolInvocations {
+            print("DSV4 strict live tool invocations: \(invocations.invocations.map(\.toolName))")
+            #expect(invocations.invocations.contains { $0.toolName == "search" })
+            #expect(invocations.invocations.contains { $0.jsonArguments.contains("\"query\"") })
+            #expect(invocations.invocations.contains { $0.jsonArguments.contains("Paris weather") })
+        } catch let invocation as ServiceToolInvocation {
+            print("DSV4 strict live tool invocation: \(invocation.toolName) \(invocation.jsonArguments)")
+            #expect(invocation.toolName == "search")
+            #expect(invocation.jsonArguments.contains("\"query\""))
             #expect(invocation.jsonArguments.contains("Paris weather"))
         }
     }
@@ -275,28 +312,30 @@ struct DSV4FlashLiveSmokeTests {
             type: "function",
             function: ToolFunction(
                 name: "search",
-                description: "Web search. Split multiple queries with '||'.",
+                description: "Web search for one query.",
                 parameters: .object([
                     "type": .string("object"),
                     "properties": .object([
-                        "queries": .object(["type": .string("string")])
+                        "query": .object(["type": .string("string")])
                     ]),
-                    "required": .array([.string("queries")]),
+                    "required": .array([.string("query")]),
                 ])
             )
         )
     }
 
-    private static func streamSearchToolPrompt() async throws -> AsyncThrowingStream<String, Error> {
+    private static func streamSearchToolPrompt(
+        reasoningEffort: String = "high"
+    ) async throws -> AsyncThrowingStream<String, Error> {
         try await MLXService.shared.streamWithTools(
             messages: [
                 ChatMessage(
                     role: "user",
-                    content: "Search for current Paris weather. You must call the search tool with queries exactly Paris weather. Do not answer with plain text."
+                    content: "Search for current Paris weather. You must call the search tool with query exactly Paris weather. Do not answer with plain text."
                 )
             ],
             parameters: Self.parameters(
-                reasoningEffort: "high",
+                reasoningEffort: reasoningEffort,
                 maxTokens: 192,
                 temperature: 0,
                 topPOverride: 1
