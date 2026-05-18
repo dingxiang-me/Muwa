@@ -33,6 +33,14 @@ struct ConfigurationView: View {
     @State private var tempCoreModelName: String = ""
     @State private var coreModelPickerItems: [ModelPickerItem] = []
     @State private var tempEnableClipboardMonitoring: Bool = false
+    /// Master switch for AI-generated empty-state greetings. Defaults to
+    /// OFF; users opt in here. Per-agent overrides on
+    /// `AgentSettings.generativeGreetingsEnabled` still win when set.
+    @State private var tempGenerativeGreetingsEnabled: Bool = false
+    /// Free-text "voice" instruction for AI-generated empty-state
+    /// greetings. Empty = use the built-in playful default. Per-agent
+    /// overrides live on `AgentSettings.greetingPersona`.
+    @State private var tempGreetingPersona: String = ""
 
     // Work generation settings state
     @State private var tempAgentTemperature: String = ""
@@ -46,6 +54,7 @@ struct ConfigurationView: View {
     // Local Inference settings state
     @State private var tempTopP: String = ""
     @State private var tempEvictionPolicy: ModelEvictionPolicy = .strictSingleModel
+    @State private var tempIdleResidencyPolicy: ModelIdleResidencyPolicy = .immediately
 
     // Toast settings state
     @State private var tempToastPosition: ToastPosition = .topRight
@@ -372,6 +381,29 @@ struct ConfigurationView: View {
                                         }
                                     }
 
+                                    SettingsDivider()
+
+                                    SettingsSubsection(label: "Generative Greetings") {
+                                        VStack(alignment: .leading, spacing: 12) {
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                Toggle(isOn: $tempGenerativeGreetingsEnabled) {
+                                                    Text("AI-generated greetings", bundle: .module)
+                                                        .font(.system(size: 12))
+                                                }
+                                                Text(
+                                                    "Off by default. When on, each empty state generates a fresh greeting + quick actions on the configured Core Model. The first generation can feel slow on small models like Foundation; the static greeting still paints instantly. Per-agent overrides in the Customization tab still win.",
+                                                    bundle: .module
+                                                )
+                                                .font(.system(size: 11))
+                                                .foregroundColor(theme.tertiaryText)
+                                            }
+
+                                            personalityEditorBlock
+                                                .disabled(!tempGenerativeGreetingsEnabled)
+                                                .opacity(tempGenerativeGreetingsEnabled ? 1 : 0.5)
+                                        }
+                                    }
+
                                 }
                             }
                         }
@@ -483,7 +515,7 @@ struct ConfigurationView: View {
 
                                     // Eviction Policy
                                     SettingsSubsection(label: "Model Management") {
-                                        VStack(alignment: .leading, spacing: 10) {
+                                        VStack(alignment: .leading, spacing: 14) {
                                             Picker("", selection: $tempEvictionPolicy) {
                                                 ForEach(ModelEvictionPolicy.allCases, id: \.self) { policy in
                                                     Text(policy.rawValue).tag(policy)
@@ -495,6 +527,27 @@ struct ConfigurationView: View {
                                             Text(tempEvictionPolicy.description)
                                                 .font(.system(size: 11))
                                                 .foregroundColor(theme.tertiaryText)
+
+                                            VStack(alignment: .leading, spacing: 8) {
+                                                HStack(spacing: 12) {
+                                                    Text("Keep model loaded after use", bundle: .module)
+                                                        .font(.system(size: 12, weight: .medium))
+                                                        .foregroundColor(theme.primaryText)
+                                                    Spacer()
+                                                    Picker("", selection: $tempIdleResidencyPolicy) {
+                                                        ForEach(ModelIdleResidencyPolicy.presets, id: \.self) {
+                                                            policy in
+                                                            Text(policy.displayName).tag(policy)
+                                                        }
+                                                    }
+                                                    .pickerStyle(.menu)
+                                                    .labelsHidden()
+                                                }
+
+                                                Text(tempIdleResidencyPolicy.description)
+                                                    .font(.system(size: 11))
+                                                    .foregroundColor(theme.tertiaryText)
+                                            }
                                         }
                                     }
                                 }
@@ -659,6 +712,67 @@ struct ConfigurationView: View {
         }
     }
 
+    // MARK: - Generative Greetings — Personality Editor
+
+    /// Inline label row + multi-line editor + hint, replacing the
+    /// previous `StyledSettingsTextArea` here. We need a custom layout
+    /// so the "Reset to Default" button can sit next to the label and
+    /// reveal/hide based on whether the editor matches the built-in
+    /// default. The editor itself never renders an empty state — see
+    /// `loadConfiguration` for the prefill convention.
+    @ViewBuilder
+    private var personalityEditorBlock: some View {
+        let defaultText = GenerativeGreetingService.defaultPersonaInstruction
+        let isAtDefault =
+            tempGreetingPersona.trimmingCharacters(in: .whitespacesAndNewlines)
+            == defaultText.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 8) {
+                Text("Personality (default for all agents)", bundle: .module)
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(theme.secondaryText)
+                Spacer()
+                if !isAtDefault {
+                    Button {
+                        tempGreetingPersona = defaultText
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: "arrow.uturn.backward")
+                                .font(.system(size: 10, weight: .semibold))
+                            Text("Reset to Default", bundle: .module)
+                                .font(.system(size: 11, weight: .medium))
+                        }
+                        .foregroundColor(theme.accentColor)
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
+            TextEditor(text: $tempGreetingPersona)
+                .font(.system(size: 13, design: .monospaced))
+                .foregroundColor(theme.primaryText)
+                .scrollContentBackground(.hidden)
+                .frame(minHeight: 100, maxHeight: 200)
+                .padding(10)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(theme.inputBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(theme.inputBorder, lineWidth: 1)
+                        )
+                )
+
+            Text(
+                "Shapes the voice of AI-generated empty-state greetings and quick actions. Each agent can override this in its Customization tab.",
+                bundle: .module
+            )
+            .font(.system(size: 11))
+            .foregroundColor(theme.tertiaryText)
+        }
+    }
+
     // MARK: - Success Toast
 
     private func showSuccess(_ message: String) {
@@ -717,6 +831,17 @@ struct ConfigurationView: View {
         tempCoreModelProvider = chat.coreModelProvider ?? ""
         tempCoreModelName = chat.coreModelName ?? ""
         tempEnableClipboardMonitoring = chat.enableClipboardMonitoring
+        tempGenerativeGreetingsEnabled = chat.generativeGreetingsEnabled
+        // Storage convention: empty string = "use the built-in default."
+        // The editor never displays an empty state — we hydrate it with
+        // the built-in default so the text is selectable, copyable, and
+        // editable in place. `saveConfiguration` collapses an unedited
+        // default back to "" so future updates to the built-in copy
+        // still propagate to users who never changed it.
+        tempGreetingPersona =
+            chat.greetingPersona.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            ? GenerativeGreetingService.defaultPersonaInstruction
+            : chat.greetingPersona
 
         // Work generation settings
         tempAgentTemperature = chat.workTemperature.map { String($0) } ?? ""
@@ -728,6 +853,7 @@ struct ConfigurationView: View {
         tempTopP = configuration.genTopP == defaults.genTopP ? "" : String(configuration.genTopP)
         tempAllowedOrigins = configuration.allowedOrigins.joined(separator: ", ")
         tempEvictionPolicy = configuration.modelEvictionPolicy
+        tempIdleResidencyPolicy = configuration.modelIdleResidencyPolicy
 
         // Load toast configuration
         let toastConfig = ToastConfigurationStore.load()
@@ -770,6 +896,12 @@ struct ConfigurationView: View {
         tempCoreModelProvider = chatDefaults.coreModelProvider ?? ""
         tempCoreModelName = chatDefaults.coreModelName ?? ""
         tempEnableClipboardMonitoring = chatDefaults.enableClipboardMonitoring
+        tempGenerativeGreetingsEnabled = chatDefaults.generativeGreetingsEnabled
+        // Match `loadConfiguration`: hydrate the editor with the
+        // built-in default rather than leaving it blank. Saving with
+        // this exact text collapses back to "" so future default
+        // updates still flow through.
+        tempGreetingPersona = GenerativeGreetingService.defaultPersonaInstruction
         tempAgentTemperature = ""
         tempAgentMaxTokens = ""
         tempAgentTopP = ""
@@ -777,6 +909,7 @@ struct ConfigurationView: View {
 
         tempTopP = ""
         tempEvictionPolicy = serverDefaults.modelEvictionPolicy
+        tempIdleResidencyPolicy = serverDefaults.modelIdleResidencyPolicy
 
         showSuccess("Settings restored to defaults")
     }
@@ -833,6 +966,7 @@ struct ConfigurationView: View {
         // configs but is not surfaced in the UI any more.
 
         configuration.modelEvictionPolicy = tempEvictionPolicy
+        configuration.modelIdleResidencyPolicy = tempIdleResidencyPolicy
 
         let parsedOrigins: [String] =
             tempAllowedOrigins
@@ -932,7 +1066,18 @@ struct ConfigurationView: View {
             workMaxIterations: parsedAgentMaxIterations,
             preflightSearchMode: tempPreflightSearchMode,
             disableTools: tempDisableTools,
-            enableClipboardMonitoring: tempEnableClipboardMonitoring
+            enableClipboardMonitoring: tempEnableClipboardMonitoring,
+            generativeGreetingsEnabled: tempGenerativeGreetingsEnabled,
+            greetingPersona: {
+                // Collapse an unedited built-in default back to "" so
+                // the storage stays in "inherit the default" mode.
+                // Trim before comparison so trailing whitespace from
+                // the editor doesn't accidentally diverge.
+                let trimmed = tempGreetingPersona.trimmingCharacters(in: .whitespacesAndNewlines)
+                let defaultTrimmed = GenerativeGreetingService.defaultPersonaInstruction
+                    .trimmingCharacters(in: .whitespacesAndNewlines)
+                return trimmed == defaultTrimmed ? "" : tempGreetingPersona
+            }()
         )
         ChatConfigurationStore.save(chatCfg)
 

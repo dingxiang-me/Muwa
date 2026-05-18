@@ -8,6 +8,103 @@
 import Foundation
 import Combine
 
+private let toolBodyTimeoutQueue = DispatchQueue(label: "ai.osaurus.tool-registry.timeout")
+
+private final class ToolBodyRaceState: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didResume = false
+    private var pendingResult: String?
+    private var continuation: CheckedContinuation<String, Never>?
+    private var bodyTask: Task<Void, Never>?
+    private var timeoutTimer: DispatchSourceTimer?
+
+    func install(continuation: CheckedContinuation<String, Never>) {
+        lock.lock()
+        if didResume, let pendingResult {
+            self.pendingResult = nil
+            lock.unlock()
+            continuation.resume(returning: pendingResult)
+            return
+        }
+        self.continuation = continuation
+        lock.unlock()
+    }
+
+    func setTasks(bodyTask: Task<Void, Never>, timeoutTimer: DispatchSourceTimer) {
+        lock.lock()
+        if didResume {
+            lock.unlock()
+            bodyTask.cancel()
+            timeoutTimer.cancel()
+            return
+        }
+        self.bodyTask = bodyTask
+        self.timeoutTimer = timeoutTimer
+        lock.unlock()
+    }
+
+    func complete(_ result: String) {
+        lock.lock()
+        guard !didResume else {
+            lock.unlock()
+            return
+        }
+        didResume = true
+        let continuation = self.continuation
+        if continuation == nil {
+            pendingResult = result
+        }
+        self.continuation = nil
+        let bodyTask = self.bodyTask
+        let timeoutTimer = self.timeoutTimer
+        self.bodyTask = nil
+        self.timeoutTimer = nil
+        lock.unlock()
+
+        bodyTask?.cancel()
+        timeoutTimer?.cancel()
+        continuation?.resume(returning: result)
+    }
+}
+
+/// Shared rough estimator for actual `tools[]` payloads. The budget UI
+/// must price the spec that will be sent this turn, not the registry's
+/// canonical full schema, because the prompt composer can now ship compact
+/// bootstrap schemas and hot-load full ones later.
+fileprivate enum ToolSpecTokenEstimator {
+    static func estimate(name: String, description: String?, parameters: JSONValue?) -> Int {
+        var total = name.count + (description?.count ?? 0)
+        if let parameters {
+            total += estimateJSONSize(parameters)
+        }
+        // Overhead for JSON structure:
+        // {"type":"function","function":{"name":"...","description":"...","parameters":...}}
+        total += 72
+        return max(1, total / TokenEstimator.charsPerToken)
+    }
+
+    /// Recursively estimate serialized JSON size without paying to encode
+    /// every tool during every context-budget refresh.
+    private static func estimateJSONSize(_ value: JSONValue) -> Int {
+        switch value {
+        case .null:
+            return 4
+        case .bool(let value):
+            return value ? 4 : 5
+        case .number(let value):
+            return String(value).count
+        case .string(let value):
+            return value.count + 2
+        case .array(let array):
+            return array.reduce(2) { $0 + estimateJSONSize($1) + 1 }
+        case .object(let object):
+            return object.reduce(2) { total, pair in
+                total + pair.key.count + 5 + estimateJSONSize(pair.value)
+            }
+        }
+    }
+}
+
 @MainActor
 final class ToolRegistry: ObservableObject {
     static let shared = ToolRegistry()
@@ -48,35 +145,11 @@ final class ToolRegistry: ObservableObject {
 
         /// Estimated tokens for full tool schema (rough heuristic: ~4 chars per token)
         var estimatedTokens: Int {
-            var total = name.count + description.count
-            if let params = parameters {
-                total += Self.estimateJSONSize(params)
-            }
-            // Overhead for JSON structure: {"type":"function","function":{"name":"...","description":"...","parameters":...}}
-            // = 38 (prefix) + 17 (desc key) + 15 (params key) + 2 (closing) = 72 chars
-            total += 72
-            return max(1, total / TokenEstimator.charsPerToken)
-        }
-
-        /// Recursively estimate the serialized size of a JSONValue
-        private static func estimateJSONSize(_ value: JSONValue) -> Int {
-            switch value {
-            case .null:
-                return 4  // "null"
-            case .bool(let b):
-                return b ? 4 : 5  // "true" or "false"
-            case .number(let n):
-                return String(n).count
-            case .string(let s):
-                return s.count + 2  // quotes
-            case .array(let arr):
-                return arr.reduce(2) { $0 + estimateJSONSize($1) + 1 }  // brackets + commas
-            case .object(let dict):
-                return dict.reduce(2) { acc, pair in
-                    // "key": value, = key.count + 4 (quotes + colon + space) + value + 1 (comma)
-                    acc + pair.key.count + 5 + estimateJSONSize(pair.value)
-                }
-            }
+            ToolSpecTokenEstimator.estimate(
+                name: name,
+                description: description,
+                parameters: parameters
+            )
         }
     }
 
@@ -108,6 +181,32 @@ final class ToolRegistry: ObservableObject {
             SearchMemoryTool(),
             // Inline data visualization rendered as a chart card.
             RenderChartTool(),
+            // Agent DB feature (spec §6). The system prompt composer
+            // gates these per-agent via `Agent.settings.dbEnabled`;
+            // registering them as built-ins means agents that *do*
+            // enable the feature don't pay an install-time round-trip.
+            DBSchemaTool(),
+            DBCreateTableTool(),
+            DBAlterTableTool(),
+            DBMigrateTool(),
+            DBInsertTool(),
+            DBUpsertTool(),
+            DBUpdateTool(),
+            DBDeleteTool(),
+            DBRestoreTool(),
+            DBQueryTool(),
+            DBExecuteTool(),
+            DBDefineViewTool(),
+            DBRunViewTool(),
+            DBListViewsTool(),
+            DBDropViewTool(),
+            // Self-scheduling + notification (spec §9, §10). These are
+            // always available — they're the primary way an agent acts
+            // outside a single turn — and are explicitly *not* gated by
+            // `dbEnabled` (see SystemPromptComposer's "alwaysLoaded" set).
+            ScheduleNextRunTool(),
+            CancelNextRunTool(),
+            NotifyTool(),
         ]
         var configChanged = false
         for tool in builtIns {
@@ -428,13 +527,12 @@ final class ToolRegistry: ObservableObject {
     /// tests can drive it with a small `timeoutSeconds` value without
     /// waiting for the full 120s production budget.
     ///
-    /// Each branch of the race converts thrown errors (including
-    /// `CancellationError` from the loser when we `cancelAll`) into a
-    /// structured `ToolEnvelope` *inside* its child task. That keeps
-    /// `withTaskGroup` non-throwing and prevents the cancelled sibling's
-    /// post-return throw from reaching the caller as the function's
-    /// error — historically the slow-tool case rethrew CancellationError
-    /// and stalled while the group drained.
+    /// This intentionally does not use `withTaskGroup`: structured child
+    /// groups must drain before returning, so a non-cooperative tool body
+    /// that ignores cancellation can still hold the caller until it exits.
+    /// The timeout branch also uses a dedicated GCD timer queue rather than
+    /// `Task.sleep`, because a saturated Swift executor can otherwise delay
+    /// the "wall-clock" timeout behind unrelated async work.
     internal nonisolated static func runToolBody(
         _ tool: OsaurusTool,
         argumentsJSON: String,
@@ -448,49 +546,39 @@ final class ToolRegistry: ObservableObject {
             tool: toolName,
             retryable: true
         )
-        // Sentinel returned by the cancelled loser branch so the
-        // consumer loop knows to ignore it. Cannot collide with any
-        // legitimate envelope because real envelopes are JSON.
-        let cancelledSentinel = "__osaurus_runToolBody_cancelled__"
+        let cancellationEnvelope = ToolEnvelope.failure(
+            kind: .executionError,
+            message: "Tool '\(toolName)' was cancelled.",
+            tool: toolName,
+            retryable: false
+        )
+        let race = ToolBodyRaceState()
 
-        return await withTaskGroup(of: String.self) { group in
-            group.addTask {
-                do {
-                    return try await tool.execute(argumentsJSON: argumentsJSON)
-                } catch is CancellationError {
-                    return cancelledSentinel
-                } catch {
-                    return ToolEnvelope.fromError(error, tool: toolName)
+        return await withTaskCancellationHandler {
+            await withCheckedContinuation { continuation in
+                race.install(continuation: continuation)
+                let timeoutTimer = DispatchSource.makeTimerSource(queue: toolBodyTimeoutQueue)
+                let timeoutNanoseconds = max(0, Int(timeoutSeconds * 1_000_000_000))
+                timeoutTimer.schedule(deadline: .now() + .nanoseconds(timeoutNanoseconds))
+                timeoutTimer.setEventHandler {
+                    race.complete(timeoutEnvelope)
                 }
-            }
-            group.addTask {
-                let nanos = UInt64(timeoutSeconds * 1_000_000_000)
-                do {
-                    try await Task.sleep(nanoseconds: nanos)
-                } catch {
-                    // Cancelled because the body finished first — yield
-                    // the sentinel so the caller's first non-sentinel
-                    // result wins.
-                    return cancelledSentinel
-                }
-                return timeoutEnvelope
-            }
+                timeoutTimer.resume()
 
-            // The first non-sentinel result is the winner; cancel the
-            // sibling and let `withTaskGroup` auto-drain on closure
-            // return. The drain is safe because every child branch
-            // converts its own errors into envelope strings — there
-            // are no uncaught throws to surface.
-            for await result in group {
-                if result == cancelledSentinel { continue }
-                group.cancelAll()
-                return result
+                let bodyTask = Task {
+                    do {
+                        let result = try await tool.execute(argumentsJSON: argumentsJSON)
+                        race.complete(result)
+                    } catch is CancellationError {
+                        race.complete(cancellationEnvelope)
+                    } catch {
+                        race.complete(ToolEnvelope.fromError(error, tool: toolName))
+                    }
+                }
+                race.setTasks(bodyTask: bodyTask, timeoutTimer: timeoutTimer)
             }
-            return ToolEnvelope.failure(
-                kind: .executionError,
-                message: "Tool '\(toolName)' produced no result.",
-                tool: toolName
-            )
+        } onCancel: {
+            race.complete(cancellationEnvelope)
         }
     }
 
@@ -542,7 +630,12 @@ final class ToolRegistry: ObservableObject {
     /// Useful when the active tool list is mode- or session-dependent.
     func totalEstimatedTokens(for tools: [Tool]) -> Int {
         tools.reduce(0) { total, tool in
-            total + estimatedTokens(for: tool.function.name)
+            total
+                + ToolSpecTokenEstimator.estimate(
+                    name: tool.function.name,
+                    description: tool.function.description,
+                    parameters: tool.function.parameters
+                )
         }
     }
 

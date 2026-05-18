@@ -265,7 +265,8 @@ enum CapabilitySearch {
 
     static func search(
         query: String,
-        topK: (methods: Int, tools: Int, skills: Int)
+        topK: (methods: Int, tools: Int, skills: Int),
+        allowedToolNames: Set<String>? = nil
     ) async -> CapabilitySearchResults {
         let methodsThreshold = minimumRelevanceScoreMethods
         let skillsThreshold = minimumRelevanceScoreSkills
@@ -281,6 +282,7 @@ enum CapabilitySearch {
             return await searchWithVerboseTrace(
                 query: query,
                 topK: topK,
+                allowedToolNames: allowedToolNames,
                 methodsThreshold: methodsThreshold,
                 skillsThreshold: skillsThreshold,
                 fusedCutoff: fusedCutoff
@@ -295,7 +297,8 @@ enum CapabilitySearch {
         async let toolHits = ToolSearchService.shared.searchHybrid(
             query: query,
             topK: topK.tools,
-            minFusedScore: fusedCutoff
+            minFusedScore: fusedCutoff,
+            allowedNames: allowedToolNames
         )
         async let skillHits = SkillSearchService.shared.search(
             query: query,
@@ -324,6 +327,7 @@ enum CapabilitySearch {
     private static func searchWithVerboseTrace(
         query: String,
         topK: (methods: Int, tools: Int, skills: Int),
+        allowedToolNames: Set<String>?,
         methodsThreshold: Float,
         skillsThreshold: Float,
         fusedCutoff: Float
@@ -336,7 +340,8 @@ enum CapabilitySearch {
         async let toolPair = ToolSearchService.shared.searchHybridWithDiagnostic(
             query: query,
             topK: topK.tools,
-            minFusedScore: fusedCutoff
+            minFusedScore: fusedCutoff,
+            allowedNames: allowedToolNames
         )
         async let skillPair = SkillSearchService.shared.searchWithDiagnostic(
             query: query,
@@ -360,6 +365,7 @@ enum CapabilitySearch {
             methods accepted=\(formatHits(methodDiag.acceptedHits), privacy: .public)
             tools bm25Available=\(toolDiag.bm25Available, privacy: .public) all=\(formatHybridHits(toolDiag.allHits), privacy: .public)
             tools accepted=\(formatHybridHits(toolDiag.acceptedHits), privacy: .public)
+            tools filteredByAllowlist=\(formatNames(toolDiag.filteredByAllowlist), privacy: .public)
             skills raw=\(formatHits(skillDiag.rawHits), privacy: .public)
             skills accepted=\(formatHits(skillDiag.acceptedHits), privacy: .public)
             """
@@ -418,11 +424,43 @@ fileprivate func formatHybridHits(_ hits: [ToolSearchHybridDiagnostic.Hit]) -> S
         .joined(separator: ",")
 }
 
+fileprivate func formatNames(_ names: [String]) -> String {
+    names.isEmpty ? "[]" : "[\(names.joined(separator: ","))]"
+}
+
 // MARK: - Preflight Tool Selection
 
 enum PreflightCapabilitySearch {
 
     private static let selectionTimeout: TimeInterval = 8
+
+    /// High-volume salutations and acknowledgements are not capability
+    /// requests. Short-circuiting them here protects every entry point
+    /// (chat, HTTP, plugin host, eval probes) from spending an LLM call and
+    /// a dynamic prompt block before the user has asked the agent to do work.
+    static func isTrivialUserInput(_ query: String) -> Bool {
+        let trimmed = query.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty, trimmed.count <= 32 else { return false }
+
+        let keptScalars = trimmed.lowercased().unicodeScalars.map { scalar -> Character in
+            if CharacterSet.alphanumerics.contains(scalar)
+                || CharacterSet.whitespacesAndNewlines.contains(scalar)
+            {
+                return Character(String(scalar))
+            }
+            return " "
+        }
+        let normalized = String(keptScalars)
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        let trivialInputs: Set<String> = [
+            "hi", "hello", "hey", "yo", "hiya", "howdy",
+            "good morning", "good afternoon", "good evening",
+            "thanks", "thank you", "thx", "ty",
+            "ok", "okay", "cool", "nice", "great",
+        ]
+        return trivialInputs.contains(normalized)
+    }
 
     /// Test seam for the LLM call. Production calls go through
     /// `CoreModelService.shared.generate`; tests inject canned responses.
@@ -550,6 +588,7 @@ enum PreflightCapabilitySearch {
         guard mode != .off,
             !query.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         else { return (.empty, nil) }
+        guard !isTrivialUserInput(query) else { return (.empty, nil) }
 
         let (catalog, groups) = await MainActor.run {
             loadDynamicCatalog(allowedNames: allowedNames)
@@ -770,7 +809,8 @@ enum PreflightCapabilitySearch {
                 temperature: 0.0,
                 maxTokens: 256,
                 timeout: selectionTimeout,
-                fallbackModel: fallbackModel
+                fallbackModel: fallbackModel,
+                modelOptions: ["reasoningEffort": .string("no_think")]
             )
         }
     }

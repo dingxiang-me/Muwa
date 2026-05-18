@@ -127,6 +127,8 @@ Browse all available endpoints, organized by category:
 | **Audio** | `/audio/transcriptions`                                |
 | **MCP**   | `/mcp/health`, `/mcp/tools`, `/mcp/call`               |
 
+The MCP endpoints are Osaurus's local HTTP MCP surface. Command-based stdio clients should launch `osaurus mcp`, which proxies to these endpoints.
+
 Each endpoint shows:
 
 - HTTP method (GET/POST)
@@ -226,6 +228,8 @@ Quick access to the full documentation at docs.osaurus.ai.
 4. Verify your expected tools are listed
 5. Test a specific tool with `POST /mcp/call`
 
+This verifies Osaurus's local MCP server surface, including tools discovered from connected URL-based Remote MCP Providers. It does not launch or inspect third-party stdio providers configured with `command` and `args`; those are outside the Remote MCP Providers transport supported by the current app.
+
 ---
 
 ## Tips
@@ -290,12 +294,27 @@ Currently env-gated:
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
 | `OSAURUS_RUN_SANDBOX_INTEGRATION_TESTS=1` | [`SandboxIntegrationTests`](../Packages/OsaurusCore/Tests/Sandbox/SandboxIntegrationTests.swift) | Boots a Linux VM; runs `pip`/`npm`/`go` workloads. |
 
+### Document runtime discovery
+
+Structured document parsing runs in-process for the built-in CSV/TSV, XLSX,
+PPTX/POTX, PDF, and rich-document adapters. The optional office runtime
+detector exists only to discover a local LibreOffice/OpenOffice-compatible
+`soffice` binary for future conversion flows; it probes version metadata and
+never sends document bytes to the runtime.
+
+Set either variable to point tests or local builds at a specific executable:
+
+| Env var | Purpose |
+| ------- | ------- |
+| `OSAURUS_OFFICE_RUNTIME_URL` | File URL for an explicit `soffice` executable. |
+| `OSAURUS_OFFICE_RUNTIME_PATH` | File-system path for an explicit `soffice` executable. |
+
 ### CI cache controls
 
 The `test-core` job caches `~/Library/Developer/Xcode/DerivedData` keyed on Swift sources, manifests, resources, the pinned Xcode version, and a manual `CACHE_SALT`. Two recovery levers when you suspect a bad cache:
 
 1. **One-shot cold build**: trigger CI manually via the **Run workflow** button on the [CI workflow](../.github/workflows/ci.yml) page and check `clear_cache`. Skips the restore for that one run.
-2. **Permanent bust**: bump `CACHE_SALT` (currently `v1`) at the top of `.github/workflows/ci.yml` to `v2` and merge. Every cache key invalidates immediately.
+2. **Permanent bust**: change `CACHE_SALT` (currently `v2-vmlx-5b84387`) at the top of `.github/workflows/ci.yml` and merge. Every cache key invalidates immediately.
 
 The cache only **saves** on `main` pushes — PRs read from it but never overwrite, so a half-baked branch can't poison everyone.
 
@@ -306,7 +325,7 @@ The full xcodebuild output is collapsed into expandable groups by `xcbeautify`. 
 - A short failure summary (failed tests + assertion messages) at the top of the GitHub Actions run page.
 - The raw `Tests.xcresult` bundle as a downloadable artifact (`test-core-xcresult-N`, 7 days retention).
 
-A passing run produces ~1–2k log lines instead of the historical ~30k, and individual tests that hang are killed in ~2 min by `-test-timeouts-enabled YES` (default 60s, max 120s per test). The whole `test-core` job is also capped at 15 minutes via `timeout-minutes`.
+A passing run produces ~1–2k log lines instead of the historical ~30k, and individual tests that hang are killed in ~2 min by `-test-timeouts-enabled YES` (default 60s, max 120s per test). The whole `test-core` job is capped at 45 minutes via `timeout-minutes`.
 
 ### Deferred follow-up
 

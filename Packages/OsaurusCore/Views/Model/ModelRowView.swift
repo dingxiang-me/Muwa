@@ -34,8 +34,14 @@ struct ModelRowView: View {
     /// Callback when user taps the Details button
     let onViewDetails: () -> Void
 
-    /// Optional cancel action when downloading
+    /// Optional cancel action when downloading or paused
     let onCancel: (() -> Void)?
+
+    /// Optional pause action while a download is in flight
+    var onPause: (() -> Void)? = nil
+
+    /// Optional resume action while a download is paused
+    var onResume: (() -> Void)? = nil
 
     // MARK: - State
 
@@ -60,8 +66,14 @@ struct ModelRowView: View {
                             .fixedSize(horizontal: false, vertical: true)
                     }
 
-                    if case .downloading(let progress) = downloadState {
-                        downloadProgressView(progress: progress)
+                    // Publication marker. Curated entries set `releasedAt`
+                    // explicitly; HF auto-fetched ones pick it up from
+                    // `lastModified` — either way the prefix is "Released".
+                    if let released = model.formattedReleaseMonth {
+                        Text(L("Released \(released)"))
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.tertiaryText)
+                            .lineLimit(1)
                     }
 
                     Spacer(minLength: 0)
@@ -137,9 +149,97 @@ struct ModelRowView: View {
                 Spacer(minLength: 0)
             }
             .padding(10)
+
+            VStack(spacing: 0) {
+                Spacer(minLength: 0)
+                headerProgressStrip
+            }
         }
-        .frame(height: 110)
+        .frame(height: 140)
         .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var headerProgressStrip: some View {
+        switch downloadState {
+        case .downloading(let progress):
+            progressStrip(progress: progress, isPaused: false)
+        case .paused(let progress):
+            progressStrip(progress: progress, isPaused: true)
+        default:
+            EmptyView()
+        }
+    }
+
+    private func progressStrip(progress: Double, isPaused: Bool) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 8) {
+                GeometryReader { geometry in
+                    ZStack(alignment: .leading) {
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(.white.opacity(0.25))
+                        RoundedRectangle(cornerRadius: 2)
+                            .fill(isPaused ? Color.white.opacity(0.6) : .white)
+                            .frame(width: geometry.size.width * progress)
+                            .animation(.easeOut(duration: 0.3), value: progress)
+                    }
+                }
+                .frame(height: 4)
+
+                Text("\(Int(progress * 100))%")
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white)
+
+                if isPaused, let onResume {
+                    Button(action: onResume) {
+                        Image(systemName: "play.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(Text("Resume download", bundle: .module))
+                } else if !isPaused, let onPause {
+                    Button(action: onPause) {
+                        Image(systemName: "pause.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(Text("Pause download", bundle: .module))
+                }
+
+                if let onCancel {
+                    Button(action: onCancel) {
+                        Image(systemName: "xmark.circle.fill")
+                            .font(.system(size: 14))
+                            .foregroundColor(.white.opacity(0.9))
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .help(Text("Cancel download", bundle: .module))
+                }
+            }
+
+            if isPaused {
+                Text("Paused", bundle: .module)
+                    .font(.system(size: 10, weight: .semibold, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.9))
+            } else if let line = metrics?.formattedLine {
+                Text(line)
+                    .font(.system(size: 10, design: .monospaced))
+                    .foregroundColor(.white.opacity(0.8))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            LinearGradient(
+                colors: [.black.opacity(0), .black.opacity(0.55)],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+        )
     }
 
     @ViewBuilder
@@ -198,7 +298,12 @@ struct ModelRowView: View {
     // MARK: - Metadata Badges
 
     private var metadataBadges: some View {
+        // Use-case pill leads (when set) so the eye lands on the
+        // editorial category before size / compatibility metadata.
         FlowLayout(spacing: 6) {
+            if let useCase = model.useCase {
+                UseCasePill(useCase: useCase)
+            }
             if let size = model.formattedDownloadSize {
                 MetadataPill(text: size, icon: "internaldrive")
             }
@@ -246,55 +351,6 @@ struct ModelRowView: View {
         )
     }
 
-    // MARK: - Download Progress View
-
-    private func downloadProgressView(progress: Double) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
-            HStack(spacing: 8) {
-                // Progress bar
-                GeometryReader { geometry in
-                    ZStack(alignment: .leading) {
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(theme.tertiaryBackground)
-
-                        RoundedRectangle(cornerRadius: 3)
-                            .fill(theme.accentColor)
-                            .frame(width: geometry.size.width * progress)
-                            .animation(.easeOut(duration: 0.3), value: progress)
-                    }
-                }
-                .frame(height: 6)
-
-                // Cancel button
-                if let onCancel = onCancel {
-                    Button(action: onCancel) {
-                        Image(systemName: "xmark.circle.fill")
-                            .font(.system(size: 16))
-                            .foregroundColor(theme.tertiaryText)
-                    }
-                    .buttonStyle(PlainButtonStyle())
-                    .help(Text("Cancel download", bundle: .module))
-                }
-            }
-
-            if let line = formattedMetricsLine() {
-                Text(line)
-                    .font(.system(size: 11, design: .monospaced))
-                    .foregroundColor(theme.tertiaryText)
-            }
-        }
-    }
-
-    // MARK: - Metrics Formatting
-
-    /// Formats download metrics into a single human-readable line
-    ///
-    /// Example output: "150 MB / 2 GB • 5.2 MB/s • ETA 3:45"
-    ///
-    /// - Returns: Formatted string with available metrics, or nil if no metrics exist
-    private func formattedMetricsLine() -> String? {
-        metrics?.formattedLine
-    }
 }
 
 // MARK: - Metadata Pill Component
@@ -351,6 +407,31 @@ private struct CompatibilityPill: View {
         .background(
             Capsule()
                 .fill(color.opacity(0.12))
+        )
+    }
+}
+
+// MARK: - Use Case Pill Component
+
+/// Colored pill surfacing a model's editorial use-case category. Tint +
+/// icon come from `ModelUseCase` so the vocabulary matches the onboarding
+/// picker's `.useCase(...)` chip.
+private struct UseCasePill: View {
+    let useCase: ModelUseCase
+
+    var body: some View {
+        HStack(spacing: 3) {
+            Image(systemName: useCase.iconName)
+                .font(.system(size: 8, weight: .semibold))
+            Text(useCase.displayName, bundle: .module)
+                .font(.system(size: 10, weight: .semibold))
+        }
+        .foregroundColor(useCase.tintColor)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            Capsule()
+                .fill(useCase.tintColor.opacity(0.12))
         )
     }
 }

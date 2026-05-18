@@ -142,6 +142,7 @@ public struct SystemPromptComposer: Sendable {
             agentId: request.agentId,
             executionMode: request.executionMode,
             query: resolvePreflightQuery(query: request.query, messages: request.messages),
+            messages: request.messages,
             cachedPreflight: request.cachedPreflight,
             additionalToolNames: request.additionalToolNames,
             frozenAlwaysLoadedNames: request.frozenAlwaysLoadedNames,
@@ -166,6 +167,28 @@ public struct SystemPromptComposer: Sendable {
         return ""
     }
 
+    /// Greetings and acknowledgements are high-volume "no work yet" turns.
+    /// Skipping preflight and dynamic capability prose for these keeps TTFT
+    /// tied to the answer, not to a tool-selection LLM call the user did not
+    /// ask for. Empty queries are not classified as trivial because preview
+    /// and cache-parity composes intentionally use `""` as "unknown next
+    /// input" rather than as a user greeting.
+    static func isTrivialPreflightQuery(_ query: String) -> Bool {
+        PreflightCapabilitySearch.isTrivialUserInput(query)
+    }
+
+    /// The agent-loop cheat sheet is expensive and only becomes valuable
+    /// after the model has already used one of those tools. Keeping the
+    /// first-turn prompt quiet leaves the compact tool descriptions as the
+    /// source of truth, then adds continuation guidance when history proves
+    /// the session actually entered the loop.
+    static func hasPriorAgentLoopUse(_ messages: [ChatMessage]) -> Bool {
+        messages.contains { message in
+            guard let calls = message.tool_calls else { return false }
+            return calls.contains { Self.agentLoopToolNames.contains($0.function.name) }
+        }
+    }
+
     /// Shared pipeline: assemble memory (returned separately) + preflight +
     /// skills + resolve tools + build ComposedContext.
     ///
@@ -181,6 +204,7 @@ public struct SystemPromptComposer: Sendable {
         agentId: UUID,
         executionMode: ExecutionMode,
         query: String,
+        messages: [ChatMessage],
         cachedPreflight: PreflightResult? = nil,
         additionalToolNames: LoadedTools = [],
         frozenAlwaysLoadedNames: LoadedTools? = nil,
@@ -204,6 +228,7 @@ public struct SystemPromptComposer: Sendable {
             agentId: agentId,
             executionMode: executionMode,
             query: query,
+            messages: messages,
             cachedPreflight: cachedPreflight,
             additionalToolNames: additionalToolNames,
             frozenAlwaysLoadedNames: frozenAlwaysLoadedNames,
@@ -229,7 +254,6 @@ public struct SystemPromptComposer: Sendable {
             trace: trace
         )
         let rendered = comp.render()
-        let toolNames = toolset.tools.map { $0.function.name }
         trace?.set("systemPromptChars", rendered.count)
         trace?.set("toolCount", toolset.tools.count)
         trace?.set("preflightItems", toolset.preflight.items.count)
@@ -242,7 +266,7 @@ public struct SystemPromptComposer: Sendable {
             preflight: toolset.preflight,
             memorySection: memorySection,
             alwaysLoadedNames: toolset.alwaysLoadedNames,
-            cacheHint: manifest.staticPrefixHash(toolNames: toolNames),
+            cacheHint: manifest.staticPrefixHash(tools: toolset.tools),
             staticPrefix: manifest.staticPrefixContent,
             contextDisable: toolset.contextDisable
         )
@@ -359,6 +383,7 @@ public struct SystemPromptComposer: Sendable {
         agentId: UUID,
         executionMode: ExecutionMode,
         query: String,
+        messages: [ChatMessage],
         cachedPreflight: PreflightResult?,
         additionalToolNames: LoadedTools,
         frozenAlwaysLoadedNames: LoadedTools?,
@@ -382,10 +407,12 @@ public struct SystemPromptComposer: Sendable {
             trace?.set("contextSizeClass", String(describing: window.sizeClass))
         }
 
+        let isTrivialInput = isTrivialPreflightQuery(query)
         let preflight = await resolvePreflight(
             snapshot: snapshot,
             agentId: agentId,
             query: query,
+            isTrivialInput: isTrivialInput,
             effectiveToolsOff: effectiveToolsOff,
             cachedPreflight: cachedPreflight,
             trace: trace
@@ -415,6 +442,7 @@ public struct SystemPromptComposer: Sendable {
             query: query,
             additionalToolNames: additionalToolNames,
             effectiveToolsOff: effectiveToolsOff,
+            isTrivialInput: isTrivialInput,
             trace: trace
         )
 
@@ -424,7 +452,9 @@ public struct SystemPromptComposer: Sendable {
             skillSuggestions: skillSuggestions,
             alwaysLoadedNames: alwaysLoadedNames,
             contextDisable: contextDisable,
-            effectiveToolsOff: effectiveToolsOff
+            effectiveToolsOff: effectiveToolsOff,
+            capabilityPromptSectionsEnabled: !isTrivialInput,
+            agentLoopGuidanceEnabled: hasPriorAgentLoopUse(messages)
         )
     }
 
@@ -435,6 +465,7 @@ public struct SystemPromptComposer: Sendable {
         snapshot: AgentConfigSnapshot,
         agentId: UUID,
         query: String,
+        isTrivialInput: Bool,
         effectiveToolsOff: Bool,
         cachedPreflight: PreflightResult?,
         trace: TTFTTrace?
@@ -442,6 +473,10 @@ public struct SystemPromptComposer: Sendable {
         if let cachedPreflight {
             trace?.set("preflightSource", "cached")
             return cachedPreflight
+        }
+        guard !isTrivialInput else {
+            trace?.set("preflightSource", "trivial")
+            return .empty
         }
         guard !effectiveToolsOff, snapshot.toolMode == .auto, !query.isEmpty else {
             trace?.set("preflightSource", "skipped")
@@ -476,9 +511,11 @@ public struct SystemPromptComposer: Sendable {
         query: String,
         additionalToolNames: LoadedTools,
         effectiveToolsOff: Bool,
+        isTrivialInput: Bool,
         trace: TTFTTrace?
     ) async -> [SkillTeaser] {
         guard snapshot.toolMode == .auto, !effectiveToolsOff, !query.isEmpty,
+            !isTrivialInput,
             tools.contains(where: { $0.function.name == "capabilities_load" })
         else { return [] }
         let alreadySurfaced = Set(preflight.companions.compactMap(\.skill?.name))
@@ -569,6 +606,28 @@ public struct SystemPromptComposer: Sendable {
             )
         }
 
+        // Agent DB onboarding (spec §5.5.3) + schema snapshot (§5.5.5).
+        // Gated on `dbEnabled`; rendered before model-family guidance so
+        // it sits as close to the persona as possible (the agent should
+        // read it before any operational guidance). The snapshot read
+        // can fail when the DB couldn't open (rare); fall back to the
+        // "no tables yet" empty state so the prompt is well-formed even
+        // when state is partially broken.
+        if !effectiveToolsOff, snapshot.dbEnabled {
+            var dbSection = OnboardingPrompt.block
+            let snapshotText = Self.renderSchemaSnapshot(agentId: agentId)
+            if !snapshotText.isEmpty {
+                dbSection += "\n\n" + snapshotText
+            }
+            composer.append(
+                .static(
+                    id: "agentDB",
+                    label: "Agent DB",
+                    content: dbSection
+                )
+            )
+        }
+
         // Per-model-family nudge — small, targeted blocks for known model
         // weaknesses (Gemma over-enumerates, GPT under-acts, etc.). We
         // deliberately ship NO universal "agentic workflow" addendum: it
@@ -612,10 +671,12 @@ public struct SystemPromptComposer: Sendable {
 
         // Agent-loop guidance: short cheat-sheet for the chat-layer-
         // intercepted tools (todo / complete / clarify / share_artifact).
-        // Gated on at least one of those names appearing in the resolved
-        // schema — in practice that's every chat where tools are on, but
-        // the gate keeps tools-off sessions from carrying dead text.
+        // First turns rely on the compact tool descriptions. Once history
+        // shows the model has entered the loop, this continuation guide is
+        // worth the extra tokens because it prevents malformed follow-up
+        // calls and premature completion.
         if !effectiveToolsOff,
+            toolset.agentLoopGuidanceEnabled,
             !resolvedNames.isDisjoint(with: Self.agentLoopToolNames)
         {
             composer.append(
@@ -650,10 +711,13 @@ public struct SystemPromptComposer: Sendable {
         }
 
         // Capability-discovery nudge: explain how to recover when the
-        // current tool kit is incomplete. Gated to auto mode + presence of
-        // `capabilities_search` so manual-mode agents and tools-disabled
-        // sessions don't see irrelevant guidance.
-        if snapshot.toolMode == .auto,
+        // current tool kit is incomplete. The gate follows the actual
+        // schema, not the mode label: manual-mode agents still carry
+        // `capabilities_search` / `capabilities_load` as pragmatic
+        // always-loaded tools. Trivial first turns suppress this prompt
+        // section through `capabilityPromptSectionsEnabled` without hiding
+        // the callable discovery tools themselves.
+        if toolset.capabilityPromptSectionsEnabled,
             !effectiveToolsOff,
             tools.contains(where: { $0.function.name == "capabilities_search" })
         {
@@ -694,7 +758,8 @@ public struct SystemPromptComposer: Sendable {
         // (the section instructs the model to call it). Rendering itself
         // skips when `companions` is empty, so this just decides whether
         // to even ask for a section.
-        if snapshot.toolMode == .auto,
+        if toolset.capabilityPromptSectionsEnabled,
+            snapshot.toolMode == .auto,
             !effectiveToolsOff,
             !preflight.companions.isEmpty,
             tools.contains(where: { $0.function.name == "capabilities_load" }),
@@ -718,7 +783,8 @@ public struct SystemPromptComposer: Sendable {
         // `capabilities_load` presence, so we just check non-empty and
         // append. Skipping on `effectiveToolsOff` here is belt-and-braces
         // for the preview composer which doesn't pre-gate.
-        if !effectiveToolsOff,
+        if toolset.capabilityPromptSectionsEnabled,
+            !effectiveToolsOff,
             !toolset.skillSuggestions.isEmpty,
             let suggestionsSection = PreflightCompanions.renderSkillSuggestions(toolset.skillSuggestions)
         {
@@ -757,7 +823,10 @@ public struct SystemPromptComposer: Sendable {
             hasResolvedDynamicTools: hasDynamicTools(snapshot: snapshot, preflight: preflight),
             skillEnabled: pluginCreatorSkill?.enabled ?? false
         )
-        if PluginCreatorGate.shouldInject(gateInputs), let skill = pluginCreatorSkill {
+        if toolset.capabilityPromptSectionsEnabled,
+            PluginCreatorGate.shouldInject(gateInputs),
+            let skill = pluginCreatorSkill
+        {
             composer.append(
                 .dynamic(
                     id: "pluginCreator",
@@ -777,6 +846,100 @@ public struct SystemPromptComposer: Sendable {
     static let agentLoopToolNames: Set<String> = [
         "todo", "complete", "clarify", "share_artifact",
     ]
+
+    /// Tools that keep their full schema in the first-turn bootstrap. They
+    /// are the path for discovering and upgrading every other capability, so
+    /// their argument contracts must stay explicit even while the rest of the
+    /// always-loaded surface ships as a compact schema skeleton.
+    private static let fullBootstrapToolNames: Set<String> = [
+        "capabilities_search", "capabilities_load",
+    ]
+
+    /// Compress first-turn always-loaded specs by keeping the callable name,
+    /// a one-line description, and the JSON shape without verbose property
+    /// descriptions. Full schemas still enter via manual picks, preflight, or
+    /// `capabilities_load`; this only shrinks the baseline every chat pays
+    /// before the user has asked for a concrete capability.
+    private static func compactBootstrapSpec(_ tool: Tool) -> Tool {
+        let name = tool.function.name
+        guard !fullBootstrapToolNames.contains(name) else { return tool }
+        return Tool(
+            type: tool.type,
+            function: ToolFunction(
+                name: name,
+                description: oneLineToolDescription(tool.function.description),
+                parameters: compactParameterSkeleton(tool.function.parameters)
+            )
+        )
+    }
+
+    /// Tool descriptions often carry examples and recovery prose that duplicate
+    /// the full schema. The bootstrap keeps just the first sentence because
+    /// the model only needs to decide whether to call or load the tool.
+    private static func oneLineToolDescription(_ description: String?) -> String? {
+        guard let description else { return nil }
+        let collapsed =
+            description
+            .split(whereSeparator: { $0.isWhitespace })
+            .joined(separator: " ")
+        guard !collapsed.isEmpty else { return nil }
+        let sentenceEnd = collapsed.firstIndex { ".!?".contains($0) }
+        let firstSentence = sentenceEnd.map { String(collapsed[...$0]) } ?? collapsed
+        if firstSentence.count <= 180 { return firstSentence }
+        return String(firstSentence.prefix(177)) + "..."
+    }
+
+    /// Drop recursive `description` fields but preserve the schema's shape,
+    /// required keys, enums, and object/array nesting. That keeps argument
+    /// validation legible for small models while removing the prose that
+    /// dominates the first-turn `tools[]` token cost.
+    private static func compactParameterSkeleton(_ value: JSONValue?) -> JSONValue? {
+        guard let value else { return nil }
+        switch value {
+        case .object(let object):
+            var compact: [String: JSONValue] = [:]
+            for (key, nested) in object where key != "description" {
+                compact[key] = compactParameterSkeleton(nested)
+            }
+            return .object(compact)
+        case .array(let array):
+            return .array(array.compactMap { compactParameterSkeleton($0) })
+        case .string, .number, .bool, .null:
+            return value
+        }
+    }
+
+    /// Tools belonging to the Agent DB feature (spec §6). Gated on
+    /// `AgentConfigSnapshot.dbEnabled` in `resolveTools` so agents that
+    /// haven't opted in don't see them in the schema or the system
+    /// prompt — keeps tool count + token cost the same as before for
+    /// users who never enable the feature.
+    static let agentDBToolNames: Set<String> = [
+        "db_schema", "db_create_table", "db_alter_table", "db_migrate",
+        "db_insert", "db_upsert", "db_update", "db_delete", "db_restore",
+        "db_query", "db_execute",
+        // Saved views (spec §6.3 / phase 2).
+        "db_define_view", "db_run_view", "db_list_views", "db_drop_view",
+    ]
+
+    /// Render the schema snapshot block injected after the onboarding
+    /// prompt when `dbEnabled` is true. Best-effort: a failure to open
+    /// the DB (e.g. the user just enabled the toggle and the first
+    /// open hasn't run yet) falls back to the empty-state block so the
+    /// agent never sees a half-rendered prompt. Sync because the
+    /// underlying `LocalAgentBridge.schemaSnapshot` is sync.
+    static func renderSchemaSnapshot(agentId: UUID) -> String {
+        do {
+            return try LocalAgentBridge.shared.schemaSnapshot(agentId: agentId)
+        } catch {
+            debugLog(
+                "[Context:agentDB] schema snapshot unavailable for "
+                    + "\(agentId.uuidString): \(error.localizedDescription); "
+                    + "falling back to empty state"
+            )
+            return SchemaSnapshot.emptyStateBlock
+        }
+    }
 
     /// Tools that can mutate the user's filesystem, exec arbitrary code,
     /// or install dependencies. `codeStyleGuidance` and `riskAwareGuidance`
@@ -864,7 +1027,6 @@ public struct SystemPromptComposer: Sendable {
         )
 
         let manifest = composer.manifest()
-        let toolNames = toolset.tools.map { $0.function.name }
         let rendered = composer.render()
 
         return ComposedContext(
@@ -876,7 +1038,7 @@ public struct SystemPromptComposer: Sendable {
             preflight: .empty,
             memorySection: nil,
             alwaysLoadedNames: toolset.alwaysLoadedNames,
-            cacheHint: manifest.staticPrefixHash(toolNames: toolNames),
+            cacheHint: manifest.staticPrefixHash(tools: toolset.tools),
             staticPrefix: manifest.staticPrefixContent,
             contextDisable: toolset.contextDisable
         )
@@ -917,7 +1079,9 @@ public struct SystemPromptComposer: Sendable {
             skillSuggestions: [],
             alwaysLoadedNames: alwaysLoadedNames,
             contextDisable: contextDisable,
-            effectiveToolsOff: effectiveToolsOff
+            effectiveToolsOff: effectiveToolsOff,
+            capabilityPromptSectionsEnabled: true,
+            agentLoopGuidanceEnabled: false
         )
     }
 
@@ -1143,9 +1307,14 @@ public struct SystemPromptComposer: Sendable {
 
         var byName: [String: Tool] = [:]
 
-        func add(_ specs: [Tool]) {
+        func add(_ specs: [Tool], replacingExisting: Bool = false) {
             for spec in specs where byName[spec.function.name] == nil {
                 byName[spec.function.name] = spec
+            }
+            if replacingExisting {
+                for spec in specs {
+                    byName[spec.function.name] = spec
+                }
             }
         }
 
@@ -1174,23 +1343,40 @@ public struct SystemPromptComposer: Sendable {
 
         // Always-loaded baseline: built-ins (agent loop, share_artifact,
         // capability discovery, render_chart, search_memory) + sandbox/
-        // folder runtime when the mode is active. Manual mode then layers
-        // user picks on top; auto mode layers preflight specs on top.
-        // Manual mode opts out of the LLM-driven preflight only — it does
-        // NOT strip the always-loaded surface (the chat layer depends on
-        // the loop tools).
-        add(filtered(ToolRegistry.shared.alwaysLoadedSpecs(mode: executionMode)))
+        // folder runtime when the mode is active. The first-turn baseline
+        // uses compact schema skeletons; manual picks, preflight, and
+        // `capabilities_load` replace those skeletons with full specs when
+        // a task proves it needs the heavier argument contract.
+        let baseline = filtered(ToolRegistry.shared.alwaysLoadedSpecs(mode: executionMode))
+            .map(compactBootstrapSpec)
+        add(baseline)
 
         if isManual {
             if let manualNames = snapshot.manualToolNames {
-                add(ToolRegistry.shared.specs(forTools: manualNames))
+                add(ToolRegistry.shared.specs(forTools: manualNames), replacingExisting: true)
             }
         } else {
-            add(preflight.toolSpecs)
+            add(preflight.toolSpecs, replacingExisting: true)
         }
 
         if !additionalToolNames.isEmpty {
-            add(ToolRegistry.shared.specs(forTools: Array(additionalToolNames)))
+            add(
+                ToolRegistry.shared.specs(forTools: Array(additionalToolNames)),
+                replacingExisting: true
+            )
+        }
+
+        // Agent DB feature (spec §6) is opt-in per agent. The `db_*` tools
+        // are registered as built-ins so they always live in the always-
+        // loaded surface; stripping them here keeps the schema clean for
+        // every agent that hasn't enabled the feature. The system prompt
+        // composer also skips the onboarding block when `dbEnabled` is
+        // false — both gates read from `AgentConfigSnapshot.dbEnabled`,
+        // captured once at the start of compose.
+        if !snapshot.dbEnabled {
+            for name in agentDBToolNames {
+                byName.removeValue(forKey: name)
+            }
         }
 
         return canonicalToolOrder(Array(byName.values))

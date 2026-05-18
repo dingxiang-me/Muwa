@@ -21,6 +21,7 @@ struct ToolsManagerView: View {
     @State private var searchText: String = ""
     @State private var hasAppeared = false
     @State private var isRefreshingInstalled = false
+    @ObservedObject private var managementState = ManagementStateManager.shared
 
     // Snapshot values from services (updated via .onReceive / reload)
     @State private var toolEntries: [ToolRegistry.ToolEntry] = []
@@ -28,7 +29,6 @@ struct ToolsManagerView: View {
     @State private var policyInfoCache: [String: ToolRegistry.ToolPolicyInfo] = [:]
 
     // Cached filtered results
-    @State private var filteredEntries: [ToolRegistry.ToolEntry] = []
     @State private var installedPluginsWithTools: [(plugin: PluginState, tools: [ToolRegistry.ToolEntry])] = []
     @State private var remoteProviderTools: [(provider: MCPProvider, tools: [ToolRegistry.ToolEntry])] = []
     @State private var pluginsWithMissingPermissionsCount: Int = 0
@@ -60,6 +60,10 @@ struct ToolsManagerView: View {
             withAnimation(.easeOut(duration: 0.25).delay(0.1)) {
                 hasAppeared = true
             }
+            applyPendingSubTabRequest()
+        }
+        .onChange(of: managementState.pendingToolsSubTab) { _, _ in
+            applyPendingSubTabRequest()
         }
         .task(id: searchText) {
             try? await Task.sleep(nanoseconds: 150_000_000)
@@ -99,10 +103,19 @@ struct ToolsManagerView: View {
                 }
             }
         } tabsRow: {
+            // count only what the Available tab actually renders plugin Tools +
+            // remote tools). using `filteredEntries.count` (the full registry)
+            // leaks builtin / sandbox / folder conflicting tools into the
+            // badge — none of which have a visible row — so the badge drifts
+            // from the per-section sum and varies across machines depending on
+            // whether the sandbox container has provisioned its builtin tools
+            let availableShown =
+                installedPluginsWithTools.reduce(0) { $0 + $1.tools.count }
+                + remoteProviderTools.reduce(0) { $0 + $1.tools.count }
             HeaderTabsRow(
                 selection: $selectedTab,
                 counts: [
-                    .available: filteredEntries.count,
+                    .available: availableShown,
                     .remote: remoteProviderCount,
                     .sandbox: SandboxPluginLibrary.shared.plugins.count,
                 ],
@@ -209,21 +222,10 @@ struct ToolsManagerView: View {
         let currentProviders = providerManager.configuration.providers
         let currentProviderStates = providerManager.providerStates
 
-        let (filteredEntriesResult, installedPluginsResult, remoteToolsResult) =
+        let (installedPluginsResult, remoteToolsResult) =
             await Task.detached(priority: .userInitiated) {
 
-                // 1. Filtered Entries (for counts)
-                let filteredEntries: [ToolRegistry.ToolEntry]
-                if query.isEmpty {
-                    filteredEntries = currentToolEntries
-                } else {
-                    filteredEntries = currentToolEntries.filter { e in
-                        let candidates = [e.name.lowercased(), e.description.lowercased()]
-                        return candidates.contains { SearchService.fuzzyMatch(query: queryLower, in: $0) }
-                    }
-                }
-
-                // 2. Installed Plugins with Tools (for Available tab)
+                // 1. Installed Plugins with Tools (for Available tab)
                 let installedPlugins =
                     currentPlugins
                     .filter { $0.isInstalled }
@@ -257,7 +259,7 @@ struct ToolsManagerView: View {
                         $0.plugin.displayName < $1.plugin.displayName
                     }
 
-                // 3. Remote Provider Tools (for Available tab)
+                // 2. Remote Provider Tools (for Available tab)
                 let remoteTools =
                     currentProviders
                     .filter { provider in
@@ -293,12 +295,11 @@ struct ToolsManagerView: View {
                     }
                     .sorted { $0.provider.name < $1.provider.name }
 
-                return (filteredEntries, installedPlugins, remoteTools)
+                return (installedPlugins, remoteTools)
             }.value
 
         guard !Task.isCancelled else { return }
 
-        filteredEntries = filteredEntriesResult
         installedPluginsWithTools = installedPluginsResult
         remoteProviderTools = remoteToolsResult
 
@@ -330,6 +331,18 @@ struct ToolsManagerView: View {
         toolEntries = ToolRegistry.shared.listTools()
         remoteProviderCount = providerManager.configuration.providers.count
         Task { await updateFilteredLists() }
+    }
+
+    /// Honour one-shot navigation requests routed through
+    /// `ManagementStateManager.pendingToolsSubTab` (e.g. the Claude plugin
+    /// install summary deep-linking to the Remote MCP tab after OAuth or
+    /// bearer-token imports).
+    private func applyPendingSubTabRequest() {
+        guard let raw = managementState.pendingToolsSubTab,
+            let target = ToolsTab(rawValue: raw)
+        else { return }
+        selectedTab = target
+        managementState.pendingToolsSubTab = nil
     }
 }
 

@@ -43,6 +43,25 @@ struct ContextBudgetPreviewTests {
         body: @MainActor @Sendable (UUID) async -> Void
     ) async {
         await SandboxTestLock.runWithStoragePaths {
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "osaurus-context-budget-preview-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try? FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let previousRoot = OsaurusPaths.overrideRoot
+            OsaurusPaths.overrideRoot = root
+            MemoryConfigurationStore.invalidateCache()
+            var memoryConfig = MemoryConfiguration.default
+            memoryConfig.enabled = true
+            MemoryConfigurationStore.save(memoryConfig)
+            AgentManager.shared.refresh()
+            defer {
+                MemoryConfigurationStore.invalidateCache()
+                OsaurusPaths.overrideRoot = previousRoot
+                AgentManager.shared.refresh()
+                try? FileManager.default.removeItem(at: root)
+            }
+
             let agent = Agent(
                 name: "PreviewTestAgent-\(UUID().uuidString.prefix(6))",
                 systemPrompt: "Test identity",
@@ -101,11 +120,12 @@ struct ContextBudgetPreviewTests {
 
     // MARK: - Tools on (auto)
 
-    /// Auto-mode with tools on hits the always-loaded baseline → which
-    /// trips the agent loop + capability discovery gates. This is the
-    /// previously-hidden surface the welcome screen used to under-report.
-    @Test("preview: tools on (auto) surfaces agent loop + capability discovery")
-    func toolsOn_auto_includesLoopAndCapabilityNudge() async {
+    /// Auto-mode with tools on hits the always-loaded baseline and prices
+    /// capability discovery ahead of time. Agent-loop prose is no longer a
+    /// first-turn cost: compact tool descriptions carry the initial contract,
+    /// and the heavier cheat sheet appears only after a loop tool is used.
+    @Test("preview: tools on (auto) surfaces capability discovery, not agent loop")
+    func toolsOn_auto_includesCapabilityNudgeOnly() async {
         await withAgent(toolSelectionMode: .auto) { agentId in
             let preview = SystemPromptComposer.composePreviewContext(
                 agentId: agentId,
@@ -114,7 +134,7 @@ struct ContextBudgetPreviewTests {
             let ids = sectionIds(preview)
             #expect(ids.contains("platform"))
             #expect(ids.contains("persona"))
-            #expect(ids.contains("agentLoopGuidance"))
+            #expect(ids.contains("agentLoopGuidance") == false)
             #expect(ids.contains("capabilityNudge"))
             // No model-family hint without a model id, no skills configured.
             #expect(ids.contains("modelFamilyGuidance") == false)
@@ -126,13 +146,14 @@ struct ContextBudgetPreviewTests {
         }
     }
 
-    /// Manual mode opts out of preflight, which also opts out of the
-    /// capability-discovery nudge (the nudge is gated on auto mode so
-    /// manual agents don't see "go grow your tool list" guidance they
-    /// can't act on). Loop guidance still fires because `todo`/etc.
-    /// are always-loaded built-ins regardless of mode.
-    @Test("preview: manual mode keeps agent loop, drops capability nudge")
-    func toolsOn_manual_dropsCapabilityNudge() async {
+    /// Manual mode opts out of the LLM preflight call, but it still
+    /// includes the capability discovery tools in the schema. The prompt
+    /// must explain those tools whenever they are callable; otherwise the
+    /// model sees an opaque `capabilities_search` function and #789-style
+    /// "search is enabled but never found" failures are hard to diagnose.
+    /// Loop guidance is separately deferred until a loop tool has been used.
+    @Test("preview: manual mode defers agent loop and keeps capability nudge")
+    func toolsOn_manual_keepsCapabilityNudge() async {
         await withAgent(
             toolSelectionMode: .manual,
             manualToolNames: ["render_chart"]
@@ -142,9 +163,95 @@ struct ContextBudgetPreviewTests {
                 executionMode: .none
             )
             let ids = sectionIds(preview)
-            #expect(ids.contains("agentLoopGuidance"))
-            #expect(ids.contains("capabilityNudge") == false)
+            #expect(ids.contains("agentLoopGuidance") == false)
+            #expect(ids.contains("capabilityNudge"))
             #expect(preview.tools.contains { $0.function.name == "render_chart" })
+        }
+    }
+
+    /// The prompt-bloat fix prices the actual compact bootstrap schema, not
+    /// the registry's full tool definitions. Loading a tool by name upgrades
+    /// that compact placeholder back to the full schema for subsequent tool
+    /// iterations.
+    @Test("preview: always-loaded tools use compact bootstrap schemas")
+    func toolsOn_auto_usesCompactBootstrapSchemas() async {
+        await withAgent(toolSelectionMode: .auto) { agentId in
+            let preview = SystemPromptComposer.composePreviewContext(
+                agentId: agentId,
+                executionMode: .none
+            )
+            let fullBaseline = ToolRegistry.shared.alwaysLoadedSpecs(mode: .none)
+            let fullBaselineTokens = ToolRegistry.shared.totalEstimatedTokens(for: fullBaseline)
+            #expect(preview.toolTokens < fullBaselineTokens)
+
+            let compactTodo = preview.tools.first { $0.function.name == "todo" }
+            let fullTodo = TodoTool().asOpenAITool()
+            #expect(compactTodo?.function.description != fullTodo.function.description)
+            #expect(
+                (compactTodo?.function.description?.count ?? 0)
+                    < (fullTodo.function.description?.count ?? 0)
+            )
+
+            let upgraded = SystemPromptComposer.resolveTools(
+                agentId: agentId,
+                executionMode: .none,
+                additionalToolNames: ["todo"]
+            )
+            let upgradedTodo = upgraded.first { $0.function.name == "todo" }
+            #expect(upgradedTodo?.function.description == fullTodo.function.description)
+            #expect(upgradedTodo?.function.parameters == fullTodo.function.parameters)
+        }
+    }
+
+    /// A greeting should not run preflight or carry dynamic discovery
+    /// prompt text. The callable bootstrap tools remain present so the
+    /// session can grow as soon as the user asks for real work.
+    @Test("compose: trivial greeting skips dynamic capability prompt sections")
+    func trivialGreeting_skipsPreflightAndDynamicPromptSections() async {
+        await withAgent(toolSelectionMode: .auto) { agentId in
+            let context = await SystemPromptComposer.composeChatContext(
+                agentId: agentId,
+                executionMode: .none,
+                query: "hi!"
+            )
+            let ids = sectionIds(context)
+            #expect(SystemPromptComposer.isTrivialPreflightQuery("hi!"))
+            #expect(context.preflightItems.isEmpty)
+            #expect(ids.contains("capabilityNudge") == false)
+            #expect(ids.contains("pluginCreator") == false)
+            #expect(ids.contains("agentLoopGuidance") == false)
+            #expect(context.tools.contains { $0.function.name == "capabilities_load" })
+        }
+    }
+
+    /// Once history contains an agent-loop call, the continuation guide is
+    /// worth the prompt cost. This keeps multi-step sessions stable without
+    /// charging the first "hello" or "can you..." turn.
+    @Test("compose: prior loop use enables agent loop guidance")
+    func priorLoopUse_enablesAgentLoopGuidance() async {
+        await withAgent(toolSelectionMode: .auto) { agentId in
+            let messages = [
+                ChatMessage(
+                    role: "assistant",
+                    content: nil,
+                    tool_calls: [
+                        ToolCall(
+                            id: "call_todo",
+                            type: "function",
+                            function: ToolCallFunction(name: "todo", arguments: #"{"markdown":"- [ ] one"}"#)
+                        )
+                    ],
+                    tool_call_id: nil
+                )
+            ]
+            let context = await SystemPromptComposer.composeChatContext(
+                agentId: agentId,
+                executionMode: .none,
+                query: "continue",
+                messages: messages,
+                cachedPreflight: .empty
+            )
+            #expect(sectionIds(context).contains("agentLoopGuidance"))
         }
     }
 
@@ -374,5 +481,137 @@ struct ContextBudgetPreviewTests {
             )
             #expect(preview.contextDisable == real.contextDisable)
         }
+    }
+}
+
+// MARK: - Bar Segment Widths
+
+/// Unit tests for `computeContextBudgetSegmentWidths`, the helper that
+/// drives the stacked Context Budget bar at the top of the popover.
+/// Locks the contract that prevents the original "broken when no ceiling"
+/// bug: tiny entries with a hard 3pt floor would inflate combined widths
+/// past the GeometryReader, so the orange Tools segment visibly shrank
+/// even though the legend showed 81%.
+@Suite
+struct ContextBudgetSegmentWidthsTests {
+
+    private let available: CGFloat = 216
+
+    /// The screenshot's exact bucket counts (Platform/Persona/Agent DB/
+    /// Agent Loop/Capability Discovery/Memory/Tools) with `breakdown.total`
+    /// as the scale — the "no ceiling" case. Bars must fill the entire
+    /// track, no slack on the right.
+    @Test("no ceiling: widths fill the entire track")
+    func noCeiling_fillsTrack() {
+        let tokens = [16, 10, 681, 324, 116, 21, 5200]
+        let total = tokens.reduce(0, +)
+
+        let widths = computeContextBudgetSegmentWidths(
+            tokens: tokens,
+            totalTokens: total,
+            available: available,
+            fillsTrack: true
+        )
+
+        #expect(widths.count == tokens.count)
+        let sum = widths.reduce(0, +)
+        #expect(abs(sum - available) < 0.5)
+    }
+
+    /// With a ceiling far above `breakdown.total`, the bar should show
+    /// real headroom: segments sum to `total/cap * available`, well below
+    /// the full track. The HStack's trailing `Spacer` paints the rest.
+    @Test("with ceiling: widths leave headroom proportional to budget cap")
+    func withCeiling_leavesHeadroom() {
+        let tokens = [681, 324, 116, 5200]
+        let total = tokens.reduce(0, +)
+        let cap = total * 10
+
+        let widths = computeContextBudgetSegmentWidths(
+            tokens: tokens,
+            totalTokens: cap,
+            available: available,
+            fillsTrack: false
+        )
+
+        let sum = widths.reduce(0, +)
+        let expectedSum = available * CGFloat(total) / CGFloat(cap)
+        #expect(abs(sum - expectedSum) < 1.0)
+        #expect(sum < available)
+    }
+
+    /// Pathological: 30 nearly-zero entries with a single dominant one.
+    /// Old code would push the rendered HStack ~30pt past the track
+    /// because every tiny entry got bumped to 3pt. The helper must cap
+    /// the total at exactly `available` regardless of entry count.
+    @Test("tiny entries do not overflow the available width")
+    func manyTinyEntries_doNotOverflow() {
+        var tokens = Array(repeating: 1, count: 30)
+        tokens.append(5000)
+        let total = tokens.reduce(0, +)
+
+        let widths = computeContextBudgetSegmentWidths(
+            tokens: tokens,
+            totalTokens: total,
+            available: available,
+            fillsTrack: true
+        )
+
+        let sum = widths.reduce(0, +)
+        #expect(sum <= available + 0.5)
+        // Dominant entry should still be the largest segment.
+        let maxIdx = widths.indices.max { widths[$0] < widths[$1] }
+        #expect(maxIdx == tokens.count - 1)
+    }
+
+    /// Larger token counts must produce equal-or-wider segments at the
+    /// no-ceiling fillsTrack call site. Catches future regressions where
+    /// the floor or rounding step flips the ordering.
+    @Test("segment widths are monotonic with token counts")
+    func widths_areMonotonicWithTokens() {
+        let tokens = [10, 100, 500, 1000, 5000]
+        let total = tokens.reduce(0, +)
+
+        let widths = computeContextBudgetSegmentWidths(
+            tokens: tokens,
+            totalTokens: total,
+            available: available,
+            fillsTrack: true
+        )
+
+        for i in 1 ..< widths.count {
+            #expect(widths[i] >= widths[i - 1])
+        }
+    }
+
+    /// Degenerate inputs collapse to zeros rather than crashing or
+    /// producing NaN: the popover may render the bar before any tokens
+    /// have been counted (empty conversation, model swap mid-stream).
+    @Test("degenerate inputs return zero widths")
+    func degenerateInputs_returnZeros() {
+        #expect(
+            computeContextBudgetSegmentWidths(
+                tokens: [],
+                totalTokens: 0,
+                available: available,
+                fillsTrack: true
+            ).isEmpty
+        )
+
+        let zeroAvailable = computeContextBudgetSegmentWidths(
+            tokens: [100, 200],
+            totalTokens: 300,
+            available: 0,
+            fillsTrack: true
+        )
+        #expect(zeroAvailable == [0, 0])
+
+        let zeroTotal = computeContextBudgetSegmentWidths(
+            tokens: [0, 0, 0],
+            totalTokens: 0,
+            available: available,
+            fillsTrack: true
+        )
+        #expect(zeroTotal == [0, 0, 0])
     }
 }
