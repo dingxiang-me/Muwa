@@ -155,19 +155,20 @@ struct DashboardToolPicker: View {
             .background(theme.secondaryBackground)
             Divider().opacity(0.4)
             ScrollView {
-                LazyVStack(alignment: .leading, spacing: 0, pinnedViews: [.sectionHeaders]) {
+                LazyVStack(alignment: .leading, spacing: 24) {
                     ForEach(groupedSections, id: \.title) { section in
-                        Section {
-                            ForEach(section.tools) { tool in
-                                row(tool)
-                                Divider().opacity(0.25)
-                            }
-                        } header: {
+                        VStack(alignment: .leading, spacing: 12) {
                             groupHeader(section.title)
+                            VStack(spacing: 14) {
+                                ForEach(section.tools) { tool in
+                                    row(tool)
+                                }
+                            }
                         }
                     }
                 }
-                .padding(.bottom, 8)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 16)
             }
             if catalog.isEmpty {
                 emptyState
@@ -261,13 +262,22 @@ struct DashboardToolPicker: View {
     }
 
     private func groupHeader(_ title: String) -> some View {
-        Text(title)
-            .font(.system(size: 10, weight: .semibold))
-            .foregroundColor(theme.tertiaryText)
+        Text(prettyGroupTitle(title))
+            .font(.system(size: 14, weight: .bold))
+            .foregroundColor(theme.accentColor)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 6)
-            .background(theme.secondaryBackground)
+            .padding(.horizontal, 4)
+    }
+
+    /// "osaurus.macos-use" -> "Macos Use", "osaurus.calendar" -> "Calendar"
+    private func prettyGroupTitle(_ raw: String) -> String {
+        let stripped = raw.hasPrefix("osaurus.")
+            ? String(raw.dropFirst("osaurus.".count))
+            : raw
+        return stripped
+            .split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
     }
 
     private func row(_ tool: PickableTool) -> some View {
@@ -277,28 +287,34 @@ struct DashboardToolPicker: View {
             guard !isDisabled else { return }
             selectedTool = tool
         } label: {
-            VStack(alignment: .leading, spacing: 4) {
-                HStack(spacing: 6) {
+            VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: 8) {
+                        Text(humanize(tool.name))
+                            .font(.system(size: 15, weight: .semibold))
+                            .foregroundColor(isDisabled ? theme.tertiaryText : theme.primaryText)
+                            .lineLimit(1)
+                        if tool.effectivePolicy == .ask {
+                            policyBadge(
+                                "Will prompt",
+                                icon: "hand.raised.fill",
+                                color: theme.warningColor
+                            )
+                        }
+                        Spacer()
+                        if isSelected {
+                            Image(systemName: "checkmark.circle.fill")
+                                .font(.system(size: 14))
+                                .foregroundColor(theme.accentColor)
+                        }
+                    }
                     Text(tool.name)
-                        .font(.system(size: 12, weight: .semibold, design: .monospaced))
-                        .foregroundColor(isDisabled ? theme.tertiaryText : theme.primaryText)
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(theme.tertiaryText)
                         .lineLimit(1)
-                    if tool.effectivePolicy == .ask {
-                        policyBadge(
-                            "Will prompt",
-                            icon: "hand.raised.fill",
-                            color: theme.warningColor
-                        )
-                    }
-                    Spacer()
-                    if isSelected {
-                        Image(systemName: "checkmark.circle.fill")
-                            .font(.system(size: 12))
-                            .foregroundColor(theme.accentColor)
-                    }
                 }
                 Text(tool.description)
-                    .font(.system(size: 11))
+                    .font(.system(size: 12))
                     .foregroundColor(theme.secondaryText)
                     .lineLimit(2)
                 if let reason = tool.unavailableReason {
@@ -313,17 +329,32 @@ struct DashboardToolPicker: View {
                     }
                 }
             }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 8)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 12)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(
-                Rectangle()
-                    .fill(isSelected ? theme.accentColor.opacity(0.08) : Color.clear)
+                RoundedRectangle(cornerRadius: 10)
+                    .fill(isSelected ? theme.accentColor.opacity(0.12) : theme.secondaryBackground)
             )
-            .contentShape(Rectangle())
+            .overlay(
+                RoundedRectangle(cornerRadius: 10)
+                    .strokeBorder(
+                        isSelected ? theme.accentColor.opacity(0.5) : theme.cardBorder.opacity(0.5),
+                        lineWidth: isSelected ? 1.5 : 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 10))
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
+    }
+
+    /// "get_active_window" -> "Get Active Window"
+    private func humanize(_ raw: String) -> String {
+        raw
+            .split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
     }
 
     private func policyBadge(_ text: String, icon: String, color: Color) -> some View {
