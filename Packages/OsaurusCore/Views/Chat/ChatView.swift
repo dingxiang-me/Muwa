@@ -3212,9 +3212,15 @@ struct ChatView: View {
     // MARK: - Header
 
     private var chatHeader: some View {
-        Color.clear
-            .frame(height: 52)
-            .allowsHitTesting(false)
+        VStack(spacing: 0) {
+            // reserve for the toolbar (content extends behind it)
+            Color.clear
+                .frame(height: 52)
+                .allowsHitTesting(false)
+            ChatHeaderAgentView(windowState: windowState, session: session)
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, 6)
+        }
     }
 
     // MARK: - Message Thread

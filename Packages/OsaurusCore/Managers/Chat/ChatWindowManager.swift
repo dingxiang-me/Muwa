@@ -509,10 +509,8 @@ public final class ChatWindowManager: NSObject, ObservableObject {
         let toolbar = NSToolbar(identifier: "ChatToolbar")
         toolbar.allowsUserCustomization = false
         toolbar.autosavesConfiguration = false
-        // Anchor the agent pill at the toolbar's geometric center; without
-        // this it drifts off-axis because of the asymmetric leading/trailing
-        // items and the traffic-light area.
-        toolbar.centeredItemIdentifier = ChatToolbarDelegate.agentItem
+        // center the mode toggle (otherwise it drifts off-axis)
+        toolbar.centeredItemIdentifier = ChatToolbarDelegate.modeToggleItem
 
         let toolbarDelegate = ChatToolbarDelegate(windowState: windowState, session: windowState.session)
         toolbar.delegate = toolbarDelegate
@@ -659,19 +657,13 @@ private final class ChatPanel: NSPanel {
 private final class ChatToolbarDelegate: NSObject, NSToolbarDelegate {
     fileprivate static let sidebarItem = NSToolbarItem.Identifier("ChatToolbar.sidebar")
     fileprivate static let modeToggleItem = NSToolbarItem.Identifier("ChatToolbar.modeToggle")
-    fileprivate static let agentItem = NSToolbarItem.Identifier("ChatToolbar.agent")
     fileprivate static let actionItem = NSToolbarItem.Identifier("ChatToolbar.action")
     fileprivate static let pinItem = NSToolbarItem.Identifier("ChatToolbar.pin")
 
-    /// Layout: sidebar + chat/dashboard mode toggle on the leading edge,
-    /// agent pill centered (via the toolbar's `centeredItemIdentifier`),
-    /// action + pin on the trailing edge. The flexible spaces let the
-    /// trailing items hug the right edge. Any stale identifiers AppKit
-    /// may have persisted in user defaults fall through to `default: nil`
-    /// in `itemForItemIdentifier`, which renders them as no-ops rather
-    /// than crashing.
+    /// sidebar leading, mode toggle centered, action + pin trailing.
+    /// agent pill is rendered by `ChatView`, not the toolbar.
     private static let itemIdentifiers: [NSToolbarItem.Identifier] = [
-        sidebarItem, modeToggleItem, .flexibleSpace, agentItem, .flexibleSpace, actionItem, pinItem,
+        sidebarItem, .flexibleSpace, modeToggleItem, .flexibleSpace, actionItem, pinItem,
     ]
 
     private weak var windowState: ChatWindowState?
@@ -711,13 +703,6 @@ private final class ChatToolbarDelegate: NSObject, NSToolbarDelegate {
                 identifier: itemIdentifier,
                 rootView:
                     ChatToolbarModeToggleView(windowState: windowState, session: session)
-            )
-
-        case Self.agentItem:
-            return makeHostingItem(
-                identifier: itemIdentifier,
-                rootView:
-                    ChatToolbarAgentView(windowState: windowState, session: session)
             )
 
         case Self.actionItem:
@@ -798,8 +783,9 @@ private struct ChatToolbarSidebarView: View {
     }
 }
 
-/// Agent selector pill that lives in the toolbar's centered slot.
-private struct ChatToolbarAgentView: View {
+/// agent pill, rendered below the toolbar so it doesn't fight the
+/// centered mode toggle (and so the dashboard tab can omit it).
+struct ChatHeaderAgentView: View {
     @ObservedObject var windowState: ChatWindowState
     @ObservedObject var session: ChatSession
 

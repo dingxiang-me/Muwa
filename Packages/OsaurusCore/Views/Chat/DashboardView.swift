@@ -35,7 +35,7 @@ struct DashboardView: View {
             pinRequest = nil
             showAddSheet = true
         }
-        // drain both on appear (request buffered before mount) and on change (request arrives while open)
+        // drain on mount (buffered) and on change (arrives while open)
         .onAppear { drainPendingPinRequest() }
         .onChange(of: viewModel.pendingPinRequest) { _, _ in drainPendingPinRequest() }
         .sheet(isPresented: $showAddSheet) {
@@ -164,9 +164,6 @@ struct DashboardView: View {
                             showAddSheet = true
                         }
                     )
-                    // Drag payload is the widget's UUID as a string —
-                    // small, copyable, and avoids hauling the whole
-                    // widget through the pasteboard.
                     .draggable(widget.id.uuidString)
                     .dropDestination(for: String.self) { items, _ in
                         guard let raw = items.first,
@@ -189,13 +186,12 @@ struct DashboardView: View {
 // MARK: - Notifications
 
 extension Notification.Name {
-    /// posted by the toolbar's `+ Add Widget` button
+    /// toolbar's `+ Add Widget` button
     static let dashboardAddWidgetRequested = Notification.Name(
         "dashboardAddWidgetRequested"
     )
 
-    /// posted by external surfaces (e.g. chat's right-click menu);
-    /// userInfo carries `toolName: String` and `argumentsJSON: String`
+    /// external surfaces (e.g. chat right-click); userInfo: toolName, argumentsJSON
     static let dashboardPinRequested = Notification.Name(
         "dashboardPinRequested"
     )
@@ -211,7 +207,7 @@ struct DashboardPinRequest: Equatable {
             let argsRaw = info["argumentsJSON"] as? String
         else { return nil }
         self.toolName = toolName
-        // best-effort: fall back to empty object on malformed JSON so the picker still pre-fills
+        // fall back to empty object on malformed JSON so picker still pre-fills
         if let data = argsRaw.data(using: .utf8),
             let parsed = try? JSONDecoder().decode(JSONValue.self, from: data)
         {
