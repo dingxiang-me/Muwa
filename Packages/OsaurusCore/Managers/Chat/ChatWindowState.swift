@@ -24,6 +24,12 @@ final class ChatWindowState: ObservableObject {
 
     @Published var showSidebar: Bool = false
 
+    /// Drives the in-chat "Keep this chat running?" confirmation overlay
+    /// that intercepts a close while `session.isStreaming` is true. Set
+    /// from `ChatWindowManager.shouldAllowClose`; cleared by the alert's
+    /// button actions in `ChatView`.
+    @Published var showCloseConfirmation: Bool = false
+
     // MARK: - Agent State
 
     @Published var agentId: UUID
@@ -133,6 +139,21 @@ final class ChatWindowState: ObservableObject {
         session.onSessionChanged = nil
     }
 
+    // MARK: - Close-Confirmation Actions
+
+    /// "Continue in Background" — adopt the live session as a background
+    /// task (visible in the notch) and dismiss the window.
+    func confirmCloseInBackground() {
+        BackgroundTaskManager.shared.detachChatWindow(windowId: windowId)
+        ChatWindowManager.shared.closeWindow(id: windowId)
+    }
+
+    /// "Stop and Close" — cancel the in-flight stream, then dismiss.
+    func confirmCloseAndStop() {
+        session.stop()
+        ChatWindowManager.shared.closeWindow(id: windowId)
+    }
+
     // MARK: - API
 
     var activeAgent: Agent { cachedActiveAgent }
@@ -235,13 +256,20 @@ final class ChatWindowState: ObservableObject {
         let newConfig = newTheme.customThemeConfig
         // Skip only if the full config is identical (not just the ID)
         guard oldConfig != newConfig else { return }
+        let shouldRedecodeBackgroundImage = Self.needsBackgroundImageRedecode(
+            oldConfig: oldConfig,
+            newConfig: newConfig
+        )
 
         theme = newTheme
 
-        // Only re-decode background image when the theme itself changes (different ID)
-        if oldConfig?.metadata.id != newConfig?.metadata.id {
-            decodeBackgroundImageAsync(themeConfig: theme.customThemeConfig)
+        if shouldRedecodeBackgroundImage {
+            decodeBackgroundImageAsync(themeConfig: newConfig)
         }
+    }
+
+    nonisolated static func needsBackgroundImageRedecode(oldConfig: CustomTheme?, newConfig: CustomTheme?) -> Bool {
+        BackgroundImageDecodeKey(config: oldConfig) != BackgroundImageDecodeKey(config: newConfig)
     }
 
     func refreshAgentConfig() {
@@ -398,6 +426,18 @@ final class ChatWindowState: ObservableObject {
         }
     }
 
+    private struct BackgroundImageDecodeKey: Equatable {
+        let themeId: UUID?
+        let backgroundType: ThemeBackground.BackgroundType?
+        let imageData: String?
+
+        init(config: CustomTheme?) {
+            self.themeId = config?.metadata.id
+            self.backgroundType = config?.background.type
+            self.imageData = config?.background.imageData
+        }
+    }
+
     private func setupNotificationObservers() {
         notificationObservers.append(
             NotificationCenter.default.addObserver(
@@ -415,16 +455,18 @@ final class ChatWindowState: ObservableObject {
                 queue: .main
             ) { [weak self] _ in Task { @MainActor in self?.refreshAgentConfig() } }
         )
-        // Refresh theme when global theme changes (only if agent uses global theme)
+        // refresh theme when any theme on disk changes. refreshTheme()
+        // re-resolves from `installedThemes`/`currentTheme` and no ops via its
+        // config equality guard if this window's effective theme is unchanged,
+        // so windows pinned to an agent specific theme also pick up live edits
+        // to that theme without waiting for a reopen
         notificationObservers.append(
             NotificationCenter.default.addObserver(
                 forName: .globalThemeChanged,
                 object: nil,
                 queue: .main
             ) { [weak self] _ in
-                Task { @MainActor in
-                    if self?.themeId == nil { self?.refreshTheme() }
-                }
+                Task { @MainActor in self?.refreshTheme() }
             }
         )
         // Note: `.agentUpdated` is intentionally not observed here.

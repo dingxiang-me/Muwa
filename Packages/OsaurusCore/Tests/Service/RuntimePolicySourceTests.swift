@@ -92,9 +92,40 @@ struct RuntimePolicySourceTests {
         // canonical multi-turn encoder so UI-generated cache boundaries can
         // be reused on growing chat prompts. `ad1d231` synchronizes before and
         // after safetensors disk writes against the GPU stream after generation.
-        #expect(manifest.contains("ad1d23199b056ed502124717e6ca8877f2fb303a"))
-        #expect(workspaceResolved.contains("ad1d23199b056ed502124717e6ca8877f2fb303a"))
-        #expect(appResolved.contains("ad1d23199b056ed502124717e6ca8877f2fb303a"))
+        // `c0f8b3b` adds Nemotron Omni live-voice handoff support and preserves
+        // pre-encoded Parakeet/audio embeddings. `e497f61` adds the reusable
+        // retained live PCM buffer plus a streaming cursor for VAD/call-mode
+        // polling without losing the final full-turn waveform. `638024b`
+        // adds a tracked OmniAudioLatencyBench for raw PCM vs pre-encoded
+        // Parakeet call-mode measurements. `fb8fb39` makes Omni media cache
+        // restore token-aware and records prompt/media topology in the bench
+        // output. `b57fe98` refreshes the Parakeet/RADIO integration docs
+        // consumed by Osaurus live-voice work. `81c8ef7` adds the
+        // OmniAudioChunkStabilityBench proof that current Parakeet embeddings
+        // cannot be concatenated safely across independently encoded chunks.
+        // `f728718` fixes DSV4 Flash long-prompt HSA selection by masking
+        // future compressed-pool chunks before indexer top-k. `6561a72`
+        // preserves DSV4's ratio-4 overlap-compressor state across decode
+        // calls, preventing the previous complete pool window from being
+        // zeroed after a single-token generation boundary. `e1280c3` is a
+        // build-time fix that breaks up a nested ternary + four-level `??`
+        // chain in LLMModelFactory.swift that the Swift type checker could
+        // not solve within its time budget; runtime behavior is unchanged.
+        let currentVmlxRevision = "e1280c3978d68e9204006923e922e62cb2ea5628"
+        #expect(manifest.contains(currentVmlxRevision))
+        #expect(workspaceResolved.contains(currentVmlxRevision))
+        #expect(appResolved.contains(currentVmlxRevision))
+        #expect(!workspaceResolved.contains("b57fe98845bd1f678bd8f722dc50dba56f11d029"))
+        #expect(!appResolved.contains("b57fe98845bd1f678bd8f722dc50dba56f11d029"))
+        #expect(!appResolved.contains("fb8fb3959ac97598c6b4ddeba0516f01d84ddf0e"))
+        #expect(!workspaceResolved.contains("638024bae655b93b1da92385ce9fb4935584fb64"))
+        #expect(!appResolved.contains("638024bae655b93b1da92385ce9fb4935584fb64"))
+        #expect(!workspaceResolved.contains("e497f61c3a68c6d70334d8a14a7ad0a58864af9b"))
+        #expect(!appResolved.contains("e497f61c3a68c6d70334d8a14a7ad0a58864af9b"))
+        #expect(!workspaceResolved.contains("c0f8b3b1e87f92983bb82f8ace2ec6fd3779c471"))
+        #expect(!appResolved.contains("c0f8b3b1e87f92983bb82f8ace2ec6fd3779c471"))
+        #expect(!workspaceResolved.contains("ad1d23199b056ed502124717e6ca8877f2fb303a"))
+        #expect(!appResolved.contains("ad1d23199b056ed502124717e6ca8877f2fb303a"))
         #expect(!workspaceResolved.contains("6de602c6d18daf2c1a07cef16b79b507a25feafd"))
         #expect(!appResolved.contains("6de602c6d18daf2c1a07cef16b79b507a25feafd"))
         #expect(!workspaceResolved.contains("b350af6daad0d25c39335356f56de2ae8d70226c"))
@@ -428,6 +459,39 @@ struct RuntimePolicySourceTests {
             ),
             "ModelRuntime must not use the plain local-directory load overload; it bypasses vmlx LoadConfiguration.default, including load-time memory caps, mmap safetensors, and JANGTQ prestack/alignment"
         )
+    }
+
+    @Test("ModelRuntime wires idle residency around model leases")
+    func modelRuntimeWiresIdleResidencyAroundLeases() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+        let manager = try Self.source("Services/ModelRuntime/ModelResidencyManager.swift")
+
+        #expect(runtime.contains("ModelResidencyManager.shared.markActive(modelName: modelName)"))
+        #expect(runtime.contains("ModelResidencyManager.shared.markActive(modelName: holder.name)"))
+        #expect(runtime.contains("private func scheduleIdleResidency(for modelName: String) async"))
+        #expect(runtime.contains("ServerConfigurationStore.load()?.modelIdleResidencyPolicy"))
+        #expect(runtime.contains("ModelResidencyManager.shared.scheduleIdleUnload"))
+        #expect(runtime.contains("ModelLease.shared.count(for: name)"))
+        #expect(runtime.contains("await ModelResidencyManager.shared.cancel(modelName: name)"))
+        #expect(runtime.contains("await ModelResidencyManager.shared.cancelAll()"))
+        #expect(manager.contains("guard await leaseCount(modelName) == 0"))
+        #expect(manager.contains("guard await isResident(modelName)"))
+    }
+
+    @Test("UI and health expose model idle residency")
+    func uiAndHealthExposeModelIdleResidency() throws {
+        let settings = try Self.source("Views/Settings/ConfigurationView.swift")
+        let health = try Self.source("Networking/HTTPHandler.swift")
+        let windows = try Self.source("Managers/Chat/ChatWindowManager.swift")
+
+        #expect(settings.contains("tempIdleResidencyPolicy"))
+        #expect(settings.contains("Keep model loaded after use"))
+        #expect(settings.contains("ModelIdleResidencyPolicy.presets"))
+        #expect(health.contains("\"resident_models\": residentModels"))
+        #expect(health.contains("\"idle_unload_at\""))
+        #expect(health.contains("\"idle_seconds_remaining\""))
+        #expect(windows.contains("modelIdleResidencyPolicy"))
+        #expect(windows.contains("if idlePolicy == .immediately"))
     }
 
     @Test("ModelRuntime does not block model-ready on hidden Hy3 warmup generation")

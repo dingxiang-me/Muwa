@@ -46,6 +46,15 @@ struct FloatingInputCard: View {
     /// Binding to the session's auto-speak preference. When true, a chip is shown
     /// so the user can disable it without waiting to be re-prompted.
     @Binding var autoSpeakAssistant: Bool
+    /// Single-slot queued send that was authored while a run was streaming.
+    /// Non-nil renders a chip + flips the Send button into "Send Now"
+    /// (interrupt) mode. Nil → ordinary Send / Queue behavior.
+    @Binding var queuedSend: QueuedSend?
+    /// Cancel + immediately dispatch the queued send. Only invoked when
+    /// `queuedSend != nil` (the SendNow button is otherwise hidden).
+    var onSendNow: (() -> Void)?
+    /// Discard the queued send without sending it. Called by the chip's ×.
+    var onCancelQueued: (() -> Void)?
 
     init(
         text: Binding<String>,
@@ -69,7 +78,10 @@ struct FloatingInputCard: View {
         onClearChat: (() -> Void)? = nil,
         onSkillSelected: ((UUID) -> Void)? = nil,
         pendingSkillId: Binding<UUID?> = .constant(nil),
-        autoSpeakAssistant: Binding<Bool> = .constant(false)
+        autoSpeakAssistant: Binding<Bool> = .constant(false),
+        queuedSend: Binding<QueuedSend?> = .constant(nil),
+        onSendNow: (() -> Void)? = nil,
+        onCancelQueued: (() -> Void)? = nil
     ) {
         self._text = text
         self._selectedModel = selectedModel
@@ -93,6 +105,9 @@ struct FloatingInputCard: View {
         self.onSkillSelected = onSkillSelected
         self._pendingSkillId = pendingSkillId
         self._autoSpeakAssistant = autoSpeakAssistant
+        self._queuedSend = queuedSend
+        self.onSendNow = onSendNow
+        self.onCancelQueued = onCancelQueued
     }
 
     // Observe managers for reactive updates
@@ -140,6 +155,10 @@ struct FloatingInputCard: View {
     @State private var localText: String = ""
     @State private var isFocused: Bool = false
     @State private var isComposing: Bool = false
+    /// Keeps focus in the input through the send/queue state cascade.
+    /// `syncAndSend` and `sendNowButton` arm `lockFocus(for:)` before
+    /// the mutations that would otherwise let AppKit blur the field.
+    @StateObject private var textViewFocusController = TextViewFocusController()
     @Environment(\.theme) private var theme
     @Environment(\.colorScheme) private var colorScheme
     @State private var isDragOver = false
@@ -174,6 +193,17 @@ struct FloatingInputCard: View {
     @State private var lastConfirmedLength: Int = 0
 
     @State private var pauseTimerCancellable: AnyCancellable? = nil
+    @State private var liveVoiceAttachmentId: UUID?
+    /// Active pasted-content attachment whose preview sheet is showing.
+    /// Set on chip tap; cleared on dismiss.
+    @State private var pastedContentPreview: Attachment?
+    @State private var pastedContentEdit: Attachment?
+    /// Character threshold above which clipboard text is converted to a
+    /// pasted-content attachment instead of being inlined into the input.
+    private static let pastedContentThreshold: Int = 400
+    @State private var liveVoicePreencodeTask: Task<Void, Never>?
+    @State private var lastLiveVoicePreencodeAt: Date = .distantPast
+    @State private var lastLiveVoicePreencodeSampleCount: Int = 0
 
     // TextEditor should grow up to ~6 lines before scrolling
     private var inputFontSize: CGFloat { CGFloat(theme.bodySize) }
@@ -193,7 +223,10 @@ struct FloatingInputCard: View {
 
         let hasText = !localText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         let hasContent = hasText || !pendingAttachments.isEmpty
-        return hasContent && !isStreaming
+        // During streaming, "send" enqueues the payload (handled by the
+        // parent). The bar swaps Send for SendQueue/SendNow visually but
+        // the keyboard path still goes through onSend → enqueueSend.
+        return hasContent
     }
 
     private var showPlaceholder: Bool {
@@ -400,9 +433,11 @@ struct FloatingInputCard: View {
                 }
             }
             .onChange(of: isStreaming) { wasStreaming, nowStreaming in
-                // re-focus the input when streaming ends so the user can type immediately.
-                // focus is cleared on send to stop the NSTextView cursor-blink display link
-                // during streaming; restore it once the response is complete.
+                // Safety net: if focus was lost during streaming (e.g.
+                // the user clicked elsewhere or dismissed a dialog),
+                // re-claim it once the agent finishes so the user can
+                // type immediately. The normal send path keeps focus
+                // throughout via `TextViewFocusController.lockFocus`.
                 if wasStreaming && !nowStreaming {
                     isFocused = true
                 }
@@ -428,6 +463,7 @@ struct FloatingInputCard: View {
                     print("[FloatingInputCard] onDisappear: Stopping active voice recording")
                     // Don't use cancelVoiceInput() here as it forces continuous mode off.
                     // Instead, just stop recording but preserve the mode.
+                    cancelLiveVoicePreencodeSession(removeRegistryEntry: true)
                     Task {
                         _ = await speechService.stopStreamingTranscription()
                         speechService.clearTranscription()
@@ -521,6 +557,7 @@ struct FloatingInputCard: View {
                             checkForPause()
                             checkForSilenceTimeout()
                             handlePauseCountdown()
+                            scheduleLiveVoicePreencodeIfNeeded()
                         }
                 } else {
                     pauseTimerCancellable = nil
@@ -660,6 +697,9 @@ extension FloatingInputCard {
         if speechService.isRecording {
             print("[FloatingInputCard] startVoiceInput: Recording already active, ensuring UI is visible")
             showVoiceOverlay = true
+            if liveVoiceAttachmentId == nil {
+                beginLiveVoicePreencodeSession()
+            }
             if voiceInputState == .idle {
                 voiceInputState = .recording
                 lastVoiceActivityTime = Date()
@@ -674,6 +714,7 @@ extension FloatingInputCard {
         // Show overlay immediately for visual feedback, but don't set recording state yet.
         // Recording state will be set when speechService.isRecording becomes true.
         showVoiceOverlay = true
+        beginLiveVoicePreencodeSession()
 
         Task {
             do {
@@ -704,11 +745,92 @@ extension FloatingInputCard {
         }
     }
 
+    private func beginLiveVoicePreencodeSession() {
+        if let oldId = liveVoiceAttachmentId {
+            LiveVoiceAudioInputRegistry.shared.remove(for: oldId)
+        }
+        liveVoicePreencodeTask?.cancel()
+        liveVoicePreencodeTask = nil
+        liveVoiceAttachmentId = UUID()
+        lastLiveVoicePreencodeAt = .distantPast
+        lastLiveVoicePreencodeSampleCount = 0
+    }
+
+    private func cancelLiveVoicePreencodeSession(removeRegistryEntry: Bool) {
+        liveVoicePreencodeTask?.cancel()
+        liveVoicePreencodeTask = nil
+        if removeRegistryEntry, let id = liveVoiceAttachmentId {
+            LiveVoiceAudioInputRegistry.shared.remove(for: id)
+        }
+        liveVoiceAttachmentId = nil
+        lastLiveVoicePreencodeAt = .distantPast
+        lastLiveVoicePreencodeSampleCount = 0
+    }
+
+    @discardableResult
+    private func scheduleLiveVoicePreencodeIfNeeded(
+        force: Bool = false,
+        snapshot providedSnapshot: LiveVoiceAudioSnapshot? = nil,
+        attachmentId providedAttachmentId: UUID? = nil
+    ) -> Task<Void, Never>? {
+        guard mediaCapabilities.supportsAudio,
+            let modelName = selectedModel,
+            ModelFamilyNames.isNemotronOmniFamily(modelName)
+        else {
+            return nil
+        }
+
+        guard let snapshot = providedSnapshot ?? speechService.currentLiveAudioSnapshot(),
+            !snapshot.samples.isEmpty
+        else {
+            return nil
+        }
+
+        let attachmentId: UUID
+        if let providedAttachmentId {
+            attachmentId = providedAttachmentId
+        } else if let existing = liveVoiceAttachmentId {
+            attachmentId = existing
+        } else {
+            let newId = UUID()
+            liveVoiceAttachmentId = newId
+            attachmentId = newId
+        }
+
+        let sampleCount = snapshot.samples.count
+        let minSampleDelta = max(4_000, snapshot.sampleRate / 2)
+        if !force {
+            guard sampleCount >= minSampleDelta else { return nil }
+            guard Date().timeIntervalSince(lastLiveVoicePreencodeAt) >= 0.75 else { return nil }
+            guard sampleCount - lastLiveVoicePreencodeSampleCount >= minSampleDelta else { return nil }
+        }
+
+        lastLiveVoicePreencodeAt = Date()
+        lastLiveVoicePreencodeSampleCount = sampleCount
+
+        let samples = snapshot.samples
+        let sampleRate = snapshot.sampleRate
+        let task = Task.detached(priority: .utility) {
+            let result = await ModelRuntime.shared.preencodeLiveVoiceAudioIfResident(
+                modelName: modelName,
+                attachmentId: attachmentId,
+                samples: samples,
+                sampleRate: sampleRate
+            )
+            print(
+                "[Osaurus][LiveVoice] preencode_status=\(result.status.rawValue) samples=\(result.sampleCount) sample_rate=\(result.sampleRate) encode_ms=\(result.encodeMs) message=\(result.message ?? "")"
+            )
+        }
+        liveVoicePreencodeTask = task
+        return task
+    }
+
     private func cancelVoiceInput() {
         print("[FloatingInputCard] User cancelled voice input - disabling continuous mode")
         hasDetectedSpeechThisTurn = false
         lastConfirmedLength = 0
         isContinuousVoiceMode = false
+        cancelLiveVoicePreencodeSession(removeRegistryEntry: true)
         Task {
             _ = await speechService.stopStreamingTranscription()
             speechService.clearTranscription()
@@ -830,6 +952,7 @@ extension FloatingInputCard {
     }
 
     private func stopVoiceInputFromTimeout() {
+        cancelLiveVoicePreencodeSession(removeRegistryEntry: true)
         Task {
             _ = await speechService.stopStreamingTranscription(force: false)
             speechService.clearTranscription()
@@ -841,6 +964,28 @@ extension FloatingInputCard {
     private func sendVoiceMessage(_ message: String) {
         print("[FloatingInputCard] Sending voice message. Continuous mode: \(isContinuousVoiceMode)")
         logVoiceState(trigger: "sendVoiceMessage-start")
+        let voiceCaptureStart = CFAbsoluteTimeGetCurrent()
+        let voiceSnapshot = mediaCapabilities.supportsAudio ? speechService.currentLiveAudioSnapshot() : nil
+        let snapshotMs = Int((CFAbsoluteTimeGetCurrent() - voiceCaptureStart) * 1000)
+        let wavEncodeStart = CFAbsoluteTimeGetCurrent()
+        let voiceAudioData = voiceSnapshot?.wavData()
+        let wavEncodeMs = Int((CFAbsoluteTimeGetCurrent() - wavEncodeStart) * 1000)
+        let voiceAttachmentId = liveVoiceAttachmentId ?? UUID()
+        liveVoiceAttachmentId = voiceAttachmentId
+        let finalPreencodeTask = voiceSnapshot.flatMap {
+            scheduleLiveVoicePreencodeIfNeeded(
+                force: true,
+                snapshot: $0,
+                attachmentId: voiceAttachmentId
+            )
+        }
+        if mediaCapabilities.supportsAudio {
+            let wavBytes = voiceAudioData?.count ?? 0
+            let durationMs = Int((voiceSnapshot?.durationSeconds ?? 0) * 1000)
+            print(
+                "[Osaurus][LiveVoice] snapshot_ms=\(snapshotMs) wav_encode_ms=\(wavEncodeMs) wav_bytes=\(wavBytes) sample_rate=\(voiceSnapshot?.sampleRate ?? 0) duration_ms=\(durationMs)"
+            )
+        }
 
         // show sending state first
         voiceInputState = .sending
@@ -854,6 +999,7 @@ extension FloatingInputCard {
             print("[FloatingInputCard] Invoking cleanup for voice message (\(message.count) chars)")
             let cleanedMessage = await TranscriptionCleanupService.shared.clean(message)
             print("[FloatingInputCard] Cleanup done. Original: \(message) | Cleaned: \(cleanedMessage)")
+            await finalPreencodeTask?.value
 
             await MainActor.run {
                 voiceInputState = .idle
@@ -861,6 +1007,24 @@ extension FloatingInputCard {
 
                 let existing = localText.trimmingCharacters(in: .whitespacesAndNewlines)
                 let fullMessage = existing.isEmpty ? cleanedMessage : "\(existing) \(cleanedMessage)"
+
+                if let voiceAudioData {
+                    let voiceAttachment = Attachment(
+                        id: voiceAttachmentId,
+                        kind: .audio(
+                            voiceAudioData,
+                            format: "wav",
+                            filename: "voice-input.wav"
+                        )
+                    )
+                    if let voiceSnapshot {
+                        LiveVoiceAudioInputRegistry.shared.store(
+                            snapshot: voiceSnapshot,
+                            for: voiceAttachment.id
+                        )
+                    }
+                    pendingAttachments.append(voiceAttachment)
+                }
 
                 // try to paste. if it fails (permissions), we fall back to direct text setting
                 if KeyboardSimulationService.shared.pasteText(cleanedMessage) {
@@ -879,6 +1043,7 @@ extension FloatingInputCard {
                     text = ""
                     onSend(fullMessage)
                 }
+                cancelLiveVoicePreencodeSession(removeRegistryEntry: voiceAudioData == nil)
             }
         }
     }
@@ -925,11 +1090,13 @@ extension FloatingInputCard {
     private func syncAndSend() {
         guard canSend else { return }
         let message = localText
+        // Hold first responder through the binding-flush cascade
+        // (clearing local + bound text, parent reconcile, optional
+        // new run kickoff). 300 ms covers the longest observed
+        // cascade with margin. Covers both fresh sends and queueing.
+        textViewFocusController.lockFocus(for: 0.3)
         localText = ""
         text = ""
-        // resign first responder so the NSTextView cursor-blink display link stops driving
-        // the window compositor at 60fps through the streaming response
-        isFocused = false
         onSend(message)
     }
 
@@ -985,6 +1152,65 @@ extension FloatingInputCard {
             )
         default:
             break
+        }
+    }
+
+    // MARK: - Queued Send Chip
+
+    /// Compact chip preview of the message that's queued to flush when the
+    /// active run finishes (or be dispatched immediately via Send Now).
+    /// Visible only when `queuedSend != nil`.
+    @ViewBuilder
+    private var queuedSendChipView: some View {
+        if let queued = queuedSend {
+            let preview: String = {
+                let trimmed = queued.text.trimmingCharacters(in: .whitespacesAndNewlines)
+                if trimmed.isEmpty {
+                    return String(localized: "Queued attachment", bundle: .module)
+                }
+                if trimmed.count <= 80 { return trimmed }
+                return String(trimmed.prefix(80)) + "\u{2026}"
+            }()
+            HStack(spacing: 5) {
+                Image(systemName: "clock.arrow.circlepath")
+                    .font(.system(size: 11, weight: .medium))
+                    .foregroundColor(theme.accentColor)
+                Text("Queued:", bundle: .module)
+                    .font(theme.font(size: 11, weight: .semibold))
+                    .foregroundColor(theme.accentColor)
+                Text(verbatim: preview)
+                    .font(theme.font(size: 11, weight: .medium))
+                    .foregroundColor(theme.primaryText)
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Button {
+                    withAnimation(theme.springAnimation()) {
+                        if let onCancelQueued {
+                            onCancelQueued()
+                        } else {
+                            queuedSend = nil
+                        }
+                    }
+                } label: {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 7, weight: .bold))
+                        .foregroundColor(theme.secondaryText)
+                        .padding(3)
+                        .background(Circle().fill(theme.tertiaryBackground))
+                }
+                .buttonStyle(.plain)
+                .help("Cancel queued message")
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .fill(theme.accentColor.opacity(0.12))
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8, style: .continuous)
+                    .strokeBorder(theme.accentColor.opacity(0.3), lineWidth: 0.5)
+            )
         }
     }
 
@@ -1064,11 +1290,22 @@ extension FloatingInputCard {
                             )
                         }
                     case .document, .documentRef:
-                        DocumentChip(attachment: attachment) {
-                            withAnimation(theme.springAnimation()) {
-                                _ = pendingAttachments.remove(at: index)
-                            }
-                        }
+                        DocumentChip(
+                            attachment: attachment,
+                            onRemove: {
+                                withAnimation(theme.springAnimation()) {
+                                    _ = pendingAttachments.remove(at: index)
+                                }
+                            },
+                            onTap: attachment.isPastedContent
+                                ? {
+                                    pastedContentPreview = attachment
+                                } : nil,
+                            onEdit: attachment.isPastedContent
+                                ? {
+                                    pastedContentEdit = attachment
+                                } : nil
+                        )
                     case .audio, .audioRef, .video, .videoRef:
                         // Audio/video attachments display as a labeled chip
                         // with a media-type icon. Inline-bytes are kept on
@@ -1085,6 +1322,23 @@ extension FloatingInputCard {
             }
         }
         .frame(height: 48)
+        .sheet(item: $pastedContentPreview) { attachment in
+            PastedContentSheet(attachment: attachment) {
+                pastedContentPreview = nil
+            }
+        }
+        .sheet(item: $pastedContentEdit) { attachment in
+            PastedContentSheet(
+                attachment: attachment,
+                onDismiss: { pastedContentEdit = nil },
+                onSave: { updated in
+                    if let idx = pendingAttachments.firstIndex(where: { $0.id == attachment.id }) {
+                        pendingAttachments[idx] = .pastedContent(updated)
+                    }
+                    pastedContentEdit = nil
+                }
+            )
+        }
     }
 
     // MARK: - Selector Row (Model + Tools)
@@ -1805,7 +2059,13 @@ extension FloatingInputCard {
                 switch content {
                 case .text(let text):
                     Button {
-                        localText += text
+                        if text.count >= Self.pastedContentThreshold {
+                            withAnimation(theme.springAnimation()) {
+                                pendingAttachments.append(.pastedContent(text))
+                            }
+                        } else {
+                            localText += text
+                        }
                         clipboardService.markAsRead()
                     } label: {
                         Text("Paste to Input", bundle: .module)
@@ -1868,18 +2128,29 @@ extension FloatingInputCard {
 
         switch content {
         case .text(let text):
-            // Inject directly into the text input area for better UX (editing)
-            withAnimation(theme.springAnimation()) {
-                if localText.isEmpty {
-                    localText = text
-                } else {
-                    if !localText.hasSuffix("\n") {
-                        localText += "\n"
-                    }
-                    localText += text
+            if text.count >= Self.pastedContentThreshold {
+                // Large paste → convert to a "pasted content" attachment.
+                // Lets the user view / remove the snippet without polluting
+                // the input field with hundreds of lines of text.
+                withAnimation(theme.springAnimation()) {
+                    pendingAttachments.append(.pastedContent(text))
+                    clipboardService.markAsRead()
+                    isFocused = true
                 }
-                clipboardService.markAsRead()
-                isFocused = true
+            } else {
+                // Inject directly into the text input area for better UX (editing)
+                withAnimation(theme.springAnimation()) {
+                    if localText.isEmpty {
+                        localText = text
+                    } else {
+                        if !localText.hasSuffix("\n") {
+                            localText += "\n"
+                        }
+                        localText += text
+                    }
+                    clipboardService.markAsRead()
+                    isFocused = true
+                }
             }
 
         case .image(let data):
@@ -2038,9 +2309,11 @@ extension FloatingInputCard {
     // MARK: - Input Card
 
     private var inputCard: some View {
-        VStack(alignment: .leading, spacing: 0) {
-            if !pendingAttachments.isEmpty || pendingSkillId != nil {
+        let hasChipRow = !pendingAttachments.isEmpty || pendingSkillId != nil || queuedSend != nil
+        return VStack(alignment: .leading, spacing: 0) {
+            if hasChipRow {
                 HStack(alignment: .center, spacing: 6) {
+                    queuedSendChipView
                     pendingSkillChipView
                     if !pendingAttachments.isEmpty {
                         inlinePendingAttachmentsPreview
@@ -2052,7 +2325,7 @@ extension FloatingInputCard {
 
             textInputArea
                 .padding(.horizontal, 12)
-                .padding(.top, (pendingAttachments.isEmpty && pendingSkillId == nil) ? 10 : 6)
+                .padding(.top, hasChipRow ? 6 : 10)
                 .padding(.bottom, 6)
 
             buttonBar
@@ -2136,27 +2409,29 @@ extension FloatingInputCard {
     }
 
     /// Capability-gated UTType allowlist for both the file picker and
-    /// the drop zone. Resolves from `selectedModel`; non-multimodal
-    /// models stay at images + documents only. Audio appears only for
-    /// Nemotron-3-Nano-Omni; video appears for Qwen-VL family +
-    /// SmolVLM 2 + Nemotron-Omni.
+    /// the drop zone. Resolves from `selectedModel` plus the session's
+    /// already-known image support bit. Text-only models keep document
+    /// attach support but reject image/audio/video media.
     ///
     /// See `Models/Configuration/ModelMediaCapabilities.swift` for the
     /// substring/regex matcher; tests pin the boundary at
     /// `ModelMediaCapabilitiesMCDCTests`.
     private var mediaCapabilities: ModelMediaCapabilities.Capabilities {
-        guard let modelId = selectedModel else { return .imageOnly }
-        return ModelMediaCapabilities.from(modelId: modelId)
+        ModelMediaCapabilities.composerCapabilities(
+            modelId: selectedModel,
+            fallbackSupportsImages: supportsImages
+        )
     }
 
-    /// UTTypes the drop zone advertises. Image + fileURL always — image
-    /// is universally supported across multimodal models, fileURL covers
-    /// document parsing. Audio + movie/video are conditional on the
-    /// loaded model's capabilities so users can't drop a wav onto a
-    /// dense LLM and have it silently ignored.
+    /// UTTypes the drop zone advertises. `fileURL` stays enabled for
+    /// documents, while image/audio/video are advertised only when the
+    /// selected model can consume them.
     private var dropAcceptedTypes: [UTType] {
-        var types: [UTType] = [UTType.image, UTType.fileURL]
+        var types: [UTType] = [UTType.fileURL]
         let cap = mediaCapabilities
+        if cap.supportsImage {
+            types.append(.image)
+        }
         if cap.supportsAudio {
             types.append(.audio)
             // explicit common audio formats so HEIF-style "any audio"
@@ -2179,9 +2454,12 @@ extension FloatingInputCard {
     /// only). Picker shows audio/video formats only when the loaded
     /// model can actually consume them.
     private var pickerAllowedTypes: [UTType] {
-        var types: [UTType] = [UTType.image]
-        types.append(contentsOf: DocumentParser.supportedDocumentTypes)
+        var types: [UTType] = []
         let cap = mediaCapabilities
+        if cap.supportsImage {
+            types.append(.image)
+        }
+        types.append(contentsOf: DocumentParser.supportedDocumentTypes)
         if cap.supportsAudio {
             types.append(.audio)
             types.append(.mp3)
@@ -2223,8 +2501,18 @@ extension FloatingInputCard {
         let ext = url.pathExtension.lowercased()
         let cap = mediaCapabilities
 
-        // Image fast path — universally supported among VLMs.
+        // Image fast path — only for image-capable models.
         if DocumentParser.isImageFile(url: url) {
+            guard cap.supportsImage else {
+                ToastManager.shared.error(
+                    "Cannot attach \(url.lastPathComponent)",
+                    message:
+                        cap.anyMedia
+                        ? "The current model supports \(cap.summary) only."
+                        : "The current model is text-only."
+                )
+                return
+            }
             if let data = try? Data(contentsOf: url), data.count <= maxImageSize,
                 let nsImage = NSImage(data: data),
                 let pngData = nsImage.pngData()
@@ -2325,7 +2613,9 @@ extension FloatingInputCard {
         let cap = mediaCapabilities
 
         for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
+            if cap.supportsImage,
+                provider.hasItemConformingToTypeIdentifier(UTType.image.identifier)
+            {
                 handled = true
                 provider.loadDataRepresentation(forTypeIdentifier: UTType.image.identifier) { data, error in
                     guard let data = data, error == nil, data.count <= maxImageSize else { return }
@@ -2393,6 +2683,7 @@ extension FloatingInputCard {
             isFocused: $isFocused,
             isComposing: $isComposing,
             maxHeight: maxHeight,
+            focusController: textViewFocusController,
             onCommit: {
                 if showSlashPopup {
                     let cmds = slashFilteredCommands
@@ -2421,7 +2712,14 @@ extension FloatingInputCard {
                     localText = ""
                     text = ""
                     return true
-                } : nil
+                } : nil,
+            onPasteText: { pasted in
+                guard pasted.count >= Self.pastedContentThreshold else { return false }
+                withAnimation(theme.springAnimation()) {
+                    pendingAttachments.append(.pastedContent(pasted))
+                }
+                return true
+            }
         )
         .frame(maxHeight: maxHeight)
         .overlay(alignment: .topLeading) {
@@ -2437,7 +2735,7 @@ extension FloatingInputCard {
         }
         .background(
             PasteboardImageMonitor(
-                supportsImages: supportsImages,
+                supportsImages: mediaCapabilities.supportsImage,
                 onImagePaste: { imageData in
                     withAnimation(theme.springAnimation()) {
                         pendingAttachments.append(.image(imageData))
@@ -2467,8 +2765,14 @@ extension FloatingInputCard {
                 keyboardHint
                 if isStreaming {
                     stopButton
+                    if queuedSend != nil {
+                        sendNowButton
+                    } else {
+                        sendQueueButton
+                    }
+                } else {
+                    sendButton
                 }
-                sendButton
             }
         }
     }
@@ -2505,10 +2809,35 @@ extension FloatingInputCard {
         SendButton(canSend: canSend, action: syncAndSend)
     }
 
+    /// Streaming + empty queue: pressing Send queues the message. Same
+    /// dispatcher as `sendButton` (`syncAndSend → onSend`); the parent
+    /// notices `isStreaming == true` and routes to `enqueueSend`.
+    private var sendQueueButton: some View {
+        SendQueueButton(canSend: canSend, action: syncAndSend)
+    }
+
+    /// Streaming + a queued message present: pressing this stops the
+    /// current run and dispatches the queued payload immediately.
+    private var sendNowButton: some View {
+        SendNowButton {
+            // Stop -> send cascade fans out across more runloop turns
+            // than syncAndSend, hence the longer lock.
+            textViewFocusController.lockFocus(for: 0.4)
+            onSendNow?()
+        }
+    }
+
     // MARK: - Card Styling
 
     private var cardBackground: some View {
         ZStack {
+            // NSVisualEffectView-backed glass behind everything, only when
+            // the prompt card's own glass toggle is on. The fill above is
+            // already semi-transparent so the material shows through.
+            if theme.glassInputEnabled {
+                ThemedGlassSurface(cornerRadius: 20)
+            }
+
             RoundedRectangle(cornerRadius: 20, style: .continuous)
                 .fill(theme.primaryBackground.opacity(theme.isDark ? 0.82 : 0.94))
 
@@ -2620,23 +2949,23 @@ struct CachedImageThumbnail: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             if let nsImage = cachedImage {
+                let thumbSize = AttachmentThumbnailLayout.size(for: nsImage, longAxis: size)
                 Image(nsImage: nsImage)
                     .resizable()
-                    .aspectRatio(contentMode: .fill)
-                    .frame(width: size, height: size)
+                    .aspectRatio(contentMode: .fit)
+                    .frame(width: thumbSize.width, height: thumbSize.height)
                     .clipShape(RoundedRectangle(cornerRadius: 8, style: .continuous))
                     .overlay(
                         RoundedRectangle(cornerRadius: 8, style: .continuous)
                             .strokeBorder(theme.primaryBorder.opacity(0.3), lineWidth: 1)
                     )
             } else {
-                // Placeholder while loading
+                // Square placeholder — aspect is unknown until decode completes.
                 RoundedRectangle(cornerRadius: 8, style: .continuous)
                     .fill(theme.secondaryBackground)
                     .frame(width: size, height: size)
             }
 
-            // Remove button
             Button(action: onRemove) {
                 Image(systemName: "xmark.circle.fill")
                     .font(theme.font(size: 16, weight: .regular))
@@ -2653,7 +2982,6 @@ struct CachedImageThumbnail: View {
         .padding(.top, 4)
         .padding(.trailing, 4)
         .task(id: imageData) {
-            // Decode image only once when data changes
             cachedImage = NSImage(data: imageData)
         }
     }
@@ -3515,6 +3843,126 @@ private struct StopButton: View {
             )
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+    }
+}
+
+// MARK: - Send Queue Button
+
+/// Used while a run is streaming and the queue is empty. Pressing it
+/// stores the current input as a single-slot pending send (handled by
+/// the parent). Shares the exact 32×32 circular footprint of
+/// `SendButton`; the only visual delta is a muted gray fill (instead of
+/// the accent gradient) plus a hover tooltip that explains the queue
+/// semantics. The icon stays `arrow.up` so users still read it as
+/// "send".
+private struct SendQueueButton: View {
+    let canSend: Bool
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(theme.tertiaryBackground.opacity(canSend ? 0.95 : 0.7))
+
+                if isHovered && canSend {
+                    Circle()
+                        .fill(theme.accentColor.opacity(0.12))
+                }
+
+                Image(systemName: "arrow.up")
+                    .font(theme.font(size: CGFloat(theme.bodySize) + 1, weight: .semibold))
+                    .foregroundColor(theme.secondaryText)
+            }
+            .frame(width: 32, height: 32)
+            .overlay(
+                Circle()
+                    .strokeBorder(theme.secondaryText.opacity(isHovered ? 0.35 : 0.2), lineWidth: 1)
+            )
+        }
+        .buttonStyle(.plain)
+        .disabled(!canSend)
+        .opacity(canSend ? 1 : 0.5)
+        .help("Queue message · sent when current run finishes")
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) {
+                isHovered = hovering
+            }
+        }
+        .animation(.easeOut(duration: 0.1), value: canSend)
+        .transition(.opacity.combined(with: .scale(scale: 0.95)))
+    }
+}
+
+// MARK: - Send Now Button
+
+/// Accent-tinted variant that stops the active run and dispatches the
+/// queued send immediately. Visible only when a queued message exists.
+/// Same 32×32 circular footprint as `SendButton`; differentiated by a
+/// `bolt.fill` icon (signals "urgent / now") and a hover tooltip.
+private struct SendNowButton: View {
+    let action: () -> Void
+
+    @State private var isHovered = false
+    @Environment(\.theme) private var theme
+
+    var body: some View {
+        Button(action: action) {
+            ZStack {
+                Circle()
+                    .fill(
+                        LinearGradient(
+                            colors: [
+                                theme.accentColor,
+                                theme.accentColor.opacity(0.85),
+                            ],
+                            startPoint: .top,
+                            endPoint: .bottom
+                        )
+                    )
+
+                if isHovered {
+                    Circle()
+                        .fill(Color.white.opacity(0.15))
+                }
+
+                Image(systemName: "bolt.fill")
+                    .font(theme.font(size: CGFloat(theme.bodySize) + 1, weight: .semibold))
+                    .foregroundColor(.white)
+            }
+            .frame(width: 32, height: 32)
+            .overlay(
+                Circle()
+                    .strokeBorder(
+                        LinearGradient(
+                            colors: [
+                                Color.white.opacity(isHovered ? 0.35 : 0.2),
+                                theme.accentColor.opacity(0.3),
+                            ],
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ),
+                        lineWidth: 1
+                    )
+            )
+            .shadow(
+                color: theme.accentColor.opacity(isHovered ? 0.5 : 0.35),
+                radius: isHovered ? 10 : 6,
+                x: 0,
+                y: isHovered ? 4 : 2
+            )
+        }
+        .buttonStyle(.plain)
+        .help("Send now · interrupts current run")
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) {
                 isHovered = hovering

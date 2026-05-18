@@ -230,6 +230,57 @@ struct RemoteChatRequestEncodingTests {
         #expect(provider.mergedModelIds(discovered: ["gpt-4.1", "gpt-5.5"]) == ["prod-chat", "gpt-5.5"])
     }
 
+    @Test func deepSeekProvider_dropsLocalInstructReasoningEffort() throws {
+        #expect(
+            RemoteProviderService.chatCompletionsReasoningEffort(
+                providerType: .openaiLegacy,
+                host: "api.deepseek.com",
+                effort: "instruct"
+            ) == nil
+        )
+    }
+
+    @Test func deepSeekProvider_preservesAcceptedReasoningEfforts() throws {
+        for effort in ["low", "medium", "high", "max", "xhigh"] {
+            #expect(
+                RemoteProviderService.chatCompletionsReasoningEffort(
+                    providerType: .openaiLegacy,
+                    host: "api.deepseek.com",
+                    effort: effort
+                ) == effort
+            )
+        }
+    }
+
+    @Test func remoteChatReasoningControls_deepSeekNormalizesAndFiltersEfforts() throws {
+        let accepted = RemoteProviderService.remoteChatReasoningControls(
+            providerType: .openaiLegacy,
+            host: "api.deepseek.com",
+            model: "deepseek-v4-pro",
+            effort: "  MAX  "
+        )
+        #expect(accepted.effort == "max")
+        #expect(accepted.thinking == nil)
+
+        let direct = RemoteProviderService.remoteChatReasoningControls(
+            providerType: .openaiLegacy,
+            host: "api.deepseek.com",
+            model: "deepseek-v4-pro",
+            effort: "instruct"
+        )
+        #expect(direct.effort == nil)
+        #expect(direct.thinking == ThinkingConfig(type: "disabled"))
+
+        let unknown = RemoteProviderService.remoteChatReasoningControls(
+            providerType: .openaiLegacy,
+            host: "api.deepseek.com",
+            model: "deepseek-v4-pro",
+            effort: "reasoning"
+        )
+        #expect(unknown.effort == nil)
+        #expect(unknown.thinking == nil)
+    }
+
     // MARK: - `reasoning_content` echo (issue #959)
 
     @Test func chatMessage_encode_includesReasoningContentWhenPresent() throws {
@@ -375,6 +426,17 @@ struct RemoteChatRequestEncodingTests {
         }
     }
 
+    @Test func dsv4RemoteEffort_normalizesAcceptedEffortCasing() throws {
+        let translated = RemoteProviderService.dsv4RemoteEffort(
+            host: "api.deepseek.com",
+            model: "deepseek-v4-pro",
+            effort: "  HIGH  "
+        )
+
+        #expect(translated.effort == "high")
+        #expect(translated.thinking == nil)
+    }
+
     @Test func dsv4RemoteEffort_nonDeepSeekHost_stripsInstructWithoutThinkingField() throws {
         // OpenRouter and other OpenAI-compat hosts that may serve DSV4 IDs
         // will also reject `"instruct"`, but the DeepSeek-only `thinking`
@@ -389,15 +451,19 @@ struct RemoteChatRequestEncodingTests {
         #expect(translated.thinking == nil)
     }
 
-    @Test func dsv4RemoteEffort_passesThroughWhenTranslationDoesNotApply() throws {
-        // Non-DSV4 model: effort flows through verbatim regardless of host.
-        let nonDSV4 = RemoteProviderService.dsv4RemoteEffort(
-            host: "api.deepseek.com",
-            model: "gpt-5.5",
-            effort: "instruct"
-        )
-        #expect(nonDSV4.effort == "instruct")
-        #expect(nonDSV4.thinking == nil)
+    @Test func dsv4RemoteEffort_stripsDirectRailAliasesForAllRemoteModels() throws {
+        // Direct/off aliases are local runtime controls. Public remote schemas
+        // reject them as `reasoning_effort` values, even when the model is not
+        // a local DSV4 bundle.
+        for effort in ["instruct", "none", "no_think", "off", "disabled", "false"] {
+            let nonDSV4 = RemoteProviderService.dsv4RemoteEffort(
+                host: "api.openai.com",
+                model: "gpt-5.5",
+                effort: effort
+            )
+            #expect(nonDSV4.effort == nil)
+            #expect(nonDSV4.thinking == nil)
+        }
 
         // Nil effort: nothing to translate, nothing to inject.
         let nilEffort = RemoteProviderService.dsv4RemoteEffort(
@@ -436,6 +502,51 @@ struct RemoteChatRequestEncodingTests {
 
         #expect(payload["thinking"] == nil)
         #expect(payload["reasoning_effort"] as? String == "high")
+    }
+
+    @Test func geminiRequest_stripsAdditionalPropertiesFromToolSchemas() throws {
+        let request = Self.makeRequest(
+            model: "gemini-2.5-pro",
+            maxTokens: 1024,
+            tools: [Self.strictNestedTool]
+        )
+        let payload = try Self.encodeAsDictionary(request.toGeminiRequest())
+        let tools = try #require(payload["tools"] as? [[String: Any]])
+        let functionDeclarations = try #require(tools.first?["functionDeclarations"] as? [[String: Any]])
+        let parameters = try #require(functionDeclarations.first?["parameters"] as? [String: Any])
+
+        #expect(parameters["additionalProperties"] == nil)
+        let properties = try #require(parameters["properties"] as? [String: Any])
+        let location = try #require(properties["location"] as? [String: Any])
+        #expect(location["additionalProperties"] == nil)
+
+        let locationProperties = try #require(location["properties"] as? [String: Any])
+        let city = try #require(locationProperties["city"] as? [String: Any])
+        #expect(city["type"] as? String == "string")
+
+        let tags = try #require(properties["tags"] as? [String: Any])
+        let items = try #require(tags["items"] as? [String: Any])
+        #expect(items["additionalProperties"] == nil)
+
+        let itemProperties = try #require(items["properties"] as? [String: Any])
+        #expect(itemProperties["name"] != nil)
+    }
+
+    @Test func openAIRequest_preservesAdditionalPropertiesInToolSchemas() throws {
+        let request = Self.makeRequest(
+            model: "gpt-4.1",
+            maxTokens: 1024,
+            tools: [Self.strictNestedTool]
+        )
+        let payload = try Self.encodeAsDictionary(request)
+        let tools = try #require(payload["tools"] as? [[String: Any]])
+        let function = try #require(tools.first?["function"] as? [String: Any])
+        let parameters = try #require(function["parameters"] as? [String: Any])
+
+        #expect(parameters["additionalProperties"] as? Bool == false)
+        let properties = try #require(parameters["properties"] as? [String: Any])
+        let location = try #require(properties["location"] as? [String: Any])
+        #expect(location["additionalProperties"] as? Bool == false)
     }
 
     // MARK: - Fixtures
@@ -481,7 +592,52 @@ struct RemoteChatRequestEncodingTests {
         )
     )
 
+    private static let strictNestedTool = Tool(
+        type: "function",
+        function: ToolFunction(
+            name: "plan_site",
+            description: "Plan a site",
+            parameters: .object([
+                "type": .string("object"),
+                "additionalProperties": .bool(false),
+                "required": .array([.string("location")]),
+                "properties": .object([
+                    "location": .object([
+                        "type": .string("object"),
+                        "additionalProperties": .bool(false),
+                        "properties": .object([
+                            "city": .object([
+                                "type": .string("string"),
+                                "description": .string("City name"),
+                            ])
+                        ]),
+                    ]),
+                    "tags": .object([
+                        "type": .string("array"),
+                        "items": .object([
+                            "type": .string("object"),
+                            "additionalProperties": .bool(false),
+                            "properties": .object([
+                                "name": .object([
+                                    "type": .string("string")
+                                ])
+                            ]),
+                        ]),
+                    ]),
+                ]),
+            ])
+        )
+    )
+
     private static func encodeAsDictionary(_ request: RemoteChatRequest) throws -> [String: Any] {
+        let data = try JSONEncoder().encode(request)
+        guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
+            throw DecodeAsDictionaryError.notAnObject
+        }
+        return obj
+    }
+
+    private static func encodeAsDictionary(_ request: GeminiGenerateContentRequest) throws -> [String: Any] {
         let data = try JSONEncoder().encode(request)
         guard let obj = try JSONSerialization.jsonObject(with: data) as? [String: Any] else {
             throw DecodeAsDictionaryError.notAnObject

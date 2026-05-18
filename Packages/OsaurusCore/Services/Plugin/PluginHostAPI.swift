@@ -1042,12 +1042,13 @@ final class PluginHostContext: @unchecked Sendable {
         builtInTools: [Tool],
         additionalToolSpecs: [Tool] = []
     ) -> EnrichedInference {
-        var seen = Set((inference.tools ?? []).map { $0.function.name })
         var tools = inference.tools ?? []
-        for spec in builtInTools + preflight.toolSpecs + additionalToolSpecs
-        where !seen.contains(spec.function.name) {
-            tools.append(spec)
-            seen.insert(spec.function.name)
+        for spec in builtInTools + preflight.toolSpecs + additionalToolSpecs {
+            if let index = tools.firstIndex(where: { $0.function.name == spec.function.name }) {
+                tools[index] = spec
+            } else {
+                tools.append(spec)
+            }
         }
 
         let messages = inference.request.messages
@@ -1118,17 +1119,27 @@ final class PluginHostContext: @unchecked Sendable {
 
         case "capabilities_load":
             let newTools = await CapabilityLoadBuffer.shared.drain()
-            let existing = Set((toolSpecs ?? []).map { $0.function.name })
-            let additions = newTools.filter { !existing.contains($0.function.name) }
-            if !additions.isEmpty {
-                toolSpecs = (toolSpecs ?? []) + additions
+            if !newTools.isEmpty {
+                var merged = toolSpecs ?? []
+                for tool in newTools {
+                    if let index = merged.firstIndex(where: {
+                        $0.function.name == tool.function.name
+                    }) {
+                        // Plugins share the chat-side lazy bootstrap path; loading a
+                        // tool must upgrade any compact placeholder already present.
+                        merged[index] = tool
+                    } else {
+                        merged.append(tool)
+                    }
+                }
+                toolSpecs = merged
                 // Persist additions to the per-session cache so subsequent
                 // requests with the same `session_id` continue to see these
                 // tools without the model having to re-discover them.
                 if let sid = prep.enriched.request.session_id {
                     recordSessionLoadedTools(
                         sessionId: sid,
-                        names: additions.map { $0.function.name }
+                        names: newTools.map { $0.function.name }
                     )
                 }
             }
@@ -1452,6 +1463,7 @@ final class PluginHostContext: @unchecked Sendable {
                 do {
                     let stream = try await prep.engine.streamChat(request: iterReq)
                     var iterContent = ""
+                    var iterFinishReason = "stop"
 
                     for try await delta in stream {
                         // Cancellation check: plugin called `complete_cancel`
@@ -1493,6 +1505,9 @@ final class PluginHostContext: @unchecked Sendable {
                             // usage delta and remember it for the aggregated
                             // return so non-stream and stream paths surface
                             // the same metering shape.
+                            if let stopReason = stats.stopReason {
+                                iterFinishReason = stopReason
+                            }
                             let usage: [String: Any] = [
                                 "completion_tokens": stats.tokenCount,
                                 "tokens_per_second": stats.tokensPerSecond,
@@ -1511,7 +1526,7 @@ final class PluginHostContext: @unchecked Sendable {
                     if !iterContent.isEmpty {
                         messages.append(ChatMessage(role: "assistant", content: iterContent))
                     }
-                    emit(Self.chunkPayload(id: cid, delta: [:], finishReason: "stop"))
+                    emit(Self.chunkPayload(id: cid, delta: [:], finishReason: iterFinishReason))
                     Self.persistStreamingInference(
                         pluginId: pid,
                         agentId: prep.agentId,
@@ -1527,7 +1542,7 @@ final class PluginHostContext: @unchecked Sendable {
                         toolCallsExecuted: toolCallsExecuted,
                         sharedArtifacts: sharedArtifacts,
                         usage: lastUsage,
-                        finishReason: "stop"
+                        finishReason: iterFinishReason
                     )
 
                 } catch let invs as ServiceToolInvocations {

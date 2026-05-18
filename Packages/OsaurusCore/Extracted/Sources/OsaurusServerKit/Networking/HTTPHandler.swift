@@ -20,6 +20,56 @@ private final class SendableBool: @unchecked Sendable {
     }
 }
 
+private final class HTTPTraceRecorder: @unchecked Sendable {
+    private let trace: TTFTTrace?
+    private let lock = NSLock()
+    private var emitted = false
+    private var markedFirstSemanticDelta = false
+
+    init(_ trace: TTFTTrace?) {
+        self.trace = trace
+    }
+
+    func mark(_ name: String) {
+        trace?.mark(name)
+    }
+
+    func set(_ key: String, _ value: Any) {
+        trace?.set(key, value)
+    }
+
+    func markFirstSemanticDelta(_ kind: String) {
+        guard trace != nil else { return }
+        lock.lock()
+        let shouldMark = !markedFirstSemanticDelta
+        if shouldMark {
+            markedFirstSemanticDelta = true
+        }
+        lock.unlock()
+        guard shouldMark else { return }
+        trace?.set("http_first_semantic_delta_kind", kind)
+        trace?.mark("http_first_semantic_delta")
+    }
+
+    func emit(finishReason: String, responseStatus: Int, errorMessage: String? = nil) {
+        guard trace != nil else { return }
+        lock.lock()
+        let shouldEmit = !emitted
+        if shouldEmit {
+            emitted = true
+        }
+        lock.unlock()
+        guard shouldEmit else { return }
+        trace?.set("http_finish_reason", finishReason)
+        trace?.set("http_response_status", responseStatus)
+        if let errorMessage {
+            trace?.set("http_error", errorMessage)
+        }
+        trace?.mark("http_trace_emit")
+        trace?.emit()
+    }
+}
+
 /// SwiftNIO HTTP request handler
 final class HTTPHandler: ChannelInboundHandler, Sendable {
     typealias InboundIn = HTTPServerRequestPart
@@ -1453,7 +1503,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             requestBodyString = nil
         }
 
-        guard let req = try? JSONDecoder().decode(ChatCompletionRequest.self, from: data) else {
+        guard var req = try? JSONDecoder().decode(ChatCompletionRequest.self, from: data) else {
             let body = Self.errorBody(.openai(type: "invalid_request_error"), message: "Invalid request format")
             Self.sendResponse(
                 context: context,
@@ -1507,6 +1557,22 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         let created = Int(Date().timeIntervalSince1970)
         let responseId = Self.shortId(prefix: "chatcmpl-", length: 12)
         let model = req.model
+        #if DEBUG
+            let ttftTrace: TTFTTrace? = TTFTTrace()
+        #else
+            let ttftTrace: TTFTTrace? = nil
+        #endif
+        let httpTrace = HTTPTraceRecorder(ttftTrace)
+        req.ttftTrace = ttftTrace
+        httpTrace.mark("http_request_decoded")
+        httpTrace.set("endpoint", "/chat/completions")
+        httpTrace.set("model", model)
+        httpTrace.set("stream", wantsSSE ? 1 : 0)
+        httpTrace.set("request_body_bytes", data.count)
+        httpTrace.set("http_message_count", req.messages.count)
+        httpTrace.set("http_input_image_count", req.messages.reduce(0) { $0 + $1.imageUrls.count })
+        httpTrace.set("http_input_audio_count", req.messages.reduce(0) { $0 + $1.audioInputs.count })
+        httpTrace.set("http_input_video_count", req.messages.reduce(0) { $0 + $1.videoUrls.count })
 
         let memoryAgentId = head.headers.first(name: "X-Osaurus-Agent-Id")
 
@@ -1553,14 +1619,20 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             Task(priority: .userInitiated) {
                 defer { keepaliveTask.cancel() }
                 do {
+                    httpTrace.mark("http_task_start")
                     let chatEngine = self.chatEngine
                     let enrichedReq = await Self.enrichWithAgentContext(req, agentId: memoryAgentId)
+                    httpTrace.mark("http_enrich_done")
+                    httpTrace.set("http_enriched_message_count", enrichedReq.messages.count)
 
-                    // Compute prefix hash after enrichment so it matches the cache key
+                    // Compute prefix evidence after enrichment so it tracks
+                    // the actual system prompt + tool schema payload sent.
                     let prefixHash: String = {
                         let sysContent = enrichedReq.messages.first(where: { $0.role == "system" })?.content ?? ""
-                        let toolNames = (enrichedReq.tools ?? []).map { $0.function.name }
-                        return ModelRuntime.computePrefixHash(systemContent: sysContent, toolNames: toolNames)
+                        return ModelRuntime.computePrefixHash(
+                            systemContent: sysContent,
+                            tools: enrichedReq.tools ?? []
+                        )
                     }()
                     hop {
                         writerBound.value.writeRole(
@@ -1572,12 +1644,17 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             context: ctx.value
                         )
                     }
+                    httpTrace.mark("http_sse_role_written")
 
+                    httpTrace.mark("http_stream_chat_start")
                     let stream = try await chatEngine.streamChat(request: enrichedReq)
+                    httpTrace.mark("http_stream_chat_ready")
                     var accumulatedContent = ""
                     var authoritativeCompletionTokens: Int?
+                    var streamFinishReason = "stop"
                     for try await delta in stream {
                         if let reasoning = StreamingReasoningHint.decode(delta) {
+                            httpTrace.markFirstSemanticDelta("reasoning")
                             hop {
                                 writerBound.value.writeReasoning(
                                     reasoning,
@@ -1591,9 +1668,13 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         }
                         if let stats = StreamingStatsHint.decode(delta) {
                             authoritativeCompletionTokens = stats.tokenCount
+                            if let stopReason = stats.stopReason {
+                                streamFinishReason = stopReason
+                            }
                             continue
                         }
                         if StreamingToolHint.isSentinel(delta) { continue }
+                        httpTrace.markFirstSemanticDelta("content")
                         accumulatedContent += delta
                         hop {
                             writerBound.value.writeContent(
@@ -1609,9 +1690,13 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     let promptTokens = Self.estimatePromptTokens(enrichedReq.messages)
                     let completionTokens =
                         authoritativeCompletionTokens ?? TokenEstimator.estimate(accumulatedContent)
+                    httpTrace.set("http_prompt_tokens_estimate", promptTokens)
+                    httpTrace.set("http_completion_tokens", completionTokens)
+                    let finalStreamFinishReason = streamFinishReason
                     hop {
-                        writerBound.value.writeFinish(
-                            model,
+                        writerBound.value.writeFinishWithReason(
+                            finalStreamFinishReason,
+                            model: model,
                             responseId: responseId,
                             created: created,
                             context: ctx.value
@@ -1628,6 +1713,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         }
                         writerBound.value.writeEnd(ctx.value)
                     }
+                    httpTrace.mark("http_sse_finish_written")
+                    httpTrace.emit(finishReason: finalStreamFinishReason, responseStatus: 200)
                     if persistOnSuccess {
                         var finalMessages = priorMessages
                         if !accumulatedContent.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
@@ -1654,12 +1741,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         model: logModel,
                         temperature: logTemperature,
                         maxTokens: logMaxTokens,
-                        finishReason: .stop
+                        finishReason: RequestLog.FinishReason(rawValue: finalStreamFinishReason) ?? .stop
                     )
                 } catch let invs as ServiceToolInvocations {
                     // Multi-tool MLX completion: emit one tool_call delta
                     // per invocation, sharing one finish_reason="tool_calls".
                     // OpenAI clients deduplicate by `index`.
+                    httpTrace.markFirstSemanticDelta("tool_calls")
+                    httpTrace.set("http_tool_call_count", invs.invocations.count)
                     let includeUsage = req.stream_options?.include_usage == true
                     // Use `req.messages` here (not `enrichedReq.messages`)
                     // because the enriched value is scoped to the `do` block
@@ -1697,6 +1786,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         }
                         writerBound.value.writeEnd(ctx.value)
                     }
+                    httpTrace.mark("http_sse_tool_calls_written")
+                    httpTrace.emit(finishReason: "tool_calls", responseStatus: 200)
                     let toolLogs = invs.invocations.map {
                         ToolCallLog(name: $0.toolName, arguments: $0.jsonArguments)
                     }
@@ -1715,6 +1806,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     )
                 } catch let inv as ServiceToolInvocation {
                     // Single tool invocation — same emission as above.
+                    httpTrace.markFirstSemanticDelta("tool_calls")
+                    httpTrace.set("http_tool_call_count", 1)
                     let includeUsage = req.stream_options?.include_usage == true
                     let promptTokens = Self.estimatePromptTokens(req.messages)
                     hop {
@@ -1746,6 +1839,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         }
                         writerBound.value.writeEnd(ctx.value)
                     }
+                    httpTrace.mark("http_sse_tool_calls_written")
+                    httpTrace.emit(finishReason: "tool_calls", responseStatus: 200)
                     let toolLog = ToolCallLog(name: inv.toolName, arguments: inv.jsonArguments)
                     logSelf.logRequest(
                         method: "POST",
@@ -1769,6 +1864,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         writerBound.value.writeError(error.localizedDescription, context: ctx.value)
                         writerBound.value.writeEnd(ctx.value)
                     }
+                    httpTrace.mark("http_sse_error_written")
+                    httpTrace.emit(
+                        finishReason: "error",
+                        responseStatus: 200,
+                        errorMessage: error.localizedDescription
+                    )
                     logSelf.logRequest(
                         method: "POST",
                         path: "/chat/completions",
@@ -1799,13 +1900,21 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             let logSelf = self
             Task(priority: .userInitiated) {
                 do {
+                    httpTrace.mark("http_task_start")
                     let chatEngine = self.chatEngine
                     let enrichedReq = await Self.enrichWithAgentContext(req, agentId: memoryAgentId)
+                    httpTrace.mark("http_enrich_done")
+                    httpTrace.set("http_enriched_message_count", enrichedReq.messages.count)
+                    httpTrace.mark("http_complete_chat_start")
                     var resp = try await chatEngine.completeChat(request: enrichedReq)
-                    // Compute prefix hash after enrichment so it matches the cache key
+                    httpTrace.mark("http_complete_chat_done")
+                    // Compute prefix evidence after enrichment so it tracks
+                    // the actual system prompt + tool schema payload sent.
                     let sysContent = enrichedReq.messages.first(where: { $0.role == "system" })?.content ?? ""
-                    let toolNames = (enrichedReq.tools ?? []).map { $0.function.name }
-                    resp.prefix_hash = ModelRuntime.computePrefixHash(systemContent: sysContent, toolNames: toolNames)
+                    resp.prefix_hash = ModelRuntime.computePrefixHash(
+                        systemContent: sysContent,
+                        tools: enrichedReq.tools ?? []
+                    )
                     if persistOnSuccess, let assistantMsg = resp.choices.first?.message {
                         var finalMessages = priorMessages
                         finalMessages.append(assistantMsg)
@@ -1843,17 +1952,20 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     // Extract token counts and finish reason from response
                     let tokensIn = resp.usage.prompt_tokens
                     let tokensOut = resp.usage.completion_tokens
+                    let finishReasonString = resp.choices.first?.finish_reason ?? "stop"
                     let finishReason: RequestLog.FinishReason = {
-                        if let reason = resp.choices.first?.finish_reason {
-                            switch reason {
-                            case "stop": return .stop
-                            case "length": return .length
-                            case "tool_calls": return .toolCalls
-                            default: return .stop
-                            }
+                        switch finishReasonString {
+                        case "stop": return .stop
+                        case "length": return .length
+                        case "tool_calls": return .toolCalls
+                        default: return .stop
                         }
-                        return .stop
                     }()
+                    httpTrace.markFirstSemanticDelta("completion")
+                    httpTrace.set("http_prompt_tokens", tokensIn)
+                    httpTrace.set("http_completion_tokens", tokensOut)
+                    httpTrace.mark("http_json_response_written")
+                    httpTrace.emit(finishReason: finishReasonString, responseStatus: 200)
                     logSelf.logRequest(
                         method: "POST",
                         path: "/chat/completions",
@@ -1909,6 +2021,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             ctx.value.close(promise: nil)
                         }
                     }
+                    httpTrace.mark("http_json_error_written")
+                    httpTrace.emit(
+                        finishReason: "error",
+                        responseStatus: actualStatus,
+                        errorMessage: error.localizedDescription
+                    )
                     logSelf.logRequest(
                         method: "POST",
                         path: "/chat/completions",
@@ -2023,6 +2141,46 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     temperature: logTemperature,
                     maxTokens: logMaxTokens,
                     finishReason: .stop
+                )
+            } catch let invs as ServiceToolInvocations {
+                hop {
+                    writerBound.value.writeToolCalls(invs.invocations, model: req.model, context: ctx.value)
+                    writerBound.value.writeEnd(ctx.value)
+                }
+                let toolLogs = invs.invocations.map {
+                    ToolCallLog(name: $0.toolName, arguments: $0.jsonArguments)
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/chat",
+                    userAgent: logUserAgent,
+                    requestBody: logRequestBody,
+                    responseStatus: 200,
+                    startTime: logStartTime,
+                    model: logModel,
+                    toolCalls: toolLogs,
+                    temperature: logTemperature,
+                    maxTokens: logMaxTokens,
+                    finishReason: .toolCalls
+                )
+            } catch let inv as ServiceToolInvocation {
+                hop {
+                    writerBound.value.writeToolCalls([inv], model: req.model, context: ctx.value)
+                    writerBound.value.writeEnd(ctx.value)
+                }
+                let toolLog = ToolCallLog(name: inv.toolName, arguments: inv.jsonArguments)
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/chat",
+                    userAgent: logUserAgent,
+                    requestBody: logRequestBody,
+                    responseStatus: 200,
+                    startTime: logStartTime,
+                    model: logModel,
+                    toolCalls: [toolLog],
+                    temperature: logTemperature,
+                    maxTokens: logMaxTokens,
+                    finishReason: .toolCalls
                 )
             } catch {
                 // NDJSON response head was already 200 — surface as in-band
@@ -2198,11 +2356,31 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         Task(priority: .userInitiated) {
             let inflight = await ModelLease.shared.snapshot()
             let cached = await ModelRuntime.shared.cachedModelSummaries()
+            let residency = await ModelResidencyManager.shared.snapshots()
+            let residencyByName = Dictionary(uniqueKeysWithValues: residency.map { ($0.modelName, $0) })
+            let now = Date()
             let loaded = cached.map { $0.name }
             let current = cached.first(where: { $0.isCurrent })?.name as Any? ?? NSNull()
 
             var inflightObj: [String: Any] = [:]
             for (name, count) in inflight { inflightObj[name] = count }
+
+            let residentModels: [[String: Any]] = cached.map { summary in
+                var row: [String: Any] = [
+                    "name": summary.name,
+                    "is_current": summary.isCurrent,
+                    "inflight": inflight[summary.name] ?? 0,
+                ]
+                if let unloadAt = residencyByName[summary.name]?.unloadAt {
+                    row["idle_unload_at"] = unloadAt.ISO8601Format()
+                    row["idle_seconds_remaining"] =
+                        max(0, Int(ceil(unloadAt.timeIntervalSince(now))))
+                } else {
+                    row["idle_unload_at"] = NSNull()
+                    row["idle_seconds_remaining"] = NSNull()
+                }
+                return row
+            }
 
             let obj: [String: Any] = [
                 "status": "healthy",
@@ -2210,6 +2388,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 "loaded": loaded,
                 "current_model": current,
                 "inflight": inflightObj,
+                "resident_models": residentModels,
             ]
             let data = try? JSONSerialization.data(withJSONObject: obj)
             let body = data.flatMap { String(decoding: $0, as: UTF8.self) } ?? "{}"
