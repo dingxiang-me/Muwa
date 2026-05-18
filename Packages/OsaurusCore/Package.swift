@@ -285,10 +285,10 @@ let package = Package(
         // future compressed pool chunks before indexer top-k. `6561a72`
         // preserves ratio-4 overlap-compressor state across decode calls so
         // long-tail DSV4 generation keeps the previous complete pool window.
-        // G.3: temporary local-path dep while iterating on the VMLXServer
-        // public-API audit. Switch back to a remote revision pin before
-        // merging.
-        .package(path: "../../../vmlx-swift-lm"),
+        .package(
+            url: "https://github.com/osaurus-ai/vmlx-swift-lm",
+            revision: "a18fd8783674c9a9d4d69e4e7df0f1db1cb492e5"
+        ),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
         // resolve to tag 2.3.5. Pin Jinja's root constraint to 58d21aa so

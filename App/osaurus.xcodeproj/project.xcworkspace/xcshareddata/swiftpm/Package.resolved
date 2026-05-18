@@ -413,6 +413,14 @@
       }
     },
     {
+      "identity" : "vmlx-swift-lm",
+      "kind" : "remoteSourceControl",
+      "location" : "https://github.com/osaurus-ai/vmlx-swift-lm",
+      "state" : {
+        "revision" : "a18fd8783674c9a9d4d69e4e7df0f1db1cb492e5"
+      }
+    },
+    {
       "identity" : "yyjson",
       "kind" : "remoteSourceControl",
       "location" : "https://github.com/ibireme/yyjson.git",
