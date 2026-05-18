@@ -304,7 +304,7 @@ public actor RemoteProviderService: ToolCapableService {
         return model
     }
 
-    func generateOneShot(
+    public func generateOneShot(
         messages: [ChatMessage],
         parameters: GenerationParameters,
         requestedModel: String?
@@ -358,7 +358,7 @@ public actor RemoteProviderService: ToolCapableService {
         return content ?? ""
     }
 
-    func streamDeltas(
+    public func streamDeltas(
         messages: [ChatMessage],
         parameters: GenerationParameters,
         requestedModel: String?,
@@ -392,7 +392,7 @@ public actor RemoteProviderService: ToolCapableService {
 
     // MARK: - ToolCapableService Protocol
 
-    func respondWithTools(
+    public func respondWithTools(
         messages: [ChatMessage],
         parameters: GenerationParameters,
         stopSequences: [String],
@@ -458,7 +458,7 @@ public actor RemoteProviderService: ToolCapableService {
         return content ?? ""
     }
 
-    func streamWithTools(
+    public func streamWithTools(
         messages: [ChatMessage],
         parameters: GenerationParameters,
         stopSequences: [String],
