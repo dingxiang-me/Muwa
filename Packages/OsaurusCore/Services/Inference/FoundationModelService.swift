@@ -179,7 +179,7 @@ actor FoundationModelService: ToolCapableService {
         messages: [ChatMessage],
         parameters: GenerationParameters,
         stopSequences: [String],
-        tools: [Tool],
+        tools: [VMLXServer.Tool],
         toolChoice: ToolChoiceOption?,
         requestedModel: String?
     ) async throws -> String {
@@ -232,7 +232,7 @@ actor FoundationModelService: ToolCapableService {
         messages: [ChatMessage],
         parameters: GenerationParameters,
         stopSequences: [String],
-        tools: [Tool],
+        tools: [VMLXServer.Tool],
         toolChoice: ToolChoiceOption?,
         requestedModel: String?
     ) async throws -> AsyncThrowingStream<String, Error> {
@@ -358,7 +358,7 @@ actor FoundationModelService: ToolCapableService {
         }
 
         @available(macOS 26.0, *)
-        private func toAppleTool(_ tool: Tool) -> any FoundationModels.Tool {
+        private func toAppleTool(_ tool: VMLXServer.Tool) -> any FoundationModels.Tool {
             let desc = tool.function.description ?? ""
             let schema: GenerationSchema = makeGenerationSchema(
                 from: tool.function.parameters,
@@ -519,7 +519,7 @@ actor FoundationModelService: ToolCapableService {
         }
 
         @available(macOS 26.0, *)
-        private func shouldEnableTool(_ tool: Tool, choice: ToolChoiceOption?) -> Bool {
+        private func shouldEnableTool(_ tool: VMLXServer.Tool, choice: ToolChoiceOption?) -> Bool {
             guard let choice else { return true }
             switch choice {
             case .auto: return true

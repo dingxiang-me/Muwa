@@ -285,10 +285,10 @@ let package = Package(
         // future compressed pool chunks before indexer top-k. `6561a72`
         // preserves ratio-4 overlap-compressor state across decode calls so
         // long-tail DSV4 generation keeps the previous complete pool window.
-        .package(
-            url: "https://github.com/osaurus-ai/vmlx-swift-lm",
-            revision: "e1280c3978d68e9204006923e922e62cb2ea5628"
-        ),
+        // G.3: temporary local-path dep while iterating on the VMLXServer
+        // public-API audit. Switch back to a remote revision pin before
+        // merging.
+        .package(path: "../../../vmlx-swift-lm"),
         // Osaurus-owned transformers/Jinja chain. `swift-transformers`
         // depends on `osaurus-ai/Jinja`, but its semver range can fresh-
         // resolve to tag 2.3.5. Pin Jinja's root constraint to 58d21aa so
@@ -431,6 +431,7 @@ let package = Package(
                 .product(name: "MLXLLM", package: "vmlx-swift-lm"),
                 .product(name: "MLXVLM", package: "vmlx-swift-lm"),
                 .product(name: "MLXLMCommon", package: "vmlx-swift-lm"),
+                .product(name: "VMLXServer", package: "vmlx-swift-lm"),
                 .product(name: "Tokenizers", package: "swift-transformers"),
                 .product(name: "FluidAudio", package: "FluidAudio"),
                 .product(name: "VecturaKit", package: "VecturaKit"),
@@ -444,13 +445,14 @@ let package = Package(
             ],
             path: ".",
             exclude: [
-                "Tests", "SQLCipher", "Extracted/Tests",
-                "Extracted/Package.swift", "Extracted/.gitignore",
-                "Extracted/Sources/osaurus-cli",
+                "Tests", "SQLCipher",
+                // G.3: Extracted/ is being replaced by VMLXServer (from
+                // vmlx-swift-lm). Excluded entirely while we audit the
+                // public-API surface; deleted in G.5.
+                "Extracted",
             ],
             resources: [
                 .process("Resources"),
-                .process("Extracted/Sources/OsaurusEngine/Resources"),
             ]
         ),
         .testTarget(
