@@ -446,10 +446,6 @@ let package = Package(
             path: ".",
             exclude: [
                 "Tests", "SQLCipher",
-                // G.3: Extracted/ is being replaced by VMLXServer (from
-                // vmlx-swift-lm). Excluded entirely while we audit the
-                // public-API surface; deleted in G.5.
-                "Extracted",
             ],
             resources: [
                 .process("Resources"),
