@@ -69,20 +69,7 @@ struct WidgetCard: View {
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) { isHovered = hovering }
         }
-        .contextMenu {
-            Button(action: onRefresh) {
-                Label("Refresh", systemImage: "arrow.clockwise")
-            }
-            if let onEdit {
-                Button(action: onEdit) {
-                    Label("Edit", systemImage: "slider.horizontal.3")
-                }
-            }
-            Divider()
-            Button(role: .destructive, action: onRemove) {
-                Label("Remove", systemImage: "trash")
-            }
-        }
+        .contextMenu { menuItems }
     }
 
     /// legacy widgets were stored with `title = toolName` ("get_events");
@@ -94,6 +81,26 @@ struct WidgetCard: View {
             .split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
             .map { $0.prefix(1).uppercased() + $0.dropFirst() }
             .joined(separator: " ")
+    }
+
+    @ViewBuilder
+    private var menuItems: some View {
+        if let timestamp = lastUpdatedLabel {
+            Text("Updated \(timestamp)")
+            Divider()
+        }
+        Button(action: onRefresh) {
+            Label("Refresh", systemImage: "arrow.clockwise")
+        }
+        if let onEdit {
+            Button(action: onEdit) {
+                Label("Edit", systemImage: "slider.horizontal.3")
+            }
+        }
+        Divider()
+        Button(role: .destructive, action: onRemove) {
+            Label("Remove", systemImage: "trash")
+        }
     }
 
     // MARK: Header
@@ -111,20 +118,7 @@ struct WidgetCard: View {
                 ProgressView().scaleEffect(0.6).frame(width: 24, height: 24)
             }
 
-            Menu {
-                Button(action: onRefresh) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
-                }
-                if let onEdit {
-                    Button(action: onEdit) {
-                        Label("Edit", systemImage: "slider.horizontal.3")
-                    }
-                }
-                Divider()
-                Button(role: .destructive, action: onRemove) {
-                    Label("Remove", systemImage: "trash")
-                }
-            } label: {
+            Menu { menuItems } label: {
                 Image(systemName: "ellipsis")
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(theme.secondaryText)
@@ -191,14 +185,6 @@ struct WidgetCard: View {
     @ViewBuilder
     private var footer: some View {
         HStack(spacing: 6) {
-            if let timestamp = lastUpdatedLabel {
-                Image(systemName: "clock")
-                    .font(.system(size: 9))
-                    .foregroundColor(theme.tertiaryText)
-                Text(timestamp)
-                    .font(.system(size: 10))
-                    .foregroundColor(theme.tertiaryText)
-            }
             Spacer()
             if widget.refreshInBackground {
                 Image(systemName: "moon.fill")
@@ -209,13 +195,13 @@ struct WidgetCard: View {
         }
     }
 
+    /// computed on menu open so the label is fresh without driving per-second view updates
     private var lastUpdatedLabel: String? {
-        if case let .success(_, fetchedAt) = result {
-            let formatter = RelativeDateTimeFormatter()
-            formatter.unitsStyle = .abbreviated
-            return formatter.localizedString(for: fetchedAt, relativeTo: Date())
-        }
-        return nil
+        guard case let .success(_, fetchedAt) = result else { return nil }
+        if Date().timeIntervalSince(fetchedAt) < 60 { return "just now" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .abbreviated
+        return formatter.localizedString(for: fetchedAt, relativeTo: Date())
     }
 }
 
