@@ -701,7 +701,9 @@ struct DashboardAddWidgetSheet: View {
     private var previewWidget: DashboardWidget {
         DashboardWidget(
             id: editing?.id ?? UUID(),
-            title: title.isEmpty ? (selectedTool?.name ?? "Untitled") : title,
+            title: title.isEmpty
+                ? (selectedTool.map(Self.defaultTitle(for:)) ?? "Untitled")
+                : title,
             toolName: selectedTool?.name ?? "",
             arguments: arguments,
             refreshSeconds: refreshInterval.seconds,
@@ -775,7 +777,7 @@ struct DashboardAddWidgetSheet: View {
         if let prefill {
             if let tool = DashboardToolCatalog.buildCatalog().first(where: { $0.name == prefill.toolName }) {
                 selectedTool = tool
-                title = tool.name
+                title = Self.defaultTitle(for: tool)
             }
             arguments = prefill.arguments
         }
@@ -789,10 +791,35 @@ struct DashboardAddWidgetSheet: View {
         inferenceApplied = false
         if editing == nil {
             if title.isEmpty, let tool = selectedTool {
-                title = tool.name
+                title = Self.defaultTitle(for: tool)
             }
             arguments = .object([:])
         }
+    }
+
+    /// prefers the plugin/provider group ("osaurus.calendar" -> "Calendar") over the
+    /// action verb so the card reads as a category. user can override in step 2.
+    private static func defaultTitle(for tool: PickableTool) -> String {
+        let raw: String
+        switch tool.group {
+        case .builtIn:
+            raw = tool.name
+        case .plugin(let id), .sandboxPlugin(let id):
+            raw = id
+        case .mcp(let provider, _):
+            raw = provider
+        }
+        return humanize(raw)
+    }
+
+    private static func humanize(_ raw: String) -> String {
+        let stripped = raw.hasPrefix("osaurus.")
+            ? String(raw.dropFirst("osaurus.".count))
+            : raw
+        return stripped
+            .split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
     }
 
     /// invalidate cached preview when args change; user must hit "Reload" again

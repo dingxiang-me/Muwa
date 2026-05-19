@@ -85,20 +85,25 @@ struct WidgetCard: View {
         }
     }
 
+    /// legacy widgets were stored with `title = toolName` ("get_events");
+    /// humanize at render time so the user sees "Get Events" without a migration
+    private var displayTitle: String {
+        let trimmed = widget.title.trimmingCharacters(in: .whitespaces)
+        if !trimmed.isEmpty, trimmed != widget.toolName { return widget.title }
+        return widget.toolName
+            .split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+    }
+
     // MARK: Header
 
     private var header: some View {
         HStack(spacing: 10) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text(widget.title)
-                    .font(.system(size: 14, weight: .semibold))
-                    .foregroundColor(theme.primaryText)
-                    .lineLimit(1)
-                Text(widget.toolName)
-                    .font(.system(size: 10, design: .monospaced))
-                    .foregroundColor(theme.tertiaryText)
-                    .lineLimit(1)
-            }
+            Text(displayTitle)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(theme.primaryText)
+                .lineLimit(1)
 
             Spacer(minLength: 8)
 
