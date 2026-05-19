@@ -66,17 +66,15 @@ enum DashboardToolCatalog {
         return nil
     }
 
-    /// when `showAllPluginTools` is false (default), only `widget: true`-flagged plugin tools
-    /// appear — keeps the picker curated for non-technical users. setting true is the
-    /// power-user escape hatch surfaced by the picker's "Show all plugin tools" toggle.
-    static func buildCatalog(showAllPluginTools: Bool = false) -> [PickableTool] {
+    /// only `widget: true`-flagged plugin tools appear — keeps the picker curated
+    static func buildCatalog() -> [PickableTool] {
         let registry = ToolRegistry.shared
         // hide built-in agent-loop tools (`complete`, `clarify`, `capabilities_*`, etc.) —
         // they're chat infrastructure, not user-facing data sources
         let builtInNames = registry.builtInToolNames
         let entries = registry.listTools().filter {
             guard $0.enabled, !builtInNames.contains($0.name) else { return false }
-            return showAllPluginTools || isWidgetReady($0.name)
+            return isWidgetReady($0.name)
         }
 
         // map provider display name → MCPProvider so we can detect connection state per tool
@@ -142,17 +140,13 @@ struct DashboardToolPicker: View {
     @Binding var selectedTool: PickableTool?
     @State private var searchText: String = ""
     @State private var catalog: [PickableTool] = []
-    @State private var showAllPluginTools: Bool = false
 
     var body: some View {
         VStack(spacing: 0) {
-            VStack(spacing: 8) {
-                searchBar
-                showAllToggle
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 10)
-            .background(theme.secondaryBackground)
+            searchBar
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(theme.secondaryBackground)
             Divider().opacity(0.4)
             ScrollView {
                 LazyVStack(alignment: .leading, spacing: 24) {
@@ -176,11 +170,10 @@ struct DashboardToolPicker: View {
         }
         .background(theme.primaryBackground)
         .onAppear { rebuildCatalog() }
-        .onChange(of: showAllPluginTools) { _, _ in rebuildCatalog() }
     }
 
     private func rebuildCatalog() {
-        catalog = DashboardToolCatalog.buildCatalog(showAllPluginTools: showAllPluginTools)
+        catalog = DashboardToolCatalog.buildCatalog()
     }
 
     private var searchBar: some View {
@@ -201,40 +194,15 @@ struct DashboardToolPicker: View {
         )
     }
 
-    private var showAllToggle: some View {
-        HStack(spacing: 6) {
-            Toggle("", isOn: $showAllPluginTools)
-                .toggleStyle(.switch)
-                .labelsHidden()
-                .controlSize(.mini)
-            Text("Show all plugin tools")
-                .font(.system(size: 10))
-                .foregroundColor(theme.secondaryText)
-            Spacer()
-            if showAllPluginTools {
-                Text("Advanced")
-                    .font(.system(size: 9, weight: .semibold))
-                    .foregroundColor(theme.warningColor)
-                    .padding(.horizontal, 5)
-                    .padding(.vertical, 1)
-                    .background(Capsule().fill(theme.warningColor.opacity(0.15)))
-            }
-        }
-    }
-
     private var emptyState: some View {
         VStack(spacing: 8) {
             Image(systemName: "puzzlepiece.extension")
                 .font(.system(size: 22, weight: .light))
                 .foregroundColor(theme.tertiaryText)
-            Text(
-                showAllPluginTools
-                    ? "No plugin tools found. Install plugins from the Plugins tab."
-                    : "No plugins offer widgets yet. Install plugins, or flip on \"Show all plugin tools\" above."
-            )
-            .font(.system(size: 11))
-            .foregroundColor(theme.tertiaryText)
-            .multilineTextAlignment(.center)
+            Text("No plugins offer widgets yet. Install plugins from the Plugins tab.")
+                .font(.system(size: 11))
+                .foregroundColor(theme.tertiaryText)
+                .multilineTextAlignment(.center)
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, 20)
