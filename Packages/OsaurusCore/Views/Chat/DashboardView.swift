@@ -36,7 +36,11 @@ struct DashboardView: View {
             showAddSheet = true
         }
         // drain on mount (buffered) and on change (arrives while open)
-        .onAppear { drainPendingPinRequest() }
+        .onAppear {
+            drainPendingPinRequest()
+            DashboardBriefingService.shared.dashboardDidAppear()
+        }
+        .onDisappear { DashboardBriefingService.shared.dashboardDidDisappear() }
         .onChange(of: viewModel.pendingPinRequest) { _, _ in drainPendingPinRequest() }
         .sheet(isPresented: $showAddSheet) {
             DashboardAddWidgetSheet(
@@ -127,21 +131,23 @@ struct DashboardView: View {
     }
 
     private var greetingHeader: some View {
-        VStack(alignment: .leading, spacing: 4) {
+        HStack(alignment: .firstTextBaseline) {
             Text(greetingText)
                 .font(.system(size: 26, weight: .semibold))
                 .foregroundColor(theme.primaryText)
+            Spacer()
             Text(Date.now.formatted(date: .complete, time: .omitted))
                 .font(.system(size: 12))
                 .foregroundColor(theme.secondaryText)
         }
-        .frame(maxWidth: .infinity, alignment: .leading)
+        .frame(maxWidth: .infinity)
     }
 
     private var grid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
             greetingHeader
+            DashboardBriefingBand()
             LazyVGrid(
                 columns: [
                     GridItem(.flexible(minimum: 280), spacing: 20),
