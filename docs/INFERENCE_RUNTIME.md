@@ -5,6 +5,11 @@ osaurus's MLX inference path is a thin shell around vmlx-swift-lm's
 management, and per-model scheduling all live inside the library. This
 document describes the small slice osaurus owns.
 
+Native Swift image generation is a separate pending lane. Osaurus does not
+currently route local `/v1/images/generations` or `/v1/images/edits` through
+`vMLXFlux`; see `NATIVE_SWIFT_IMAGE_GENERATION_INTEGRATION.md` for the wiring
+contract and the current blocked vMLX matrix.
+
 ## End-to-end shape
 
 ```
@@ -44,7 +49,7 @@ per container at load time
 
 | Field | Value | Why |
 |---|---|---|
-| `modelKey` | `"<modelName>\|kv=fp16"` | per-model isolation across loads; KV-mode tag prevents serving disk entries encoded under a different `defaultKVMode` after a mid-session change |
+| `modelKey` | `"<modelName>\|kv=fp16\|cachefmt=2\|restore=fullhit-trim-eval1\|..."` | per-model isolation across loads; KV-mode, serializer, restore-contract, and topology tags prevent serving disk entries encoded under a different cache contract after a runtime update |
 | `diskCacheDir` | `OsaurusPaths.diskKVCache()` | osaurus-managed sandbox path |
 | `enableDiskCache` | `true` when probe-write succeeds, else `false` | graceful fallback to memory-only when the dir is read-only / out-of-disk |
 | `usePagedCache` | `true` | content-addressed paged blocks for prefix reuse |
@@ -62,6 +67,14 @@ DSV4 is intentionally left to vmlx's default cache topology. Osaurus does
 not set `DSV4_KV_MODE`; unset means the production SWA+CSA+HSA
 `DeepseekV4Cache` path. Operator-provided `DSV4_KV_MODE=full` or `tq`
 is treated as a diagnostic override and disables the hybrid pool.
+DSV4 disk-prefix reuse is additionally namespaced with
+`layers=deepseekV4|prefix=hybrid-pool-disk|decode=max-rp110` so records
+created before the current native pool serializer and max-reasoning decode
+policy cannot be reused after an app/library update.
+For `reasoningEffort=max`, Osaurus applies a DSV4-specific default
+`repetitionPenalty=1.10` only when the request did not specify one and the
+bundle default is no-op. This is a decode stability policy for the observed
+raw max-reasoning repeated-token loop; explicit request penalties still win.
 
 osaurus deliberately does not pass `GenerateParameters.maxKVSize` -- a
 global rotating cache window forced from the app layer conflicted with
@@ -180,6 +193,7 @@ reasoning gets dropped together with the other sentinels.
 | `InferenceFeatureFlags.swift` | Single user-tunable: `mlxBatchEngineMaxBatchSize`. |
 | `MetalGate.swift` | Embedding-only counter (kept as the canonical hook for any future MLX-vs-CoreML interlock). |
 | `ModelLease.swift` | Per-model refcount; `unload(name)` waits for `count == 0` before freeing buffers. |
+| `NATIVE_SWIFT_IMAGE_GENERATION_INTEGRATION.md` | Pending native Swift image-generation lane and release gate. |
 
 ## Tests
 

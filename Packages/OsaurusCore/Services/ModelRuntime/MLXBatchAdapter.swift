@@ -60,6 +60,8 @@ struct MLXBatchAdapter {
         let compiledBatchDecode: Bool
     }
 
+    private static let dsv4MaxReasoningRepetitionPenalty: Float = 1.10
+
     static func effectiveGenerationSettings(
         modelName: String,
         generation: GenerationParameters,
@@ -73,6 +75,10 @@ struct MLXBatchAdapter {
             }
             return modelDefaults.temperature
         }()
+        let repetitionPenalty = Self.effectiveRepetitionPenalty(
+            modelName: modelName,
+            generation: generation,
+            modelDefault: modelDefaults.repetitionPenalty)
 
         return EffectiveGenerationSettings(
             temperature: generation.temperature ?? defaultTemperature ?? 0.7,
@@ -82,12 +88,38 @@ struct MLXBatchAdapter {
             topP: generation.topPOverride ?? modelDefaults.topP ?? runtimeTopP,
             topK: modelDefaults.topK ?? 0,
             minP: generation.minPOverride ?? modelDefaults.minP ?? 0,
-            repetitionPenalty: generation.repetitionPenalty ?? modelDefaults.repetitionPenalty,
+            repetitionPenalty: repetitionPenalty,
             compiledBatchDecode: shouldEnableCompiledBatchDecode(
                 modelName: modelName,
                 maxBatchSize: maxBatchSize
             )
         )
+    }
+
+    private static func effectiveRepetitionPenalty(
+        modelName: String,
+        generation: GenerationParameters,
+        modelDefault: Float?
+    ) -> Float? {
+        if let explicit = generation.repetitionPenalty {
+            return explicit
+        }
+
+        let resolved = modelDefault
+        guard
+            DSV4ReasoningProfile.matches(modelId: modelName),
+            let effort = generation.modelOptions["reasoningEffort"]?.stringValue,
+            DSV4ReasoningProfile.normalizedEffort(effort) == "max",
+            (resolved ?? 1.0) <= 1.0
+        else {
+            return resolved
+        }
+
+        // DSV4 Flash max-reasoning can enter a repeated "thinking" token loop
+        // under the model's shipped no-op penalty. Keep this as a decode policy,
+        // not a parser or stop-condition guard: explicit request penalties still
+        // win, and high/instruct modes keep the bundle defaults.
+        return dsv4MaxReasoningRepetitionPenalty
     }
 
     /// Same-model gate for the single-slot runtime path. With

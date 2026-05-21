@@ -579,6 +579,7 @@ struct ChatCompletionRequest: Codable, Sendable {
             response_format: response_format,
             stream_options: stream_options
         )
+        copy.max_completion_tokens = max_completion_tokens
         copy.modelOptions = modelOptions
         copy.ttftTrace = ttftTrace
         copy.enable_thinking = enable_thinking
