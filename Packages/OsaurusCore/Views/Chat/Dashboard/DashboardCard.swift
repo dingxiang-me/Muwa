@@ -120,14 +120,17 @@ struct WidgetCard: View {
 
             Menu { menuItems } label: {
                 Image(systemName: "ellipsis")
-                    .font(.system(size: 11, weight: .medium))
-                    .foregroundColor(theme.secondaryText)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(theme.primaryText)
                     .frame(width: 24, height: 24)
                     .background(Circle().fill(theme.tertiaryBackground))
+                    .clipShape(Circle())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
             .frame(width: 24)
+            .opacity(isHovered ? 1 : 0)
+            .animation(.easeInOut(duration: 0.15), value: isHovered)
         }
     }
 

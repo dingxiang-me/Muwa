@@ -394,7 +394,9 @@ struct DashboardAddWidgetSheet: View {
 
     private func sizeChip(_ s: WidgetSize) -> some View {
         let isSelected = size == s
+        let isDisabled = !Self.isSize(s, allowedFor: renderer)
         return Button {
+            guard !isDisabled else { return }
             size = s
         } label: {
             VStack(spacing: 4) {
@@ -403,7 +405,11 @@ struct DashboardAddWidgetSheet: View {
                 Text(sizeLabel(s))
                     .font(.system(size: 11, weight: .semibold))
             }
-            .foregroundColor(isSelected ? theme.accentColor : theme.secondaryText)
+            .foregroundColor(
+                isDisabled
+                    ? theme.tertiaryText
+                    : (isSelected ? theme.accentColor : theme.secondaryText)
+            )
             .frame(maxWidth: .infinity, minHeight: 56)
             .padding(.horizontal, 6)
             .padding(.vertical, 10)
@@ -419,8 +425,19 @@ struct DashboardAddWidgetSheet: View {
                     )
             )
             .contentShape(Rectangle())
+            .opacity(isDisabled ? 0.45 : 1)
         }
         .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .help(isDisabled ? "This size isn't supported for the selected renderer." : "")
+    }
+
+    /// calendar's week strip + event list don't fit in compact heights
+    private static func isSize(_ size: WidgetSize, allowedFor renderer: WidgetRenderer) -> Bool {
+        switch renderer {
+        case .calendar: return size == .large
+        default: return true
+        }
     }
 
     // MARK: Step 4 — Schedule
@@ -818,6 +835,11 @@ struct DashboardAddWidgetSheet: View {
                 title = Self.defaultTitle(for: tool)
             }
             arguments = .object([:])
+            // pre-select the plugin-recommended renderer so step 3 opens with it highlighted
+            if let rec = recommendedRenderer {
+                renderer = rec
+                size = Self.defaultSize(for: rec)
+            }
         }
     }
 
@@ -834,6 +856,14 @@ struct DashboardAddWidgetSheet: View {
             raw = provider
         }
         return humanize(raw)
+    }
+
+    /// renderers with rich custom layouts need more vertical room than the generic ones
+    private static func defaultSize(for renderer: WidgetRenderer) -> WidgetSize {
+        switch renderer {
+        case .calendar: return .large
+        default: return .medium
+        }
     }
 
     private static func humanize(_ raw: String) -> String {

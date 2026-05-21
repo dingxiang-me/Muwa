@@ -46,11 +46,21 @@ struct PickableTool: Identifiable, Equatable {
 
 @MainActor
 enum DashboardToolCatalog {
-    /// returns the plugin-declared renderer for a tool, if the registry catalog provided one
+    /// known tool names that osaurus ships a dedicated renderer for, used as a fallback
+    /// when the plugin manifest hasn't declared a `defaultRender`
+    private static let builtInRendererFallbacks: [String: WidgetRenderer] = [
+        "get_events": .calendar,
+    ]
+
+    /// returns the plugin-declared renderer for a tool, falling back to osaurus's known
+    /// shape map so first-party plugins get the recommended renderer without manifest changes
     static func renderHint(forTool name: String) -> WidgetRenderer? {
-        toolSummary(forTool: name)
-            .flatMap { $0.defaultRender }
-            .flatMap { WidgetRenderer(rawValue: $0) }
+        if let manifest = toolSummary(forTool: name)?.defaultRender,
+            let r = WidgetRenderer(rawValue: manifest)
+        {
+            return r
+        }
+        return builtInRendererFallbacks[name]
     }
 
     /// returns true if the plugin author flagged this tool as widget-ready

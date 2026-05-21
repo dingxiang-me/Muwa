@@ -20494,6 +20494,9 @@
     "This server requires OAuth sign in to provide tools." : {
 
     },
+    "This size isn't supported for the selected renderer." : {
+
+    },
     "This text is inserted into the chat input when you select the command. You continue typing after it." : {
 
     },
