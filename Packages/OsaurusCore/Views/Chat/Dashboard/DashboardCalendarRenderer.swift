@@ -208,6 +208,13 @@ struct CalendarRendererView: View {
             .contentShape(RoundedRectangle(cornerRadius: 8))
         }
         .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
     }
 
     // MARK: Events list
@@ -226,28 +233,50 @@ struct CalendarRendererView: View {
     private func eventRow(_ event: CalendarEvent) -> some View {
         let now = Date()
         let isHappening = event.start <= now && (event.end ?? event.start.addingTimeInterval(1800)) > now
-        return HStack(alignment: .top, spacing: 14) {
-            timeColumn(event, isHappening: isHappening)
-                .frame(width: 64, alignment: .leading)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(event.title)
-                    .font(.system(size: 13, weight: .semibold))
-                    .foregroundColor(theme.primaryText)
-                    .lineLimit(1)
-                if let subtitle = event.subtitle, !subtitle.isEmpty {
-                    Text(subtitle)
-                        .font(.system(size: 11))
-                        .foregroundColor(theme.tertiaryText)
+        return Button {
+            openInCalendar(event)
+        } label: {
+            HStack(alignment: .top, spacing: 14) {
+                timeColumn(event, isHappening: isHappening)
+                    .frame(width: 64, alignment: .leading)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(event.title)
+                        .font(.system(size: 13, weight: .semibold))
+                        .foregroundColor(theme.primaryText)
                         .lineLimit(1)
+                    if let subtitle = event.subtitle, !subtitle.isEmpty {
+                        Text(subtitle)
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.tertiaryText)
+                            .lineLimit(1)
+                    }
                 }
+                Spacer(minLength: 6)
+                Circle()
+                    .fill(theme.tertiaryText.opacity(0.5))
+                    .frame(width: 5, height: 5)
+                    .padding(.top, 6)
             }
-            Spacer(minLength: 6)
-            Circle()
-                .fill(theme.tertiaryText.opacity(0.5))
-                .frame(width: 5, height: 5)
-                .padding(.top, 6)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
         }
-        .padding(.vertical, 10)
+        .buttonStyle(.plain)
+        .onHover { hovering in
+            if hovering {
+                NSCursor.pointingHand.push()
+            } else {
+                NSCursor.pop()
+            }
+        }
+    }
+
+    private func openInCalendar(_ event: CalendarEvent) {
+        let encoder = JSONEncoder()
+        guard let data = try? encoder.encode(["eventId": event.id]),
+              let argsJSON = String(data: data, encoding: .utf8) else { return }
+        Task {
+            _ = try? await ToolRegistry.shared.execute(name: "open_event", argumentsJSON: argsJSON)
+        }
     }
 
     @ViewBuilder
