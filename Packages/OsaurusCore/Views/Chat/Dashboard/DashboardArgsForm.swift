@@ -122,9 +122,19 @@ struct DashboardArgsForm: View {
             if props.isEmpty {
                 emptyState("This tool takes no arguments.")
             } else {
-                VStack(alignment: .leading, spacing: 12) {
-                    ForEach(props) { prop in
-                        propertyRow(prop)
+                let required = props.filter { $0.required }
+                let optional = props.filter { !$0.required }
+                VStack(alignment: .leading, spacing: 16) {
+                    if !required.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            ForEach(required) { propertyRow($0) }
+                        }
+                    }
+                    if !optional.isEmpty {
+                        VStack(alignment: .leading, spacing: 12) {
+                            sectionHeader("Optional")
+                            ForEach(optional) { propertyRow($0) }
+                        }
                     }
                 }
             }
@@ -132,6 +142,14 @@ struct DashboardArgsForm: View {
             emptyState("Tool has no parameter schema. Edit raw JSON below.")
             rawJSONEditor
         }
+    }
+
+    private func sectionHeader(_ title: String) -> some View {
+        Text(title)
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(theme.secondaryText)
+            .textCase(.uppercase)
+            .frame(maxWidth: .infinity, alignment: .leading)
     }
 
     // MARK: Rows
