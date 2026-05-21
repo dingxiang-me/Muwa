@@ -451,6 +451,23 @@ extension ChatMessage {
         self.reasoning_content = nil
     }
 
+    /// Initialize with already-normalized multimodal content parts.
+    /// Used by compatibility endpoints (for example Open Responses) whose
+    /// request shape already carries image URLs rather than raw image bytes.
+    init(role: String, contentParts: [MessageContentPart]) {
+        self.role = role
+        self.contentParts = contentParts.isEmpty ? nil : contentParts
+        let texts = contentParts.compactMap { part -> String? in
+            if case .text(let text) = part { return text }
+            return nil
+        }
+        self.content = texts.isEmpty ? nil : texts.joined()
+        self.localAudioSamples = []
+        self.tool_calls = nil
+        self.tool_call_id = nil
+        self.reasoning_content = nil
+    }
+
     /// Multimodal init covering image + audio + video. Used by the
     /// chat composer when the loaded model's capabilities advertise the
     /// modality. Audio bytes encode as `input_audio` with explicit

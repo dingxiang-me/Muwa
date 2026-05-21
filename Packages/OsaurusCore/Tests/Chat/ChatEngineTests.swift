@@ -45,6 +45,47 @@ struct ChatEngineTests {
         #expect(chat.model == "JANGQ-AI/Hy3-preview-JANGTQ")
     }
 
+    @Test func openResponsesRequest_preservesInputImagePartsForVLRuntime() throws {
+        let data = Data(
+            #"""
+            {
+              "model": "zaya-vl",
+              "input": [
+                {
+                  "type": "message",
+                  "role": "user",
+                  "content": [
+                    {"type": "input_text", "text": "describe this"},
+                    {"type": "input_image", "image_url": "data:image/png;base64,QUJD", "detail": "high"}
+                  ]
+                }
+              ]
+            }
+            """#.utf8
+        )
+
+        let request = try JSONDecoder().decode(OpenResponsesRequest.self, from: data)
+        let chat = request.toChatCompletionRequest()
+
+        #expect(chat.messages.count == 1)
+        #expect(chat.messages[0].role == "user")
+        #expect(chat.messages[0].content == "describe this")
+        #expect(chat.messages[0].imageUrls == ["data:image/png;base64,QUJD"])
+        #expect(chat.messages[0].imageDataFromParts == [Data("ABC".utf8)])
+
+        guard let parts = chat.messages[0].contentParts else {
+            Issue.record("Responses input_image must survive conversion as ChatMessage.contentParts")
+            return
+        }
+        #expect(parts.count == 2)
+        if case .imageUrl(let url, let detail) = parts[1] {
+            #expect(url == "data:image/png;base64,QUJD")
+            #expect(detail == "high")
+        } else {
+            Issue.record("Second converted part should be image_url")
+        }
+    }
+
     @Test func streamChat_yields_deltas_success() async throws {
         let svc = FakeModelService(deltas: ["a", "b", "c"])
         let engine = ChatEngine(services: [svc], installedModelsProvider: { [] })

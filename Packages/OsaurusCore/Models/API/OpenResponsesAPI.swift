@@ -811,7 +811,12 @@ extension OpenResponsesRequest {
             for item in items {
                 switch item {
                 case .message(let messageItem):
-                    messages.append(ChatMessage(role: messageItem.role, content: messageItem.content.plainText))
+                    messages.append(
+                        ChatMessage(
+                            role: messageItem.role,
+                            contentParts: messageItem.content.chatMessageParts
+                        )
+                    )
                 case .functionCall(let callItem):
                     // A prior model-issued function call echoed back as input for multi-turn history.
                     // Convert to an assistant message with tool_calls so the downstream Chat
@@ -894,6 +899,25 @@ extension OpenResponsesRequest {
         )
         request.reasoning_effort = reasoning?.effort
         return request
+    }
+}
+
+private extension OpenResponsesMessageContent {
+    var chatMessageParts: [MessageContentPart] {
+        switch self {
+        case .text(let text):
+            return [.text(text)]
+        case .parts(let parts):
+            return parts.compactMap { part in
+                switch part {
+                case .inputText(let textPart):
+                    return .text(textPart.text)
+                case .inputImage(let imagePart):
+                    guard let url = imagePart.image_url, !url.isEmpty else { return nil }
+                    return .imageUrl(url: url, detail: imagePart.detail)
+                }
+            }
+        }
     }
 }
 
