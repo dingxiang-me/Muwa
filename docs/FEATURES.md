@@ -1216,7 +1216,7 @@ Eight settings total, down from v1's 18. The per-section budget knobs, MMR tunin
 
 **Tool API:** `search_memory(scope, query)` with three scopes: `pinned`, `episodes`, `transcript`. Replaces v1's five-scope tool.
 
-**HTTP API:** Same `X-Osaurus-Agent-Id` header for read-side context injection. `POST /memory/ingest` writes transcripts and triggers an immediate distillation flush after the batch (no need to wait for the writer's debounce).
+**HTTP API:** `POST /memory/ingest` writes transcripts and triggers an immediate distillation flush after the batch (no need to wait for the writer's debounce). Strict `/chat/completions` requests do not inject read-side memory; app chat, `POST /agents/{id}/run`, and plugin host inference own composed agent context.
 
 **Storage:** `~/.osaurus/memory/memory.sqlite` (SQLite with WAL mode), `~/.osaurus/memory/vectura/` (vector index)
 

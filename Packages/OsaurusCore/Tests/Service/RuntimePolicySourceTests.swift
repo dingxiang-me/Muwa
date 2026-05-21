@@ -194,7 +194,7 @@ struct RuntimePolicySourceTests {
         #expect(serverView.contains("reloadAccessKeys(readKeychain: true)"))
     }
 
-    @Test("plugin host inference carries agent memory like HTTP chat")
+    @Test("plugin host inference carries agent memory")
     func pluginHostInferenceInjectsAgentMemoryPrefix() throws {
         let source = try Self.source("Services/Plugin/PluginHostAPI.swift")
 
