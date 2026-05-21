@@ -61,6 +61,20 @@ struct MemoryView: View {
     @State var backfillSummary: String?
     @State var showBackfillConfirm: Bool = false
 
+    /// Wall-clock timestamp of the last `loadData()` that landed values
+    /// on MainActor. Used by the on-appear path to short-circuit when
+    /// the user re-enters the Memory tab and our cached state is still
+    /// fresh — the in-view mutation sites (`saveIdentityEdit`, override
+    /// add/remove, distill, consolidate, clear, etc.) still pass
+    /// `forceReload: true` so they always re-fetch.
+    @State var lastLoadedAt: Date?
+
+    /// Default freshness window for `.onAppear` refreshes. The Memory
+    /// tab opens many SQLite cursors per load; a 10 s window means a
+    /// quick tab-toggle round trip (Settings → Memory → Settings →
+    /// Memory) no longer re-hits the database.
+    static let memoryDataFreshWindow: TimeInterval = 10
+
     // MARK: UI State
 
     @State private var selectedAgent: Agent?
@@ -171,7 +185,7 @@ struct MemoryView: View {
             }
         }
         .onAppear {
-            loadData()
+            loadData(staleAfter: Self.memoryDataFreshWindow)
             withAnimation(.easeOut(duration: 0.25).delay(0.05)) {
                 hasAppeared = true
             }
@@ -181,7 +195,7 @@ struct MemoryView: View {
                 identity: identity,
                 onSave: { newContent in
                     saveIdentityEdit(newContent)
-                    showToast("Identity saved")
+                    showToast(L("Identity saved"))
                 }
             )
             .frame(minWidth: 500, minHeight: 400)
@@ -190,7 +204,7 @@ struct MemoryView: View {
             AddOverrideSheet(
                 onAdd: { text in
                     addOverride(text)
-                    showToast("Override added")
+                    showToast(L("Override added"))
                 }
             )
             .frame(minWidth: 440, minHeight: 220)
@@ -243,7 +257,7 @@ struct MemoryView: View {
                 config.enabled = true
                 MemoryConfigurationStore.save(config)
                 loadData()
-                showToast("Memory enabled")
+                showToast(L("Memory enabled"))
             } label: {
                 Text("Enable", bundle: .module)
                     .font(.system(size: 13, weight: .semibold))
@@ -289,7 +303,7 @@ struct MemoryView: View {
                     await MainActor.run {
                         isDistilling = false
                         loadData()
-                        showToast("Pending distillation complete")
+                        showToast(L("Pending distillation complete"))
                     }
                 }
             }
@@ -303,7 +317,7 @@ struct MemoryView: View {
                     await MainActor.run {
                         isSyncing = false
                         loadData()
-                        showToast("Sync complete")
+                        showToast(L("Sync complete"))
                     }
                 }
             }
@@ -410,7 +424,7 @@ struct MemoryView: View {
                             content: content,
                             onDelete: {
                                 removeOverride(index: index)
-                                showToast("Override removed")
+                                showToast(L("Override removed"))
                             }
                         )
                     }
@@ -478,7 +492,7 @@ struct MemoryView: View {
                         )
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help(Text("Preview memory context", bundle: .module))
+                .localizedHelp("Preview memory context")
             }
             .padding(.vertical, 10)
             .padding(.horizontal, 4)
@@ -731,7 +745,7 @@ struct MemoryView: View {
                             await MainActor.run {
                                 isConsolidating = false
                                 loadData()
-                                showToast("Consolidation complete")
+                                showToast(L("Consolidation complete"))
                             }
                         }
                     } label: {
@@ -886,7 +900,24 @@ struct MemoryView: View {
         }
     }
 
-    func loadData(onComplete: (@Sendable @MainActor () -> Void)? = nil) {
+    func loadData(
+        onComplete: (@Sendable @MainActor () -> Void)? = nil,
+        staleAfter: TimeInterval = 0
+    ) {
+        // Skip if the previous load is still within the freshness
+        // window. Setting `staleAfter` to 0 (the default) preserves the
+        // existing always-reload behavior for in-view mutation
+        // callsites; `.onAppear` passes `memoryDataFreshWindow` to
+        // avoid the redundant SQLite walk on quick tab revisits.
+        if staleAfter > 0,
+            let last = lastLoadedAt,
+            Date().timeIntervalSince(last) < staleAfter,
+            !isLoading
+        {
+            onComplete?()
+            return
+        }
+
         config = MemoryConfigurationStore.load()
         Task.detached(priority: .userInitiated) {
             let db = MemoryDatabase.shared
@@ -896,7 +927,7 @@ struct MemoryView: View {
                     await MainActor.run {
                         isLoading = false
                         onComplete?()
-                        showToast("Failed to open memory database", isError: true)
+                        showToast(L("Failed to open memory database"), isError: true)
                     }
                     return
                 }
@@ -965,6 +996,7 @@ struct MemoryView: View {
                 chatActive = loadedChatActive
                 distillSnapshot = loadedDistillSnapshot
                 isLoading = false
+                lastLoadedAt = Date()
                 onComplete?()
                 if let loadError {
                     showToast(loadError, isError: true)
@@ -980,7 +1012,7 @@ struct MemoryView: View {
             try MemoryDatabase.shared.removeIdentityOverride(at: index)
         } catch {
             MemoryLogger.database.error("Failed to remove override: \(error)")
-            showToast("Failed to remove override", isError: true)
+            showToast(L("Failed to remove override"), isError: true)
         }
         loadData()
     }
@@ -990,7 +1022,7 @@ struct MemoryView: View {
             try MemoryDatabase.shared.appendIdentityOverride(text)
         } catch {
             MemoryLogger.database.error("Failed to add override: \(error)")
-            showToast("Failed to add override", isError: true)
+            showToast(L("Failed to add override"), isError: true)
         }
         loadData()
     }
@@ -1008,7 +1040,7 @@ struct MemoryView: View {
             try MemoryDatabase.shared.saveIdentity(updated)
         } catch {
             MemoryLogger.database.error("Failed to save identity: \(error)")
-            showToast("Failed to save identity", isError: true)
+            showToast(L("Failed to save identity"), isError: true)
         }
         loadData()
     }
@@ -1021,7 +1053,7 @@ struct MemoryView: View {
         try? db.open()
         Task { await MemorySearchService.shared.clearIndex() }
         loadData()
-        showToast("All memory cleared")
+        showToast(L("All memory cleared"))
     }
 
     private func formatBytes(_ bytes: Int64) -> String {

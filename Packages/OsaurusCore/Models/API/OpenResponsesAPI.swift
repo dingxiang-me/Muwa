@@ -243,6 +243,34 @@ public struct OpenResponsesInputImagePart: Codable, Sendable {
     }
 }
 
+extension OpenResponsesMessageContent {
+    fileprivate var chatPlainText: String? {
+        let text = plainText
+        return text.isEmpty ? nil : text
+    }
+
+    fileprivate var chatContentParts: [MessageContentPart]? {
+        guard case .parts(let parts) = self else { return nil }
+        var converted: [MessageContentPart] = []
+        var hasMedia = false
+
+        for part in parts {
+            switch part {
+            case .inputText(let textPart):
+                converted.append(.text(textPart.text))
+            case .inputImage(let imagePart):
+                guard let imageURL = imagePart.image_url, !imageURL.isEmpty else {
+                    continue
+                }
+                converted.append(.imageUrl(url: imageURL, detail: imagePart.detail))
+                hasMedia = true
+            }
+        }
+
+        return hasMedia ? converted : nil
+    }
+}
+
 /// Function call output item (tool result)
 public struct OpenResponsesFunctionCallOutputItem: Codable, Sendable {
     public let type: String
@@ -342,6 +370,7 @@ public struct OpenResponsesResponse: Codable, Sendable {
     public let status: OpenResponsesStatus
     public let model: String
     public let output: [OpenResponsesOutputItem]
+    public let output_text: String?
     public let usage: OpenResponsesUsage?
     public let metadata: [String: String]?
 
@@ -351,7 +380,8 @@ public struct OpenResponsesResponse: Codable, Sendable {
         status: OpenResponsesStatus,
         model: String,
         output: [OpenResponsesOutputItem],
-        usage: OpenResponsesUsage?
+        usage: OpenResponsesUsage?,
+        outputText: String? = nil
     ) {
         self.id = id
         self.object = "response"
@@ -359,8 +389,21 @@ public struct OpenResponsesResponse: Codable, Sendable {
         self.status = status
         self.model = model
         self.output = output
+        self.output_text = outputText ?? Self.text(from: output)
         self.usage = usage
         self.metadata = nil
+    }
+
+    private static func text(from output: [OpenResponsesOutputItem]) -> String? {
+        let parts = output.flatMap { item -> [String] in
+            guard case .message(let message) = item else { return [] }
+            return message.content.compactMap { content in
+                guard case .outputText(let text) = content else { return nil }
+                return text.text
+            }
+        }
+        let joined = parts.joined()
+        return joined.isEmpty ? nil : joined
     }
 }
 
@@ -811,7 +854,13 @@ extension OpenResponsesRequest {
             for item in items {
                 switch item {
                 case .message(let messageItem):
-                    messages.append(ChatMessage(role: messageItem.role, content: messageItem.content.plainText))
+                    messages.append(
+                        ChatMessage(
+                            role: messageItem.role,
+                            content: messageItem.content.chatPlainText,
+                            contentParts: messageItem.content.chatContentParts
+                        )
+                    )
                 case .functionCall(let callItem):
                     // A prior model-issued function call echoed back as input for multi-turn history.
                     // Convert to an assistant message with tool_calls so the downstream Chat

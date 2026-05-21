@@ -20,6 +20,75 @@ private final class SendableBool: @unchecked Sendable {
     }
 }
 
+private final class LockedStringAccumulator: @unchecked Sendable {
+    private let lock = NSLock()
+    private var storage = ""
+
+    func append(_ value: String) {
+        lock.withLock {
+            storage += value
+        }
+    }
+
+    var value: String {
+        lock.withLock { storage }
+    }
+}
+
+private final class OpenResponsesContextStore: @unchecked Sendable {
+    private struct Entry {
+        let model: String
+        let messages: [ChatMessage]
+    }
+
+    private let lock = NSLock()
+    private var entries: [String: Entry] = [:]
+    private var insertionOrder: [String] = []
+    private let maxEntries = 128
+    private let maxMessagesPerEntry = 40
+
+    func transcript(for responseId: String?, model: String) -> [ChatMessage] {
+        guard let responseId, !responseId.isEmpty else { return [] }
+        return lock.withLock {
+            guard let entry = entries[responseId], entry.model == model else { return [] }
+            return entry.messages
+        }
+    }
+
+    func store(responseId: String, model: String, messages: [ChatMessage]) {
+        guard !responseId.isEmpty, !messages.isEmpty else { return }
+        let clipped = Array(messages.suffix(maxMessagesPerEntry))
+        lock.withLock {
+            if entries[responseId] == nil {
+                insertionOrder.append(responseId)
+            }
+            entries[responseId] = Entry(model: model, messages: clipped)
+
+            while insertionOrder.count > maxEntries {
+                let evicted = insertionOrder.removeFirst()
+                entries.removeValue(forKey: evicted)
+            }
+        }
+    }
+}
+
+private final class OneShotContinuation<Value: Sendable>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var didResume = false
+
+    func resume(_ continuation: CheckedContinuation<Value, Never>, returning value: Value) -> Bool {
+        lock.lock()
+        guard !didResume else {
+            lock.unlock()
+            return false
+        }
+        didResume = true
+        lock.unlock()
+        continuation.resume(returning: value)
+        return true
+    }
+}
+
 private final class HTTPTraceRecorder: @unchecked Sendable {
     private let trace: TTFTTrace?
     private let lock = NSLock()
@@ -76,10 +145,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     typealias OutboundOut = HTTPServerResponsePart
 
     private let configuration: ServerConfiguration
-    private let apiKeyValidator: APIKeyValidator
+    private let apiKeyValidatorProvider: @Sendable () -> APIKeyValidator
+    private var apiKeyValidator: APIKeyValidator { apiKeyValidatorProvider() }
     private let chatEngine: ChatEngineProtocol
     private let trustLoopback: Bool
     private let _isChannelActive = SendableBool(false)
+    private static let openResponsesContextStore = OpenResponsesContextStore()
     /// Per-request scratch state. `internal` so peer-file helpers (e.g.
     /// `HTTPRequestParse.readRequestBody()`) can drain the buffered body
     /// without going through a private accessor.
@@ -106,12 +177,13 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     init(
         configuration: ServerConfiguration,
         apiKeyValidator: APIKeyValidator = .empty,
+        apiKeyValidatorProvider: (@Sendable () -> APIKeyValidator)? = nil,
         eventLoop: EventLoop,
         chatEngine: ChatEngineProtocol = ChatEngine(),
         trustLoopback: Bool = true
     ) {
         self.configuration = configuration
-        self.apiKeyValidator = apiKeyValidator
+        self.apiKeyValidatorProvider = apiKeyValidatorProvider ?? { apiKeyValidator }
         self.chatEngine = chatEngine
         self.trustLoopback = trustLoopback
         self.stateRef = NIOLoopBound(RequestState(), eventLoop: eventLoop)
@@ -344,6 +416,15 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     method: method,
                     path: path
                 )
+            } else if head.method == .GET, path == "/admin/cache-stats" {
+                handleCacheStatsEndpoint(
+                    head: head,
+                    context: context,
+                    startTime: startTime,
+                    userAgent: userAgent,
+                    method: method,
+                    path: path
+                )
             } else if head.method == .GET, path == "/models" {
                 handleModelsEndpoint(head: head, context: context, startTime: startTime, userAgent: userAgent)
             } else if head.method == .GET, path == "/tags" {
@@ -352,6 +433,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 handleShowEndpoint(head: head, context: context, startTime: startTime, userAgent: userAgent)
             } else if head.method == .POST, path == "/chat/completions" || path == "/v1/chat/completions" {
                 handleChatCompletions(head: head, context: context, startTime: startTime, userAgent: userAgent)
+            } else if head.method == .POST, path == "/generate" {
+                handleOllamaGenerate(head: head, context: context, startTime: startTime, userAgent: userAgent)
             } else if head.method == .POST, path == "/chat" {
                 handleChatNDJSON(head: head, context: context, startTime: startTime, userAgent: userAgent)
             } else if head.method == .GET, path == "/mcp/health" {
@@ -480,6 +563,156 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
             stateRef.value.requestHead = nil
             stateRef.value.requestBodyBuffer = nil
+        }
+    }
+
+    /// `/admin/cache-stats` exposes the current vmlx `CacheCoordinator`
+    /// counters for loaded models. It is intentionally read-only and does not
+    /// load a model by itself; an empty `models` array is the correct cold
+    /// startup state.
+    private func handleCacheStatsEndpoint(
+        head: HTTPRequestHead,
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?,
+        method: String,
+        path: String
+    ) {
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let cors = stateRef.value.corsHeaders
+        let hop = Self.makeHop(channel: context.channel, loop: loop)
+        let version = head.version
+        let logSelf = self
+        let logStartTime = startTime
+        let logUserAgent = userAgent
+        let logMethod = method
+        let logPath = path
+
+        Task(priority: .userInitiated) {
+            let cached = await ModelRuntime.shared.cachedModelSummaries()
+            var aggregate: [String: Int] = [
+                "prefix_hits": 0,
+                "prefix_misses": 0,
+                "paged_hits": 0,
+                "paged_misses": 0,
+                "disk_l2_hits": 0,
+                "disk_l2_misses": 0,
+                "disk_l2_stores": 0,
+                "ssm_companion_hits": 0,
+                "ssm_companion_misses": 0,
+                "ssm_companion_rederives": 0,
+            ]
+
+            let models: [[String: Any]] = cached.map { summary in
+                var row: [String: Any] = [
+                    "name": summary.name,
+                    "is_current": summary.isCurrent,
+                    "weights_bytes": summary.bytes,
+                ]
+                if let draftStrategy = summary.draftStrategyDescription {
+                    row["draft_strategy"] = draftStrategy
+                } else {
+                    row["draft_strategy"] = NSNull()
+                }
+                if let nativeMTPDepth = summary.nativeMTPDepth {
+                    row["native_mtp_depth"] = nativeMTPDepth
+                } else {
+                    row["native_mtp_depth"] = NSNull()
+                }
+                let mlxPress = summary.mlxPressStatus
+                var mlxPressStatus: [String: Any] = [
+                    "enabled": mlxPress.enabled,
+                    "backend": mlxPress.backend.rawValue,
+                    "tiles_under_management": mlxPress.tilesUnderManagement,
+                    "total_routed_bytes": mlxPress.totalRoutedBytes,
+                ]
+                if let coldFraction = mlxPress.coldFraction {
+                    mlxPressStatus["cold_fraction"] = coldFraction
+                } else {
+                    mlxPressStatus["cold_fraction"] = NSNull()
+                }
+                row["mlx_press"] = mlxPressStatus
+                guard let stats = summary.cacheStats else {
+                    row["cache_enabled"] = false
+                    return row
+                }
+
+                row["cache_enabled"] = true
+                row["is_hybrid"] = stats.isHybrid
+                row["is_paged_incompatible"] = stats.isPagedIncompatible
+
+                var paged: [String: Any] = ["enabled": stats.pagedEnabled]
+                if let pagedStats = stats.pagedStats {
+                    paged["total_blocks"] = pagedStats.totalBlocks
+                    paged["allocated_blocks"] = pagedStats.allocatedBlocks
+                    paged["free_blocks"] = pagedStats.freeBlocks
+                    paged["hits"] = pagedStats.cacheHits
+                    paged["misses"] = pagedStats.cacheMisses
+                    paged["evictions"] = pagedStats.evictions
+                    aggregate["paged_hits", default: 0] += pagedStats.cacheHits
+                    aggregate["paged_misses", default: 0] += pagedStats.cacheMisses
+                    aggregate["prefix_hits", default: 0] += pagedStats.cacheHits
+                    aggregate["prefix_misses", default: 0] += pagedStats.cacheMisses
+                }
+                row["paged_cache"] = paged
+
+                var disk: [String: Any] = ["enabled": stats.diskEnabled]
+                if let diskStats = stats.diskStats {
+                    disk["hits"] = diskStats.hits
+                    disk["misses"] = diskStats.misses
+                    disk["stores"] = diskStats.stores
+                    disk["max_size_bytes"] = diskStats.maxSizeBytes
+                    aggregate["disk_l2_hits", default: 0] += diskStats.hits
+                    aggregate["disk_l2_misses", default: 0] += diskStats.misses
+                    aggregate["disk_l2_stores", default: 0] += diskStats.stores
+                    aggregate["prefix_hits", default: 0] += diskStats.hits
+                    aggregate["prefix_misses", default: 0] += diskStats.misses
+                }
+                row["block_disk_store"] = disk
+
+                let ssm = stats.ssmStats
+                row["ssm_companion_cache"] = [
+                    "hits": ssm.hits,
+                    "misses": ssm.misses,
+                    "rederives": ssm.reDerives,
+                ]
+                aggregate["ssm_companion_hits", default: 0] += ssm.hits
+                aggregate["ssm_companion_misses", default: 0] += ssm.misses
+                aggregate["ssm_companion_rederives", default: 0] += ssm.reDerives
+                return row
+            }
+
+            let obj: [String: Any] = [
+                "status": "ok",
+                "timestamp": Date().ISO8601Format(),
+                "models": models,
+                "aggregate": aggregate,
+            ]
+            let data = try? JSONSerialization.data(withJSONObject: obj, options: .osaurusCanonical)
+            let body = data.flatMap { String(decoding: $0, as: UTF8.self) } ?? "{}"
+            let headers: [(String, String)] =
+                [("Content-Type", "application/json; charset=utf-8")]
+                + cors
+
+            hop {
+                logSelf.sendResponse(
+                    context: ctx.value,
+                    version: version,
+                    status: .ok,
+                    headers: headers,
+                    body: body
+                )
+            }
+            logSelf.logRequest(
+                method: logMethod,
+                path: logPath,
+                userAgent: logUserAgent,
+                requestBody: nil,
+                responseBody: body,
+                responseStatus: 200,
+                startTime: logStartTime
+            )
         }
     }
 
@@ -880,7 +1113,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 )
             )
 
-            let encoder = JSONEncoder()
+            let encoder = JSONEncoder.osaurusCanonical()
             guard let requestData = try? encoder.encode(request),
                 let requestJSON = String(data: requestData, encoding: .utf8)
             else {
@@ -1632,7 +1865,27 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             SystemPromptComposer.injectSystemContent(composed.prompt, into: &enriched.messages)
         }
         SystemPromptComposer.injectMemoryPrefix(composed.memorySection, into: &enriched.messages)
-        return enriched
+        let mergedTools = mergeAgentContextTools(composed.tools, clientTools: request.tools)
+        let resolvedToolChoice: ToolChoiceOption? = {
+            guard let mergedTools, !mergedTools.isEmpty else { return nil }
+            return request.tool_choice ?? .auto
+        }()
+        return enriched.withContext(
+            messages: enriched.messages,
+            tools: mergedTools,
+            toolChoice: resolvedToolChoice
+        )
+    }
+
+    private static func mergeAgentContextTools(
+        _ agentTools: [Tool],
+        clientTools: [Tool]?
+    ) -> [Tool]? {
+        let clientTools = clientTools ?? []
+        guard !agentTools.isEmpty || !clientTools.isEmpty else { return nil }
+        let clientNames = Set(clientTools.map(\.function.name))
+        let contextTools = agentTools.filter { !clientNames.contains($0.function.name) }
+        return contextTools + clientTools
     }
 
     // MARK: - Memory Ingestion
@@ -1692,6 +1945,28 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
 
         let cors = stateRef.value.corsHeaders
+        guard MemoryConfigurationStore.load().enabled else {
+            let responseBody = #"{"error":"memory_disabled","message":"Memory is disabled"}"#
+            sendResponse(
+                context: context,
+                version: head.version,
+                status: .serviceUnavailable,
+                headers: [("Content-Type", "application/json; charset=utf-8")] + cors,
+                body: responseBody
+            )
+            logRequest(
+                method: "POST",
+                path: "/memory/ingest",
+                userAgent: userAgent,
+                requestBody: requestBodyString,
+                responseBody: responseBody,
+                responseStatus: 503,
+                startTime: startTime,
+                errorMessage: "memory disabled"
+            )
+            return
+        }
+
         let loop = context.eventLoop
         let ctx = NIOLoopBound(context, eventLoop: loop)
         let hop = Self.makeHop(channel: context.channel, loop: loop)
@@ -1702,49 +1977,116 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         Task(priority: .userInitiated) {
             let db = MemoryDatabase.shared
+            guard await MemoryDatabase.waitForSharedOpen(timeoutSeconds: 8) else {
+                let responseBody = #"{"error":"memory_database_unavailable","message":"Memory database is not ready"}"#
+                var headers: [(String, String)] = [("Content-Type", "application/json")]
+                headers.append(contentsOf: cors)
+                let headersCopy = headers
+                hop {
+                    var responseHead = HTTPResponseHead(version: head.version, status: .serviceUnavailable)
+                    var buffer = ctx.value.channel.allocator.buffer(capacity: responseBody.utf8.count)
+                    buffer.writeString(responseBody)
+                    var nioHeaders = HTTPHeaders()
+                    for (name, value) in headersCopy { nioHeaders.add(name: name, value: value) }
+                    nioHeaders.add(name: "Content-Length", value: String(buffer.readableBytes))
+                    nioHeaders.add(name: "Connection", value: "close")
+                    responseHead.headers = nioHeaders
+                    let c = ctx.value
+                    c.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
+                    c.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+                    c.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil as HTTPHeaders?))).whenComplete { _ in
+                        ctx.value.close(promise: nil)
+                    }
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/memory/ingest",
+                    userAgent: logUserAgent,
+                    requestBody: logRequestBody,
+                    responseBody: responseBody,
+                    responseStatus: 503,
+                    startTime: logStartTime,
+                    errorMessage: "memory database not ready"
+                )
+                return
+            }
 
             let skipExtraction = req.skip_extraction ?? false
 
-            try? db.deleteTranscriptForConversation(req.conversation_id)
+            do {
+                try db.deleteTranscriptForConversation(req.conversation_id)
 
-            for (i, turn) in req.turns.enumerated() {
-                let turnDate = turn.date ?? req.session_date
+                for (i, turn) in req.turns.enumerated() {
+                    let turnDate = turn.date ?? req.session_date
 
-                let pairs: [(role: String, content: String, index: Int)] = [
-                    ("user", turn.user, i * 2),
-                    ("assistant", turn.assistant, i * 2 + 1),
-                ]
-                for (role, content, chunkIndex) in pairs {
-                    let tokens = TokenEstimator.estimate(content)
-                    let storedTurn = TranscriptTurn(
-                        conversationId: req.conversation_id,
-                        chunkIndex: chunkIndex,
-                        role: role,
-                        content: content,
-                        tokenCount: tokens,
-                        agentId: req.agent_id
-                    )
-                    try? db.insertTranscriptTurn(
-                        agentId: req.agent_id,
-                        conversationId: req.conversation_id,
-                        chunkIndex: chunkIndex,
-                        role: role,
-                        content: content,
-                        tokenCount: tokens,
-                        createdAt: turnDate
-                    )
-                    await MemorySearchService.shared.indexTranscriptTurn(storedTurn)
+                    let pairs: [(role: String, content: String, index: Int)] = [
+                        ("user", turn.user, i * 2),
+                        ("assistant", turn.assistant, i * 2 + 1),
+                    ]
+                    for (role, content, chunkIndex) in pairs {
+                        let tokens = TokenEstimator.estimate(content)
+                        let storedTurn = TranscriptTurn(
+                            conversationId: req.conversation_id,
+                            chunkIndex: chunkIndex,
+                            role: role,
+                            content: content,
+                            tokenCount: tokens,
+                            agentId: req.agent_id
+                        )
+                        try db.insertTranscriptTurn(
+                            agentId: req.agent_id,
+                            conversationId: req.conversation_id,
+                            chunkIndex: chunkIndex,
+                            role: role,
+                            content: content,
+                            tokenCount: tokens,
+                            createdAt: turnDate
+                        )
+                        await MemorySearchService.shared.indexTranscriptTurn(storedTurn)
+                    }
+
+                    if !skipExtraction {
+                        await MemoryService.shared.bufferTurn(
+                            userMessage: turn.user,
+                            assistantMessage: turn.assistant,
+                            agentId: req.agent_id,
+                            conversationId: req.conversation_id,
+                            sessionDate: turnDate
+                        )
+                    }
                 }
-
-                if !skipExtraction {
-                    await MemoryService.shared.bufferTurn(
-                        userMessage: turn.user,
-                        assistantMessage: turn.assistant,
-                        agentId: req.agent_id,
-                        conversationId: req.conversation_id,
-                        sessionDate: turnDate
-                    )
+            } catch {
+                let responseBody = #"{"error":"memory_ingest_failed","message":"Memory transcript write failed"}"#
+                var headers: [(String, String)] = [("Content-Type", "application/json")]
+                headers.append(contentsOf: cors)
+                let headersCopy = headers
+                hop {
+                    var responseHead = HTTPResponseHead(version: head.version, status: .internalServerError)
+                    var buffer = ctx.value.channel.allocator.buffer(capacity: responseBody.utf8.count)
+                    buffer.writeString(responseBody)
+                    var nioHeaders = HTTPHeaders()
+                    for (name, value) in headersCopy { nioHeaders.add(name: name, value: value) }
+                    nioHeaders.add(name: "Content-Length", value: String(buffer.readableBytes))
+                    nioHeaders.add(name: "Connection", value: "close")
+                    responseHead.headers = nioHeaders
+                    let c = ctx.value
+                    c.write(NIOAny(HTTPServerResponsePart.head(responseHead)), promise: nil)
+                    c.write(NIOAny(HTTPServerResponsePart.body(.byteBuffer(buffer))), promise: nil)
+                    c.writeAndFlush(NIOAny(HTTPServerResponsePart.end(nil as HTTPHeaders?))).whenComplete { _ in
+                        ctx.value.close(promise: nil)
+                    }
                 }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/memory/ingest",
+                    userAgent: logUserAgent,
+                    requestBody: logRequestBody,
+                    responseBody: responseBody,
+                    responseStatus: 500,
+                    startTime: logStartTime,
+                    errorMessage: "\(error)"
+                )
+                return
             }
 
             // Ingestion always implies "I'm done with this conversation
@@ -2050,7 +2392,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             // 5. Return the agent's address, the generated API key, and the permanence flag.
             let response = PairResponse(agentAddress: agentAddress, apiKey: fullKey, isPermanent: isPermanent)
             let json =
-                (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) }
+                (try? JSONEncoder.osaurusCanonical().encode(response)).map { String(decoding: $0, as: UTF8.self) }
                 ?? #"{"error":"Encoding failed"}"#
             // Never log the freshly minted key. The wire response still
             // contains it; the request log gets a redacted copy with the
@@ -2062,7 +2404,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 isPermanent: isPermanent
             )
             let redactedJson =
-                (try? JSONEncoder().encode(redactedResponse)).map { String(decoding: $0, as: UTF8.self) }
+                (try? JSONEncoder.osaurusCanonical().encode(redactedResponse)).map {
+                    String(decoding: $0, as: UTF8.self)
+                }
                 ?? #"{"agentAddress":"<redacted>","apiKey":"<redacted>"}"#
 
             hop {
@@ -2242,7 +2586,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         relayBaseURL: invite.url,
                         apiKey: apiKey
                     )
-                    return (try? JSONEncoder().encode(body))
+                    return (try? JSONEncoder.osaurusCanonical().encode(body))
                         .map { String(decoding: $0, as: UTF8.self) }
                         ?? #"{"error":"Encoding failed"}"#
                 }
@@ -2337,7 +2681,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
             let response = AgentListResponse(agents: items)
             let json =
-                (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) } ?? #"{"agents":[]}"#
+                (try? JSONEncoder.osaurusCanonical().encode(response)).map { String(decoding: $0, as: UTF8.self) }
+                ?? #"{"agents":[]}"#
 
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -2436,7 +2781,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 updated_at: formatter.string(from: agent.updatedAt)
             )
             let json =
-                (try? JSONEncoder().encode(item)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+                (try? JSONEncoder.osaurusCanonical().encode(item)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
 
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -2713,34 +3058,6 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 for outcome in outcomes {
                     let invocation = outcome.invocation
                     let callId = outcome.callId
-                    hop {
-                        writerBound.value.writeContent(
-                            StreamingToolHint.encode(invocation.toolName),
-                            model: model,
-                            responseId: responseId,
-                            created: created,
-                            context: ctx.value
-                        )
-                        writerBound.value.writeContent(
-                            StreamingToolHint.encodeArgs(invocation.jsonArguments),
-                            model: model,
-                            responseId: responseId,
-                            created: created,
-                            context: ctx.value
-                        )
-                        writerBound.value.writeContent(
-                            StreamingToolHint.encodeDone(
-                                callId: callId,
-                                name: invocation.toolName,
-                                arguments: invocation.jsonArguments,
-                                result: outcome.result
-                            ),
-                            model: model,
-                            responseId: responseId,
-                            created: created,
-                            context: ctx.value
-                        )
-                    }
                     assistantToolCalls.append(
                         ToolCall(
                             id: callId,
@@ -2932,7 +3249,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 let pollUrl = "/v1/tasks/\(resolvedId)"
                 let resp: [String: Any] = ["id": resolvedId, "status": "running", "poll_url": pollUrl]
                 responseBody =
-                    (try? JSONSerialization.data(withJSONObject: resp)).flatMap { String(decoding: $0, as: UTF8.self) }
+                    (try? JSONSerialization.data(withJSONObject: resp, options: .osaurusCanonical))
+                    .flatMap { String(decoding: $0, as: UTF8.self) }
                     ?? "{}"
                 status = .accepted
             } else {
@@ -3251,7 +3569,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 let json: String
                 if ollamaFormat {
                     let response = OllamaEmbedResponse(model: EmbeddingService.modelName, embeddings: embeddings)
-                    json = (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+                    json =
+                        (try? JSONEncoder.osaurusCanonical().encode(response)).map {
+                            String(decoding: $0, as: UTF8.self)
+                        } ?? "{}"
                 } else {
                     let objects = embeddings.enumerated().map { OpenAIEmbeddingObject(embedding: $1, index: $0) }
                     let tokenCount = texts.reduce(0) { $0 + $1.split(separator: " ").count }
@@ -3260,7 +3581,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         model: EmbeddingService.modelName,
                         usage: OpenAIEmbeddingUsage(prompt_tokens: tokenCount, total_tokens: tokenCount)
                     )
-                    json = (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+                    json =
+                        (try? JSONEncoder.osaurusCanonical().encode(response)).map {
+                            String(decoding: $0, as: UTF8.self)
+                        } ?? "{}"
                 }
 
                 hop {
@@ -3551,7 +3875,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                                 ChatMessage(role: "assistant", content: accumulatedContent)
                             )
                         }
-                        ChatHistoryWriter.persist(
+                        ChatHistoryWriter.persistInBackground(
                             source: .http,
                             sourcePluginId: nil,
                             agentId: resolvedAgentUUID,
@@ -3584,6 +3908,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     // and unavailable in this catch — at worst we under-
                     // count by the agent system-prompt fragment.
                     let promptTokens = Self.estimatePromptTokens(req.messages)
+                    let requestTools = req.tools
                     hop {
                         for (idx, inv) in invs.invocations.enumerated() {
                             self.writeOpenAIToolCallSSE(
@@ -3593,7 +3918,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                                 model: model,
                                 responseId: responseId,
                                 created: created,
-                                context: ctx.value
+                                context: ctx.value,
+                                tools: requestTools
                             )
                         }
                         writerBound.value.writeFinishWithReason(
@@ -3639,6 +3965,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     httpTrace.set("http_tool_call_count", 1)
                     let includeUsage = req.stream_options?.include_usage == true
                     let promptTokens = Self.estimatePromptTokens(req.messages)
+                    let requestTools = req.tools
                     hop {
                         self.writeOpenAIToolCallSSE(
                             inv,
@@ -3647,7 +3974,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             model: model,
                             responseId: responseId,
                             created: created,
-                            context: ctx.value
+                            context: ctx.value,
+                            tools: requestTools
                         )
                         writerBound.value.writeFinishWithReason(
                             "tool_calls",
@@ -3747,7 +4075,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     if persistOnSuccess, let assistantMsg = resp.choices.first?.message {
                         var finalMessages = priorMessages
                         finalMessages.append(assistantMsg)
-                        ChatHistoryWriter.persist(
+                        ChatHistoryWriter.persistInBackground(
                             source: .http,
                             sourcePluginId: nil,
                             agentId: resolvedAgentUUID,
@@ -3756,11 +4084,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             model: model
                         )
                     }
-                    let json = try JSONEncoder().encode(resp)
+                    let body = try Self.chatCompletionResponseBody(resp)
                     var headers: [(String, String)] = [("Content-Type", "application/json")]
                     headers.append(contentsOf: cors)
                     let headersCopy = headers
-                    let body = String(decoding: json, as: UTF8.self)
                     hop {
                         var responseHead = HTTPResponseHead(version: head.version, status: .ok)
                         var buffer = ctx.value.channel.allocator.buffer(capacity: body.utf8.count)
@@ -3909,6 +4236,19 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             return
         }
 
+        let shouldStream = req.stream ?? true
+        if !shouldStream {
+            handleOllamaChatNonStreaming(
+                head: head,
+                context: context,
+                startTime: startTime,
+                userAgent: userAgent,
+                requestBodyString: requestBodyString,
+                request: req
+            )
+            return
+        }
+
         let writer = NDJSONResponseWriter()
         let cors = stateRef.value.corsHeaders
         let loop = context.eventLoop
@@ -3938,6 +4278,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     // assistant content. Add a `thinking` field on the
                     // NDJSON response shape (and decode reasoning here
                     // first) when an upstream client requests it.
+                    if StreamingReasoningHint.decode(delta) != nil { continue }
                     if StreamingStatsHint.decode(delta) != nil { continue }
                     if StreamingToolHint.isSentinel(delta) { continue }
                     hop {
@@ -4033,6 +4374,479 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 )
             }
         }
+    }
+
+    private func handleOllamaChatNonStreaming(
+        head: HTTPRequestHead,
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?,
+        requestBodyString: String?,
+        request: ChatCompletionRequest
+    ) {
+        let cors = stateRef.value.corsHeaders
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let hop = Self.makeHop(channel: context.channel, loop: loop)
+        let logSelf = self
+        Task(priority: .userInitiated) {
+            do {
+                let response = try await self.chatEngine.completeChat(request: request)
+                let message = response.choices.first?.message
+                let body = Self.ollamaChatJSON(
+                    model: request.model,
+                    content: message?.content ?? "",
+                    toolCalls: message?.tool_calls,
+                    done: true
+                )
+                let headers = [("Content-Type", "application/json; charset=utf-8")] + cors
+                hop {
+                    logSelf.sendResponse(
+                        context: ctx.value,
+                        version: head.version,
+                        status: .ok,
+                        headers: headers,
+                        body: body
+                    )
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/chat",
+                    userAgent: userAgent,
+                    requestBody: requestBodyString,
+                    responseBody: body,
+                    responseStatus: 200,
+                    startTime: startTime,
+                    model: request.model,
+                    tokensInput: response.usage.prompt_tokens,
+                    tokensOutput: response.usage.completion_tokens,
+                    temperature: request.temperature ?? 0.7,
+                    maxTokens: request.max_tokens ?? 1024,
+                    finishReason: message?.tool_calls?.isEmpty == false ? .toolCalls : .stop
+                )
+            } catch let invs as ServiceToolInvocations {
+                let body = Self.ollamaChatToolCallsJSON(model: request.model, invocations: invs.invocations)
+                let headers = [("Content-Type", "application/json; charset=utf-8")] + cors
+                hop {
+                    logSelf.sendResponse(
+                        context: ctx.value,
+                        version: head.version,
+                        status: .ok,
+                        headers: headers,
+                        body: body
+                    )
+                }
+                let toolLogs = invs.invocations.map {
+                    ToolCallLog(name: $0.toolName, arguments: $0.jsonArguments)
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/chat",
+                    userAgent: userAgent,
+                    requestBody: requestBodyString,
+                    responseBody: body,
+                    responseStatus: 200,
+                    startTime: startTime,
+                    model: request.model,
+                    toolCalls: toolLogs,
+                    temperature: request.temperature ?? 0.7,
+                    maxTokens: request.max_tokens ?? 1024,
+                    finishReason: .toolCalls
+                )
+            } catch let inv as ServiceToolInvocation {
+                let body = Self.ollamaChatToolCallsJSON(model: request.model, invocations: [inv])
+                let headers = [("Content-Type", "application/json; charset=utf-8")] + cors
+                hop {
+                    logSelf.sendResponse(
+                        context: ctx.value,
+                        version: head.version,
+                        status: .ok,
+                        headers: headers,
+                        body: body
+                    )
+                }
+                let toolLog = ToolCallLog(name: inv.toolName, arguments: inv.jsonArguments)
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/chat",
+                    userAgent: userAgent,
+                    requestBody: requestBodyString,
+                    responseBody: body,
+                    responseStatus: 200,
+                    startTime: startTime,
+                    model: request.model,
+                    toolCalls: [toolLog],
+                    temperature: request.temperature ?? 0.7,
+                    maxTokens: request.max_tokens ?? 1024,
+                    finishReason: .toolCalls
+                )
+            } catch {
+                let body = Self.ollamaGenerateErrorJSON(error.localizedDescription)
+                let headers = [("Content-Type", "application/json; charset=utf-8")] + cors
+                hop {
+                    logSelf.sendResponse(
+                        context: ctx.value,
+                        version: head.version,
+                        status: .internalServerError,
+                        headers: headers,
+                        body: body
+                    )
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/chat",
+                    userAgent: userAgent,
+                    requestBody: requestBodyString,
+                    responseStatus: 500,
+                    startTime: startTime,
+                    model: request.model,
+                    errorMessage: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private struct OllamaGenerateOptions: Decodable, Sendable {
+        let num_predict: Int?
+        let temperature: Float?
+        let top_p: Float?
+        let stop: FlexibleStringArray?
+    }
+
+    private struct OllamaGenerateRequest: Decodable, Sendable {
+        let model: String
+        let prompt: String
+        let system: String?
+        let stream: Bool?
+        let options: OllamaGenerateOptions?
+    }
+
+    private struct FlexibleStringArray: Decodable, Sendable {
+        let values: [String]
+
+        init(from decoder: Decoder) throws {
+            let container = try decoder.singleValueContainer()
+            if let value = try? container.decode(String.self) {
+                values = [value]
+            } else {
+                values = (try? container.decode([String].self)) ?? []
+            }
+        }
+    }
+
+    private func handleOllamaGenerate(
+        head: HTTPRequestHead,
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?
+    ) {
+        let data: Data
+        let requestBodyString: String?
+        if let body = stateRef.value.requestBodyBuffer {
+            var bodyCopy = body
+            let bytes = bodyCopy.readBytes(length: bodyCopy.readableBytes) ?? []
+            data = Data(bytes)
+            requestBodyString = String(decoding: data, as: UTF8.self)
+        } else {
+            data = Data()
+            requestBodyString = nil
+        }
+
+        guard let ollama = try? JSONDecoder().decode(OllamaGenerateRequest.self, from: data) else {
+            sendResponse(
+                context: context,
+                version: head.version,
+                status: .badRequest,
+                headers: [("Content-Type", "text/plain; charset=utf-8")],
+                body: "Invalid request format"
+            )
+            logRequest(
+                method: "POST",
+                path: "/generate",
+                userAgent: userAgent,
+                requestBody: requestBodyString,
+                responseStatus: 400,
+                startTime: startTime,
+                errorMessage: "Invalid request format"
+            )
+            return
+        }
+
+        let maxTokens = ollama.options?.num_predict.flatMap { $0 > 0 ? $0 : nil }
+        var messages: [ChatMessage] = []
+        if let system = ollama.system?.trimmingCharacters(in: .whitespacesAndNewlines), !system.isEmpty {
+            messages.append(ChatMessage(role: "system", content: system))
+        }
+        messages.append(ChatMessage(role: "user", content: ollama.prompt))
+        let chatRequest = ChatCompletionRequest(
+            model: ollama.model,
+            messages: messages,
+            temperature: ollama.options?.temperature,
+            max_tokens: maxTokens,
+            stream: ollama.stream,
+            top_p: ollama.options?.top_p,
+            frequency_penalty: nil,
+            presence_penalty: nil,
+            stop: ollama.options?.stop?.values,
+            n: nil,
+            tools: nil,
+            tool_choice: nil,
+            session_id: nil
+        )
+
+        let shouldStream = ollama.stream ?? true
+        if !shouldStream {
+            handleOllamaGenerateNonStreaming(
+                head: head,
+                context: context,
+                startTime: startTime,
+                userAgent: userAgent,
+                requestBodyString: requestBodyString,
+                request: chatRequest
+            )
+            return
+        }
+
+        let writer = OllamaGenerateNDJSONResponseWriter()
+        let cors = stateRef.value.corsHeaders
+        let loop = context.eventLoop
+        let writerBound = NIOLoopBound(writer, eventLoop: loop)
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let hop = Self.makeHop(channel: context.channel, loop: loop)
+        hop {
+            writerBound.value.writeHeaders(ctx.value, extraHeaders: cors)
+        }
+
+        let logStartTime = startTime
+        let logUserAgent = userAgent
+        let logRequestBody = requestBodyString
+        let logModel = chatRequest.model
+        let logTemperature = chatRequest.temperature ?? 0.7
+        let logMaxTokens = chatRequest.max_tokens ?? 1024
+        let logSelf = self
+        Task(priority: .userInitiated) {
+            do {
+                let stream = try await self.chatEngine.streamChat(request: chatRequest)
+                for try await delta in stream {
+                    if StreamingReasoningHint.decode(delta) != nil { continue }
+                    if StreamingStatsHint.decode(delta) != nil { continue }
+                    if StreamingToolHint.isSentinel(delta) { continue }
+                    hop {
+                        writerBound.value.writeContent(
+                            delta,
+                            model: chatRequest.model,
+                            created: Int(Date().timeIntervalSince1970),
+                            context: ctx.value
+                        )
+                    }
+                }
+                hop {
+                    writerBound.value.writeFinish(
+                        chatRequest.model,
+                        created: Int(Date().timeIntervalSince1970),
+                        context: ctx.value
+                    )
+                    writerBound.value.writeEnd(ctx.value)
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/generate",
+                    userAgent: logUserAgent,
+                    requestBody: logRequestBody,
+                    responseStatus: 200,
+                    startTime: logStartTime,
+                    model: logModel,
+                    temperature: logTemperature,
+                    maxTokens: logMaxTokens,
+                    finishReason: .stop
+                )
+            } catch {
+                hop {
+                    writerBound.value.writeError(error.localizedDescription, context: ctx.value)
+                    writerBound.value.writeEnd(ctx.value)
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/generate",
+                    userAgent: logUserAgent,
+                    requestBody: logRequestBody,
+                    responseStatus: 200,
+                    startTime: logStartTime,
+                    model: logModel,
+                    temperature: logTemperature,
+                    maxTokens: logMaxTokens,
+                    finishReason: .error,
+                    errorMessage: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private func handleOllamaGenerateNonStreaming(
+        head: HTTPRequestHead,
+        context: ChannelHandlerContext,
+        startTime: Date,
+        userAgent: String?,
+        requestBodyString: String?,
+        request: ChatCompletionRequest
+    ) {
+        let cors = stateRef.value.corsHeaders
+        let loop = context.eventLoop
+        let ctx = NIOLoopBound(context, eventLoop: loop)
+        let hop = Self.makeHop(channel: context.channel, loop: loop)
+        let logSelf = self
+        Task(priority: .userInitiated) {
+            do {
+                let response = try await self.chatEngine.completeChat(request: request)
+                let content = response.choices.first?.message.content ?? ""
+                let body = Self.ollamaGenerateJSON(
+                    model: request.model,
+                    response: content,
+                    done: true
+                )
+                let headers = [("Content-Type", "application/json; charset=utf-8")] + cors
+                hop {
+                    logSelf.sendResponse(
+                        context: ctx.value,
+                        version: head.version,
+                        status: .ok,
+                        headers: headers,
+                        body: body
+                    )
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/generate",
+                    userAgent: userAgent,
+                    requestBody: requestBodyString,
+                    responseBody: body,
+                    responseStatus: 200,
+                    startTime: startTime,
+                    model: request.model,
+                    tokensInput: response.usage.prompt_tokens,
+                    tokensOutput: response.usage.completion_tokens,
+                    temperature: request.temperature ?? 0.7,
+                    maxTokens: request.max_tokens ?? 1024,
+                    finishReason: .stop
+                )
+            } catch {
+                let body = Self.ollamaGenerateErrorJSON(error.localizedDescription)
+                let headers = [("Content-Type", "application/json; charset=utf-8")] + cors
+                hop {
+                    logSelf.sendResponse(
+                        context: ctx.value,
+                        version: head.version,
+                        status: .internalServerError,
+                        headers: headers,
+                        body: body
+                    )
+                }
+                logSelf.logRequest(
+                    method: "POST",
+                    path: "/generate",
+                    userAgent: userAgent,
+                    requestBody: requestBodyString,
+                    responseStatus: 500,
+                    startTime: startTime,
+                    model: request.model,
+                    errorMessage: error.localizedDescription
+                )
+            }
+        }
+    }
+
+    private static func ollamaGenerateJSON(model: String, response: String, done: Bool) -> String {
+        let object: [String: Any] = [
+            "model": model,
+            "created_at": Date().ISO8601Format(),
+            "response": response,
+            "done": done,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: .osaurusCanonical) else {
+            return #"{"done":true}"#
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func ollamaChatJSON(
+        model: String,
+        content: String,
+        toolCalls: [ToolCall]? = nil,
+        done: Bool
+    ) -> String {
+        var message: [String: Any] = [
+            "role": "assistant",
+            "content": content,
+        ]
+        if let toolCalls, !toolCalls.isEmpty {
+            message["tool_calls"] = toolCalls.map { call in
+                [
+                    "function": [
+                        "name": call.function.name,
+                        "arguments": ollamaArguments(from: call.function.arguments),
+                    ]
+                ]
+            }
+        }
+        let object: [String: Any] = [
+            "model": model,
+            "created_at": Date().ISO8601Format(),
+            "message": message,
+            "done": done,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: object) else {
+            return #"{"message":{"role":"assistant","content":""},"done":true}"#
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func ollamaChatToolCallsJSON(
+        model: String,
+        invocations: [ServiceToolInvocation]
+    ) -> String {
+        let toolCalls = invocations.map { inv in
+            [
+                "function": [
+                    "name": inv.toolName,
+                    "arguments": ollamaArguments(from: inv.jsonArguments),
+                ]
+            ]
+        }
+        let object: [String: Any] = [
+            "model": model,
+            "created_at": Date().ISO8601Format(),
+            "message": [
+                "role": "assistant",
+                "content": "",
+                "tool_calls": toolCalls,
+            ],
+            "done": true,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: object) else {
+            return #"{"message":{"role":"assistant","content":"","tool_calls":[]},"done":true}"#
+        }
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func ollamaArguments(from json: String) -> Any {
+        guard let data = json.data(using: .utf8),
+            let object = try? JSONSerialization.jsonObject(with: data)
+        else { return json }
+        return object
+    }
+
+    private static func ollamaGenerateErrorJSON(_ message: String) -> String {
+        let object: [String: Any] = [
+            "error": [
+                "message": message,
+                "type": "internal_error",
+            ],
+            "done": true,
+        ]
+        guard let data = try? JSONSerialization.data(withJSONObject: object, options: .osaurusCanonical) else {
+            return #"{"error":{"message":"internal error","type":"internal_error"},"done":true}"#
+        }
+        return String(decoding: data, as: UTF8.self)
     }
 
     // MARK: - SSE keepalive
@@ -4200,6 +5014,16 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     "is_current": summary.isCurrent,
                     "inflight": inflight[summary.name] ?? 0,
                 ]
+                if let draftStrategy = summary.draftStrategyDescription {
+                    row["draft_strategy"] = draftStrategy
+                } else {
+                    row["draft_strategy"] = NSNull()
+                }
+                if let nativeMTPDepth = summary.nativeMTPDepth {
+                    row["native_mtp_depth"] = nativeMTPDepth
+                } else {
+                    row["native_mtp_depth"] = NSNull()
+                }
                 if let unloadAt = residencyByName[summary.name]?.unloadAt {
                     row["idle_unload_at"] = unloadAt.ISO8601Format()
                     row["idle_seconds_remaining"] =
@@ -4211,6 +5035,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 return row
             }
 
+            let memoryConfig = MemoryConfigurationStore.load()
             let obj: [String: Any] = [
                 "status": "healthy",
                 "timestamp": Date().ISO8601Format(),
@@ -4218,8 +5043,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 "current_model": current,
                 "inflight": inflightObj,
                 "resident_models": residentModels,
+                "memory_enabled": memoryConfig.enabled,
+                "memory_database_open": MemoryDatabase.shared.isOpen,
             ]
-            let data = try? JSONSerialization.data(withJSONObject: obj)
+            let data = try? JSONSerialization.data(withJSONObject: obj, options: .osaurusCanonical)
             let body = data.flatMap { String(decoding: $0, as: UTF8.self) } ?? "{}"
             let headers: [(String, String)] =
                 [("Content-Type", "application/json; charset=utf-8")]
@@ -4269,14 +5096,16 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 models.insert(OpenAIModel(modelName: "foundation"), at: 0)
             }
 
-            // Get remote provider models
-            let remoteModels = await MainActor.run {
-                RemoteProviderManager.shared.getOpenAIModels()
-            }
+            // Remote provider startup may be blocked on Keychain auth. Keep
+            // local model listing responsive and append remote models only
+            // when the MainActor snapshot is immediately available.
+            let remoteModels = await Self.remoteOpenAIModelsSnapshot()
             models.append(contentsOf: remoteModels)
 
             let response = ModelsResponse(data: models)
-            let json = (try? JSONEncoder().encode(response)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+            let json =
+                (try? JSONEncoder.osaurusCanonical().encode(response)).map { String(decoding: $0, as: UTF8.self) }
+                ?? "{}"
 
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4355,10 +5184,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 models.insert(fm, at: 0)
             }
 
-            // Get remote provider models
-            let remoteModels = await MainActor.run {
-                RemoteProviderManager.shared.getOpenAIModels()
-            }
+            // Keep Ollama tags usable for local models even if remote
+            // provider auth is blocked during app startup.
+            let remoteModels = await Self.remoteOpenAIModelsSnapshot()
             for var remoteModel in remoteModels {
                 remoteModel.modified_at = now
                 remoteModel.size = 0
@@ -4377,7 +5205,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             }
 
             let payload = ["models": models]
-            let json = (try? JSONEncoder().encode(payload)).map { String(decoding: $0, as: UTF8.self) } ?? "{}"
+            let json =
+                (try? JSONEncoder.osaurusCanonical().encode(payload)).map { String(decoding: $0, as: UTF8.self) }
+                ?? "{}"
 
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4399,6 +5229,26 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 responseStatus: 200,
                 startTime: logStartTime
             )
+        }
+    }
+
+    private static func remoteOpenAIModelsSnapshot(timeoutNanoseconds: UInt64 = 250_000_000) async
+        -> [OpenAIModel]
+    {
+        await withCheckedContinuation { continuation in
+            let once = OneShotContinuation<[OpenAIModel]>()
+            let modelsTask = Task {
+                let models = await MainActor.run {
+                    RemoteProviderManager.shared.getOpenAIModels()
+                }
+                _ = once.resume(continuation, returning: models)
+            }
+            Task {
+                try? await Task.sleep(nanoseconds: timeoutNanoseconds)
+                if once.resume(continuation, returning: []) {
+                    modelsTask.cancel()
+                }
+            }
         }
     }
 
@@ -4493,7 +5343,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             "general.name": "Apple Foundation Model",
                         ],
                     ]
-                    let jsonData = (try? JSONSerialization.data(withJSONObject: response)) ?? Data("{}".utf8)
+                    let jsonData =
+                        (try? JSONSerialization.data(withJSONObject: response, options: .osaurusCanonical))
+                        ?? Data("{}".utf8)
                     let json = String(decoding: jsonData, as: UTF8.self)
                     hop {
                         var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4574,7 +5426,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             }
 
             let response = modelInfo.toShowResponse()
-            let jsonData = (try? JSONEncoder().encode(response)) ?? Data("{}".utf8)
+            let jsonData = (try? JSONEncoder.osaurusCanonical().encode(response)) ?? Data("{}".utf8)
             let json = String(decoding: jsonData, as: UTF8.self)
 
             hop {
@@ -4631,7 +5483,11 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 return obj
             }
             let payload: [String: Any] = ["tools": tools]
-            let data = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{}".utf8)
+            // Sorted keys: external MCP clients may byte-compare or hash
+            // schema bytes. See `JSONDeterminism.swift`.
+            let data =
+                (try? JSONSerialization.data(withJSONObject: payload, options: .osaurusCanonical))
+                ?? Data("{}".utf8)
             let mcpToolsBody = String(decoding: data, as: UTF8.self)
             hop {
                 var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4703,10 +5559,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 case let d as Double: try container.encode(d)
                 case let s as String: try container.encode(s)
                 case let arr as [Any]:
-                    let enc = try JSONSerialization.data(withJSONObject: arr, options: [])
+                    let enc = try JSONSerialization.data(withJSONObject: arr, options: .osaurusCanonical)
                     try container.encode(String(decoding: enc, as: UTF8.self))
                 case let dict as [String: Any]:
-                    let enc = try JSONSerialization.data(withJSONObject: dict, options: [])
+                    let enc = try JSONSerialization.data(withJSONObject: dict, options: .osaurusCanonical)
                     try container.encode(String(decoding: enc, as: UTF8.self))
                 default:
                     try container.encodeNil()
@@ -4736,7 +5592,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         let argsJSON: String = {
             if let a = req.arguments?.value,
-                let d = try? JSONSerialization.data(withJSONObject: a, options: [])
+                let d = try? JSONSerialization.data(withJSONObject: a, options: .osaurusCanonical)
             {
                 return String(decoding: d, as: UTF8.self)
             }
@@ -4767,7 +5623,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             "content": [["type": "text", "text": message]],
                             "isError": true,
                         ]
-                        let data = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{}".utf8)
+                        let data =
+                            (try? JSONSerialization.data(withJSONObject: payload, options: .osaurusCanonical))
+                            ?? Data("{}".utf8)
                         let body = String(decoding: data, as: UTF8.self)
                         hop {
                             var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4805,7 +5663,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     "content": [["type": "text", "text": result]],
                     "isError": false,
                 ]
-                let d = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{}".utf8)
+                let d =
+                    (try? JSONSerialization.data(withJSONObject: payload, options: .osaurusCanonical))
+                    ?? Data("{}".utf8)
                 let body = String(decoding: d, as: UTF8.self)
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4839,7 +5699,9 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     "content": [["type": "text", "text": error.localizedDescription]],
                     "isError": true,
                 ]
-                let d = (try? JSONSerialization.data(withJSONObject: payload)) ?? Data("{}".utf8)
+                let d =
+                    (try? JSONSerialization.data(withJSONObject: payload, options: .osaurusCanonical))
+                    ?? Data("{}".utf8)
                 let body = String(decoding: d, as: UTF8.self)
                 hop {
                     var headers = [("Content-Type", "application/json; charset=utf-8")]
@@ -4897,7 +5759,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         guard let anthropicReq = try? JSONDecoder().decode(AnthropicMessagesRequest.self, from: data) else {
             let error = AnthropicError(message: "Invalid request format", errorType: "invalid_request_error")
             let errorJson =
-                (try? JSONEncoder().encode(error)).map { String(decoding: $0, as: UTF8.self) }
+                (try? JSONEncoder.osaurusCanonical().encode(error)).map { String(decoding: $0, as: UTF8.self) }
                 ?? #"{"type":"error","error":{"type":"invalid_request_error","message":"Invalid request format"}}"#
             var headers = [("Content-Type", "application/json; charset=utf-8")]
             headers.append(contentsOf: stateRef.value.corsHeaders)
@@ -5182,7 +6044,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     )
                 )
 
-                let json = try JSONEncoder().encode(anthropicResp)
+                let json = try JSONEncoder.osaurusCanonical().encode(anthropicResp)
                 var headers: [(String, String)] = [("Content-Type", "application/json")]
                 headers.append(contentsOf: cors)
                 let headersCopy = headers
@@ -5269,7 +6131,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             } catch {
                 let errorResp = AnthropicError(message: error.localizedDescription, errorType: "api_error")
                 let errorJson =
-                    (try? JSONEncoder().encode(errorResp))
+                    (try? JSONEncoder.osaurusCanonical().encode(errorResp))
                     .map { String(decoding: $0, as: UTF8.self) }
                     ?? #"{"type":"error","error":{"type":"api_error","message":"Internal error"}}"#
                 var headers: [(String, String)] = [("Content-Type", "application/json")]
@@ -5431,12 +6293,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     if let duration = result.durationSeconds {
                         response["duration"] = duration
                     }
-                    let jsonData = try JSONSerialization.data(withJSONObject: response)
+                    let jsonData = try JSONSerialization.data(withJSONObject: response, options: .osaurusCanonical)
                     responseBody = String(decoding: jsonData, as: UTF8.self)
                 } else {
                     // Default JSON format
                     let response = ["text": result.text]
-                    let jsonData = try JSONEncoder().encode(response)
+                    let jsonData = try JSONEncoder.osaurusCanonical().encode(response)
                     responseBody = String(decoding: jsonData, as: UTF8.self)
                 }
 
@@ -5496,6 +6358,79 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
     // MARK: - Open Responses API
 
+    private static func applyOpenResponsesContext(
+        to request: ChatCompletionRequest,
+        previousResponseId: String?
+    ) -> ChatCompletionRequest {
+        let previous = openResponsesContextStore.transcript(
+            for: previousResponseId,
+            model: request.model
+        )
+        guard !previous.isEmpty else { return request }
+
+        var copy = request
+        let currentSystem = request.messages.filter { $0.role.lowercased() == "system" }
+        let currentNonSystem = request.messages.filter { $0.role.lowercased() != "system" }
+        copy.messages = currentSystem + previous + currentNonSystem
+        return copy
+    }
+
+    private static func assistantMessages(from response: ChatCompletionResponse) -> [ChatMessage] {
+        response.choices.compactMap { choice in
+            let message = choice.message
+            if let content = message.content, !content.isEmpty {
+                return ChatMessage(
+                    role: "assistant",
+                    content: content,
+                    tool_calls: message.tool_calls,
+                    tool_call_id: nil,
+                    reasoning_content: message.reasoning_content
+                )
+            }
+            if let toolCalls = message.tool_calls, !toolCalls.isEmpty {
+                return ChatMessage(
+                    role: "assistant",
+                    content: nil,
+                    tool_calls: toolCalls,
+                    tool_call_id: nil,
+                    reasoning_content: message.reasoning_content
+                )
+            }
+            return nil
+        }
+    }
+
+    private static func assistantMessage(from invocations: [ServiceToolInvocation]) -> ChatMessage? {
+        let toolCalls = invocations.map { inv in
+            ToolCall(
+                id: inv.toolCallId ?? Self.shortId(prefix: "call_"),
+                type: "function",
+                function: ToolCallFunction(name: inv.toolName, arguments: inv.jsonArguments)
+            )
+        }
+        guard !toolCalls.isEmpty else { return nil }
+        return ChatMessage(
+            role: "assistant",
+            content: nil,
+            tool_calls: toolCalls,
+            tool_call_id: nil
+        )
+    }
+
+    private static func storeOpenResponsesContext(
+        responseId: String,
+        model: String,
+        request: ChatCompletionRequest,
+        assistantMessages: [ChatMessage]
+    ) {
+        guard !assistantMessages.isEmpty else { return }
+        openResponsesContextStore.store(
+            responseId: responseId,
+            model: model,
+            messages: request.messages + assistantMessages
+        )
+    }
+
     private func handleOpenResponses(
         head: HTTPRequestHead,
         context: ChannelHandlerContext,
@@ -5518,7 +6453,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         guard let openResponsesReq = try? JSONDecoder().decode(OpenResponsesRequest.self, from: data) else {
             let error = OpenResponsesErrorResponse(code: "invalid_request_error", message: "Invalid request format")
             let errorJson =
-                (try? JSONEncoder().encode(error)).map { String(decoding: $0, as: UTF8.self) }
+                (try? JSONEncoder.osaurusCanonical().encode(error)).map { String(decoding: $0, as: UTF8.self) }
                 ?? #"{"error":{"type":"error","code":"invalid_request_error","message":"Invalid request format"}}"#
             var headers = [("Content-Type", "application/json; charset=utf-8")]
             headers.append(contentsOf: stateRef.value.corsHeaders)
@@ -5541,12 +6476,16 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             return
         }
 
-        // Convert to internal format
-        let internalReq = openResponsesReq.toChatCompletionRequest()
-
         // Generate response ID
         let responseId = Self.shortId(prefix: "resp_")
         let model = openResponsesReq.model
+
+        // Convert to internal format, preserving local Responses API
+        // context when clients chain turns with `previous_response_id`.
+        let internalReq = Self.applyOpenResponsesContext(
+            to: openResponsesReq.toChatCompletionRequest(),
+            previousResponseId: openResponsesReq.previous_response_id
+        )
 
         // Determine if streaming
         let wantsStream = openResponsesReq.stream ?? false
@@ -5642,6 +6581,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         // streaming and catch closures. A heap box satisfies Sendable for
         // the concurrent closures that read/mutate the flag.
         let messageItemOpen = AtomicBoolBox()
+        let outputText = LockedStringAccumulator()
 
         Task(priority: .userInitiated) {
             do {
@@ -5668,6 +6608,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         continue
                     }
                     if StreamingToolHint.isSentinel(delta) { continue }
+                    outputText.append(delta)
                     hop {
                         // First non-reasoning chunk: close the reasoning
                         // item (if any) then open the message item so the
@@ -5691,6 +6632,15 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     }
                     writerBound.value.writeResponseCompleted(context: ctx.value)
                     writerBound.value.writeEnd(ctx.value)
+                }
+                let text = outputText.value
+                if !text.isEmpty {
+                    Self.storeOpenResponsesContext(
+                        responseId: responseId,
+                        model: model,
+                        request: internalReq,
+                        assistantMessages: [ChatMessage(role: "assistant", content: text)]
+                    )
                 }
                 logSelf.logRequest(
                     method: "POST",
@@ -5718,6 +6668,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     writerBound.value.writeResponseCompleted(context: ctx.value)
                     writerBound.value.writeEnd(ctx.value)
                 }
+                if let assistant = Self.assistantMessage(from: invs.invocations) {
+                    Self.storeOpenResponsesContext(
+                        responseId: responseId,
+                        model: model,
+                        request: internalReq,
+                        assistantMessages: [assistant]
+                    )
+                }
                 let toolLogs = invs.invocations.map {
                     ToolCallLog(name: $0.toolName, arguments: $0.jsonArguments)
                 }
@@ -5743,6 +6701,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     self.writeOpenResponsesFunctionCall(inv, writer: writerBound.value, context: ctx.value)
                     writerBound.value.writeResponseCompleted(context: ctx.value)
                     writerBound.value.writeEnd(ctx.value)
+                }
+                if let assistant = Self.assistantMessage(from: [inv]) {
+                    Self.storeOpenResponsesContext(
+                        responseId: responseId,
+                        model: model,
+                        request: internalReq,
+                        assistantMessages: [assistant]
+                    )
                 }
 
                 let toolLog = ToolCallLog(name: inv.toolName, arguments: inv.jsonArguments)
@@ -5808,7 +6774,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             output: items,
             usage: OpenResponsesUsage(inputTokens: 0, outputTokens: 0)
         )
-        return (try? JSONEncoder().encode(resp))
+        return (try? JSONEncoder.osaurusCanonical().encode(resp))
             .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
     }
 
@@ -5846,7 +6812,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             stopReason: "tool_use",
             usage: AnthropicUsage(inputTokens: 0, outputTokens: 0)
         )
-        return (try? JSONEncoder().encode(resp))
+        return (try? JSONEncoder.osaurusCanonical().encode(resp))
             .map { String(decoding: $0, as: UTF8.self) } ?? "{}"
     }
 
@@ -5884,12 +6850,17 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         model: String,
         responseId: String,
         created: Int,
-        context: ChannelHandlerContext
+        context: ChannelHandlerContext,
+        tools: [Tool]? = nil
     ) {
         let callId: String = {
             if let preservedId = inv.toolCallId, !preservedId.isEmpty { return preservedId }
             return Self.shortId(prefix: "call_")
         }()
+        let argumentsJSON = Self.canonicalToolArgumentsJSON(
+            inv.jsonArguments,
+            schema: Self.toolSchema(named: inv.toolName, in: tools)
+        )
         writer.writeToolCallStart(
             callId: callId,
             functionName: inv.toolName,
@@ -5899,7 +6870,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             created: created,
             context: context
         )
-        Self.forEachStringChunk(inv.jsonArguments, size: 1024) { chunk in
+        Self.forEachStringChunk(argumentsJSON, size: 1024) { chunk in
             writer.writeToolCallArgumentsDelta(
                 callId: callId,
                 index: index,
@@ -5976,8 +6947,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
                 // Convert to Open Responses format
                 let openResponsesResp = resp.toOpenResponsesResponse(responseId: responseId)
+                Self.storeOpenResponsesContext(
+                    responseId: responseId,
+                    model: model,
+                    request: internalReq,
+                    assistantMessages: Self.assistantMessages(from: resp)
+                )
 
-                let json = try JSONEncoder().encode(openResponsesResp)
+                let json = try JSONEncoder.osaurusCanonical().encode(openResponsesResp)
                 var headers: [(String, String)] = [("Content-Type", "application/json")]
                 headers.append(contentsOf: cors)
                 let headersCopy = headers
@@ -6019,6 +6996,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     model: model,
                     invocations: invs.invocations
                 )
+                if let assistant = Self.assistantMessage(from: invs.invocations) {
+                    Self.storeOpenResponsesContext(
+                        responseId: responseId,
+                        model: model,
+                        request: internalReq,
+                        assistantMessages: [assistant]
+                    )
+                }
                 Self.writeJSONResponse(body: body, cors: cors, head: head, ctx: ctx, hop: hop)
                 let toolLogs = invs.invocations.map {
                     ToolCallLog(name: $0.toolName, arguments: $0.jsonArguments)
@@ -6041,6 +7026,14 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     model: model,
                     invocations: [inv]
                 )
+                if let assistant = Self.assistantMessage(from: [inv]) {
+                    Self.storeOpenResponsesContext(
+                        responseId: responseId,
+                        model: model,
+                        request: internalReq,
+                        assistantMessages: [assistant]
+                    )
+                }
                 Self.writeJSONResponse(body: body, cors: cors, head: head, ctx: ctx, hop: hop)
                 let toolLog = ToolCallLog(name: inv.toolName, arguments: inv.jsonArguments)
                 logSelf.logRequest(
@@ -6058,7 +7051,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             } catch {
                 let errorResp = OpenResponsesErrorResponse(code: "api_error", message: error.localizedDescription)
                 let errorJson =
-                    (try? JSONEncoder().encode(errorResp))
+                    (try? JSONEncoder.osaurusCanonical().encode(errorResp))
                     .map { String(decoding: $0, as: UTF8.self) }
                     ?? #"{"error":{"type":"error","code":"api_error","message":"Internal error"}}"#
                 var headers: [(String, String)] = [("Content-Type", "application/json")]
@@ -6210,6 +7203,136 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     }
 
     // MARK: - Request Logging
+
+    /// Encode an OpenAI chat-completions response and verify the bytes before
+    /// putting them on the wire. Tool-call arguments are model-authored JSON
+    /// strings and can contain nested backslash/quote sequences; if Codable
+    /// ever produces bytes a client parser rejects, fall back to a
+    /// JSONSerialization envelope that treats those arguments as opaque
+    /// strings and escapes them at the transport boundary.
+    private static func chatCompletionResponseBody(_ response: ChatCompletionResponse) throws -> String {
+        let encoded = try JSONEncoder.osaurusCanonical().encode(response)
+        if (try? JSONSerialization.jsonObject(with: encoded)) != nil {
+            return String(decoding: encoded, as: UTF8.self)
+        }
+
+        let data = try JSONSerialization.data(
+            withJSONObject: chatCompletionResponseJSONObject(response),
+            options: .osaurusCanonical
+        )
+        return String(decoding: data, as: UTF8.self)
+    }
+
+    private static func chatCompletionResponseJSONObject(_ response: ChatCompletionResponse) -> [String: Any] {
+        var object: [String: Any] = [
+            "id": response.id,
+            "object": response.object,
+            "created": response.created,
+            "model": response.model,
+            "choices": response.choices.map(chatChoiceJSONObject(_:)),
+            "usage": [
+                "prompt_tokens": response.usage.prompt_tokens,
+                "completion_tokens": response.usage.completion_tokens,
+                "total_tokens": response.usage.total_tokens,
+            ],
+        ]
+        if let fingerprint = response.system_fingerprint {
+            object["system_fingerprint"] = fingerprint
+        }
+        if let prefixHash = response.prefix_hash {
+            object["prefix_hash"] = prefixHash
+        }
+        return object
+    }
+
+    private static func chatChoiceJSONObject(_ choice: ChatChoice) -> [String: Any] {
+        [
+            "index": choice.index,
+            "finish_reason": choice.finish_reason,
+            "message": chatMessageJSONObject(choice.message),
+        ]
+    }
+
+    private static func chatMessageJSONObject(_ message: ChatMessage) -> [String: Any] {
+        var object: [String: Any] = ["role": message.role]
+        if let content = message.content {
+            object["content"] = content
+        }
+        if let toolCalls = message.tool_calls {
+            object["tool_calls"] = toolCalls.map(toolCallJSONObject(_:))
+        }
+        if let toolCallId = message.tool_call_id {
+            object["tool_call_id"] = toolCallId
+        }
+        if let reasoning = message.reasoning_content {
+            object["reasoning_content"] = reasoning
+        }
+        return object
+    }
+
+    private static func toolCallJSONObject(_ call: ToolCall) -> [String: Any] {
+        var object: [String: Any] = [
+            "id": call.id,
+            "type": call.type,
+            "function": [
+                "name": call.function.name,
+                "arguments": canonicalToolArgumentsJSON(call.function.arguments),
+            ],
+        ]
+        if let signature = call.geminiThoughtSignature {
+            object["geminiThoughtSignature"] = signature
+        }
+        return object
+    }
+
+    private static func canonicalToolArgumentsJSON(_ json: String, schema: JSONValue? = nil) -> String {
+        let candidates = [
+            json,
+            json.replacingOccurrences(of: #"\""#, with: #"""#),
+        ]
+        guard let object = candidates.lazy.compactMap({ candidate -> Any? in
+            guard let data = candidate.data(using: .utf8) else { return nil }
+            return try? JSONSerialization.jsonObject(with: data)
+        }).first else {
+            return json
+        }
+        let normalized = normalizeNestedJSONStringValues(object)
+        let coerced: Any
+        if let schema {
+            let candidate = SchemaValidator.coerceArguments(normalized, against: schema)
+            let result = SchemaValidator.validate(arguments: candidate, against: schema)
+            coerced = result.isValid ? candidate : normalized
+        } else {
+            coerced = normalized
+        }
+        guard JSONSerialization.isValidJSONObject(coerced),
+            let encoded = try? JSONSerialization.data(withJSONObject: coerced, options: .osaurusCanonical),
+            let string = String(data: encoded, encoding: .utf8)
+        else {
+            return json
+        }
+        return string
+    }
+
+    private static func normalizeNestedJSONStringValues(_ value: Any) -> Any {
+        if let dictionary = value as? [String: Any] {
+            return dictionary.mapValues(normalizeNestedJSONStringValues(_:))
+        }
+        if let array = value as? [Any] {
+            return array.map(normalizeNestedJSONStringValues(_:))
+        }
+        if let string = value as? String,
+            let nestedData = string.data(using: .utf8),
+            let nested = try? JSONSerialization.jsonObject(with: nestedData)
+        {
+            return normalizeNestedJSONStringValues(nested)
+        }
+        return value
+    }
+
+    private static func toolSchema(named name: String, in tools: [Tool]?) -> JSONValue? {
+        tools?.first(where: { $0.function.name == name })?.function.parameters
+    }
 
     /// Log a completed request to InsightsService
     private func logRequest(

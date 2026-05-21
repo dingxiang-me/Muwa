@@ -280,7 +280,30 @@ public struct RemoteProvider: Codable, Identifiable, Sendable, Equatable {
             }
         }
 
+        // OpenRouter app attribution: surfaces Osaurus on openrouter.ai/rankings.
+        // Constants live on `OpenRouterOAuthService.Attribution` so the OAuth
+        // app row and these per-request headers can't drift. nil-checks let
+        // user-supplied customHeaders win.
+        if host.lowercased().trimmingCharacters(in: .whitespaces)
+            == OpenRouterOAuthService.Attribution.host
+        {
+            let attribution = OpenRouterOAuthService.Attribution.self
+            if headers[attribution.refererHeader] == nil {
+                headers[attribution.refererHeader] = attribution.referrerURL
+            }
+            if headers[attribution.titleHeader] == nil {
+                headers[attribution.titleHeader] = attribution.appTitle
+            }
+        }
+
         return headers
+    }
+
+    /// Resolve Keychain-backed headers away from the main actor.
+    public func resolvedHeadersOffMainActor() async -> [String: String] {
+        await RemoteProviderKeychain.runOffCooperativeExecutor {
+            self.resolvedHeaders()
+        }
     }
 
     /// Check if provider has an API key stored in Keychain
@@ -299,6 +322,13 @@ public struct RemoteProvider: Codable, Identifiable, Sendable, Equatable {
 
     public func getOAuthTokens() -> RemoteProviderOAuthTokens? {
         RemoteProviderKeychain.getOAuthTokens(for: id)
+    }
+
+    /// Resolve OAuth tokens away from the main actor.
+    public func getOAuthTokensOffMainActor() async -> RemoteProviderOAuthTokens? {
+        await RemoteProviderKeychain.runOffCooperativeExecutor {
+            self.getOAuthTokens()
+        }
     }
 
     public func mergedModelIds(discovered: [String]) -> [String] {

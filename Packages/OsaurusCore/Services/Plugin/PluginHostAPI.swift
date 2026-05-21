@@ -629,6 +629,7 @@ final class PluginHostContext: @unchecked Sendable {
     struct AgentContext {
         let agentId: UUID
         let systemPrompt: String
+        let memorySection: String?
         let model: String?
         let temperature: Float?
         let maxTokens: Int?
@@ -639,6 +640,7 @@ final class PluginHostContext: @unchecked Sendable {
             AgentContext(
                 agentId: agentId,
                 systemPrompt: newPrompt,
+                memorySection: memorySection,
                 model: model,
                 temperature: temperature,
                 maxTokens: maxTokens,
@@ -700,7 +702,8 @@ final class PluginHostContext: @unchecked Sendable {
         clean.removeValue(forKey: "preflight")
         if json["tools"] is Bool { clean.removeValue(forKey: "tools") }
 
-        guard let cleanData = try? JSONSerialization.data(withJSONObject: clean) else { return nil }
+        guard let cleanData = try? JSONSerialization.data(withJSONObject: clean, options: .osaurusCanonical)
+        else { return nil }
         return (json, cleanData)
     }
 
@@ -718,7 +721,11 @@ final class PluginHostContext: @unchecked Sendable {
         activeAgentId: UUID? = nil
     ) async -> PreparedInference {
         let options = InferenceOptions(from: rawJSON)
-        let agentCtx = await resolveAgentContext(agentId: activeAgentId)
+        let agentCtx = await resolveAgentContext(
+            agentId: activeAgentId,
+            messages: request.messages,
+            allowPreflight: options.wantsPreflight
+        )
         let execMode = agentCtx?.executionMode ?? .none
         var enriched = enrichRequest(request, context: agentCtx, options: options)
         if let pid = pluginId {
@@ -771,7 +778,11 @@ final class PluginHostContext: @unchecked Sendable {
     /// `agent_address` / `agent_id` is intentionally ignored — see
     /// `warnAgentOverrideOnce` in the dispatch / inference entry points.
     /// Internal (not private) so unit tests can pin the resolution surface.
-    static func resolveAgentContext(agentId: UUID?) async -> AgentContext? {
+    static func resolveAgentContext(
+        agentId: UUID?,
+        messages: [ChatMessage] = [],
+        allowPreflight: Bool = true
+    ) async -> AgentContext? {
         guard let agentId else { return nil }
 
         let resolved: (id: UUID, autonomousEnabled: Bool)? = await MainActor.run {
@@ -804,13 +815,17 @@ final class PluginHostContext: @unchecked Sendable {
         let composed = await SystemPromptComposer.composeChatContext(
             agentId: agentId,
             executionMode: execMode,
-            model: agentModel
+            model: agentModel,
+            query: extractPreflightQuery(from: messages),
+            messages: messages,
+            cachedPreflight: allowPreflight ? nil : .empty
         )
         return await MainActor.run {
             let mgr = AgentManager.shared
             return AgentContext(
                 agentId: agentId,
                 systemPrompt: composed.prompt,
+                memorySection: composed.memorySection,
                 model: agentModel,
                 temperature: mgr.effectiveTemperature(for: agentId),
                 maxTokens: mgr.effectiveMaxTokens(for: agentId),
@@ -841,6 +856,7 @@ final class PluginHostContext: @unchecked Sendable {
 
         var messages = request.messages
         SystemPromptComposer.injectSystemContent(ctx.systemPrompt, into: &messages)
+        SystemPromptComposer.injectMemoryPrefix(ctx.memorySection, into: &messages)
 
         let effectiveTools: [Tool]?
         if let explicit = request.tools, !explicit.isEmpty {
@@ -1330,7 +1346,7 @@ final class PluginHostContext: @unchecked Sendable {
                         model: prep.enriched.request.model
                     )
 
-                    guard let encoded = try? JSONEncoder().encode(response),
+                    guard let encoded = try? JSONEncoder.osaurusCanonical().encode(response),
                         var json = (try? JSONSerialization.jsonObject(with: encoded)) as? [String: Any]
                     else {
                         return Self.jsonString([
@@ -1807,7 +1823,7 @@ final class PluginHostContext: @unchecked Sendable {
         userData: UnsafeMutableRawPointer?
     ) {
         guard let callback,
-            let data = try? JSONSerialization.data(withJSONObject: payload),
+            let data = try? JSONSerialization.data(withJSONObject: payload, options: .osaurusCanonical),
             let str = String(data: data, encoding: .utf8)
         else { return }
         str.withCString { callback($0, userData) }
@@ -2726,8 +2742,11 @@ extension PluginHostContext {
     }
 
     /// Serialize a dictionary to a JSON string. Falls back to "{}" on encoding failure.
+    /// Uses canonical (sorted-keys) output so plugin-side prompt prefixes and
+    /// chunk payloads stay byte-stable across calls.
     static func jsonString(_ dict: [String: Any]) -> String {
-        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: []) else { return "{}" }
+        guard let data = try? JSONSerialization.data(withJSONObject: dict, options: .osaurusCanonical)
+        else { return "{}" }
         return String(decoding: data, as: UTF8.self)
     }
 

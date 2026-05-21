@@ -6,6 +6,7 @@
 //
 
 import AppKit
+import Combine
 import Foundation
 import SwiftUI
 
@@ -93,6 +94,25 @@ struct ModelDownloadView: View {
     /// Import-from-Hugging-Face sheet state
     @State private var showImportSheet = false
 
+    /// Cached output of `gridLists`. We used to recompute four filter +
+    /// sort passes from a body computed property, which would re-run on
+    /// every `modelManager.objectWillChange` publish (one per download
+    /// progress chunk). The snapshot is now refreshed only when the
+    /// inputs it actually depends on change (filter state, sort option,
+    /// selected tab, debounced search text, or a throttled
+    /// `modelManager` publish).
+    @State private var gridListsSnapshot = GridLists(
+        suggested: [],
+        others: [],
+        downloaded: [],
+        displayed: []
+    )
+
+    /// Coalesces bursts of `modelManager.objectWillChange` publishes
+    /// (e.g. download progress) so we recompute `gridLists` at most once
+    /// per ~150 ms instead of per chunk.
+    @State private var gridListsRefreshTask: Task<Void, Never>?
+
     // MARK: - Deep Link Support
 
     /// Optional model ID for deep linking (e.g., from URL schemes)
@@ -102,9 +122,13 @@ struct ModelDownloadView: View {
     var deeplinkFile: String? = nil
 
     var body: some View {
-        // compute the grid lists once per body pass and thread them down
-        // so derived properties don't re-run multiple times during animation frames
-        let lists = gridLists
+        // Render from the cached snapshot rather than recomputing the
+        // filter+sort pipeline per body pass. The snapshot is refreshed
+        // by `.onAppear`, by `.onChange` of each user-driven input
+        // (filter / sort / tab / debounced search), and by a throttled
+        // `.onReceive(modelManager)` to absorb the high-frequency
+        // download-progress publishes.
+        let lists = gridListsSnapshot
         return VStack(spacing: 0) {
             headerView(lists: lists)
                 .opacity(hasAppeared ? 1 : 0)
@@ -143,6 +167,22 @@ struct ModelDownloadView: View {
                 try? await Task.sleep(nanoseconds: 150_000_000)  // 150ms delay
                 modelManager.fetchRemoteMLXModels(searchText: searchText)
             }
+
+            refreshGridLists()
+        }
+        .onDisappear {
+            gridListsRefreshTask?.cancel()
+            gridListsRefreshTask = nil
+        }
+        .onChange(of: selectedTab) { _, _ in refreshGridLists() }
+        .onChange(of: sortOption) { _, _ in refreshGridLists() }
+        .onChange(of: filterState) { _, _ in refreshGridLists() }
+        .onChange(of: debouncedSearchText) { _, _ in refreshGridLists() }
+        .onReceive(
+            modelManager.objectWillChange
+                .throttle(for: .milliseconds(200), scheduler: DispatchQueue.main, latest: true)
+        ) { _ in
+            scheduleGridListsRefresh()
         }
         .onChange(of: searchText) { _, newValue in
             // If input looks like a Hugging Face repo, switch to All so it's visible
@@ -242,7 +282,7 @@ struct ModelDownloadView: View {
                     }
                     .buttonStyle(PlainButtonStyle())
                     .disabled(modelManager.isLoadingSuggested)
-                    .help(L("Refresh OsaurusAI models from Hugging Face"))
+                    .localizedHelp("Refresh OsaurusAI models from Hugging Face")
                 }
 
                 // Import from Hugging Face
@@ -266,7 +306,7 @@ struct ModelDownloadView: View {
                     .foregroundColor(theme.secondaryText)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help(L("Import an MLX model from Hugging Face"))
+                .localizedHelp("Import an MLX model from Hugging Face")
 
                 // Download status indicator (shown when downloads are active)
                 if modelManager.activeDownloadsCount > 0 {
@@ -291,9 +331,7 @@ struct ModelDownloadView: View {
                 ],
                 badges: modelManager.activeDownloadsCount > 0
                     ? [.downloaded: modelManager.activeDownloadsCount]
-                    : nil,
-                searchText: $searchText,
-                searchPlaceholder: "Search models"
+                    : nil
             )
         }
     }
@@ -387,7 +425,10 @@ struct ModelDownloadView: View {
             VStack(alignment: .leading, spacing: 16) {
                 HStack {
                     Text("Filters", bundle: .module)
-                        .font(.system(size: 14, weight: .bold))
+                        .font(.system(size: 10, weight: .bold))
+                        .tracking(0.6)
+                        .foregroundColor(theme.tertiaryText)
+                        .textCase(.uppercase)
                     Spacer()
                     if filterState.isActive {
                         Button {
@@ -617,7 +658,7 @@ struct ModelDownloadView: View {
                     sortFilterBar
                         .padding(.horizontal, 24)
                         .padding(.top, 12)
-                        .padding(.bottom, 4)
+                        .padding(.bottom, 12)
 
                     ScrollView {
                         VStack(spacing: 12) {
@@ -630,20 +671,7 @@ struct ModelDownloadView: View {
                             } else {
                                 switch selectedTab {
                                 case .all:
-                                    if !lists.suggested.isEmpty {
-                                        modelGridSection(
-                                            title: L("Recommended"),
-                                            models: lists.suggested,
-                                            isFirst: true
-                                        )
-                                    }
-                                    if !lists.others.isEmpty {
-                                        modelGridSection(
-                                            title: L("Others"),
-                                            models: lists.others,
-                                            isFirst: lists.suggested.isEmpty
-                                        )
-                                    }
+                                    modelGrid(models: lists.displayed)
                                 case .downloaded:
                                     modelGrid(models: lists.downloaded)
                                 }
@@ -679,6 +707,8 @@ struct ModelDownloadView: View {
 
     private var sortFilterBar: some View {
         HStack(spacing: 12) {
+            SearchField(text: $searchText, placeholder: "Search models", width: 240, compact: true)
+
             Spacer()
 
             // Sort button
@@ -687,15 +717,15 @@ struct ModelDownloadView: View {
             } label: {
                 HStack(spacing: 6) {
                     Image(systemName: "arrow.up.arrow.down")
-                        .font(.system(size: 13))
+                        .font(.system(size: 12))
                     if sortOption == .recommended {
                         Text("Sort", bundle: .module)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                     } else {
                         Text("Sort: ", bundle: .module)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             + Text(sortOption.displayName)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                     }
                 }
                 .lineLimit(1)
@@ -718,7 +748,7 @@ struct ModelDownloadView: View {
             .popover(isPresented: $showSortPopover, arrowEdge: .top) {
                 sortPopoverView
             }
-            .help(L("Sort models"))
+            .localizedHelp("Sort models")
 
             // Filter button
             Button {
@@ -729,15 +759,15 @@ struct ModelDownloadView: View {
                         systemName: filterState.isActive
                             ? "line.3.horizontal.decrease.circle.fill" : "line.3.horizontal.decrease.circle"
                     )
-                    .font(.system(size: 13))
+                    .font(.system(size: 12))
                     if let active = activeFilterSummary {
                         Text("Filter: ", bundle: .module)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                             + Text(active)
-                            .font(.system(size: 13, weight: .semibold))
+                            .font(.system(size: 12, weight: .semibold))
                     } else {
                         Text("Filter", bundle: .module)
-                            .font(.system(size: 13, weight: .medium))
+                            .font(.system(size: 12, weight: .medium))
                     }
                 }
                 .lineLimit(1)
@@ -889,7 +919,7 @@ struct ModelDownloadView: View {
     }
 
     private func pillButton(
-        _ title: String,
+        _ title: LocalizedStringKey,
         icon: String? = nil,
         color: Color,
         bg: Color,
@@ -898,9 +928,13 @@ struct ModelDownloadView: View {
         Button(action: action) {
             Group {
                 if let icon {
-                    Label(title, systemImage: icon)
+                    Label {
+                        Text(localized: title)
+                    } icon: {
+                        Image(systemName: icon)
+                    }
                 } else {
-                    Text(title)
+                    Text(localized: title)
                 }
             }
             .font(.system(size: 12, weight: .medium))
@@ -1041,14 +1075,17 @@ struct ModelDownloadView: View {
     }
 
     /// Consolidates all list computations. Each input pipeline runs once.
-    private var gridLists: GridLists {
+    private func computeGridLists() -> GridLists {
         let mem = systemMonitor.totalMemoryGB
 
-        let availSearched = SearchService.filterModels(modelManager.availableModels, with: debouncedSearchText)
+        let osaurusOnly = modelManager.availableModels.filter { Self.isOsaurusAI($0) }
+        let osaurusSuggested = modelManager.suggestedModels.filter { Self.isOsaurusAI($0) }
+
+        let availSearched = SearchService.filterModels(osaurusOnly, with: debouncedSearchText)
         let availFiltered = filterState.apply(to: availSearched, totalMemoryGB: mem)
         let allFiltered = applySort(to: availFiltered)
 
-        let suggSearched = SearchService.filterModels(modelManager.suggestedModels, with: debouncedSearchText)
+        let suggSearched = SearchService.filterModels(osaurusSuggested, with: debouncedSearchText)
         let suggFiltered = filterState.apply(to: suggSearched, totalMemoryGB: mem)
         let suggested = sortedSuggested(suggFiltered)
 
@@ -1064,6 +1101,30 @@ struct ModelDownloadView: View {
         }
 
         return GridLists(suggested: suggested, others: others, downloaded: downloaded, displayed: displayed)
+    }
+
+    /// Eager refresh of the cached snapshot. Called from `.onAppear` and
+    /// from every `.onChange` of a user-driven input — these flips
+    /// should feel immediate.
+    private func refreshGridLists() {
+        gridListsRefreshTask?.cancel()
+        gridListsRefreshTask = nil
+        gridListsSnapshot = computeGridLists()
+    }
+
+    /// Debounced refresh for `modelManager.objectWillChange` bursts so
+    /// the grid doesn't re-filter+sort on every download progress chunk.
+    /// `.throttle` on the publisher already caps to ~5 Hz; the extra
+    /// 50 ms sleep here coalesces any same-tick publishes.
+    private func scheduleGridListsRefresh() {
+        guard gridListsRefreshTask == nil else { return }
+        gridListsRefreshTask = Task { @MainActor in
+            try? await Task.sleep(for: .milliseconds(50))
+            if !Task.isCancelled {
+                gridListsSnapshot = computeGridLists()
+            }
+            gridListsRefreshTask = nil
+        }
     }
 
     private func sortedSuggested(_ filtered: [MLXModel]) -> [MLXModel] {
@@ -1152,6 +1213,10 @@ struct ModelDownloadView: View {
                 return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
             }
         }
+    }
+
+    private static func isOsaurusAI(_ model: MLXModel) -> Bool {
+        model.id.lowercased().hasPrefix("osaurusai/")
     }
 
     private func compatibilityRank(_ model: MLXModel) -> Int {
@@ -1285,6 +1350,8 @@ private struct DownloadStatusIndicator: View {
                     .font(.system(size: 12, weight: .medium))
                     .foregroundColor(theme.secondaryText)
             }
+            .lineLimit(1)
+            .fixedSize(horizontal: true, vertical: false)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(
@@ -1299,7 +1366,7 @@ private struct DownloadStatusIndicator: View {
                 isHovering = hovering
             }
         }
-        .help(Text("Downloading \(activeCount) model\(activeCount == 1 ? "" : "s") – Click to view", bundle: .module))
+        .help(Text(localized: "Downloading \(activeCount) model\(activeCount == 1 ? "" : "s") – Click to view"))
     }
 }
 

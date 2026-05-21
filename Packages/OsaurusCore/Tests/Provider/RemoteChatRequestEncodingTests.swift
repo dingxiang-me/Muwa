@@ -322,9 +322,30 @@ struct RemoteChatRequestEncodingTests {
         #expect(
             RemoteProviderService.echoesReasoningContent(
                 providerType: .openaiLegacy,
-                host: "api.deepseek.com"
+                host: "api.deepseek.com",
+                model: "deepseek-chat"
             ) == true
         )
+    }
+
+    /// Local ds4 servers run on `localhost`, so the host alone can't tell
+    /// us they're DeepSeek-family; we have to look at the model id too.
+    @Test func echoesReasoningContent_trueForLocalHostWithDeepSeekModel() throws {
+        let cases: [(host: String, model: String)] = [
+            ("localhost:8888", "deepseek-v4-flash"),
+            ("127.0.0.1:9000", "deepseek-r1"),
+            ("ds4.local", "DeepSeek-V3"),
+        ]
+        for c in cases {
+            #expect(
+                RemoteProviderService.echoesReasoningContent(
+                    providerType: .openaiLegacy,
+                    host: c.host,
+                    model: c.model
+                ) == true,
+                "expected reasoning_content echo for host=\(c.host) model=\(c.model)"
+            )
+        }
     }
 
     @Test func echoesReasoningContent_falseForOtherOpenAICompatHosts() throws {
@@ -332,7 +353,8 @@ struct RemoteChatRequestEncodingTests {
             #expect(
                 RemoteProviderService.echoesReasoningContent(
                     providerType: .openaiLegacy,
-                    host: host
+                    host: host,
+                    model: "gpt-4o-mini"
                 ) == false
             )
         }
@@ -343,7 +365,8 @@ struct RemoteChatRequestEncodingTests {
             #expect(
                 RemoteProviderService.echoesReasoningContent(
                     providerType: providerType,
-                    host: "api.deepseek.com"
+                    host: "api.deepseek.com",
+                    model: "deepseek-chat"
                 ) == false
             )
         }
@@ -387,6 +410,83 @@ struct RemoteChatRequestEncodingTests {
         #expect(stripped.count == 2)
         #expect(stripped[0].reasoning_content == nil)
         #expect(stripped[1].reasoning_content == nil)
+    }
+
+    /// End-to-end: a follow-up turn against a local ds4 server must keep
+    /// `reasoning_content` on the wire so ds4's prompt template renders the
+    /// same `<think>…</think>` block that produced its cached KV state.
+    @Test func wireBody_includesReasoningContent_forLocalDS4() throws {
+        let body = try Self.encodedWireBody(
+            providerType: .openaiLegacy,
+            host: "localhost:8888",
+            model: "deepseek-v4-flash",
+            assistantReasoning: "The user wants weather; call get_weather."
+        )
+
+        #expect(body.contains("\"reasoning_content\""))
+        #expect(body.contains("The user wants weather"))
+    }
+
+    /// Symmetric guard: non-DeepSeek host+model still strips
+    /// `reasoning_content` to avoid unknown-field rejections on strict schemas.
+    @Test func wireBody_omitsReasoningContent_forNonDeepSeekRemote() throws {
+        let body = try Self.encodedWireBody(
+            providerType: .openaiLegacy,
+            host: "api.openai.com",
+            model: "gpt-5",
+            assistantReasoning: "internal trace"
+        )
+
+        #expect(!body.contains("\"reasoning_content\""))
+        #expect(!body.contains("internal trace"))
+    }
+
+    /// Mirrors the strip-or-echo branch in `buildURLRequest`, then encodes
+    /// with the canonical encoder. Returns the wire body as a string.
+    private static func encodedWireBody(
+        providerType: RemoteProviderType,
+        host: String,
+        model: String,
+        assistantReasoning: String
+    ) throws -> String {
+        let request = RemoteChatRequest(
+            model: model,
+            messages: [
+                ChatMessage(role: "user", content: "hi"),
+                ChatMessage(
+                    role: "assistant",
+                    content: "answer",
+                    tool_calls: nil,
+                    tool_call_id: nil,
+                    reasoning_content: assistantReasoning
+                ),
+            ],
+            temperature: nil,
+            max_completion_tokens: nil,
+            stream: false,
+            top_p: nil,
+            frequency_penalty: nil,
+            presence_penalty: nil,
+            stop: nil,
+            tools: nil,
+            tool_choice: nil,
+            reasoning_effort: nil,
+            reasoning: nil,
+            thinking: nil,
+            modelOptions: [:],
+            veniceParameters: nil
+        )
+
+        var outbound = request
+        if !RemoteProviderService.echoesReasoningContent(
+            providerType: providerType,
+            host: host,
+            model: model
+        ) {
+            outbound.messages = RemoteProviderService.strippingReasoningContent(from: outbound.messages)
+        }
+        let data = try JSONEncoder.osaurusCanonical().encode(outbound)
+        return String(decoding: data, as: UTF8.self)
     }
 
     // MARK: - DSV4 remote effort translation
@@ -549,6 +649,259 @@ struct RemoteChatRequestEncodingTests {
         #expect(location["additionalProperties"] as? Bool == false)
     }
 
+    // MARK: - Gemini schema sanitization regression tests
+    //
+    // Each case pins one of the MCP-driven incompatibilities Gemini's OpenAPI 3.0
+    // validator rejects with HTTP 400 `INVALID_ARGUMENT`.
+
+    @Test func geminiRequest_dropsRequiredEntriesNotDeclaredInProperties() throws {
+        // Reproduces the exact 400 in the bug report:
+        //   `function_declarations[i].parameters.required[j]: property is not defined`
+        let tool = Self.makeTool(
+            name: "broken_required",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "foo": .object(["type": .string("string")])
+                ]),
+                "required": .array([.string("foo"), .string("bar")]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+
+        let required = try #require(parameters["required"] as? [String])
+        #expect(required == ["foo"])
+    }
+
+    @Test func geminiRequest_omitsRequiredWhenAllEntriesUndefined() throws {
+        let tool = Self.makeTool(
+            name: "all_required_undefined",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "foo": .object(["type": .string("string")])
+                ]),
+                "required": .array([.string("bar"), .string("baz")]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+
+        #expect(parameters["required"] == nil)
+    }
+
+    @Test func geminiRequest_stripsPropertiesAndRequiredOnNonObjectTypes() throws {
+        // Notion-style MCP schemas attach `properties`/`required` to string
+        // fields. Gemini rejects them: "only allowed for OBJECT type".
+        let tool = Self.makeTool(
+            name: "non_object_with_object_shape",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "name": .object([
+                        "type": .string("string"),
+                        "properties": .object([
+                            "nested": .object(["type": .string("string")])
+                        ]),
+                        "required": .array([.string("nested")]),
+                    ])
+                ]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+
+        let properties = try #require(parameters["properties"] as? [String: Any])
+        let name = try #require(properties["name"] as? [String: Any])
+
+        #expect(name["type"] as? String == "string")
+        #expect(name["properties"] == nil)
+        #expect(name["required"] == nil)
+    }
+
+    @Test func geminiRequest_infersObjectTypeWhenPropertiesPresentWithoutType() throws {
+        // Schema fragment with `properties` but no `type` — implicit object
+        // per JSON Schema, rejected by Gemini until inferred.
+        let tool = Self.makeTool(
+            name: "implicit_object",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "data": .object([
+                        "properties": .object([
+                            "page_id": .object(["type": .string("string")])
+                        ]),
+                        "required": .array([.string("page_id"), .string("ghost")]),
+                    ])
+                ]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+        let properties = try #require(parameters["properties"] as? [String: Any])
+        let data = try #require(properties["data"] as? [String: Any])
+
+        #expect(data["type"] as? String == "object")
+        let required = try #require(data["required"] as? [String])
+        #expect(required == ["page_id"])
+    }
+
+    @Test func geminiRequest_stripsContentEncodingAndContentMediaType() throws {
+        // chrome-devtools-mcp-style screenshot tool — Gemini rejects these.
+        let tool = Self.makeTool(
+            name: "take_screenshot",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "image": .object([
+                        "type": .string("string"),
+                        "contentEncoding": .string("base64"),
+                        "contentMediaType": .string("image/png"),
+                    ])
+                ]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+        let properties = try #require(parameters["properties"] as? [String: Any])
+        let image = try #require(properties["image"] as? [String: Any])
+
+        #expect(image["contentEncoding"] == nil)
+        #expect(image["contentMediaType"] == nil)
+        #expect(image["type"] as? String == "string")
+    }
+
+    @Test func geminiRequest_stripsRefAndDefsAndConst() throws {
+        let tool = Self.makeTool(
+            name: "ref_and_const",
+            parameters: .object([
+                "type": .string("object"),
+                "$schema": .string("https://json-schema.org/draft/2020-12/schema"),
+                "$id": .string("urn:example:schema"),
+                "$defs": .object([
+                    "Foo": .object(["type": .string("string")])
+                ]),
+                "definitions": .object([
+                    "Bar": .object(["type": .string("number")])
+                ]),
+                "properties": .object([
+                    "kind": .object([
+                        "type": .string("string"),
+                        "const": .string("widget"),
+                    ]),
+                    "ref_field": .object([
+                        "$ref": .string("#/$defs/Foo")
+                    ]),
+                    "either": .object([
+                        "oneOf": .array([
+                            .object(["type": .string("string")]),
+                            .object(["type": .string("number")]),
+                        ])
+                    ]),
+                ]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+
+        #expect(parameters["$schema"] == nil)
+        #expect(parameters["$id"] == nil)
+        #expect(parameters["$defs"] == nil)
+        #expect(parameters["definitions"] == nil)
+
+        let properties = try #require(parameters["properties"] as? [String: Any])
+
+        let kind = try #require(properties["kind"] as? [String: Any])
+        #expect(kind["const"] == nil)
+        #expect(kind["type"] as? String == "string")
+
+        let refField = try #require(properties["ref_field"] as? [String: Any])
+        #expect(refField["$ref"] == nil)
+
+        let either = try #require(properties["either"] as? [String: Any])
+        #expect(either["oneOf"] == nil)
+    }
+
+    @Test func geminiRequest_normalizesArrayNullableTypeUnion() throws {
+        let tool = Self.makeTool(
+            name: "nullable_union",
+            parameters: .object([
+                "type": .string("object"),
+                "properties": .object([
+                    "label": .object([
+                        "type": .array([.string("string"), .string("null")])
+                    ])
+                ]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+        let properties = try #require(parameters["properties"] as? [String: Any])
+        let label = try #require(properties["label"] as? [String: Any])
+
+        #expect(label["type"] as? String == "string")
+        #expect(label["nullable"] as? Bool == true)
+    }
+
+    @Test func geminiRequest_preservesAllowedKeywords() throws {
+        let tool = Self.makeTool(
+            name: "rich_schema",
+            parameters: .object([
+                "type": .string("object"),
+                "description": .string("A rich schema"),
+                "propertyOrdering": .array([.string("count"), .string("tags")]),
+                "properties": .object([
+                    "count": .object([
+                        "type": .string("integer"),
+                        "format": .string("int32"),
+                        "minimum": .number(0),
+                        "maximum": .number(100),
+                        "nullable": .bool(true),
+                    ]),
+                    "tags": .object([
+                        "type": .string("array"),
+                        "minItems": .number(1),
+                        "maxItems": .number(5),
+                        "items": .object([
+                            "type": .string("string"),
+                            "enum": .array([.string("a"), .string("b")]),
+                        ]),
+                    ]),
+                    "either": .object([
+                        "anyOf": .array([
+                            .object(["type": .string("string")]),
+                            .object(["type": .string("number")]),
+                        ])
+                    ]),
+                ]),
+                "required": .array([.string("count")]),
+            ])
+        )
+        let parameters = try Self.geminiParameters(for: tool)
+
+        #expect(parameters["description"] as? String == "A rich schema")
+        let ordering = try #require(parameters["propertyOrdering"] as? [String])
+        #expect(ordering == ["count", "tags"])
+        let required = try #require(parameters["required"] as? [String])
+        #expect(required == ["count"])
+
+        let properties = try #require(parameters["properties"] as? [String: Any])
+
+        let count = try #require(properties["count"] as? [String: Any])
+        #expect(count["type"] as? String == "integer")
+        #expect(count["format"] as? String == "int32")
+        #expect((count["minimum"] as? NSNumber)?.doubleValue == 0)
+        #expect((count["maximum"] as? NSNumber)?.doubleValue == 100)
+        #expect(count["nullable"] as? Bool == true)
+
+        let tags = try #require(properties["tags"] as? [String: Any])
+        #expect(tags["type"] as? String == "array")
+        #expect((tags["minItems"] as? NSNumber)?.doubleValue == 1)
+        #expect((tags["maxItems"] as? NSNumber)?.doubleValue == 5)
+        let items = try #require(tags["items"] as? [String: Any])
+        #expect(items["type"] as? String == "string")
+        let enumValues = try #require(items["enum"] as? [String])
+        #expect(enumValues == ["a", "b"])
+
+        let either = try #require(properties["either"] as? [String: Any])
+        let anyOf = try #require(either["anyOf"] as? [[String: Any]])
+        #expect(anyOf.count == 2)
+    }
+
     // MARK: - Fixtures
 
     private static func makeRequest(
@@ -576,6 +929,28 @@ struct RemoteChatRequestEncodingTests {
             modelOptions: [:],
             veniceParameters: nil
         )
+    }
+
+    /// Single-tool fixture for the Gemini sanitizer regression tests.
+    private static func makeTool(name: String, parameters: JSONValue) -> Tool {
+        Tool(
+            type: "function",
+            function: ToolFunction(
+                name: name,
+                description: "Test tool",
+                parameters: parameters
+            )
+        )
+    }
+
+    /// Encode through `toGeminiRequest()` and return the wire-format `parameters`
+    /// dict for the first function declaration.
+    private static func geminiParameters(for tool: Tool) throws -> [String: Any] {
+        let request = makeRequest(model: "gemini-2.5-pro", maxTokens: 1024, tools: [tool])
+        let payload = try encodeAsDictionary(request.toGeminiRequest())
+        let tools = try #require(payload["tools"] as? [[String: Any]])
+        let functionDeclarations = try #require(tools.first?["functionDeclarations"] as? [[String: Any]])
+        return try #require(functionDeclarations.first?["parameters"] as? [String: Any])
     }
 
     private static let weatherTool = Tool(

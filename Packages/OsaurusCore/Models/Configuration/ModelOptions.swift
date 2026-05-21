@@ -85,6 +85,7 @@ enum ModelProfileRegistry {
         Hy3ReasoningProfile.self,
         LingRuntimeProfile.self,
         ZayaThinkingProfile.self,
+        Gemma4ThinkingProfile.self,
         Gemini31FlashImageProfile.self,
         GeminiProImageProfile.self,
         GeminiFlashImageProfile.self,
@@ -149,8 +150,8 @@ enum ModelProfileRegistry {
 /// three intentional modes:
 /// - instruct: closed `</think>` assistant tail, answer on content rail
 /// - reasoning: open `<think>` assistant tail, normal reasoning split
-/// - max: public API/UI compatibility selector; vmlx normalizes it to the
-///   stable high-thinking rail by default unless raw max is explicitly enabled
+/// - max: raw DSV4 max reasoning effort; Osaurus passes it through to vmlx
+///   unchanged so runtime issues are fixed at the engine layer, not hidden here
 struct DSV4ReasoningProfile: ModelProfile {
     static let displayName = "DSV4 Reasoning"
 
@@ -380,11 +381,11 @@ struct Hy3ReasoningProfile: ModelProfile {
 
 // MARK: - Ling Runtime Profile
 
-/// Ling-2.6 Flash (`model_type=bailing_hybrid`) is served as a non-reasoning
-/// chat model in osaurus. The explicit profile reserves Ling IDs ahead of
-/// `AutoThinkingProfile`, so a locally installed template cannot accidentally
-/// expose the generic Thinking toggle. `MLXBatchAdapter` separately forces
-/// `enable_thinking=false` for Ling requests at tokenization time.
+/// Ling-2.6 Flash (`model_type=bailing_hybrid`) uses an `enable_thinking`
+/// chat-template kwarg to choose the upstream "detailed thinking on/off"
+/// directive. Osaurus defaults the option off for local chat, but explicit
+/// user/API opt-in must still reach vmlx; this is a template mode, not an
+/// output-shaping guard.
 struct LingRuntimeProfile: ModelProfile {
     static let displayName = "Ling"
 
@@ -392,8 +393,20 @@ struct LingRuntimeProfile: ModelProfile {
         ModelFamilyNames.isLingFamily(modelId)
     }
 
-    static let options: [ModelOptionDefinition] = []
-    static let defaults: [String: ModelOptionValue] = [:]
+    static let options: [ModelOptionDefinition] = [
+        ModelOptionDefinition(
+            id: "disableThinking",
+            label: "Disable Thinking",
+            icon: "brain.head.profile",
+            kind: .toggle(default: true)
+        )
+    ]
+
+    static let defaults: [String: ModelOptionValue] = [
+        "disableThinking": .bool(true)
+    ]
+
+    static let thinkingOption: (id: String, inverted: Bool)? = ("disableThinking", true)
 }
 
 // MARK: - Zaya Thinking Profile
@@ -411,6 +424,36 @@ struct ZayaThinkingProfile: ModelProfile {
     static func matches(modelId: String) -> Bool {
         ModelFamilyNames.isZayaFamily(modelId)
             && !ModelFamilyNames.isZayaVLFamily(modelId)
+    }
+
+    static let options: [ModelOptionDefinition] = [
+        ModelOptionDefinition(
+            id: "disableThinking",
+            label: "Disable Thinking",
+            icon: "brain.head.profile",
+            kind: .toggle(default: true)
+        )
+    ]
+
+    static let defaults: [String: ModelOptionValue] = [
+        "disableThinking": .bool(true)
+    ]
+
+    static let thinkingOption: (id: String, inverted: Bool)? = ("disableThinking", true)
+}
+
+// MARK: - Gemma 4 Thinking Profile
+
+/// Gemma-4 chat templates expose an `enable_thinking` kwarg. Leaving the
+/// generic auto-thinking default ON can spend short API responses entirely in
+/// the hidden reasoning rail, producing an empty visible assistant message.
+/// Default to direct/no-thinking chat while preserving explicit opt-in.
+struct Gemma4ThinkingProfile: ModelProfile {
+    static let displayName = "Gemma 4 Thinking"
+
+    static func matches(modelId: String) -> Bool {
+        let lower = modelId.lowercased()
+        return lower.contains("gemma-4") || lower.contains("gemma4")
     }
 
     static let options: [ModelOptionDefinition] = [

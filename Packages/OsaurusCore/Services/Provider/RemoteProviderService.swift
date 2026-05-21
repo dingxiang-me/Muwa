@@ -76,10 +76,15 @@ public actor RemoteProviderService: ToolCapableService {
         sessionInvalidatedFlag.withLock { $0 }
     }
 
-    public init(provider: RemoteProvider, models: [String], resolvedHeaders: [String: String]) {
+    public init(
+        provider: RemoteProvider,
+        models: [String],
+        resolvedHeaders: [String: String],
+        cachedOAuthTokens: RemoteProviderOAuthTokens? = nil
+    ) {
         self.provider = provider
         self.cachedHeaders = resolvedHeaders
-        self.cachedOAuthTokens = provider.getOAuthTokens()
+        self.cachedOAuthTokens = cachedOAuthTokens
         self.availableModels = models
         // Create a unique prefix for model names (lowercase, sanitized)
         self.providerPrefix = provider.name
@@ -141,16 +146,25 @@ public actor RemoteProviderService: ToolCapableService {
     }
 
     /// Whether the target provider requires `reasoning_content` to be echoed
-    /// back on assistant messages in multi-round conversations. DeepSeek's
-    /// thinking mode 400s otherwise (issue #959). Other OpenAI-compat hosts
-    /// get the field stripped to avoid unknown-field rejections.
+    /// back on assistant messages in multi-round conversations.
+    ///
+    /// DeepSeek-family models inline the previous turn's `reasoning_content`
+    /// between `<think>…</think>` in their prompt template; dropping it
+    /// busts the server's KV cache at the first reasoning token (issue #959,
+    /// reproduced against a local ds4 server with `deepseek-v4-flash`).
+    /// Matched by host or model id so this works for the hosted API, local
+    /// ds4-style servers (`localhost:PORT`), and OpenAI-compat aggregators
+    /// serving a DeepSeek model. Everything else gets stripped to avoid
+    /// unknown-field rejections on strict schemas.
     static func echoesReasoningContent(
         providerType: RemoteProviderType,
-        host: String
+        host: String,
+        model: String
     ) -> Bool {
         switch providerType {
         case .openaiLegacy, .azureOpenAI:
-            return host.lowercased().contains("deepseek")
+            return host.range(of: "deepseek", options: .caseInsensitive) != nil
+                || model.range(of: "deepseek", options: .caseInsensitive) != nil
         case .anthropic, .openResponses, .openAICodex, .gemini, .osaurus:
             return false
         }
@@ -1487,7 +1501,9 @@ public actor RemoteProviderService: ToolCapableService {
     /// producers and the one-shot response parser).
     private static func geminiArgsJSON(from args: [String: AnyCodableValue]?) -> String {
         let dict = (args ?? [:]).mapValues { $0.value }
-        if let data = try? JSONSerialization.data(withJSONObject: dict),
+        // Sorted keys: replayed verbatim into the next turn's
+        // `tool_calls[].function.arguments`. See `JSONDeterminism.swift`.
+        if let data = try? JSONSerialization.data(withJSONObject: dict, options: .osaurusCanonical),
             let s = String(data: data, encoding: .utf8)
         {
             return s
@@ -1736,7 +1752,7 @@ public actor RemoteProviderService: ToolCapableService {
             // Reasoning models (o1, gpt-5) forbid temperature/top_p when reasoning is active as inferred from
             // https://community.openai.com/t/gpt-5-nano-accepted-parameters/1355086/2
             temperature: isReasoningModel ? nil : parameters.temperature,
-            max_completion_tokens: parameters.maxTokens,
+            max_completion_tokens: parameters.maxTokensExplicit ? parameters.maxTokens : nil,
             stream: stream,
             top_p: isReasoningModel ? nil : parameters.topPOverride,
             // Forward the raw OpenAI penalties — most upstream OpenAI-
@@ -1786,7 +1802,7 @@ public actor RemoteProviderService: ToolCapableService {
 
         let refreshed = try await OpenAICodexOAuthService.refresh(tokens)
         cachedOAuthTokens = refreshed
-        RemoteProviderKeychain.saveOAuthTokens(refreshed, for: provider.id)
+        await RemoteProviderKeychain.saveOAuthTokensOffMainActor(refreshed, for: provider.id)
     }
 
     private func codexOAuthHeaders() throws -> [String: String] {
@@ -2004,9 +2020,11 @@ public actor RemoteProviderService: ToolCapableService {
             urlRequest.setValue(value, forHTTPHeaderField: key)
         }
 
-        // Encode request body based on provider type
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = .prettyPrinted
+        // Canonical (sorted-keys) encoder. Remote prompt-prefix caches
+        // (ds4, vLLM, sglang, Anthropic prompt cache, ...) hash the
+        // rendered prompt — including inlined tool schemas — byte for
+        // byte; see `JSONDeterminism.swift` / `docs/JSON_DETERMINISM.md`.
+        let encoder = JSONEncoder.osaurusCanonical(prettyPrinted: true)
 
         let bodyData: Data
         switch requestProviderType {
@@ -2022,12 +2040,13 @@ public actor RemoteProviderService: ToolCapableService {
             let geminiRequest = request.toGeminiRequest()
             bodyData = try encoder.encode(geminiRequest)
         case .openaiLegacy, .azureOpenAI, .osaurus:
-            // OpenAI-compat wire format. Strip `reasoning_content` unless
-            // the target needs it echoed back (DeepSeek — see #959).
+            // OpenAI-compat wire. DeepSeek-family models need `reasoning_content`
+            // echoed back (see `echoesReasoningContent`); strip elsewhere.
             var outbound = request
             if !Self.echoesReasoningContent(
                 providerType: requestProviderType,
-                host: provider.host
+                host: provider.host,
+                model: request.model
             ) {
                 outbound.messages = Self.strippingReasoningContent(from: outbound.messages)
             }
@@ -2070,7 +2089,12 @@ public actor RemoteProviderService: ToolCapableService {
                 case .text(_, let text):
                     textContent += text
                 case .toolUse(_, let id, let name, let input):
-                    let argsData = try? JSONSerialization.data(withJSONObject: input.mapValues { $0.value })
+                    // Sorted keys: replayed into next-turn
+                    // `tool_calls[].function.arguments`.
+                    let argsData = try? JSONSerialization.data(
+                        withJSONObject: input.mapValues { $0.value },
+                        options: .osaurusCanonical
+                    )
                     let argsString = argsData.flatMap { String(data: $0, encoding: .utf8) } ?? "{}"
                     toolCalls.append(
                         ToolCall(
@@ -2735,19 +2759,117 @@ struct RemoteChatRequest: Encodable {
         parameters.map(geminiCompatibleSchema)
     }
 
+    /// JSON Schema keywords Gemini's OpenAPI 3.0 validator either rejects (HTTP
+    /// 400) or silently ignores. Stripped before send so MCP tool schemas don't
+    /// poison the request.
+    ///
+    /// Allowlist (kept, for reference): `type`, `description`, `enum`, `format`,
+    /// `items`, `properties`, `required`, `propertyOrdering`, `nullable`,
+    /// `anyOf`, `minimum`, `maximum`, `minItems`, `maxItems`.
+    private static let geminiUnsupportedSchemaKeys: Set<String> = [
+        // Rejected outright
+        "additionalProperties",
+        "$ref", "$defs", "$schema", "$id", "definitions",
+        "const", "oneOf", "allOf", "not", "if", "then", "else",
+        "patternProperties", "propertyNames",
+        "contentEncoding", "contentMediaType",
+        // Silently ignored — drop to keep payload small and intent clear
+        "default", "examples", "title", "readOnly", "writeOnly",
+        "pattern", "multipleOf", "uniqueItems",
+        "exclusiveMinimum", "exclusiveMaximum",
+        "minLength", "maxLength",
+    ]
+
+    /// Single funnel for everything Gemini needs done to OpenAI/MCP tool schemas
+    /// before they go out on the wire. Recurses children bottom-up, then applies
+    /// node-level fixups in a fixed order: union normalization runs before object
+    /// inference (so the type check sees a scalar), inference runs before
+    /// non-object stripping, and required-filtering runs last on whatever type
+    /// survived.
     private static func geminiCompatibleSchema(_ value: JSONValue) -> JSONValue {
         switch value {
         case .object(let object):
             var sanitized: [String: JSONValue] = [:]
-            for (key, child) in object where key != "additionalProperties" {
+            for (key, child) in object where !geminiUnsupportedSchemaKeys.contains(key) {
                 sanitized[key] = geminiCompatibleSchema(child)
             }
+
+            normalizeNullableTypeUnion(&sanitized)
+            inferObjectTypeIfPropertiesPresent(&sanitized)
+            stripObjectShapeFromNonObjectTypes(&sanitized)
+            filterRequiredAgainstProperties(&sanitized)
+
             return .object(sanitized)
         case .array(let array):
             return .array(array.map(geminiCompatibleSchema))
         case .string, .number, .bool, .null:
             return value
         }
+    }
+
+    /// `type: ["string", "null"]` → `type: "string"` + `nullable: true`. Gemini
+    /// rejects array-typed unions but accepts the OpenAPI 3.0 `nullable` boolean.
+    /// Bails on multi-type unions (`["string","number","null"]`) — no lossless
+    /// translation exists.
+    private static func normalizeNullableTypeUnion(_ object: inout [String: JSONValue]) {
+        guard case .array(let entries) = object["type"] else { return }
+
+        var hasNull = false
+        var scalar: String?
+        for entry in entries {
+            guard case .string(let s) = entry else { return }
+            if s == "null" {
+                hasNull = true
+            } else if scalar == nil {
+                scalar = s
+            } else {
+                return
+            }
+        }
+
+        guard hasNull, let scalar else { return }
+        object["type"] = .string(scalar)
+        object["nullable"] = .bool(true)
+    }
+
+    /// Notion-style MCP nested schemas carry `properties`/`required` without an
+    /// explicit `type`. Gemini then complains the keys are "only allowed for
+    /// OBJECT type". See opencode PR #13150.
+    private static func inferObjectTypeIfPropertiesPresent(_ object: inout [String: JSONValue]) {
+        guard object["type"] == nil else { return }
+        if object["properties"] != nil || object["required"] != nil {
+            object["type"] = .string("object")
+        }
+    }
+
+    /// `properties` and `required` are only valid on object types — Gemini
+    /// rejects them on `string`, `array`, etc. See opencode PR #11888.
+    private static func stripObjectShapeFromNonObjectTypes(_ object: inout [String: JSONValue]) {
+        guard case .string(let typeString) = object["type"], typeString.lowercased() != "object" else {
+            return
+        }
+        object["properties"] = nil
+        object["required"] = nil
+    }
+
+    /// Direct fix for `required[i]: property is not defined` (opencode #3140):
+    /// drop entries that don't reference a declared property. Empty result drops
+    /// the key entirely so we don't emit a redundant empty array.
+    private static func filterRequiredAgainstProperties(_ object: inout [String: JSONValue]) {
+        guard case .array(let required) = object["required"] else { return }
+
+        let declared: Set<String> = {
+            guard case .object(let properties) = object["properties"] else { return [] }
+            return Set(properties.keys)
+        }()
+
+        let filtered = required.filter { entry in
+            guard case .string(let name) = entry else { return false }
+            return declared.contains(name)
+        }
+
+        guard filtered.count < required.count else { return }
+        object["required"] = filtered.isEmpty ? nil : .array(filtered)
     }
 
     /// Convert to Open Responses API request format
@@ -2887,7 +3009,7 @@ struct RemoteChatRequest: Encodable {
 
 extension OpenResponsesRequest {
     func toCodexOAuthPayloadData() throws -> Data {
-        let encoded = try JSONEncoder().encode(self)
+        let encoded = try JSONEncoder.osaurusCanonical().encode(self)
         guard var object = try JSONSerialization.jsonObject(with: encoded) as? [String: Any] else {
             return encoded
         }
@@ -2896,7 +3018,7 @@ extension OpenResponsesRequest {
         object["include"] = ["reasoning.encrypted_content"]
         object.removeValue(forKey: "max_output_tokens")
 
-        return try JSONSerialization.data(withJSONObject: object)
+        return try JSONSerialization.data(withJSONObject: object, options: .osaurusCanonical)
     }
 }
 
@@ -2906,10 +3028,15 @@ extension RemoteProviderService {
     /// Fetch models from a remote provider and create a service instance
     public static func fetchModels(from provider: RemoteProvider) async throws -> [String] {
         if provider.providerType == .openAICodex {
-            guard provider.hasOAuthTokens else {
+            guard var tokens = await provider.getOAuthTokensOffMainActor() else {
                 throw RemoteProviderServiceError.requestFailed("Missing ChatGPT/Codex sign-in tokens")
             }
-            return OpenAICodexOAuthService.supportedModels
+            if tokens.isExpired {
+                let refreshed = try await OpenAICodexOAuthService.refresh(tokens)
+                _ = await RemoteProviderKeychain.saveOAuthTokensOffMainActor(refreshed, for: provider.id)
+                tokens = refreshed
+            }
+            return await OpenAICodexOAuthService.availableModels(for: tokens)
         }
 
         if provider.providerType == .anthropic {
@@ -2918,7 +3045,7 @@ extension RemoteProviderService {
             }
             return try await fetchAnthropicModels(
                 baseURL: baseURL,
-                headers: provider.resolvedHeaders(),
+                headers: await provider.resolvedHeadersOffMainActor(),
                 timeout: min(provider.timeout, 30)
             )
         }
@@ -2943,7 +3070,7 @@ extension RemoteProviderService {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         // Add provider headers
-        for (key, value) in provider.resolvedHeaders() {
+        for (key, value) in await provider.resolvedHeadersOffMainActor() {
             request.setValue(value, forHTTPHeaderField: key)
         }
 
@@ -3024,13 +3151,15 @@ extension RemoteProviderService {
     /// Tries the server's /models endpoint first (returns all available models so the user can
     /// select one in the picker). Falls back to GET /agents/{id} when /models is unavailable.
     private static func fetchOsaurusModels(from provider: RemoteProvider) async throws -> [String] {
+        let headers = await provider.resolvedHeadersOffMainActor()
+
         // Try /models first
         if let url = provider.url(for: "/models") {
             var req = URLRequest(url: url)
             req.httpMethod = "GET"
             req.setValue("application/json", forHTTPHeaderField: "Accept")
             req.timeoutInterval = min(provider.timeout, 10)
-            for (key, value) in provider.resolvedHeaders() { req.setValue(value, forHTTPHeaderField: key) }
+            for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
             if let (data, response) = try? await URLSession.shared.data(for: req),
                 let http = response as? HTTPURLResponse, http.statusCode < 400,
                 let parsed = try? JSONDecoder().decode(ModelsResponse.self, from: data),
@@ -3050,7 +3179,7 @@ extension RemoteProviderService {
         req.httpMethod = "GET"
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.timeoutInterval = min(provider.timeout, 10)
-        for (key, value) in provider.resolvedHeaders() { req.setValue(value, forHTTPHeaderField: key) }
+        for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
         guard let (data, response) = try? await URLSession.shared.data(for: req),
             let http = response as? HTTPURLResponse, http.statusCode < 400
         else {
@@ -3072,7 +3201,7 @@ extension RemoteProviderService {
         request.setValue("application/json", forHTTPHeaderField: "Accept")
 
         // Add provider headers (includes x-goog-api-key)
-        for (key, value) in provider.resolvedHeaders() {
+        for (key, value) in await provider.resolvedHeadersOffMainActor() {
             request.setValue(value, forHTTPHeaderField: key)
         }
 

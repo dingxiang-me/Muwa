@@ -31,6 +31,18 @@ import os.log
 private let batchAdapterLog = Logger(subsystem: "ai.osaurus", category: "BatchAdapter")
 
 struct MLXBatchAdapter {
+    /// Native MTP is tuned for real chat prefixes, not tiny cold-start
+    /// prompts. A 19-token cold user-only prompt reproduced a native-MTP loop
+    /// while the same request decoded correctly with AR greedy fallback.
+    static let nativeMTPTinyPromptMinimumTokens = 24
+
+    /// Aggregate live diagnostics across every resolved
+    /// `BatchEngine`. Used by the Server → Settings panel to render
+    /// the concurrency live readout without exposing
+    /// `BatchEngine`/`Registry` to UI code.
+    static func snapshotDiagnostics() async -> BatchDiagnosticsSnapshot? {
+        await Registry.shared.snapshotDiagnostics()
+    }
 
     /// Result handed back to `ModelRuntime`. The `Generation` stream is
     /// consumed by `GenerationEventMapper`, which translates the upstream
@@ -63,9 +75,12 @@ struct MLXBatchAdapter {
     static func effectiveGenerationSettings(
         modelName: String,
         generation: GenerationParameters,
-        runtimeTopP: Float,
+        runtimeDefaults: VMLXServerGenerationDefaults,
         maxBatchSize: Int,
-        modelDefaults: LocalGenerationDefaults.Defaults
+        modelDefaults: LocalGenerationDefaults.Defaults,
+        draftStrategy: MLXLMCommon.DraftStrategy? = nil,
+        nativeMTPExplicitSamplingFallback: Bool = false,
+        nativeMTPGreedyFallback: Bool = false
     ) -> EffectiveGenerationSettings {
         let defaultTemperature: Float? = {
             if modelDefaults.doSample == false {
@@ -73,21 +88,116 @@ struct MLXBatchAdapter {
             }
             return modelDefaults.temperature
         }()
+        let useNativeMTPGreedyDefaults = shouldApplyNativeMTPGreedyDefaults(
+            generation: generation,
+            draftStrategy: draftStrategy
+        )
+
+        // Merge order (per-request always wins): per-request →
+        // model-shipped defaults → server runtime defaults → static
+        // engine fallback.
+        let runtimeTopP: Float? = runtimeDefaults.topP.map { Float($0) }
+        let runtimeMinP: Float? = runtimeDefaults.minP.map { Float($0) }
+        let runtimeTopK: Int? = runtimeDefaults.topK
+        let runtimeTemperature: Float? = runtimeDefaults.temperature.map { Float($0) }
+        let runtimeMaxTokens: Int? = runtimeDefaults.maxTokens
+        let runtimeRepetitionPenalty: Float? = runtimeDefaults.repetitionPenalty.map { Float($0) }
 
         return EffectiveGenerationSettings(
-            temperature: generation.temperature ?? defaultTemperature ?? 0.7,
+            temperature: useNativeMTPGreedyDefaults || nativeMTPGreedyFallback
+                ? 0
+                : (generation.temperature ?? defaultTemperature ?? runtimeTemperature ?? 0.7),
             maxTokens: generation.maxTokensExplicit
                 ? generation.maxTokens
-                : (modelDefaults.maxTokens ?? generation.maxTokens),
-            topP: generation.topPOverride ?? modelDefaults.topP ?? runtimeTopP,
-            topK: modelDefaults.topK ?? 0,
-            minP: generation.minPOverride ?? modelDefaults.minP ?? 0,
-            repetitionPenalty: generation.repetitionPenalty ?? modelDefaults.repetitionPenalty,
-            compiledBatchDecode: shouldEnableCompiledBatchDecode(
-                modelName: modelName,
-                maxBatchSize: maxBatchSize
-            )
+                : (modelDefaults.maxTokens ?? runtimeMaxTokens ?? generation.maxTokens),
+            topP: useNativeMTPGreedyDefaults || nativeMTPGreedyFallback
+                ? (generation.topPOverride ?? 1)
+                : (generation.topPOverride ?? modelDefaults.topP ?? runtimeTopP ?? 1.0),
+            topK: useNativeMTPGreedyDefaults || nativeMTPExplicitSamplingFallback || nativeMTPGreedyFallback
+                ? 0
+                : (modelDefaults.topK ?? runtimeTopK ?? 0),
+            minP: useNativeMTPGreedyDefaults || nativeMTPGreedyFallback
+                ? (generation.minPOverride ?? 0)
+                : (generation.minPOverride ?? modelDefaults.minP ?? runtimeMinP ?? 0),
+            repetitionPenalty: {
+                if nativeMTPExplicitSamplingFallback || nativeMTPGreedyFallback {
+                    return nil
+                }
+                return useNativeMTPGreedyDefaults
+                    ? generation.repetitionPenalty
+                    : (generation.repetitionPenalty ?? modelDefaults.repetitionPenalty ?? runtimeRepetitionPenalty)
+            }(),
+            compiledBatchDecode: nativeMTPExplicitSamplingFallback || nativeMTPGreedyFallback
+                ? false
+                : shouldEnableCompiledBatchDecode(
+                    modelName: modelName,
+                    maxBatchSize: maxBatchSize
+                )
         )
+    }
+
+    static func effectiveDraftStrategy(
+        generation: GenerationParameters,
+        draftStrategy: MLXLMCommon.DraftStrategy?,
+        promptTokenCount: Int? = nil,
+        disableNativeMTP: Bool = false
+    ) -> MLXLMCommon.DraftStrategy? {
+        guard draftStrategy?.usesNativeMTP == true else {
+            return draftStrategy
+        }
+        if disableNativeMTP {
+            return nil
+        }
+        guard shouldApplyNativeMTPGreedyDefaults(
+            generation: generation,
+            draftStrategy: draftStrategy
+        ) else {
+            return nil
+        }
+        if let promptTokenCount,
+           promptTokenCount < nativeMTPTinyPromptMinimumTokens {
+            return nil
+        }
+        return draftStrategy
+    }
+
+    private static func nativeMTPFallbackReason(
+        generation: GenerationParameters,
+        draftStrategy: MLXLMCommon.DraftStrategy?,
+        promptTokenCount: Int,
+        coldWarmup: Bool
+    ) -> String? {
+        guard draftStrategy?.usesNativeMTP == true else { return nil }
+        if coldWarmup { return "cold_warmup" }
+        if !shouldApplyNativeMTPGreedyDefaults(
+            generation: generation,
+            draftStrategy: draftStrategy
+        ) {
+            return "explicit_sampling"
+        }
+        if promptTokenCount < nativeMTPTinyPromptMinimumTokens {
+            return "tiny_prompt"
+        }
+        return nil
+    }
+
+    private static func shouldApplyNativeMTPGreedyDefaults(
+        generation: GenerationParameters,
+        draftStrategy: MLXLMCommon.DraftStrategy?
+    ) -> Bool {
+        guard draftStrategy?.usesNativeMTP == true else { return false }
+        if generation.samplingParametersAreImplicit {
+            return true
+        }
+        if let temperature = generation.temperature, temperature != 0 { return false }
+        if let topP = generation.topPOverride, topP < 1 { return false }
+        if let minP = generation.minPOverride, minP != 0 { return false }
+        if let repetitionPenalty = generation.repetitionPenalty,
+           repetitionPenalty != 0,
+           repetitionPenalty != 1 {
+            return false
+        }
+        return true
     }
 
     /// Same-model gate for the single-slot runtime path. With
@@ -154,6 +264,7 @@ struct MLXBatchAdapter {
         /// abort. See `TaskCoalescer` for the construction-order
         /// invariant the coalescer enforces.
         private let coalescer = TaskCoalescer<BatchEngine>()
+        private var nativeMTPWarmModels: Set<String> = []
 
         /// Returns the cached engine for `modelName`, creating it on first
         /// use from the supplied `ModelContainer`. The container's existing
@@ -257,6 +368,91 @@ struct MLXBatchAdapter {
             await coalescer.snapshot()
         }
 
+        /// Aggregate live BatchEngine diagnostics across every resolved
+        /// engine in the registry. Used by the Server → Settings panel
+        /// to render the "Live Diagnostics" subsection. Returns `nil`
+        /// when no engine has been created yet.
+        func snapshotDiagnostics() async -> BatchDiagnosticsSnapshot? {
+            let engines = await coalescer.resolvedValues()
+            guard !engines.isEmpty else { return nil }
+
+            var pending = 0
+            var active = 0
+            var highWatermark = 0
+            var decodeSplit = 0
+            var turbo = 0
+            var accepting = true
+            let modelSummaries = await ModelRuntime.shared.cachedModelSummaries()
+            var nativeDepths = Set<Int>()
+            var cacheEnabled = 0
+            var hybrid = 0
+            var pagedIncompatible = 0
+            var prefixHits = 0
+            var prefixMisses = 0
+            var diskL2Hits = 0
+            var diskL2Misses = 0
+            var diskL2Stores = 0
+            var ssmHits = 0
+            var ssmMisses = 0
+            var ssmReDerives = 0
+            for summary in modelSummaries {
+                if let depth = summary.nativeMTPDepth {
+                    nativeDepths.insert(depth)
+                }
+                guard let stats = summary.cacheStats else { continue }
+                cacheEnabled += 1
+                if stats.isHybrid { hybrid += 1 }
+                if stats.isPagedIncompatible { pagedIncompatible += 1 }
+                if let pagedStats = stats.pagedStats {
+                    prefixHits += pagedStats.cacheHits
+                    prefixMisses += pagedStats.cacheMisses
+                }
+                if let diskStats = stats.diskStats {
+                    prefixHits += diskStats.hits
+                    prefixMisses += diskStats.misses
+                    diskL2Hits += diskStats.hits
+                    diskL2Misses += diskStats.misses
+                    diskL2Stores += diskStats.stores
+                }
+                ssmHits += stats.ssmStats.hits
+                ssmMisses += stats.ssmStats.misses
+                ssmReDerives += stats.ssmStats.reDerives
+            }
+            for engine in engines {
+                pending += await engine.pendingCount
+                active += await engine.activeCount
+                let watermark = await engine.activeCountHighWatermarkForDiagnostics
+                highWatermark = max(highWatermark, watermark)
+                decodeSplit += await engine.decodeCompatibilitySplitCountForDiagnostics
+                turbo += await engine.turboQuantCompressionCountForDiagnostics
+                if !(await engine.isAcceptingRequests) {
+                    accepting = false
+                }
+            }
+            return BatchDiagnosticsSnapshot(
+                pendingCount: pending,
+                activeCount: active,
+                activeHighWatermark: highWatermark,
+                decodeSplitCount: decodeSplit,
+                turboQuantCompressions: turbo,
+                isAcceptingRequests: accepting,
+                loadedModelCount: modelSummaries.count,
+                nativeMTPModelCount: modelSummaries.filter { $0.nativeMTPDepth != nil }.count,
+                nativeMTPDepthSummary: nativeDepths.sorted().map { "d\($0)" }.joined(separator: ", "),
+                cacheEnabledModelCount: cacheEnabled,
+                hybridModelCount: hybrid,
+                pagedIncompatibleModelCount: pagedIncompatible,
+                prefixHits: prefixHits,
+                prefixMisses: prefixMisses,
+                diskL2Hits: diskL2Hits,
+                diskL2Misses: diskL2Misses,
+                diskL2Stores: diskL2Stores,
+                ssmCompanionHits: ssmHits,
+                ssmCompanionMisses: ssmMisses,
+                ssmCompanionReDerives: ssmReDerives
+            )
+        }
+
         /// Shut down and remove the engine for `modelName`. Safe to call
         /// when no engine exists. Pending requests on the engine receive a
         /// `.cancelled` info event before the actor exits.
@@ -269,6 +465,7 @@ struct MLXBatchAdapter {
         /// one `ModelContainer` (the Metal-abort scenario the registry
         /// exists to prevent).
         func shutdownEngine(for modelName: String) async {
+            nativeMTPWarmModels.remove(modelName)
             await coalescer.remove(modelName) { engine in
                 await engine.shutdown()
                 batchAdapterLog.info(
@@ -283,6 +480,7 @@ struct MLXBatchAdapter {
         /// across the per-engine `shutdown()` — same race protection as
         /// `shutdownEngine(for:)`, applied to every cached entry.
         func shutdownAll() async {
+            nativeMTPWarmModels.removeAll()
             await coalescer.removeAll { modelName, engine in
                 await engine.shutdown()
                 batchAdapterLog.info(
@@ -293,6 +491,18 @@ struct MLXBatchAdapter {
 
         func acquireSoloLease(for modelName: String) async -> SoloGenerationGate.Lease {
             await soloGate.acquire(modelName: modelName)
+        }
+
+        func consumeNativeMTPColdWarmup(modelName: String, requested: Bool) -> Bool {
+            guard requested else { return false }
+            if nativeMTPWarmModels.contains(modelName) {
+                return false
+            }
+            nativeMTPWarmModels.insert(modelName)
+            batchAdapterLog.info(
+                "native MTP cold warmup: first request for \(modelName, privacy: .public) uses AR before enabling native MTP"
+            )
+            return true
         }
 
     }
@@ -478,7 +688,7 @@ struct MLXBatchAdapter {
             switch effort {
             case "max":
                 context["enable_thinking"] = true
-                context["reasoning_effort"] = Self.dsv4RawMaxEnabled ? "max" : "high"
+                context["reasoning_effort"] = "max"
             case "high":
                 context["enable_thinking"] = true
                 context["reasoning_effort"] = "high"
@@ -500,7 +710,11 @@ struct MLXBatchAdapter {
         }
 
         if ModelFamilyNames.isLingFamily(modelName) {
-            context["enable_thinking"] = false
+            if let disableThinking {
+                context["enable_thinking"] = !disableThinking
+            } else {
+                context["enable_thinking"] = hasPositiveReasoningEffort
+            }
             return context
         }
 
@@ -541,21 +755,6 @@ struct MLXBatchAdapter {
         return context
     }
 
-    /// DSV4's raw `max` effort prepends an extreme "absolute maximum" thinking
-    /// preface. Keep the UI's Max segment on the stable high-thinking rail by
-    /// default; enable raw max only for explicit diagnostic runs.
-    private static var dsv4RawMaxEnabled: Bool {
-        switch ProcessInfo.processInfo.environment["OSAURUS_DSV4_RAW_MAX"]?
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-            .lowercased()
-        {
-        case "1", "true", "yes", "on":
-            return true
-        default:
-            return false
-        }
-    }
-
     private static func isDirectRailReasoningEffort(_ value: String?) -> Bool {
         guard let value else { return false }
         switch value.trimmingCharacters(in: .whitespacesAndNewlines).lowercased() {
@@ -584,6 +783,7 @@ struct MLXBatchAdapter {
         buildToolsSpec: @Sendable () -> [[String: any Sendable]]?,
         generation: GenerationParameters,
         stopSequences: [String],
+        draftStrategy: MLXLMCommon.DraftStrategy?,
         runtime: RuntimeConfig,
         maxBatchSize: Int
     ) async throws -> PreparedStream {
@@ -624,12 +824,33 @@ struct MLXBatchAdapter {
         // `GenerateParameters(generationConfig:fallback:)` behavior for the
         // local app path instead of inventing osaurus-specific defaults.
         let modelDefaults = LocalGenerationDefaults.defaults(forModelId: modelName)
+        let nativeMTPColdWarmup = await Registry.shared.consumeNativeMTPColdWarmup(
+            modelName: modelName,
+            requested: draftStrategy?.usesNativeMTP == true
+        )
+        let effectiveDraftStrategy = Self.effectiveDraftStrategy(
+            generation: generation,
+            draftStrategy: draftStrategy,
+            promptTokenCount: prepared.promptTokens.count,
+            disableNativeMTP: nativeMTPColdWarmup
+        )
+        let nativeMTPFallbackReason = Self.nativeMTPFallbackReason(
+            generation: generation,
+            draftStrategy: draftStrategy,
+            promptTokenCount: prepared.promptTokens.count,
+            coldWarmup: nativeMTPColdWarmup
+        )
+        let nativeMTPExplicitSamplingFallback =
+            draftStrategy?.usesNativeMTP == true && effectiveDraftStrategy == nil
         let effective = Self.effectiveGenerationSettings(
             modelName: modelName,
             generation: generation,
-            runtimeTopP: runtime.topP,
+            runtimeDefaults: runtime.generation,
             maxBatchSize: maxBatchSize,
-            modelDefaults: modelDefaults
+            modelDefaults: modelDefaults,
+            draftStrategy: effectiveDraftStrategy,
+            nativeMTPExplicitSamplingFallback: nativeMTPExplicitSamplingFallback,
+            nativeMTPGreedyFallback: nativeMTPColdWarmup
         )
         let mlxParams = ModelRuntime.makeGenerateParameters(
             temperature: effective.temperature,
@@ -639,6 +860,7 @@ struct MLXBatchAdapter {
             minP: effective.minP,
             repetitionPenalty: effective.repetitionPenalty,
             stopSequences: stopSequences,
+            draftStrategy: effectiveDraftStrategy,
             enableCompiledBatchDecode: effective.compiledBatchDecode
         )
 
@@ -701,7 +923,7 @@ struct MLXBatchAdapter {
         }
 
         batchAdapterLog.info(
-            "submit: model=\(modelName, privacy: .public) promptTokens=\(prepared.promptTokens.count, privacy: .public) temperature=\(effective.temperature, privacy: .public) topP=\(effective.topP, privacy: .public) topK=\(effective.topK, privacy: .public) minP=\(effective.minP, privacy: .public) maxTokens=\(effective.maxTokens, privacy: .public) compiledBatchDecode=\(effective.compiledBatchDecode, privacy: .public)"
+            "submit: model=\(modelName, privacy: .public) promptTokens=\(prepared.promptTokens.count, privacy: .public) temperature=\(effective.temperature, privacy: .public) topP=\(effective.topP, privacy: .public) topK=\(effective.topK, privacy: .public) minP=\(effective.minP, privacy: .public) maxTokens=\(effective.maxTokens, privacy: .public) draftStrategy=\(effectiveDraftStrategy?.kindName ?? "none", privacy: .public) nativeMTPFallback=\(nativeMTPFallbackReason ?? "none", privacy: .public) compiledBatchDecode=\(effective.compiledBatchDecode, privacy: .public)"
         )
 
         return PreparedStream(

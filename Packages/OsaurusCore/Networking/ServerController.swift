@@ -8,10 +8,10 @@
 import Combine
 import Darwin
 import Foundation
+@preconcurrency import MLXLMCommon
 import NIOCore
 import NIOHTTP1
 import NIOPosix
-import Network
 
 /// Main controller responsible for managing the server lifecycle
 @MainActor
@@ -23,6 +23,11 @@ final class ServerController: ObservableObject {
     @Published var serverHealth: ServerHealth = .stopped
     @Published var localNetworkAddress: String = "127.0.0.1"
     @Published var configuration: ServerConfiguration = .default
+    /// Canonical vmlx runtime settings (network/cache/concurrency/etc.).
+    /// The Server → Settings tab edits this; `configuration` is
+    /// projected from it on every save so the NIO socket layer keeps
+    /// working unchanged.
+    @Published var runtimeSettings: VMLXServerRuntimeSettings = .init()
     @Published var activeRequestCount: Int = 0
     @Published var isRestarting: Bool = false
 
@@ -78,19 +83,6 @@ final class ServerController: ObservableObject {
         guard !isRunning else { return }
         guard configuration.isValidPort else {
             lastErrorMessage = "Invalid port: \(configuration.port). Port must be between 1 and 65535."
-            serverHealth = .error(lastErrorMessage!)
-            return
-        }
-
-        // Preflight: if anything is already listening on this port, abort early with a friendly message
-        var hostsToProbe = ["127.0.0.1", "::1"]
-        if configuration.exposeToNetwork {
-            let lanIP = self.getLocalIPAddress()
-            if !hostsToProbe.contains(lanIP) { hostsToProbe.append(lanIP) }
-        }
-        if await isAnyListenerActive(on: hostsToProbe, port: configuration.port, timeout: 0.25) {
-            lastErrorMessage =
-                "Port \(configuration.port) is already in use. Choose a different port in Settings."
             serverHealth = .error(lastErrorMessage!)
             return
         }
@@ -190,9 +182,15 @@ final class ServerController: ObservableObject {
     // Capture singleton pointer on init attach to UI
     init() {
         ServerControllerHolder.shared.controller = self
-        // Load persisted configuration if available
         if let saved = ServerConfigurationStore.load() {
             self.configuration = saved
+        }
+        // Read-only load. The legacy → vmlx migration (which writes to
+        // `~/.osaurus/config/`) is intentionally deferred to
+        // `bootstrapRuntimeSettings()` so a fresh install stays
+        // pristine until after the storage migrator's gate runs.
+        if let existing = ServerRuntimeSettingsStore.load() {
+            self.runtimeSettings = existing
         }
         // Keep exposeToNetwork in sync with Bonjour-enabled agents
         agentsCancellable = AgentManager.shared.$agents
@@ -202,12 +200,35 @@ final class ServerController: ObservableObject {
                     let shouldExpose = agents.contains { $0.bonjourEnabled }
                     guard self.configuration.exposeToNetwork != shouldExpose else { return }
                     self.configuration.exposeToNetwork = shouldExpose
+                    // Mirror into vmlx runtime settings so the
+                    // Settings panel reflects the override.
+                    self.runtimeSettings.network.host = shouldExpose ? "0.0.0.0" : "127.0.0.1"
                     self.saveConfiguration()
+                    ServerRuntimeSettingsStore.save(self.runtimeSettings)
                     if self.isRunning {
                         await self.restartServer()
                     }
                 }
             }
+    }
+
+    /// Runs the one-shot legacy → vmlx runtime-settings migration and
+    /// publishes the result. Idempotent — on a non-fresh install
+    /// `loadOrMigrate()` just returns the on-disk value without
+    /// writing.
+    ///
+    /// Must be invoked from the AppDelegate immediately after
+    /// `StorageMigrationCoordinator.blockingAwaitReady()` returns.
+    /// `init()` skips this because `ServerController` is constructed
+    /// as a stored property of the AppDelegate (i.e. before
+    /// `applicationDidFinishLaunching`), and the migration's first-run
+    /// `save()` would otherwise create `config/server-runtime.json`
+    /// in `~/.osaurus/` *before* the storage migrator's
+    /// `isPristineInstall()` check, flipping a true fresh install
+    /// out of the pristine fast path and painting the "Securing your
+    /// data" overlay over onboarding.
+    func bootstrapRuntimeSettings() {
+        self.runtimeSettings = ServerRuntimeSettingsStore.loadOrMigrate()
     }
 
     /// Checks if the server is responsive
@@ -227,6 +248,46 @@ final class ServerController: ObservableObject {
     /// Saves the current configuration to disk
     func saveConfiguration() {
         ServerConfigurationStore.save(configuration)
+    }
+
+    /// Persists the supplied vmlx runtime settings, projects the
+    /// network/CORS/generation slice back into the legacy
+    /// `ServerConfiguration` JSON, and decides whether the NIO socket
+    /// needs to restart.
+    ///
+    /// Fields that require a NIO restart: port, host (expose toggle),
+    /// CORS origins.
+    /// Fields that only need a generation-config invalidate: `genTopP`
+    /// changes (consumed by `RuntimeConfig.snapshot()` on the next
+    /// request).
+    func saveRuntimeSettings(_ settings: VMLXServerRuntimeSettings) async {
+        let previousConfig = configuration
+        let projected = ServerRuntimeSettingsStore.projectIntoLegacy(
+            settings,
+            base: previousConfig
+        )
+
+        runtimeSettings = settings
+        ServerRuntimeSettingsStore.save(settings)
+
+        let configChanged = projected != previousConfig
+        let restartNeeded =
+            previousConfig.port != projected.port
+            || previousConfig.exposeToNetwork != projected.exposeToNetwork
+            || previousConfig.allowedOrigins != projected.allowedOrigins
+        let runtimeConfigChanged = previousConfig.genTopP != projected.genTopP
+
+        if configChanged {
+            configuration = projected
+            saveConfiguration()
+        }
+
+        if restartNeeded, isRunning {
+            await restartServer()
+        }
+        if runtimeConfigChanged {
+            await ModelRuntime.shared.invalidateConfig()
+        }
     }
 
     // MARK: - Private Helpers
@@ -257,72 +318,6 @@ final class ServerController: ObservableObject {
             lastErrorMessage = error.localizedDescription
         }
         serverHealth = .error(lastErrorMessage ?? error.localizedDescription)
-    }
-
-    // MARK: - Port Probe (Network-based, concurrency-safe)
-
-    private func isAnyListenerActive(on hosts: [String], port: Int, timeout: TimeInterval) async
-        -> Bool
-    {
-        for host in hosts {
-            if await isListenerActive(host: host, port: port, timeout: timeout) {
-                return true
-            }
-        }
-        return false
-    }
-
-    private func isListenerActive(host: String, port: Int, timeout: TimeInterval) async -> Bool {
-        guard let nwPort = NWEndpoint.Port(rawValue: UInt16(port)) else { return false }
-        let connection = NWConnection(host: NWEndpoint.Host(host), port: nwPort, using: .tcp)
-
-        let stateStream = AsyncStream<NWConnection.State> { continuation in
-            connection.stateUpdateHandler = { state in
-                continuation.yield(state)
-                switch state {
-                case .ready, .failed(_), .cancelled:
-                    continuation.finish()
-                    // Avoid further callbacks
-                    connection.stateUpdateHandler = nil
-                default:
-                    break
-                }
-            }
-            connection.start(queue: DispatchQueue.global(qos: .utility))
-        }
-
-        return await withTaskGroup(of: Bool.self) { group in
-            // Task 1: Wait for connection state
-            group.addTask {
-                for await state in stateStream {
-                    switch state {
-                    case .ready:
-                        connection.cancel()
-                        return true
-                    case .failed(_), .cancelled:
-                        return false
-                    default:
-                        break
-                    }
-                }
-                return false
-            }
-
-            // Task 2: Timeout
-            group.addTask {
-                let ns = UInt64(max(0, timeout) * 1_000_000_000)
-                // Best-effort timeout; ignore cancellation/throwing semantics
-                try? await Task.sleep(nanoseconds: ns)
-                connection.cancel()
-                return false
-            }
-
-            let result = await group.next() ?? false
-            group.cancelAll()
-            // Ensure no further callbacks are delivered after we decide
-            connection.stateUpdateHandler = nil
-            return result
-        }
     }
 
     private func stopServerIfNeeded() async throws {

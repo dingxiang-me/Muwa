@@ -5,6 +5,7 @@
 //  Created by Terence on 8/17/25.
 //
 
+import AVFoundation
 import AppKit
 import Combine
 import QuartzCore
@@ -36,6 +37,8 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
     /// AppKit gets one or more frames where a stale/auto-presented window
     /// can flash before our real window is up.
     public func applicationWillFinishLaunching(_ notification: Notification) {
+        UncaughtExceptionLogger.install()
+
         AppDelegate.shared = self
 
         // Pin the process against macOS automatic termination. We're an
@@ -51,30 +54,40 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             "Osaurus local LLM HTTP server (long-running)"
         )
 
-        // Finalise the activation policy before AppKit paints its first
-        // frame. `LSUIElement=YES` in Info.plist means we launch as
-        // `.accessory`; if the user wants a Dock icon we have to flip to
-        // `.regular` *before* SwiftUI / AppKit can auto-present any window
-        // (e.g. the `Settings { EmptyView() }` placeholder), or that flip
-        // surfaces as a one-frame flash of an unrelated window.
-        let hideDockIcon = ServerConfigurationStore.load()?.hideDockIcon ?? false
-        NSApp.setActivationPolicy(hideDockIcon ? .accessory : .regular)
+        // Tahoe only early launch hygiene. Sequoia reported launch
+        // failures with this block active, so it falls back to the
+        // sequencing in `applicationDidFinishLaunching`
+        if #available(macOS 26.0, *) {
+            // Finalise the activation policy before AppKit paints its first
+            // frame. `LSUIElement=YES` in Info.plist means we launch as
+            // `.accessory`. if the user wants a Dock icon we have to flip to
+            // `.regular` *before* SwiftUI / AppKit can auto-present any window
+            // (e.g. the `Settings { EmptyView() }` placeholder) or that flip
+            // surfaces as a one-frame flash of an unrelated window.
+            let hideDockIcon = ServerConfigurationStore.load()?.hideDockIcon ?? false
+            NSApp.setActivationPolicy(hideDockIcon ? .accessory : .regular)
 
-        // Close (and watch for re-presents of) the SwiftUI-managed
-        // `Settings { EmptyView() }` placeholder window. Our real settings
-        // surface is `ManagementView` opened via `showManagementWindow`;
-        // the placeholder only exists to anchor `.commands`.
-        suppressSwiftUISettingsPlaceholder()
+            // close (and watch for re-presents of) the SwiftUI managed
+            // `Settings { EmptyView() }` placeholder window. our real settings
+            // surface is `ManagementView` opened via `showManagementWindow`;
+            // the placeholder only exists to anchor `.commands`
+            suppressSwiftUISettingsPlaceholder()
 
-        // Opt out of AppKit snapshot state restoration. Window *positions*
-        // still autosave via `setFrameAutosaveName`; what we're killing is
-        // the launch-time blit of the previous run's window snapshots.
-        disableAppKitStateRestoration()
+            // opt out of AppKit snapshot state restoration. window positions
+            // still autosave via `setFrameAutosaveName`. what we're killing is
+            // the launch time blit of the previous run's window snapshots
+            disableAppKitStateRestoration()
+        }
     }
 
     public func applicationSupportsSecureRestorableState(
         _ app: NSApplication
-    ) -> Bool { true }
+    ) -> Bool {
+        // Paired with `disableAppKitStateRestoration()`. Sequoia keeps
+        // AppKit's default restore behavior
+        if #available(macOS 26.0, *) { return true }
+        return false
+    }
 
     private func disableAppKitStateRestoration() {
         UserDefaults.standard.register(defaults: [
@@ -82,35 +95,60 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         ])
     }
 
-    /// SwiftUI auto-creates an `NSWindow` for the `Settings { EmptyView() }`
-    /// scene with identifier `com_apple_SwiftUI_Settings_window`. On macOS
-    /// builds with `LSUIElement=YES` plus a regular activation policy this
-    /// window can paint for a frame before `applicationDidFinishLaunching`
-    /// presents the onboarding window. Hide it on first pass, then watch
-    /// `didBecomeKeyNotification` for any re-present until our launch Task
-    /// finishes (the observer is removed there).
+    /// Hide SwiftUI's `Settings { EmptyView() }` placeholder window so it
+    /// can't paint for a frame before our onboarding window appears. We
+    /// observe both key and occlusion-state changes because the window
+    /// can be ordered on-screen without becoming key (background launch
+    /// or another app frontmost). The deferred-Task sweep is the
+    /// belt-and-suspenders for the case where neither notification fires
+    /// before SwiftUI paints.
+    private static let swiftUISettingsPlaceholderID = "com_apple_SwiftUI_Settings_window"
+
+    private static let swiftUISettingsPlaceholderNotifications: [Notification.Name] = [
+        NSWindow.didBecomeKeyNotification,
+        NSWindow.didChangeOcclusionStateNotification,
+    ]
+
     private func suppressSwiftUISettingsPlaceholder() {
-        let id = "com_apple_SwiftUI_Settings_window"
-        for window in NSApp.windows where window.identifier?.rawValue == id {
-            window.orderOut(nil)
+        sweepSwiftUISettingsPlaceholder()
+        for name in Self.swiftUISettingsPlaceholderNotifications {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleSwiftUIPlaceholderEvent(_:)),
+                name: name,
+                object: nil
+            )
         }
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(handleSwiftUIWindowKey(_:)),
-            name: NSWindow.didBecomeKeyNotification,
-            object: nil
-        )
     }
 
-    @objc private func handleSwiftUIWindowKey(_ note: Notification) {
+    private func sweepSwiftUISettingsPlaceholder() {
+        for window in NSApp.windows
+        where window.identifier?.rawValue == Self.swiftUISettingsPlaceholderID {
+            hidePlaceholder(window)
+        }
+    }
+
+    @objc private func handleSwiftUIPlaceholderEvent(_ note: Notification) {
         guard
-            let w = note.object as? NSWindow,
-            w.identifier?.rawValue == "com_apple_SwiftUI_Settings_window"
+            let window = note.object as? NSWindow,
+            window.identifier?.rawValue == Self.swiftUISettingsPlaceholderID
         else { return }
-        w.orderOut(nil)
+        hidePlaceholder(window)
+    }
+
+    private func hidePlaceholder(_ window: NSWindow) {
+        window.orderOut(nil)
+        window.setIsVisible(false)
     }
 
     public func applicationDidFinishLaunching(_ notification: Notification) {
+        // sequoia fallback. Tahoe already ran this in
+        // `applicationWillFinishLaunching`.
+        if #unavailable(macOS 26.0) {
+            let hideDockIcon = ServerConfigurationStore.load()?.hideDockIcon ?? false
+            NSApp.setActivationPolicy(hideDockIcon ? .accessory : .regular)
+        }
+
         // Make MLX C++ errors recoverable instead of process-fatal. Must run
         // before any model load can call into MLX so the first forward pass
         // is already protected. See `MLXErrorRecovery` for the rationale and
@@ -134,6 +172,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         // updates keep painting.
         StorageMigrationCoordinator.blockingAwaitReady()
 
+        // Deferred from `ServerController.init()` to keep
+        // `~/.osaurus/` pristine until the storage gate has stamped
+        // `.storage-version`. See `bootstrapRuntimeSettings()`.
+        serverController.bootstrapRuntimeSettings()
+
         // Wire up the periodic SQLite maintenance ticker (PRAGMA
         // optimize / wal_checkpoint / VACUUM at sensible intervals).
         // Idempotent — safe even if some DBs aren't open yet, the
@@ -142,7 +185,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             await StorageMaintenance.shared.start()
         }
 
-        // DSV4 cache topology is owned by vmlx-swift-lm. Leave
+        // DSV4 cache topology is owned by vmlx-swift. Leave
         // `DSV4_KV_MODE` unset here so the library default uses its
         // production SWA+CSA+HSA hybrid cache; explicit operator env vars
         // remain honored by vmlx for diagnostics.
@@ -216,10 +259,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         _ = SpeechConfigurationStore.load()
         ModelPickerItemCache.shared.prewarm()
 
-        // Auto-connect to enabled providers, then update model cache with remote models
+        // Bind the local HTTP server before heavier optional startup work such
+        // as provider connection, scheduler DB polling, sandbox registration,
+        // or Parakeet/CoreML auto-load can occupy the main actor or accelerator.
+        let serverStartupTask = Task { @MainActor in
+            await serverController.startServer()
+        }
+
+        // Do not auto-connect keychain-backed providers at launch. Explicit
+        // provider connect actions may read credentials; startup must not.
         Task { @MainActor in
-            await MCPProviderManager.shared.connectEnabledProviders()
-            await RemoteProviderManager.shared.connectEnabledProviders()
             await ModelPickerItemCache.shared.prewarmModelCache()
         }
 
@@ -234,7 +283,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         // `*Database.shared.open()` also calls the gate
         // defensively (no-op fast path) for the plugin/HTTP entry
         // points that don't go through this Task.
-        let embeddingInitTask = Task {
+        let embeddingInitTask = Task.detached(priority: .utility) {
+            guard StorageKeyManager.shared.hasCachedKey else {
+                MemoryLogger.database.error(
+                    "Storage-dependent search/index services disabled — storage key is not already unlocked"
+                )
+                return
+            }
             var memoryDBOpened = false
             for attempt in 1 ... 3 {
                 do {
@@ -277,16 +332,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             }
         }
 
-        // Auto-start server on app launch
-        Task { @MainActor in
-            await serverController.startServer()
-        }
-
         // Setup global hotkey for Chat overlay (configured)
         applyChatHotkey()
 
         // Auto-load speech model if voice features are enabled
         Task { @MainActor in
+            await serverStartupTask.value
             await SpeechService.shared.autoLoadIfNeeded()
         }
 
@@ -305,12 +356,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         // Initialize WatcherManager to start file system watchers
         _ = WatcherManager.shared
 
-        // Start the self-scheduling loop (spec §9). The scheduler reads
-        // from `~/.osaurus/scheduler.sqlite` so the storage migrator
-        // must already be ready by this point — and it is, because
-        // `StorageMigrationCoordinator.blockingAwaitReady` ran at the
-        // top of `applicationDidFinishLaunching`.
-        NextRunScheduler.shared.start()
+        // Start the self-scheduling loop only if encrypted storage is already
+        // unlocked. Startup must not trigger a Keychain/password prompt.
+        Task { @MainActor in
+            guard StorageKeyManager.shared.hasCachedKey else {
+                NSLog("[Osaurus] Scheduler disabled: storage key is not already unlocked")
+                return
+            }
+            NextRunScheduler.shared.start()
+        }
 
         // Start sandbox tool registrar. Internally awaits container
         // auto-start before the initial `registerTools` call, so the first
@@ -339,6 +393,17 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         Task { @MainActor in
             try? await Task.sleep(nanoseconds: 300_000_000)  // 300ms
 
+            // final sweep for the Tahoe placeholder suppression. no op
+            // on Sequoia (observers never installed)
+            if #available(macOS 26.0, *) {
+                sweepSwiftUISettingsPlaceholder()
+            }
+
+            if #unavailable(macOS 26.0) {
+                await Task.yield()
+                try? await Task.sleep(nanoseconds: 50_000_000)  // 50ms
+            }
+
             if presentOnboarding {
                 showOnboardingWindow()
             } else {
@@ -348,11 +413,16 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             ToastWindowController.shared.setup()
             NotchWindowController.shared.setup()
 
-            NotificationCenter.default.removeObserver(
-                self,
-                name: NSWindow.didBecomeKeyNotification,
-                object: nil
-            )
+            // tear down the Tahoe placeholder observers
+            if #available(macOS 26.0, *) {
+                for name in Self.swiftUISettingsPlaceholderNotifications {
+                    NotificationCenter.default.removeObserver(
+                        self,
+                        name: name,
+                        object: nil
+                    )
+                }
+            }
 
             // Once the initial window has had a beat to settle, prewarm
             // the AI-greeting pool for whichever (agent, model) the
@@ -406,28 +476,34 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
     // MARK: - VAD Service
 
     private func initializeVADService() {
-        // Auto-start VAD if enabled (with delay to wait for model loading)
         let vadConfig = VADConfigurationStore.load()
-        if vadConfig.vadModeEnabled && !vadConfig.enabledAgentIds.isEmpty {
-            Task { @MainActor in
-                // Wait for speech model to be loaded (up to 30 seconds)
-                let speechService = SpeechService.shared
-                var attempts = 0
-                while !speechService.isModelLoaded && attempts < 60 {
-                    try? await Task.sleep(nanoseconds: 500_000_000)  // 500ms
-                    attempts += 1
-                }
+        guard vadConfig.vadModeEnabled, !vadConfig.enabledAgentIds.isEmpty else { return }
 
-                if speechService.isModelLoaded {
-                    do {
-                        try await VADService.shared.start()
-                        log.info("VAD service started successfully on app launch")
-                    } catch {
-                        log.error("Failed to start VAD service: \(error.localizedDescription, privacy: .public)")
-                    }
-                } else {
-                    log.error("VAD service not started — speech model not loaded after 30s")
+        guard AVCaptureDevice.authorizationStatus(for: .audio) == .authorized else {
+            log.info(
+                "VAD auto-start skipped — microphone permission not yet authorized; user must re-enable from Voice settings"
+            )
+            return
+        }
+
+        Task { @MainActor in
+            // wait for speech model to be loaded (up to 30 seconds)
+            let speechService = SpeechService.shared
+            var attempts = 0
+            while !speechService.isModelLoaded && attempts < 60 {
+                try? await Task.sleep(nanoseconds: 500_000_000)  // 500ms
+                attempts += 1
+            }
+
+            if speechService.isModelLoaded {
+                do {
+                    try await VADService.shared.start()
+                    log.info("VAD service started successfully on app launch")
+                } catch {
+                    log.error("Failed to start VAD service: \(error.localizedDescription, privacy: .public)")
                 }
+            } else {
+                log.error("VAD service not started — speech model not loaded after 30s")
             }
         }
     }
@@ -1167,8 +1243,8 @@ extension AppDelegate {
         Task { @MainActor in
             if await ModelManager.shared.resolveModelIfMLXCompatible(byRepoId: modelId) == nil {
                 let alert = NSAlert()
-                alert.messageText = "Unsupported model"
-                alert.informativeText = "Osaurus only supports MLX-compatible Hugging Face repositories."
+                alert.messageText = L("Unsupported model")
+                alert.informativeText = L("Osaurus only supports MLX-compatible Hugging Face repositories.")
                 alert.alertStyle = .warning
                 alert.addButton(withTitle: "OK")
                 alert.runModal()

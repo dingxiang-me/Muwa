@@ -430,6 +430,19 @@ extension ChatMessage {
         self.reasoning_content = reasoning_content
     }
 
+    /// Initialize from a route adapter that already normalized OpenAI-style
+    /// multimodal content parts. Keeps media available to `imageUrls`,
+    /// `videoUrls`, and `audioInputs` instead of flattening the message to text.
+    init(role: String, content: String?, contentParts: [MessageContentPart]?) {
+        self.role = role
+        self.content = content
+        self.contentParts = contentParts
+        self.localAudioSamples = []
+        self.tool_calls = nil
+        self.tool_call_id = nil
+        self.reasoning_content = nil
+    }
+
     /// Initialize with multimodal content (text and images)
     init(role: String, text: String, imageData: [Data]) {
         self.role = role
@@ -529,7 +542,7 @@ struct ChatCompletionRequest: Codable, Sendable {
     /// OpenAI tool_choice ("none" | "auto" | {"type":"function","function":{"name":...}})
     let tool_choice: ToolChoiceOption?
     /// Optional session identifier for chat/history grouping. Not a KV cache key —
-    /// vmlx-swift-lm's `CacheCoordinator` is content-addressed and discovers
+    /// vmlx-swift's `CacheCoordinator` is content-addressed and discovers
     /// reusable prefixes autonomously.
     var session_id: String? = nil
     /// Deterministic-sampling seed (OpenAI v1.x). When set, identical
@@ -552,6 +565,10 @@ struct ChatCompletionRequest: Codable, Sendable {
     /// `reasoning_effort` chat-template kwarg; remote providers forward it
     /// natively where supported.
     var reasoning_effort: String? = nil
+    /// Local-only marker for app/UI requests whose sampling values came from
+    /// profile defaults. Not decoded from OpenAI JSON and not forwarded to
+    /// remote providers.
+    var samplingParametersAreImplicit: Bool = false
 
     /// Resolved max tokens, preferring max_tokens then max_completion_tokens.
     var resolvedMaxTokens: Int? { max_tokens ?? max_completion_tokens }
@@ -587,6 +604,39 @@ struct ChatCompletionRequest: Codable, Sendable {
         copy.ttftTrace = ttftTrace
         copy.enable_thinking = enable_thinking
         copy.reasoning_effort = reasoning_effort
+        copy.samplingParametersAreImplicit = samplingParametersAreImplicit
+        return copy
+    }
+
+    func withContext(
+        messages newMessages: [ChatMessage],
+        tools newTools: [Tool]?,
+        toolChoice newToolChoice: ToolChoiceOption?
+    ) -> ChatCompletionRequest {
+        var copy = ChatCompletionRequest(
+            model: model,
+            messages: newMessages,
+            temperature: temperature,
+            max_tokens: max_tokens,
+            stream: stream,
+            top_p: top_p,
+            frequency_penalty: frequency_penalty,
+            presence_penalty: presence_penalty,
+            stop: stop,
+            n: n,
+            tools: newTools,
+            tool_choice: newToolChoice,
+            session_id: session_id,
+            seed: seed,
+            response_format: response_format,
+            stream_options: stream_options
+        )
+        copy.max_completion_tokens = max_completion_tokens
+        copy.modelOptions = modelOptions
+        copy.ttftTrace = ttftTrace
+        copy.enable_thinking = enable_thinking
+        copy.reasoning_effort = reasoning_effort
+        copy.samplingParametersAreImplicit = samplingParametersAreImplicit
         return copy
     }
 }
@@ -959,12 +1009,14 @@ extension ToolFunction {
 extension Tool {
     /// Convert to Tokenizers.ToolSpec (`[String: any Sendable]`) for MLX chat templates.
     ///
-    /// The dictionary is round-tripped through canonical JSON
-    /// (`JSONSerialization.WritingOptions.sortedKeys`) so the structure handed
-    /// to the chat template — and the resulting `<tools>` block in the
-    /// rendered prompt — is byte-stable across calls. Without this, key
-    /// iteration order from a fresh dictionary literal can shift between
-    /// requests and silently invalidate the MLX paged KV cache prefix.
+    /// The dictionary is normalised via `canonicalize` so every leaf is
+    /// JSON-encodable and the values bridge cleanly through Foundation.
+    /// Byte-stability of the resulting `<tools>` block in the rendered
+    /// prompt is enforced at *encode time* by `JSONEncoder.osaurusCanonical()`
+    /// / `.osaurusCanonical` writing options (see
+    /// `docs/JSON_DETERMINISM.md`). Without those, key iteration order
+    /// from a fresh dictionary literal silently invalidates the MLX paged
+    /// KV cache prefix.
     func toTokenizerToolSpec() -> [String: any Sendable] {
         let raw: [String: any Sendable] = [
             "type": type,
@@ -980,25 +1032,30 @@ extension Tool {
     func canonicalHashPayload() -> Data {
         let spec = toTokenizerToolSpec()
         if JSONSerialization.isValidJSONObject(spec),
-            let data = try? JSONSerialization.data(withJSONObject: spec, options: [.sortedKeys])
+            let data = try? JSONSerialization.data(withJSONObject: spec, options: .osaurusCanonical)
         {
             return data
         }
 
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.sortedKeys]
+        let encoder = JSONEncoder.osaurusCanonical()
         return (try? encoder.encode(self)) ?? Data("\(type)\0\(function.name)".utf8)
     }
 
-    /// Round-trip a Sendable JSON value through `JSONSerialization` with
-    /// `.sortedKeys` to canonicalise nested key ordering. Returns `nil` on
-    /// the (extremely unlikely) serialisation failure so callers fall back
-    /// to the raw dict rather than emit nothing.
+    /// Normalise a `Sendable` JSON value into a Foundation-bridged dict.
+    /// Round-trips through `JSONSerialization` so every leaf comes back as
+    /// `NSNumber` / `NSString` / `NSArray` / `NSDictionary`, which avoids
+    /// surprises in downstream chat-template renderers. Falls back to
+    /// `JSONCanonicalization.normalizeObject` on the extremely unlikely
+    /// serialisation failure so callers never see the raw unsorted input
+    /// — preserving the determinism guarantee documented in
+    /// `docs/JSON_DETERMINISM.md`.
     fileprivate static func canonicalize(_ value: [String: any Sendable]) -> [String: any Sendable]? {
-        guard JSONSerialization.isValidJSONObject(value),
-            let data = try? JSONSerialization.data(withJSONObject: value, options: [.sortedKeys]),
+        if JSONSerialization.isValidJSONObject(value),
+            let data = try? JSONSerialization.data(withJSONObject: value, options: .osaurusCanonical),
             let reparsed = try? JSONSerialization.jsonObject(with: data, options: []) as? [String: any Sendable]
-        else { return nil }
-        return reparsed
+        {
+            return reparsed
+        }
+        return JSONCanonicalization.normalizeObject(value)
     }
 }

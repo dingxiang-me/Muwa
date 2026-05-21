@@ -30,6 +30,16 @@ public struct RemoteProviderOAuthTokens: Codable, Sendable, Equatable {
 public enum RemoteProviderKeychain {
     private static let service = "ai.osaurus.remote"
 
+    public static func runOffCooperativeExecutor<T: Sendable>(
+        _ operation: @escaping @Sendable () -> T
+    ) async -> T {
+        await withCheckedContinuation { continuation in
+            DispatchQueue.global(qos: .utility).async {
+                continuation.resume(returning: operation())
+            }
+        }
+    }
+
     // MARK: - API Key Management
 
     /// Save an API key for a provider ID
@@ -63,6 +73,8 @@ public enum RemoteProviderKeychain {
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+            kSecUseAuthenticationContext as String: KeychainQueryHelpers.nonInteractiveContext(),
         ]
 
         var result: AnyObject?
@@ -119,6 +131,15 @@ public enum RemoteProviderKeychain {
         return status == errSecSuccess
     }
 
+    @discardableResult
+    public static func saveOAuthTokensOffMainActor(_ tokens: RemoteProviderOAuthTokens, for providerId: UUID) async
+        -> Bool
+    {
+        await runOffCooperativeExecutor {
+            saveOAuthTokens(tokens, for: providerId)
+        }
+    }
+
     public static func getOAuthTokens(for providerId: UUID) -> RemoteProviderOAuthTokens? {
         let account = "\(providerId.uuidString).oauth.tokens"
 
@@ -128,6 +149,8 @@ public enum RemoteProviderKeychain {
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+            kSecUseAuthenticationContext as String: KeychainQueryHelpers.nonInteractiveContext(),
         ]
 
         var result: AnyObject?
@@ -194,6 +217,8 @@ public enum RemoteProviderKeychain {
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+            kSecUseAuthenticationContext as String: KeychainQueryHelpers.nonInteractiveContext(),
         ]
 
         var result: AnyObject?
@@ -238,6 +263,8 @@ public enum RemoteProviderKeychain {
             kSecAttrService as String: service,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecReturnAttributes as String: true,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+            kSecUseAuthenticationContext as String: KeychainQueryHelpers.nonInteractiveContext(),
         ]
 
         var result: AnyObject?

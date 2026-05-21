@@ -91,6 +91,20 @@ struct ModelProfileRegistryTests {
         #expect(profile?.thinkingOption == nil)
     }
 
+    @Test("Gemma 4 defaults thinking off so short API replies are visible")
+    func gemma4_defaultsThinkingOff() {
+        for id in [
+            "gemma-4-26b-a4b-it-jang_4m-crack",
+            "dealign.ai/Gemma-4-26B-A4B-it-JANG_4M-CRACK",
+            "OsaurusAI/gemma4-it-26b-a4b",
+        ] {
+            let profile = ModelProfileRegistry.profile(for: id)
+            #expect(profile?.displayName == Gemma4ThinkingProfile.displayName)
+            #expect(profile?.thinkingOption?.id == "disableThinking")
+            #expect(profile?.defaults["disableThinking"]?.boolValue == true)
+        }
+    }
+
     /// Nemotron-3 Reasoning bundles (model_type=nemotron_h, hybrid Mamba+Attn+MoE)
     /// must match `NemotronThinkingProfile`, NOT the generic
     /// `AutoThinkingProfile`. The two have different `disableThinking`
@@ -174,11 +188,11 @@ struct ModelProfileRegistryTests {
         }
     }
 
-    /// Ling-2.6 Flash is served as a non-reasoning chat model. The explicit
-    /// profile reserves Ling IDs ahead of `AutoThinkingProfile`, but exposes
-    /// no Thinking toggle.
-    @Test("Ling bundles match non-reasoning runtime profile")
-    func ling_matchesRuntimeProfileWithoutThinkingToggle() {
+    /// Ling-2.6 Flash / Bailing uses `enable_thinking` to select the upstream
+    /// `detailed thinking on/off` directive. Osaurus defaults it off, but must
+    /// not clamp explicit user/API opt-in.
+    @Test("Ling bundles expose thinking toggle defaulted off")
+    func ling_matchesRuntimeProfileWithDefaultOffThinkingToggle() {
         for id in [
             "OsaurusAI/Ling-2.6-flash-MXFP4",
             "OsaurusAI/Ling-2.6-flash-JANGTQ",
@@ -190,9 +204,8 @@ struct ModelProfileRegistryTests {
                 profile?.displayName == LingRuntimeProfile.displayName,
                 "expected LingRuntimeProfile for \(id), got \(profile?.displayName ?? "nil")"
             )
-            #expect(profile?.options.isEmpty == true)
-            #expect(profile?.defaults.isEmpty == true)
-            #expect(profile?.thinkingOption?.id == nil)
+            #expect(profile?.thinkingOption?.id == "disableThinking")
+            #expect(profile?.defaults["disableThinking"]?.boolValue == true)
         }
 
         for id in ["linguistics-model-7b", "darling-llm"] {
@@ -204,13 +217,19 @@ struct ModelProfileRegistryTests {
         }
     }
 
-    @Test("Profile option normalization drops stale Ling thinking preference")
-    func normalizedOptions_dropsStaleLingThinkingPreference() {
+    @Test("Profile option normalization preserves explicit Ling thinking preference")
+    func normalizedOptions_preservesExplicitLingThinkingPreference() {
         let staleLing = ModelProfileRegistry.normalizedOptions(
             for: "OsaurusAI/Ling-2.6-flash-JANGTQ",
             persisted: ["disableThinking": .bool(false)]
         )
-        #expect(staleLing.isEmpty)
+        #expect(staleLing["disableThinking"]?.boolValue == false)
+
+        let lingDefaults = ModelProfileRegistry.normalizedOptions(
+            for: "OsaurusAI/Ling-2.6-flash-JANGTQ",
+            persisted: nil
+        )
+        #expect(lingDefaults["disableThinking"]?.boolValue == true)
 
         let qwen = ModelProfileRegistry.normalizedOptions(
             for: "OsaurusAI/Qwen3.5-30B-A3B-JANGTQ",

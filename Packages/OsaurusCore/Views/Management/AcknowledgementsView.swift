@@ -277,12 +277,12 @@ struct AcknowledgementsView: View {
             licenseUrl: "https://github.com/sparkle-project/Sparkle/blob/2.x/LICENSE"
         ),
         Acknowledgement(
-            name: "MLX Swift",
-            identity: "mlx-swift",
-            version: "0.29",
-            repository: "https://github.com/ml-explore/mlx-swift",
+            name: "vMLX Swift",
+            identity: "vmlx-swift",
+            version: "0b85cad0",
+            repository: "https://github.com/osaurus-ai/vmlx-swift",
             license: "MIT",
-            licenseUrl: "https://github.com/ml-explore/mlx-swift/blob/main/LICENSE"
+            licenseUrl: "https://github.com/osaurus-ai/vmlx-swift/blob/main/LICENSE"
         ),
         Acknowledgement(
             name: "FluidAudio",
@@ -378,7 +378,7 @@ private struct PackageRow: View {
                     .foregroundColor(isHovering ? theme.accentColor : theme.tertiaryText)
             }
             .buttonStyle(.plain)
-            .help(Text("Open repository", bundle: .module))
+            .localizedHelp("Open repository")
         }
         .padding(12)
         .background(

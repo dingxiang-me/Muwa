@@ -211,8 +211,103 @@ public actor StorageMigrator {
             return true
         }
         let contents = (try? fm.contentsOfDirectory(atPath: root.path)) ?? []
-        let meaningful = contents.filter { !$0.hasPrefix(".") }
+        let meaningful = contents.filter { entry in
+            guard !entry.hasPrefix(".") else { return false }
+            return !isFreshInstallBootstrapEntry(entry, under: root)
+        }
         return meaningful.isEmpty
+    }
+
+    private func isFreshInstallBootstrapEntry(_ entry: String, under root: URL) -> Bool {
+        let url = root.appendingPathComponent(entry)
+        var isDir: ObjCBool = false
+        guard FileManager.default.fileExists(atPath: url.path, isDirectory: &isDir), isDir.boolValue else {
+            return false
+        }
+
+        if isDirectoryEmpty(url) {
+            return true
+        }
+
+        if entry == "themes" {
+            return containsOnlyBuiltInThemeJSON(url)
+        }
+
+        // Belt-and-suspenders for `config/`: the primary fix defers
+        // every pre-gate write into `~/.osaurus/config/`, but allow a
+        // future regression to land without re-flashing the overlay
+        // by accepting a directory that holds only the known bootstrap
+        // files. Anything user-touched falls through.
+        if entry == "config" {
+            return containsOnlyBootstrapConfigFiles(url)
+        }
+
+        return false
+    }
+
+    private func isDirectoryEmpty(_ url: URL) -> Bool {
+        let contents =
+            (try? FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
+        return contents.isEmpty
+    }
+
+    private func containsOnlyBuiltInThemeJSON(_ url: URL) -> Bool {
+        let files =
+            (try? FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isRegularFileKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
+        guard !files.isEmpty else { return true }
+
+        for file in files {
+            guard file.pathExtension == "json",
+                let data = try? Data(contentsOf: file),
+                let object = try? JSONSerialization.jsonObject(with: data) as? [String: Any],
+                object["isBuiltIn"] as? Bool == true
+            else {
+                return false
+            }
+        }
+        return true
+    }
+
+    /// Files the app can write into `~/.osaurus/config/` automatically
+    /// on first launch, before the user has touched any setting. Any
+    /// other JSON (chat, tools, memory, populated voice/*.json, …)
+    /// counts as user data.
+    private static let bootstrapConfigFileNames: Set<String> = [
+        "server-runtime.json",
+        "server.json",
+    ]
+
+    private func containsOnlyBootstrapConfigFiles(_ url: URL) -> Bool {
+        let entries =
+            (try? FileManager.default.contentsOfDirectory(
+                at: url,
+                includingPropertiesForKeys: [.isDirectoryKey],
+                options: [.skipsHiddenFiles]
+            )) ?? []
+
+        for entry in entries {
+            let isDir = (try? entry.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) ?? false
+            if isDir {
+                // `voice/` may be eagerly created by speech services
+                // even before any save lands. Tolerate it iff empty.
+                if entry.lastPathComponent == "voice", isDirectoryEmpty(entry) {
+                    continue
+                }
+                return false
+            }
+            if !Self.bootstrapConfigFileNames.contains(entry.lastPathComponent) {
+                return false
+            }
+        }
+        return true
     }
 
     /// Run the migrator. Safe to call repeatedly: completed steps

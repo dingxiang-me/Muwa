@@ -25,7 +25,7 @@ struct MasterMnemonicCard: View {
                     .foregroundColor(theme.tertiaryText)
                     .tracking(1)
 
-                Text("(24 words)")
+                Text(localized: "(24 words)")
                     .font(.system(size: 10, weight: .medium, design: .monospaced))
                     .foregroundColor(theme.tertiaryText)
 
@@ -102,15 +102,12 @@ struct MasterMnemonicCard: View {
     }
 
     private var wordGrid: some View {
-        // 4 columns x 6 rows. The BIP39 wordlist tops out at 8 letters per
-        // word; 4 columns keeps each cell wide enough that a word can never
-        // be truncated, even at compact window widths. Truncating a recovery
-        // phrase silently is data loss, so we never set a lineLimit / middle
-        // truncation on the word Text below.
-        let columns = Array(
-            repeating: GridItem(.flexible(minimum: 110), spacing: 10),
-            count: 4
-        )
+        // Adaptive columns sized for an 8-letter BIP39 word plus its
+        // index gutter. Reflows from 3x8 (narrow rail) through 4x6 to
+        // 6x4 (wide container). Words use `.fixedSize(horizontal: true)`
+        // and no `lineLimit` — silently truncating a recovery phrase
+        // would be data loss.
+        let columns = [GridItem(.adaptive(minimum: 110), spacing: 10)]
         return LazyVGrid(columns: columns, alignment: .leading, spacing: 8) {
             ForEach(Array(words.enumerated()), id: \.offset) { index, word in
                 wordCell(index: index + 1, word: word)
@@ -154,7 +151,7 @@ struct MasterMnemonicCard: View {
 
     private func saveAsTextFile() {
         let panel = NSSavePanel()
-        panel.title = "Save Recovery Phrase"
+        panel.title = L("Save Recovery Phrase")
         panel.nameFieldStringValue = "osaurus-recovery-phrase.txt"
         panel.allowedContentTypes = [.plainText]
         panel.canCreateDirectories = true

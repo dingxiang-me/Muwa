@@ -51,7 +51,7 @@ public struct ServerConfiguration: Codable, Equatable, Sendable {
 
     /// Legacy: maximum KV cache size in tokens.
     ///
-    /// No longer applied at runtime — vmlx-swift-lm's `CacheCoordinator` owns
+    /// No longer applied at runtime — vmlx-swift's `CacheCoordinator` owns
     /// KV cache sizing per model (sliding-window vs global vs SSM layers each
     /// have their own per-layer cache geometry). Forcing a global rotating
     /// window from osaurus historically caused broadcast crashes on
@@ -61,7 +61,7 @@ public struct ServerConfiguration: Codable, Equatable, Sendable {
     public var genMaxKVSize: Int?
 
     // KV cache quantization (kvBits, kvGroupSize, quantizedKVStart, turboQuant)
-    // and prefill step sizing are owned by the vmlx-swift-lm package.
+    // and prefill step sizing are owned by the vmlx-swift package.
 
     /// List of allowed origins for CORS. Empty disables CORS. Use "*" to allow any origin.
     public var allowedOrigins: [String]
@@ -146,7 +146,7 @@ public struct ServerConfiguration: Codable, Equatable, Sendable {
         genMaxKVSize: Int?,
         allowedOrigins: [String] = [],
         modelEvictionPolicy: ModelEvictionPolicy = .strictSingleModel,
-        modelIdleResidencyPolicy: ModelIdleResidencyPolicy = .immediately,
+        modelIdleResidencyPolicy: ModelIdleResidencyPolicy = .defaultWarm,
         maxRequestBodyBytes: Int = 32 * 1024 * 1024,
         maxPairingBodyBytes: Int = 64 * 1024
     ) {
@@ -180,7 +180,7 @@ public struct ServerConfiguration: Codable, Equatable, Sendable {
             genMaxKVSize: nil,
             allowedOrigins: [],
             modelEvictionPolicy: .strictSingleModel,
-            modelIdleResidencyPolicy: .immediately,
+            modelIdleResidencyPolicy: .defaultWarm,
             maxRequestBodyBytes: 32 * 1024 * 1024,
             maxPairingBodyBytes: 64 * 1024
         )
@@ -237,14 +237,19 @@ public enum ModelIdleResidencyPolicy: Codable, Equatable, Hashable, Sendable {
         }
     }
 
-    /// Settings picker presets. The default stays immediate for compatibility;
-    /// users opt into warmer API/chat behavior explicitly.
+    /// Default warm residency keeps local chat/API follow-up turns from paying
+    /// a full cold load and losing per-model cache/coordinator state after
+    /// every response. Immediate unload remains available as an explicit
+    /// low-memory setting.
+    public static let defaultWarm: ModelIdleResidencyPolicy = .afterSeconds(900)
+
+    /// Settings picker presets.
     public static let presets: [ModelIdleResidencyPolicy] = [
-        .immediately,
         .afterSeconds(300),
-        .afterSeconds(900),
+        .defaultWarm,
         .afterSeconds(1_800),
         .afterSeconds(3_600),
+        .immediately,
         .never,
     ]
 

@@ -2131,7 +2131,7 @@ final class ChatSession: ObservableObject {
                         model: selectedModel ?? "default",
                         messages: msgs,
                         temperature: effectiveTemp,
-                        max_tokens: effectiveMaxTokensForAgent ?? 16384,
+                        max_tokens: effectiveMaxTokensForAgent,
                         stream: true,
                         top_p: chatCfg.topPOverride,
                         frequency_penalty: nil,
@@ -2142,6 +2142,7 @@ final class ChatSession: ObservableObject {
                         tool_choice: toolSpecs.isEmpty ? nil : .auto,
                         session_id: sessionId?.uuidString
                     )
+                    req.samplingParametersAreImplicit = true
                     req.modelOptions = activeModelOptions.isEmpty ? nil : activeModelOptions
                     req.ttftTrace = ttftTrace
                     debugLog(
@@ -2502,7 +2503,7 @@ final class ChatSession: ObservableObject {
                             model: selectedModel ?? "default",
                             messages: buildMessages(),
                             temperature: effectiveTemp,
-                            max_tokens: effectiveMaxTokensForAgent ?? 16384,
+                            max_tokens: effectiveMaxTokensForAgent,
                             stream: true,
                             top_p: chatCfg.topPOverride,
                             frequency_penalty: nil,
@@ -2513,6 +2514,7 @@ final class ChatSession: ObservableObject {
                             tool_choice: nil,
                             session_id: sessionId?.uuidString
                         )
+                        finalReq.samplingParametersAreImplicit = true
                         finalReq.modelOptions = activeModelOptions.isEmpty ? nil : activeModelOptions
 
                         let processor = StreamingDeltaProcessor(

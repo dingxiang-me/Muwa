@@ -164,7 +164,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 **Components:**
 
 - `Services/Inference/MLXService.swift` — MLX model loading, warm-up orchestration
-- `Services/ModelRuntime/` — Single MLX entry point (`MLXBatchAdapter`) wrapping vmlx-swift-lm's `BatchEngine`, plus the `GenerationEventMapper` bridge to typed runtime events
+- `Services/ModelRuntime/` — Single MLX entry point (`MLXBatchAdapter`) wrapping vmlx-swift's `BatchEngine`, plus the `GenerationEventMapper` bridge to typed runtime events
 - `Services/Inference/ModelService.swift` — Model lifecycle management
 
 **Runtime behavior:**
@@ -172,7 +172,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 - **Window-scoped warm-up** — Models are loaded and prefix-cached when a chat window opens, not at app launch. Each window warms its own model independently, using the window's agent context (system prompt, memory, tools) for the prefix cache.
 - **Smart unloading** — The "Keep model loaded after use" setting controls whether a local model unloads immediately after use, stays warm for 5/15/30/60 minutes, or stays resident until an explicit unload/cleanup. Strict single-model switches still unload the replaced model immediately, and idle unload never deletes downloaded models or disk KV cache entries. The warm-up indicator (yellow dot) signals when a model is loading.
 - **Continuous batching** — `BatchEngine` shares a single forward pass across overlapping requests for the same model. The default `mlxBatchEngineMaxBatchSize` is `1` so vmlx compiled decode stays eligible for single-user chat; tune with `defaults write ai.osaurus ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize -int 8` for server-style concurrency. Takes effect on the next inference call — the registry hot-resizes the cached engine via vmlx's `BatchEngine.updateMaxBatchSize(_:)`.
-- **Library-managed KV cache** — vmlx-swift-lm's `CacheCoordinator` owns KV cache geometry (paged for global attention, rotating for sliding-window, SSM state for Mamba) sized per-model. Multi-turn KV reuse, mediaSalt for VLMs, and sliding-window correctness are all handled inside the engine — osaurus configures only `modelKey`, `diskCacheDir`, and a writability fallback.
+- **Library-managed KV cache** — vmlx-swift's `CacheCoordinator` owns KV cache geometry (paged for global attention, rotating for sliding-window, SSM state for Mamba) sized per-model. Multi-turn KV reuse, mediaSalt for VLMs, and sliding-window correctness are all handled inside the engine — osaurus configures only `modelKey`, `diskCacheDir`, and a writability fallback.
 - **Model eviction policy** — Configurable in Settings > Local Inference > Model Management. "Strict (One Model)" keeps only one model loaded (default). "Flexible (Multi Model)" allows concurrent models for high-RAM systems. `/health` exposes additive `resident_models[]` diagnostics with in-flight counts and idle-unload timing for each loaded model.
 
 **Configuration:**
@@ -299,13 +299,14 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 
 - `Managers/Documents/DocumentAdaptersBootstrap.swift` — registers built-in document adapters.
 - `Models/Documents/Workbook.swift` — typed workbook, sheet, row, and cell representation.
+- `Models/Documents/PDFDocumentRepresentation.swift` — typed PDF pages and heuristic table detections with source anchors.
 - `Models/Documents/PresentationDocument.swift` — typed deck, slide, note, and relationship representation.
 - `Models/Documents/RichDocumentRepresentation.swift` — sections, headings, links, and metadata for rich text sources.
 - `Services/Documents/CSVAdapter.swift` — CSV and TSV table parsing with bounded input handling.
 - `Services/Documents/XLSXAdapter.swift` — XLSX workbook parsing from Office Open XML packages.
 - `Services/Documents/XLSXEmitter.swift` — XLSX workbook emission for round-trip workflows.
 - `Services/Documents/PPTXAdapter.swift` — PPTX/POTX deck parsing from Office Open XML packages.
-- `Services/Documents/PDFAdapter.swift` — PDF extraction with page-level anchors.
+- `Services/Documents/PDFAdapter.swift` — PDF extraction with page-level anchors and layout-aware text-layer table detection.
 - `Services/Documents/RichDocumentAdapter.swift` — DOCX/RTF/HTML-style rich document structure extraction.
 - `Services/Documents/ExternalOfficeRuntimeDetector.swift` — optional LibreOffice/OpenOffice discovery for future conversion flows; detection reads version metadata only and does not send document bytes to a runtime.
 
@@ -314,7 +315,7 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 - CSV and TSV tables preserve headers, rows, delimiters, and source metadata.
 - XLSX workbooks preserve sheets, cells, shared strings, relationships, and can emit a minimal valid `.xlsx` package.
 - PPTX/POTX decks preserve slide grouping, text runs, notes, and relationships.
-- PDFs preserve page boundaries and anchors so citations can point back to pages.
+- PDFs preserve page boundaries, anchors, and simple text-layer tables so citations can point back to pages and detected table cells.
 - Rich documents preserve section boundaries, headings, links, and metadata.
 
 ---

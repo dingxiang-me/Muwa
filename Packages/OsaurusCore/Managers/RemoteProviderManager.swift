@@ -231,9 +231,9 @@ public final class RemoteProviderManager: ObservableObject {
 
         do {
             if provider.authType == .openAICodexOAuth {
-                if let tokens = provider.getOAuthTokens(), tokens.isExpired {
+                if let tokens = await provider.getOAuthTokensOffMainActor(), tokens.isExpired {
                     let refreshed = try await OpenAICodexOAuthService.refresh(tokens)
-                    RemoteProviderKeychain.saveOAuthTokens(refreshed, for: provider.id)
+                    await RemoteProviderKeychain.saveOAuthTokensOffMainActor(refreshed, for: provider.id)
                 }
             }
 
@@ -249,13 +249,19 @@ public final class RemoteProviderManager: ObservableObject {
                 }
             }
             let models = provider.mergedModelIds(discovered: discoveredModels)
+            let resolvedHeaders = await provider.resolvedHeadersOffMainActor()
+            let cachedOAuthTokens =
+                provider.authType == .openAICodexOAuth
+                ? await provider.getOAuthTokensOffMainActor()
+                : nil
 
-            // Create service instance – resolve headers eagerly on @MainActor
-            // so the service actor never reads from Keychain off the main thread.
+            // Create service instance with headers resolved without holding
+            // @MainActor in synchronous Keychain calls.
             let service = RemoteProviderService(
                 provider: provider,
                 models: models,
-                resolvedHeaders: provider.resolvedHeaders()
+                resolvedHeaders: resolvedHeaders,
+                cachedOAuthTokens: cachedOAuthTokens
             )
             services[providerId] = service
 
@@ -476,6 +482,10 @@ public final class RemoteProviderManager: ObservableObject {
         headers: [String: String]
     ) async throws -> [String] {
         if authType == .openAICodexOAuth && providerType == .openAICodex {
+            // testConnection runs before sign-in (no OAuth tokens exist yet), so
+            // we can't query the live /models endpoint here. The static fallback
+            // is enough to render the "test succeeded" UI; the real catalog is
+            // fetched on connect via RemoteProviderService.fetchModels.
             return OpenAICodexOAuthService.supportedModels
         }
 

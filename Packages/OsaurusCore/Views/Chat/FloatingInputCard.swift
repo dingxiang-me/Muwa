@@ -5,6 +5,7 @@
 //  Premium floating input card with model chip and smooth animations
 //
 
+import AVFoundation
 import AppKit
 import Combine
 import SwiftUI
@@ -183,6 +184,8 @@ struct FloatingInputCard: View {
     @State private var lastSpeechTime: Date = .distantFuture
     @State private var hasDetectedSpeechThisTurn: Bool = false
 
+    @State private var showMicPermissionAlert: Bool = false
+
     /// Tracks last voice activity time for silence timeout
     @State private var lastVoiceActivityTime: Date = Date()
 
@@ -269,11 +272,8 @@ struct FloatingInputCard: View {
         return nil
     }
 
-    /// Whether voice button should be visible: voice is enabled + mic permission granted + a model is downloaded.
-    /// Does NOT require the model to be loaded into memory yet — loading happens on demand.
     private var isVoiceConfigured: Bool {
         voiceConfig.voiceInputEnabled
-            && speechService.microphonePermissionGranted
             && speechModelManager.downloadedModelsCount > 0
     }
 
@@ -380,8 +380,10 @@ struct FloatingInputCard: View {
                 // Load voice config (cached after first load)
                 loadVoiceConfig()
 
-                // Ensure voice model is loaded if enabled and not already loaded
-                if voiceConfig.voiceInputEnabled && !speechService.isModelLoaded && !speechService.isLoadingModel {
+                if voiceConfig.voiceInputEnabled && !speechService.isModelLoaded
+                    && !speechService.isLoadingModel
+                    && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                {
                     if let model = SpeechModelManager.shared.selectedModel {
                         print("[VoiceDebug] Kicking off model load for: \(model.id)")
                         Task {
@@ -425,8 +427,10 @@ struct FloatingInputCard: View {
                 // Reload voice config when settings change
                 loadVoiceConfig()
 
-                // If voice was just enabled, ensure model is loaded
-                if voiceConfig.voiceInputEnabled && !speechService.isModelLoaded && !speechService.isLoadingModel {
+                if voiceConfig.voiceInputEnabled && !speechService.isModelLoaded
+                    && !speechService.isLoadingModel
+                    && AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+                {
                     if let model = SpeechModelManager.shared.selectedModel {
                         Task { try? await speechService.loadModel(model.id) }
                     }
@@ -564,6 +568,21 @@ struct FloatingInputCard: View {
                 }
             }
             .modifier(VoiceDebugObservers())
+            .themedAlert(
+                "Microphone access is off",
+                isPresented: $showMicPermissionAlert,
+                message:
+                    "Osaurus needs microphone access to transcribe speech. Enable it in System Settings → Privacy & Security → Microphone, then try again.",
+                primaryButton: .primary("Open System Settings") {
+                    if let url = URL(
+                        string:
+                            "x-apple.systempreferences:com.apple.preference.security?Privacy_Microphone"
+                    ) {
+                        NSWorkspace.shared.open(url)
+                    }
+                },
+                secondaryButton: .cancel("Cancel")
+            )
             .task {
                 // log full voice state once the view has settled (deferred to avoid type-checker load in body)
                 // 100ms
@@ -681,11 +700,35 @@ private struct VoiceDebugObservers: ViewModifier {
 extension FloatingInputCard {
 
     fileprivate func startVoiceInput() {
+        // Branch on TCC up front:
+        //   .denied / .restricted → themed "enable in Settings" alert
+        //   .notDetermined        → trigger the system permission prompt
+        //                           and prime the model load on grant
+        //   .authorized           → fall through to the existing flow
+        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        case .denied, .restricted:
+            showMicPermissionAlert = true
+            return
+        case .notDetermined:
+            Task { @MainActor in
+                let granted = await speechService.requestMicrophonePermission()
+                if granted, let model = SpeechModelManager.shared.selectedModel,
+                    !speechService.isModelLoaded, !speechService.isLoadingModel
+                {
+                    Task { try? await speechService.loadModel(model.id) }
+                }
+            }
+            return
+        case .authorized:
+            break
+        @unknown default:
+            return
+        }
+
         guard isVoiceAvailable else {
             print(
                 "[VoiceDebug] startVoiceInput called but isVoiceAvailable=false — triggering emergency load if possible"
             )
-            // Model may not be loaded yet — kick off load and bail; once loaded the button will become tappable.
             if let model = SpeechModelManager.shared.selectedModel, !speechService.isLoadingModel {
                 Task { try? await speechService.loadModel(model.id) }
             }
@@ -740,6 +783,9 @@ extension FloatingInputCard {
                 await MainActor.run {
                     voiceInputState = .idle
                     showVoiceOverlay = false
+                    if case SpeechError.microphonePermissionDenied = error {
+                        showMicPermissionAlert = true
+                    }
                 }
             }
         }
@@ -1141,12 +1187,12 @@ extension FloatingInputCard {
             if let clearChat = onClearChat {
                 clearChat()
             } else {
-                ToastManager.shared.info("Clear Chat", message: "Pass an onClearChat handler to enable /clear")
+                ToastManager.shared.infoLocalized("Clear Chat", message: "Pass an onClearChat handler to enable /clear")
             }
         case "model":
             showModelPicker = true
         case "help":
-            ToastManager.shared.info(
+            ToastManager.shared.infoLocalized(
                 "Slash Commands",
                 message: "Type / to open commands. ↑↓ to navigate, ↵ to select, Esc to dismiss."
             )
@@ -1166,7 +1212,7 @@ extension FloatingInputCard {
             let preview: String = {
                 let trimmed = queued.text.trimmingCharacters(in: .whitespacesAndNewlines)
                 if trimmed.isEmpty {
-                    return String(localized: "Queued attachment", bundle: .module)
+                    return L("Queued attachment")
                 }
                 if trimmed.count <= 80 { return trimmed }
                 return String(trimmed.prefix(80)) + "\u{2026}"
@@ -1199,7 +1245,7 @@ extension FloatingInputCard {
                         .background(Circle().fill(theme.tertiaryBackground))
                 }
                 .buttonStyle(.plain)
-                .help("Cancel queued message")
+                .localizedHelp("Cancel queued message")
             }
             .padding(.horizontal, 10)
             .padding(.vertical, 6)
@@ -1476,12 +1522,12 @@ extension FloatingInputCard {
                     Image(systemName: "exclamationmark.triangle.fill")
                         .font(theme.font(size: CGFloat(theme.captionSize) - 2))
                         .foregroundColor(.orange)
-                        .help(Text("This model is outdated. Click to switch to a newer version.", bundle: .module))
+                        .localizedHelp("This model is outdated. Click to switch to a newer version.")
                 } else {
                     Circle()
                         .fill(Color.green)
                         .frame(width: 6, height: 6)
-                        .help(Text("Model ready", bundle: .module))
+                        .localizedHelp("Model ready")
                 }
 
                 // Model name with metadata badges
@@ -1569,7 +1615,7 @@ extension FloatingInputCard {
                         .foregroundColor(isEnabled ? theme.secondaryText : theme.tertiaryText)
                 }
             }
-            .help(Text("Toggle model reasoning mode", bundle: .module))
+            .localizedHelp("Toggle model reasoning mode")
         }
     }
 
@@ -1593,7 +1639,7 @@ extension FloatingInputCard {
                     .foregroundColor(autoSpeakAssistant ? theme.secondaryText : theme.tertiaryText)
             }
         }
-        .help(Text("Auto-speak every reply in this chat", bundle: .module))
+        .localizedHelp("Auto-speak every reply in this chat")
     }
 
     private func toggleThinking(id: String) {
@@ -2047,7 +2093,7 @@ extension FloatingInputCard {
                 isClipboardHovered = hovering
             }
         }
-        .help(Text("Attach snippet from \(clipboardService.lastSourceApp ?? "clipboard")", bundle: .module))
+        .help(Text(localized: "Attach snippet from \(clipboardService.lastSourceApp ?? "clipboard")"))
         .contextMenu {
             Button {
                 clipboardService.markAsRead()
@@ -2183,7 +2229,7 @@ extension FloatingInputCard {
                         }
                     } catch {
                         _ = await MainActor.run {
-                            ToastManager.shared.error("Could not attach file", message: error.localizedDescription)
+                            ToastManager.shared.error(L("Could not attach file"), message: error.localizedDescription)
                         }
                     }
                 }
@@ -2201,7 +2247,7 @@ extension FloatingInputCard {
                 folderChipContent(hasFolder: hasFolder, canEdit: true)
             }
             .buttonStyle(.plain)
-            .help(hasFolder ? "Change working folder" : "Select a working folder")
+            .help(hasFolder ? Text(localized: "Change working folder") : Text(localized: "Select a working folder"))
             .contextMenu {
                 if hasFolder {
                     Button {
@@ -2247,7 +2293,7 @@ extension FloatingInputCard {
                         .overlay(Circle().strokeBorder(theme.primaryBorder.opacity(0.5), lineWidth: 1))
                 }
                 .buttonStyle(.plain)
-                .help(Text("Clear folder selection", bundle: .module))
+                .localizedHelp("Clear folder selection")
                 .transition(.opacity.combined(with: .scale(scale: 0.8)))
             }
         }
@@ -2354,9 +2400,19 @@ extension FloatingInputCard {
     // MARK: - Voice Input Button
 
     private var voiceInputButton: some View {
-        Group {
-            if speechService.isLoadingModel {
-                // model is loading — show a small spinner in place of the mic icon
+        // Only render the disabled "loading…" state when mic access has
+        // actually been granted. For `.notDetermined`/`.denied` the model
+        // can't be used yet, and a background autoload (e.g.
+        // `SpeechService.autoLoadIfNeeded` at launch) would otherwise
+        // freeze the button and swallow the tap that needs to surface
+        // either the system mic prompt or the denied alert.
+        let micAuthorized = AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        return Group {
+            if speechService.isLoadingModel && micAuthorized {
+                // Original disabled-spinner state — only when mic is
+                // already authorized, since otherwise no model load is
+                // running and the tap must remain free to surface either
+                // the system prompt or the denied alert.
                 InputActionButton(
                     icon: "mic.fill",
                     help: "Loading voice model…",
@@ -2400,7 +2456,7 @@ extension FloatingInputCard {
             } catch {
                 _ = await MainActor.run {
                     ToastManager.shared.error(
-                        "Could not attach \(filename)",
+                        L("Could not attach \(filename)"),
                         message: error.localizedDescription
                     )
                 }
@@ -2505,11 +2561,11 @@ extension FloatingInputCard {
         if DocumentParser.isImageFile(url: url) {
             guard cap.supportsImage else {
                 ToastManager.shared.error(
-                    "Cannot attach \(url.lastPathComponent)",
+                    L("Cannot attach \(url.lastPathComponent)"),
                     message:
                         cap.anyMedia
-                        ? "The current model supports \(cap.summary) only."
-                        : "The current model is text-only."
+                        ? L("The current model supports \(cap.summary) only.")
+                        : L("The current model is text-only.")
                 )
                 return
             }
@@ -2542,11 +2598,11 @@ extension FloatingInputCard {
 
         // Reject otherwise — surface a toast so the user knows why.
         ToastManager.shared.error(
-            "Cannot attach \(url.lastPathComponent)",
+            L("Cannot attach \(url.lastPathComponent)"),
             message:
                 cap.anyMedia
-                ? "The current model supports \(cap.summary) only."
-                : "The current model is text-only."
+                ? L("The current model supports \(cap.summary) only.")
+                : L("The current model is text-only.")
         )
     }
 
@@ -2570,15 +2626,15 @@ extension FloatingInputCard {
     private func attachAudio(url: URL, ext: String) {
         guard let data = try? Data(contentsOf: url) else {
             ToastManager.shared.error(
-                "Could not read \(url.lastPathComponent)",
-                message: "File may be unreadable or too large to attach."
+                L("Could not read \(url.lastPathComponent)"),
+                message: L("File may be unreadable or too large to attach.")
             )
             return
         }
         // Cap inline audio at 50 MB — beyond that the user is sending
         // multi-minute clips that should go through a streaming API.
         guard data.count <= 50 * 1024 * 1024 else {
-            ToastManager.shared.error(
+            ToastManager.shared.errorLocalized(
                 "Audio file too large",
                 message: "Files larger than 50 MB are not supported in chat attachments."
             )
@@ -2593,13 +2649,13 @@ extension FloatingInputCard {
     private func attachVideo(url: URL) {
         guard let data = try? Data(contentsOf: url) else {
             ToastManager.shared.error(
-                "Could not read \(url.lastPathComponent)",
-                message: "File may be unreadable or too large to attach."
+                L("Could not read \(url.lastPathComponent)"),
+                message: L("File may be unreadable or too large to attach.")
             )
             return
         }
         guard data.count <= 100 * 1024 * 1024 else {
-            ToastManager.shared.error(
+            ToastManager.shared.errorLocalized(
                 "Video file too large",
                 message: "Files larger than 100 MB are not supported. Trim before attaching."
             )
@@ -3732,7 +3788,7 @@ private struct SlashCommandTriggerButton: View {
             )
         }
         .buttonStyle(.plain)
-        .help(Text("Browse slash commands", bundle: .module))
+        .localizedHelp("Browse slash commands")
         .onHover { isHovered = $0 }
     }
 }
@@ -3964,7 +4020,7 @@ private struct SendQueueButton: View {
         .buttonStyle(.plain)
         .disabled(!canSend)
         .opacity(canSend ? 1 : 0.5)
-        .help("Queue message · sent when current run finishes")
+        .localizedHelp("Queue message · sent when current run finishes")
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) {
                 isHovered = hovering
@@ -4034,7 +4090,7 @@ private struct SendNowButton: View {
             )
         }
         .buttonStyle(.plain)
-        .help("Send now · interrupts current run")
+        .localizedHelp("Send now · interrupts current run")
         .onHover { hovering in
             withAnimation(.easeOut(duration: 0.15)) {
                 isHovered = hovering

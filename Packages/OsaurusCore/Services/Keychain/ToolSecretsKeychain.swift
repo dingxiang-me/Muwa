@@ -43,6 +43,8 @@ public enum ToolSecretsKeychain {
             kSecAttrAccount as String: account,
             kSecReturnData as String: true,
             kSecMatchLimit as String: kSecMatchLimitOne,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+            kSecUseAuthenticationContext as String: KeychainQueryHelpers.nonInteractiveContext(),
         ]
 
         var result: AnyObject?
@@ -110,20 +112,35 @@ public enum ToolSecretsKeychain {
     public static func getAllSecrets(for pluginId: String, agentId: UUID) -> [String: String] {
         let accountPrefix = agentAccountPrefix(agentId: agentId, pluginId: pluginId)
 
-        let allItems = fetchAllItems(attributesOnly: false)
+        let allItems = fetchAllItems(attributesOnly: true)
         var secrets: [String: String] = [:]
         for item in allItems {
-            if let account = item[kSecAttrAccount as String] as? String,
-                account.hasPrefix(accountPrefix),
-                let data = item[kSecValueData as String] as? Data,
-                let value = String(data: data, encoding: .utf8)
-            {
-                let secretId = String(account.dropFirst(accountPrefix.count))
+            guard let account = item[kSecAttrAccount as String] as? String,
+                account.hasPrefix(accountPrefix)
+            else { continue }
+            let secretId = String(account.dropFirst(accountPrefix.count))
+            if let value = getSecret(id: secretId, for: pluginId, agentId: agentId) {
                 secrets[secretId] = value
             }
         }
 
         return secrets
+    }
+
+    /// Per-agent secrets merged on top of `Agent.defaultId` (Plugins-tab
+    /// writes act as global defaults; Agents-tab writes override per-key).
+    public static func resolvedSecretsWithDefaults(pluginId: String, agentId: UUID) -> [String: String] {
+        resolvedSecretsMerging(pluginId: pluginId, primary: agentId, defaults: Agent.defaultId)
+    }
+
+    /// Two-id merge primitive: `primary` agent's secrets overlaid on `defaults`.
+    public static func resolvedSecretsMerging(pluginId: String, primary: UUID, defaults: UUID) -> [String: String] {
+        let defaultDict = getAllSecrets(for: pluginId, agentId: defaults)
+        if primary == defaults { return defaultDict }
+        let primaryDict = getAllSecrets(for: pluginId, agentId: primary)
+        var merged = defaultDict
+        for (k, v) in primaryDict { merged[k] = v }
+        return merged
     }
 
     public static func hasAllRequiredSecrets(specs: [PluginManifest.SecretSpec], for pluginId: String, agentId: UUID)
@@ -223,6 +240,8 @@ public enum ToolSecretsKeychain {
             kSecAttrService as String: service,
             kSecMatchLimit as String: kSecMatchLimitAll,
             kSecReturnAttributes as String: true,
+            kSecUseAuthenticationUI as String: kSecUseAuthenticationUISkip,
+            kSecUseAuthenticationContext as String: KeychainQueryHelpers.nonInteractiveContext(),
         ]
         if !attributesOnly {
             query[kSecReturnData as String] = true

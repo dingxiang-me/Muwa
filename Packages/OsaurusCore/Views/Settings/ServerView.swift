@@ -13,6 +13,7 @@ import UniformTypeIdentifiers
 
 enum ServerTab: String, CaseIterable, AnimatedTabItem {
     case overview = "Overview"
+    case settings = "Settings"
     case apiReference = "API Reference"
 
     var title: String { rawValue }
@@ -55,6 +56,8 @@ struct ServerView: View {
                 switch selectedTab {
                 case .overview:
                     OverviewTabContent()
+                case .settings:
+                    ServerSettingsTabContent()
                 case .apiReference:
                     APIReferenceTabContent(searchText: searchText)
                 }
@@ -160,7 +163,7 @@ private struct ServerStatusCard: View {
                                 )
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .help(Text("Copy URL", bundle: .module))
+                        .localizedHelp("Copy URL")
                     }
                 }
 
@@ -221,6 +224,7 @@ private struct AccessKeysSection: View {
     @State private var generatedKey: String?
     @State private var isGeneratingKey = false
     @State private var keyGenError: String?
+    @State private var didLoadAccessKeys = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
@@ -235,24 +239,35 @@ private struct AccessKeysSection: View {
 
                 Spacer()
 
-                if OsaurusIdentity.exists() {
-                    Button(action: { showingKeyGenerator = true }) {
-                        HStack(spacing: 6) {
-                            Image(systemName: "plus")
-                                .font(.system(size: 10, weight: .semibold))
-                            Text("Generate Key", bundle: .module)
-                                .font(.system(size: 12, weight: .semibold))
-                        }
-                        .foregroundColor(.white)
-                        .padding(.horizontal, 12)
+                Button(action: { reloadAccessKeys(readKeychain: true) }) {
+                    Text("Refresh", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.secondaryText)
+                        .padding(.horizontal, 10)
                         .padding(.vertical, 6)
                         .background(
                             RoundedRectangle(cornerRadius: 6)
-                                .fill(theme.accentColor)
+                                .stroke(theme.primaryBorder.opacity(0.6), lineWidth: 1)
                         )
-                    }
-                    .buttonStyle(PlainButtonStyle())
                 }
+                .buttonStyle(PlainButtonStyle())
+
+                Button(action: { showingKeyGenerator = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Generate Key", bundle: .module)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(theme.accentColor)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
             }
 
             if let generatedKey {
@@ -270,7 +285,9 @@ private struct AccessKeysSection: View {
                             .foregroundColor(theme.warningColor)
                     }
                     Text(
-                        "All API endpoints are restricted until you create an access key. Click \"Generate Key\" above to get started.",
+                        didLoadAccessKeys
+                            ? "All API endpoints are restricted until you create an access key. Click \"Generate Key\" above to get started."
+                            : "Access key metadata is loaded on demand so startup never reads Keychain. Refresh to inspect existing keys.",
                         bundle: .module
                     )
                     .font(.system(size: 12))
@@ -314,9 +331,6 @@ private struct AccessKeysSection: View {
                     keyGenError = nil
                 }
             )
-        }
-        .onAppear {
-            reloadAccessKeys()
         }
     }
 
@@ -499,7 +513,11 @@ private struct AccessKeysSection: View {
             .background(Capsule().fill(color.opacity(0.12)))
     }
 
-    private func reloadAccessKeys() {
+    private func reloadAccessKeys(readKeychain: Bool = false) {
+        if readKeychain {
+            APIKeyManager.shared.reload()
+            didLoadAccessKeys = true
+        }
         accessKeys = APIKeyManager.shared.listKeys().sorted { $0.createdAt > $1.createdAt }
         let knownAgentAddrs = Set(
             AgentManager.shared.agents.compactMap { $0.agentAddress }
@@ -679,7 +697,7 @@ private struct RelaysSectionView: View {
                                 .foregroundColor(copiedRelayURL == agent.id ? theme.successColor : theme.tertiaryText)
                         }
                         .buttonStyle(PlainButtonStyle())
-                        .help(Text("Copy relay URL", bundle: .module))
+                        .localizedHelp("Copy relay URL")
                     }
                 }
 
@@ -718,7 +736,7 @@ private struct RelaysSectionView: View {
                         .foregroundColor(theme.accentColor)
                 }
                 .buttonStyle(PlainButtonStyle())
-                .help(Text("Set up this agent's identity in the Identity tab", bundle: .module))
+                .localizedHelp("Set up this agent's identity in the Identity tab")
             }
         }
         .padding(.horizontal, 12)
@@ -1669,7 +1687,7 @@ private struct ResponsePanel: View {
                             .foregroundColor(theme.tertiaryText)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(Text("Copy response", bundle: .module))
+                    .localizedHelp("Copy response")
 
                     Button(action: onClearResponse) {
                         Image(systemName: "xmark")
@@ -1677,7 +1695,7 @@ private struct ResponsePanel: View {
                             .foregroundColor(theme.tertiaryText)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(Text("Clear response", bundle: .module))
+                    .localizedHelp("Clear response")
                 }
             }
 
@@ -2076,7 +2094,7 @@ private struct TranscriptionTestRow: View {
                             .foregroundColor(theme.tertiaryText)
                     }
                     .buttonStyle(PlainButtonStyle())
-                    .help(Text("Remove file", bundle: .module))
+                    .localizedHelp("Remove file")
                 }
                 .padding(.horizontal, 12)
                 .padding(.vertical, 10)
@@ -2127,8 +2145,8 @@ private struct TranscriptionTestRow: View {
         panel.canChooseDirectories = false
         panel.canChooseFiles = true
         panel.allowedContentTypes = [.audio, .wav, .mp3, .mpeg4Audio]
-        panel.message = "Select an audio file to transcribe"
-        panel.prompt = "Select"
+        panel.message = L("Select an audio file to transcribe")
+        panel.prompt = L("Select")
 
         if panel.runModal() == .OK, let url = panel.url {
             loadFile(from: url)

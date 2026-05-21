@@ -4,7 +4,7 @@
 //
 //  Best-effort detection of inline tool-call JSON in generated text for the
 //  remote (non-MLX) provider path.  The MLX path delegates to the upstream
-//  ToolCallProcessor from mlx-swift-lm instead.
+//  ToolCallProcessor from vmlx-swift instead.
 //
 
 import Foundation
@@ -16,7 +16,7 @@ import Foundation
 /// `tool_calls` field.  This helper parses those out as a fallback.
 ///
 /// The MLX local-inference path does NOT use this — it delegates entirely to
-/// `ToolCallProcessor` from `MLXLMCommon` (mlx-swift-lm).
+/// `ToolCallProcessor` from `MLXLMCommon` (vmlx-swift).
 enum RemoteToolDetection {
     /// Best-effort detector for inline tool-call JSON in generated text. Returns (toolName, argsJSON).
     ///
@@ -115,10 +115,12 @@ enum RemoteToolDetection {
             let obj = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else { return nil }
 
+        // Sorted keys: extracted args become next-turn
+        // `tool_calls[].function.arguments`. See `JSONDeterminism.swift`.
         if let function = obj["function"] as? [String: Any], let name = function["name"] as? String {
             if let argsString = function["arguments"] as? String { return (name, argsString) }
             if let argsObj = function["arguments"],
-                let argsData = try? JSONSerialization.data(withJSONObject: argsObj),
+                let argsData = try? JSONSerialization.data(withJSONObject: argsObj, options: .osaurusCanonical),
                 let argsJSON = String(data: argsData, encoding: .utf8)
             {
                 return (name, argsJSON)
@@ -127,7 +129,7 @@ enum RemoteToolDetection {
         if let name = obj["tool_name"] as? String {
             if let argsString = obj["arguments"] as? String { return (name, argsString) }
             if let argsObj = obj["arguments"],
-                let argsData = try? JSONSerialization.data(withJSONObject: argsObj),
+                let argsData = try? JSONSerialization.data(withJSONObject: argsObj, options: .osaurusCanonical),
                 let argsJSON = String(data: argsData, encoding: .utf8)
             {
                 return (name, argsJSON)
@@ -136,7 +138,7 @@ enum RemoteToolDetection {
         if let name = obj["name"] as? String {
             if let argsString = obj["arguments"] as? String { return (name, argsString) }
             if let argsObj = obj["arguments"],
-                let argsData = try? JSONSerialization.data(withJSONObject: argsObj),
+                let argsData = try? JSONSerialization.data(withJSONObject: argsObj, options: .osaurusCanonical),
                 let argsJSON = String(data: argsData, encoding: .utf8)
             {
                 return (name, argsJSON)
