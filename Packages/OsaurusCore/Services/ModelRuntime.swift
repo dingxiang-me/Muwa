@@ -847,9 +847,11 @@ public actor ModelRuntime {
         } else if ModelFamilyNames.isZayaFamily(modelName) {
             tags.append("layers=zayaCCA")
             tags.append("prefix=path-dependent-disk")
-        } else if ModelFamilyNames.isLingFamily(modelName) {
+        } else if Self.isKnownHybridModel(name: modelName) {
             tags.append("layers=hybrid-ssm")
-        } else if ModelFamilyNames.isNemotronOmniFamily(modelName) {
+        }
+
+        if ModelFamilyNames.isNemotronOmniFamily(modelName) {
             tags.append("media=omni-audio-video")
         }
 
