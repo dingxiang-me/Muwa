@@ -155,8 +155,9 @@ struct DashboardView: View {
                 ],
                 spacing: 20
             ) {
+                let reorderable = viewModel.widgets.count > 1
                 ForEach(viewModel.widgets) { widget in
-                    WidgetCard(
+                    let card = WidgetCard(
                         widget: widget,
                         result: viewModel.results[widget.id] ?? .idle,
                         onRefresh: {
@@ -170,14 +171,19 @@ struct DashboardView: View {
                             showAddSheet = true
                         }
                     )
-                    .draggable(widget.id.uuidString)
-                    .dropDestination(for: String.self) { items, _ in
-                        guard let raw = items.first,
-                            let dragged = UUID(uuidString: raw),
-                            dragged != widget.id
-                        else { return false }
-                        viewModel.moveWidget(id: dragged, before: widget.id)
-                        return true
+                    if reorderable {
+                        card
+                            .draggable(widget.id.uuidString)
+                            .dropDestination(for: String.self) { items, _ in
+                                guard let raw = items.first,
+                                    let dragged = UUID(uuidString: raw),
+                                    dragged != widget.id
+                                else { return false }
+                                viewModel.moveWidget(id: dragged, before: widget.id)
+                                return true
+                            }
+                    } else {
+                        card
                     }
                 }
             }

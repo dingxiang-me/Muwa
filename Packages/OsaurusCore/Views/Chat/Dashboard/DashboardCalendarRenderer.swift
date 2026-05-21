@@ -99,12 +99,46 @@ enum CalendarPayloadAdapter {
     }()
 }
 
+// MARK: - Refresh-time arg rewriting
+
+enum CalendarWeekArgs {
+    /// rewrites the configured (or default) start/end keys to span the current week,
+    /// so a single fetch covers all 7 days the strip exposes
+    static func rewrite(_ args: JSONValue, mapping: WidgetFieldMapping) -> JSONValue {
+        let startKey = mapping.startKey ?? "fromDate"
+        let endKey = mapping.endKey ?? "toDate"
+        let (start, end) = currentWeekBounds()
+        let formatter = ISO8601DateFormatter()
+        formatter.formatOptions = [.withInternetDateTime]
+
+        var dict: [String: JSONValue] = {
+            if case .object(let d) = args { return d }
+            return [:]
+        }()
+        dict[startKey] = .string(formatter.string(from: start))
+        dict[endKey] = .string(formatter.string(from: end))
+        return .object(dict)
+    }
+
+    private static func currentWeekBounds() -> (Date, Date) {
+        var cal = Calendar.current
+        cal.firstWeekday = 2 // Monday
+        let today = cal.startOfDay(for: Date())
+        guard let interval = cal.dateInterval(of: .weekOfYear, for: today) else {
+            return (today, today.addingTimeInterval(7 * 86400))
+        }
+        return (interval.start, interval.end)
+    }
+}
+
 // MARK: - View
 
 struct CalendarRendererView: View {
     @Environment(\.theme) private var theme
     let payload: JSONValue
     let mapping: WidgetFieldMapping
+
+    @State private var selectedDay: Date = Calendar.current.startOfDay(for: Date())
 
     private var events: [CalendarEvent] {
         CalendarPayloadAdapter.parse(payload, mapping: mapping)
@@ -113,27 +147,18 @@ struct CalendarRendererView: View {
     var body: some View {
         let weekDays = currentWeek()
         let today = Calendar.current.startOfDay(for: Date())
-        let todaysEvents = events.filter {
-            Calendar.current.isDate($0.start, inSameDayAs: today)
+        let dayEvents = events.filter {
+            Calendar.current.isDate($0.start, inSameDayAs: selectedDay)
         }
 
         VStack(alignment: .leading, spacing: 14) {
-            heading
             weekStrip(days: weekDays, today: today)
-            if todaysEvents.isEmpty {
+            if dayEvents.isEmpty {
                 emptyState
             } else {
-                eventsList(todaysEvents)
+                eventsList(dayEvents)
             }
         }
-    }
-
-    // MARK: Heading
-
-    private var heading: some View {
-        Text(Date.now.formatted(.dateTime.weekday(.wide).month(.wide).day()))
-            .font(.system(size: 18, weight: .semibold))
-            .foregroundColor(theme.primaryText)
     }
 
     // MARK: Week strip
@@ -141,32 +166,48 @@ struct CalendarRendererView: View {
     private func weekStrip(days: [Date], today: Date) -> some View {
         HStack(spacing: 6) {
             ForEach(days, id: \.self) { day in
-                dayChip(day, isToday: Calendar.current.isDate(day, inSameDayAs: today))
+                dayChip(
+                    day,
+                    isToday: Calendar.current.isDate(day, inSameDayAs: today),
+                    isSelected: Calendar.current.isDate(day, inSameDayAs: selectedDay)
+                )
             }
         }
     }
 
-    private func dayChip(_ day: Date, isToday: Bool) -> some View {
+    private func dayChip(_ day: Date, isToday: Bool, isSelected: Bool) -> some View {
         let weekday = day.formatted(.dateTime.weekday(.abbreviated)).uppercased()
         let dayNum = Calendar.current.component(.day, from: day)
-        return VStack(spacing: 2) {
-            Text(weekday)
-                .font(.system(size: 9, weight: .semibold))
-                .foregroundColor(isToday ? theme.primaryBackground : theme.tertiaryText)
-            Text("\(dayNum)")
-                .font(.system(size: 18, weight: .semibold, design: .rounded))
-                .foregroundColor(isToday ? theme.primaryBackground : theme.primaryText)
+        let filled = isToday
+        return Button {
+            withAnimation(.easeOut(duration: 0.15)) {
+                selectedDay = Calendar.current.startOfDay(for: day)
+            }
+        } label: {
+            VStack(spacing: 2) {
+                Text(weekday)
+                    .font(.system(size: 9, weight: .semibold))
+                    .foregroundColor(filled ? theme.primaryBackground : theme.tertiaryText)
+                Text("\(dayNum)")
+                    .font(.system(size: 18, weight: .semibold, design: .rounded))
+                    .foregroundColor(filled ? theme.primaryBackground : theme.primaryText)
+            }
+            .frame(maxWidth: .infinity)
+            .padding(.vertical, 8)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(filled ? theme.primaryText : theme.secondaryBackground)
+            )
+            .overlay(
+                RoundedRectangle(cornerRadius: 8)
+                    .stroke(
+                        isSelected && !filled ? theme.accentColor : theme.cardBorder.opacity(filled ? 0 : 0.5),
+                        lineWidth: isSelected && !filled ? 1.5 : 1
+                    )
+            )
+            .contentShape(RoundedRectangle(cornerRadius: 8))
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 8)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(isToday ? theme.primaryText : theme.secondaryBackground)
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 8)
-                .stroke(theme.cardBorder.opacity(isToday ? 0 : 0.5), lineWidth: 1)
-        )
+        .buttonStyle(.plain)
     }
 
     // MARK: Events list

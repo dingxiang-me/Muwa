@@ -116,7 +116,11 @@ final class DashboardViewModel: ObservableObject {
         refreshTokens[id] = token
         results[id] = .loading
 
-        let argumentsJSON = encodeArgs(widget.arguments)
+        // calendar widgets always fetch the current week so day-tap filtering has data
+        let effectiveArgs: JSONValue = widget.renderConfig.renderer == .calendar
+            ? CalendarWeekArgs.rewrite(widget.arguments, mapping: widget.renderConfig.mapping)
+            : widget.arguments
+        let argumentsJSON = encodeArgs(effectiveArgs)
         do {
             let raw = try await ToolRegistry.shared.execute(
                 name: widget.toolName,
