@@ -708,11 +708,32 @@ struct DashboardAddWidgetSheet: View {
         case .source:
             return selectedTool != nil
         case .configure:
-            return !title.trimmingCharacters(in: .whitespaces).isEmpty
+            guard !title.trimmingCharacters(in: .whitespaces).isEmpty else { return false }
+            return missingRequiredArgs.isEmpty
         case .style:
             return true
         case .schedule:
             return canSave
+        }
+    }
+
+    /// names of required schema fields the user hasn't filled (or left blank)
+    private var missingRequiredArgs: [String] {
+        guard let props = DashboardSchemaParser.parse(selectedTool?.parameters) else { return [] }
+        return props
+            .filter { $0.required }
+            .filter { !isArgumentProvided($0.name) }
+            .map { $0.name }
+    }
+
+    private func isArgumentProvided(_ key: String) -> Bool {
+        guard case .object(let dict) = arguments, let value = dict[key] else { return false }
+        switch value {
+        case .null: return false
+        case .string(let s): return !s.trimmingCharacters(in: .whitespaces).isEmpty
+        case .array(let arr): return !arr.isEmpty
+        case .object(let d): return !d.isEmpty
+        case .number, .bool: return true
         }
     }
 
