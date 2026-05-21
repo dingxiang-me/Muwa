@@ -342,9 +342,19 @@ struct DashboardAddWidgetSheet: View {
                     .foregroundColor(isSelected ? theme.accentColor : theme.secondaryText)
                     .frame(width: 22)
                 VStack(alignment: .leading, spacing: 1) {
-                    Text(info.title)
-                        .font(.system(size: 12, weight: .semibold))
-                        .foregroundColor(theme.primaryText)
+                    HStack(spacing: 6) {
+                        Text(info.title)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(theme.primaryText)
+                        if recommendedRenderer == r {
+                            Text("Recommended")
+                                .font(.system(size: 9, weight: .semibold))
+                                .foregroundColor(theme.accentColor)
+                                .padding(.horizontal, 5)
+                                .padding(.vertical, 1)
+                                .background(Capsule().fill(theme.accentColor.opacity(0.15)))
+                        }
+                    }
                     Text(info.description)
                         .font(.system(size: 10))
                         .foregroundColor(theme.tertiaryText)
@@ -549,6 +559,11 @@ struct DashboardAddWidgetSheet: View {
             case .chart:
                 mappingField("X-axis field", binding: mappingBinding(\.xKey))
                 mappingField("Y-axis field", binding: mappingBinding(\.yKey))
+            case .calendar:
+                mappingField("Title field", binding: mappingBinding(\.titleKey))
+                mappingField("Subtitle field", binding: mappingBinding(\.subtitleKey))
+                mappingField("Start field", binding: mappingBinding(\.startKey))
+                mappingField("End field", binding: mappingBinding(\.endKey))
             default:
                 EmptyView()
             }
@@ -741,15 +756,24 @@ struct DashboardAddWidgetSheet: View {
     }
 
     /// hides `.raw` from the consumer chip list (still selectable via existing widget on edit)
+    private var recommendedRenderer: WidgetRenderer? {
+        selectedTool.flatMap { DashboardToolCatalog.renderHint(forTool: $0.name) }
+    }
+
     private var consumerRenderers: [WidgetRenderer] {
-        var out: [WidgetRenderer] = [.stat, .keyValue, .list, .table, .markdown, .chart]
+        var out: [WidgetRenderer] = [.stat, .keyValue, .list, .table, .markdown, .chart, .calendar]
         if renderer == .raw { out.append(.raw) }
+        // surface plugin-recommended renderer first so it's the obvious default
+        if let rec = recommendedRenderer, let idx = out.firstIndex(of: rec) {
+            out.remove(at: idx)
+            out.insert(rec, at: 0)
+        }
         return out
     }
 
     private var shouldShowMapping: Bool {
         switch renderer {
-        case .stat, .list, .table, .chart: return true
+        case .stat, .list, .table, .chart, .calendar: return true
         default: return false
         }
     }
@@ -923,6 +947,8 @@ struct DashboardAddWidgetSheet: View {
             return ("Article", "Formatted text or summary", "doc.text")
         case .chart:
             return ("Chart", "Visualize numbers as a graph", "chart.bar.fill")
+        case .calendar:
+            return ("Calendar", "Week strip with today's events", "calendar")
         case .raw:
             return ("Raw data", "Show the underlying response", "curlybraces")
         }

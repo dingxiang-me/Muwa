@@ -226,6 +226,8 @@ struct WidgetRendererView: View {
             MarkdownRenderer(payload: payload)
         case .chart:
             ChartRenderer(payload: payload, mapping: mapping)
+        case .calendar:
+            CalendarRendererView(payload: payload, mapping: mapping)
         case .raw:
             RawRenderer(payload: payload)
         }

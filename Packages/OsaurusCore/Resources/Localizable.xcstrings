@@ -1608,6 +1608,9 @@
     "All API endpoints are restricted until you create an access key. Click \"Generate Key\" above to get started." : {
 
     },
+    "ALL DAY" : {
+
+    },
     "All enabled capabilities are sent to the model every turn." : {
 
     },
@@ -13403,6 +13406,12 @@
           }
         }
       }
+    },
+    "Nothing scheduled today" : {
+
+    },
+    "NOW" : {
+
     },
     "NULL" : {
 

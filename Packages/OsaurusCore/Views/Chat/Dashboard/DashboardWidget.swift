@@ -12,6 +12,7 @@ enum WidgetRenderer: String, Codable, Sendable, CaseIterable {
     case table
     case markdown
     case chart
+    case calendar
     case raw
 }
 
@@ -21,19 +22,25 @@ struct WidgetFieldMapping: Codable, Equatable, Sendable {
     var valueKey: String?
     var xKey: String?
     var yKey: String?
+    var startKey: String?
+    var endKey: String?
 
     init(
         titleKey: String? = nil,
         subtitleKey: String? = nil,
         valueKey: String? = nil,
         xKey: String? = nil,
-        yKey: String? = nil
+        yKey: String? = nil,
+        startKey: String? = nil,
+        endKey: String? = nil
     ) {
         self.titleKey = titleKey
         self.subtitleKey = subtitleKey
         self.valueKey = valueKey
         self.xKey = xKey
         self.yKey = yKey
+        self.startKey = startKey
+        self.endKey = endKey
     }
 }
 
