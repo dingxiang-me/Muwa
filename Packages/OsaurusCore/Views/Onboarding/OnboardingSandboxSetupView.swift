@@ -56,10 +56,10 @@ struct SandboxSetupBody: View {
     var body: some View {
         OnboardingTwoColumnBody(
             illustrationAsset: "osaurus-sandbox",
-            leftHeadline: "A safety net for your agent",
+            leftHeadline: "A safety net for your dino",
             leftBody:
-                "When your agent installs packages, runs scripts, or fiddles with files, it does that in a tiny Linux box — completely walled off from your Mac.",
-            subtitle: "Used whenever your agent needs to run real code."
+                "When your dino installs packages, runs scripts, or fiddles with files, it does that in a tiny, walled-off workspace — separate from your Mac.",
+            subtitle: "Where your dino runs anything that touches your system."
         ) {
             VStack(alignment: .leading, spacing: 14) {
                 explainerCard
@@ -77,12 +77,12 @@ struct SandboxSetupBody: View {
                 bulletRow(
                     icon: "shippingbox.fill",
                     title: L("Walled off from your Mac"),
-                    detail: L("Risky commands stay inside the box. Your files and apps don't see them.")
+                    detail: L("Anything risky stays inside the box. Your files and apps don't see them.")
                 )
                 bulletRow(
                     icon: "terminal.fill",
                     title: L("Real code, safely"),
-                    detail: L("Lets your agent install packages, run scripts, and work with files like a real machine.")
+                    detail: L("Lets your dino install packages, run scripts, and work with files like a real machine.")
                 )
                 bulletRow(
                     icon: "arrow.uturn.backward.circle.fill",
@@ -133,7 +133,7 @@ struct SandboxSetupBody: View {
                         .font(theme.font(size: 12, weight: .semibold))
                     Spacer(minLength: 0)
                     if !state.showAdvanced {
-                        Text("\(state.config.cpus) CPU · \(state.config.memoryGB) GB")
+                        Text("\(state.config.cpus) cores · \(state.config.memoryGB) GB memory")
                             .font(.system(size: 11, weight: .medium, design: .monospaced))
                             .foregroundColor(theme.tertiaryText)
                     }
@@ -154,7 +154,7 @@ struct SandboxSetupBody: View {
         OnboardingGlassCard {
             VStack(alignment: .leading, spacing: 14) {
                 resourceRow(
-                    label: "CPUs",
+                    label: "Processor cores",
                     value: "\(state.config.cpus)",
                     binding: $state.config.cpus,
                     range: 1 ... 8

@@ -97,7 +97,7 @@ public actor RemoteProviderService: ToolCapableService {
         // between tokens. The app-level streamInactivityTimeout handles stall detection.
         config.timeoutIntervalForRequest = max(provider.timeout, 300)
         config.timeoutIntervalForResource = max(provider.timeout * 2, 600)
-        self.session = URLSession(configuration: config)
+        self.session = GlobalProxySettings.makeSession(base: config)
     }
 
     /// Minimum timeout for image generation models (5 minutes).
@@ -3068,16 +3068,13 @@ extension RemoteProviderService {
             throw RemoteProviderServiceError.invalidURL
         }
 
-        var request = URLRequest(url: url)
-        request.httpMethod = "GET"
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        let request = modelDiscoveryRequest(
+            url: url,
+            headers: await provider.resolvedHeadersOffMainActor(),
+            timeout: provider.timeout
+        )
 
-        // Add provider headers
-        for (key, value) in await provider.resolvedHeadersOffMainActor() {
-            request.setValue(value, forHTTPHeaderField: key)
-        }
-
-        let (data, response) = try await URLSession.shared.data(for: request)
+        let (data, response) = try await GlobalProxySettings.makeSession().data(for: request)
 
         guard let httpResponse = response as? HTTPURLResponse else {
             throw RemoteProviderServiceError.invalidResponse
@@ -3114,6 +3111,30 @@ extension RemoteProviderService {
             }
             throw error
         }
+    }
+
+    /// Builds a bounded `/models` request so provider connect tests do not hang
+    /// longer than the user-configured discovery timeout.
+    static func modelDiscoveryRequest(
+        url: URL,
+        headers: [String: String],
+        timeout: TimeInterval
+    ) -> URLRequest {
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.timeoutInterval = modelDiscoveryTimeout(timeout)
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+
+        for (key, value) in headers {
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        return request
+    }
+
+    static func modelDiscoveryTimeout(_ timeout: TimeInterval) -> TimeInterval {
+        guard timeout.isFinite else { return 30 }
+        return min(max(timeout, 1), 30)
     }
 
     private static func canUseManualModelDiscoveryFallback(
@@ -3163,7 +3184,7 @@ extension RemoteProviderService {
             req.setValue("application/json", forHTTPHeaderField: "Accept")
             req.timeoutInterval = min(provider.timeout, 10)
             for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
-            if let (data, response) = try? await URLSession.shared.data(for: req),
+            if let (data, response) = try? await GlobalProxySettings.makeSession().data(for: req),
                 let http = response as? HTTPURLResponse, http.statusCode < 400,
                 let parsed = try? JSONDecoder().decode(ModelsResponse.self, from: data),
                 !parsed.data.isEmpty
@@ -3183,7 +3204,7 @@ extension RemoteProviderService {
         req.setValue("application/json", forHTTPHeaderField: "Accept")
         req.timeoutInterval = min(provider.timeout, 10)
         for (key, value) in headers { req.setValue(value, forHTTPHeaderField: key) }
-        guard let (data, response) = try? await URLSession.shared.data(for: req),
+        guard let (data, response) = try? await GlobalProxySettings.makeSession().data(for: req),
             let http = response as? HTTPURLResponse, http.statusCode < 400
         else {
             return ["default"]
@@ -3210,7 +3231,7 @@ extension RemoteProviderService {
 
         let config = URLSessionConfiguration.default
         config.timeoutIntervalForRequest = min(provider.timeout, 30)
-        let session = URLSession(configuration: config)
+        let session = GlobalProxySettings.makeSession(base: config)
 
         let (data, response) = try await session.data(for: request)
 
@@ -3266,14 +3287,9 @@ extension RemoteProviderService {
                 throw RemoteProviderServiceError.invalidURL
             }
 
-            var request = URLRequest(url: url)
-            request.httpMethod = "GET"
-            request.setValue("application/json", forHTTPHeaderField: "Accept")
-            for (key, value) in headers {
-                request.setValue(value, forHTTPHeaderField: key)
-            }
+            let request = modelDiscoveryRequest(url: url, headers: headers, timeout: timeout)
 
-            let (data, response) = try await URLSession.shared.data(for: request)
+            let (data, response) = try await GlobalProxySettings.makeSession().data(for: request)
 
             guard let httpResponse = response as? HTTPURLResponse else {
                 throw RemoteProviderServiceError.invalidResponse
