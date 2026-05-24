@@ -146,51 +146,86 @@ struct DashboardView: View {
     private var grid: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: 20) {
-            greetingHeader
-            DashboardBriefingBand()
-            LazyVGrid(
-                columns: [
-                    GridItem(.flexible(minimum: 280), spacing: 20),
-                    GridItem(.flexible(minimum: 280), spacing: 20),
-                ],
-                spacing: 20
-            ) {
-                let reorderable = viewModel.widgets.count > 1
-                ForEach(viewModel.widgets) { widget in
-                    let card = WidgetCard(
-                        widget: widget,
-                        result: viewModel.results[widget.id] ?? .idle,
-                        onRefresh: {
-                            Task { await viewModel.refresh(id: widget.id) }
-                        },
-                        onRemove: {
-                            viewModel.removeWidget(id: widget.id)
-                        },
-                        onEdit: {
-                            editingWidget = widget
-                            showAddSheet = true
-                        }
-                    )
-                    if reorderable {
-                        card
-                            .draggable(widget.id.uuidString)
-                            .dropDestination(for: String.self) { items, _ in
-                                guard let raw = items.first,
-                                    let dragged = UUID(uuidString: raw),
-                                    dragged != widget.id
-                                else { return false }
-                                viewModel.moveWidget(id: dragged, before: widget.id)
-                                return true
-                            }
-                    } else {
-                        card
-                    }
-                }
-            }
+                greetingHeader
+                DashboardBriefingBand()
+                widgetRows
             }
             .padding(24)
             .frame(maxWidth: 1100)
             .frame(maxWidth: .infinity)
+        }
+    }
+
+    /// Two-column flow where `.large` widgets span the full width and `.small`/`.medium`
+    /// take a single column. A leftover single non-large widget keeps its half width.
+    private var widgetRows: some View {
+        let reorderable = viewModel.widgets.count > 1
+        let rows = packedRows(viewModel.widgets)
+        return VStack(spacing: 20) {
+            ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                HStack(alignment: .top, spacing: 20) {
+                    ForEach(row) { widget in
+                        card(for: widget, reorderable: reorderable)
+                            .frame(maxWidth: .infinity)
+                    }
+                    // pad a lone half-width widget so it stays in the left column
+                    if row.count == 1, row[0].size != .large {
+                        Color.clear.frame(maxWidth: .infinity)
+                    }
+                }
+            }
+        }
+    }
+
+    /// Packs the ordered widgets into rows: each `.large` widget gets its own full-width row;
+    /// `.small`/`.medium` widgets pair up into two-column rows.
+    private func packedRows(_ widgets: [DashboardWidget]) -> [[DashboardWidget]] {
+        var rows: [[DashboardWidget]] = []
+        var pending: DashboardWidget?
+        for widget in widgets {
+            if widget.size == .large {
+                if let p = pending { rows.append([p]); pending = nil }
+                rows.append([widget])
+            } else if let p = pending {
+                rows.append([p, widget])
+                pending = nil
+            } else {
+                pending = widget
+            }
+        }
+        if let p = pending { rows.append([p]) }
+        return rows
+    }
+
+    @ViewBuilder
+    private func card(for widget: DashboardWidget, reorderable: Bool) -> some View {
+        let card = WidgetCard(
+            widget: widget,
+            result: viewModel.results[widget.id] ?? .idle,
+            onRefresh: {
+                Task { await viewModel.refresh(id: widget.id) }
+            },
+            onRemove: {
+                viewModel.removeWidget(id: widget.id)
+            },
+            onEdit: {
+                editingWidget = widget
+                showAddSheet = true
+            }
+        )
+        if reorderable {
+            card
+                .draggable(widget.id.uuidString)
+                .dropDestination(for: String.self) { items, _ in
+                    guard let raw = items.first,
+                        let dragged = UUID(uuidString: raw),
+                        dragged != widget.id
+                    else { return false }
+                    viewModel.moveWidget(id: dragged, before: widget.id)
+                    return true
+                }
+        } else {
+            card
         }
     }
 }

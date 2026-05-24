@@ -433,7 +433,7 @@ struct DashboardAddWidgetSheet: View {
         }
         .buttonStyle(.plain)
         .disabled(isDisabled)
-        .help(isDisabled ? "This size isn't supported for the selected renderer." : "")
+        .help(isDisabled ? "This size isn't supported for the selected renderer." : sizeHelp(s))
     }
 
     /// calendar's week strip + event list don't fit in compact heights
@@ -1026,9 +1026,9 @@ struct DashboardAddWidgetSheet: View {
 
     private func sizeIcon(_ s: WidgetSize) -> String {
         switch s {
-        case .small: return "rectangle.compress.vertical"
+        case .small: return "rectangle"
         case .medium: return "rectangle"
-        case .large: return "rectangle.expand.vertical"
+        case .large: return "rectangle.split.2x1"
         }
     }
 
@@ -1037,6 +1037,15 @@ struct DashboardAddWidgetSheet: View {
         case .small: return "Small"
         case .medium: return "Medium"
         case .large: return "Large"
+        }
+    }
+
+    /// footprint hint shown as a tooltip, reflecting how the size lays out in the grid
+    private func sizeHelp(_ s: WidgetSize) -> String {
+        switch s {
+        case .small: return "Single column · shows fewer rows"
+        case .medium: return "Single column · standard"
+        case .large: return "Full width · spans both columns"
         }
     }
 
