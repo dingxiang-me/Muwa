@@ -351,7 +351,8 @@ private struct TableRenderer: View {
 
     /// caps at five columns to keep wide rows from overflowing the card
     private func build() -> (columns: [String], rows: [[String: String]]) {
-        guard case .array(let items) = payload, !items.isEmpty else {
+        let items = arrayItems(from: payload)
+        guard !items.isEmpty else {
             return ([], [])
         }
         let objs: [[String: JSONValue]] = items.compactMap {
@@ -461,7 +462,7 @@ private struct ListRenderer: View {
     }
 
     private func buildRows() -> [Row] {
-        guard case .array(let items) = payload else { return [] }
+        let items = arrayItems(from: payload)
         let titleKey = mapping.titleKey
         let subtitleKey = mapping.subtitleKey
         return items.compactMap { item -> Row? in
@@ -565,6 +566,22 @@ private struct EmptyRendererState: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
     }
+}
+
+/// Unwraps the row array for list/table renderers. Accepts a top-level array, or finds the
+/// array under common envelope keys (e.g. `list_messages` returns `{messages: [...], total}`),
+/// or falls back to the object's first array value.
+private func arrayItems(from payload: JSONValue) -> [JSONValue] {
+    if case .array(let arr) = payload { return arr }
+    if case .object(let dict) = payload {
+        for key in ["messages", "items", "results", "data", "rows", "records", "events", "entries"] {
+            if case .array(let arr) = dict[key] ?? .null { return arr }
+        }
+        for key in dict.keys.sorted() {
+            if case .array(let arr) = dict[key] ?? .null { return arr }
+        }
+    }
+    return []
 }
 
 /// returns nil for arrays/objects so callers can fall back to placeholder text

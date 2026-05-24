@@ -215,7 +215,8 @@ struct DashboardAddWidgetSheet: View {
                     fieldGroup("Details") {
                         DashboardArgsForm(
                             parameters: selectedTool?.parameters,
-                            arguments: $arguments
+                            arguments: $arguments,
+                            toolName: selectedTool?.name
                         )
                     }
                 } else {

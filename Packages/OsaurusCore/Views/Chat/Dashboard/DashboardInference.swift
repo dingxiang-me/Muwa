@@ -33,6 +33,14 @@ enum DashboardInference {
             }
         }
 
+        // envelopes that wrap a primary collection alongside metadata
+        // (e.g. `{messages: [...], total: N, has_more: false}`) — render the collection
+        for key in ["messages", "items", "results", "data", "rows", "records", "events", "entries"] {
+            if case .array(let arr) = dict[key] ?? .null {
+                return inferFromArray(arr)
+            }
+        }
+
         let numericKey = dict.first(where: {
             if case .number = $0.value { return true }
             return false

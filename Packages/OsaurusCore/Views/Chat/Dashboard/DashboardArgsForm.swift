@@ -111,6 +111,9 @@ struct DashboardArgsForm: View {
     @Environment(\.theme) private var theme
     let parameters: JSONValue?
     @Binding var arguments: JSONValue
+    /// the tool being configured — lets specific fields populate a dropdown from a companion
+    /// tool (e.g. `mailbox_path` is filled from `list_mailboxes`) instead of free text
+    var toolName: String? = nil
 
     private var parsed: [ParsedProperty]? {
         DashboardSchemaParser.parse(parameters)
@@ -156,8 +159,22 @@ struct DashboardArgsForm: View {
 
     @ViewBuilder
     private func propertyRow(_ prop: ParsedProperty) -> some View {
-        // booleans read more naturally as "label ............ toggle" on one line
-        if case .boolean = prop.kind {
+        if let provider = cascadingProvider(for: prop) {
+            // cascading dropdown labels itself ("Account"/"Mailbox"), so the generic field
+            // name is dropped — the sub-pickers carry their own required markers
+            VStack(alignment: .leading, spacing: 6) {
+                DynamicEnumField(
+                    provider: provider,
+                    value: stringBinding(for: prop.name, defaultValue: prop.defaultValue),
+                    theme: theme,
+                    required: prop.required
+                ) {
+                    stringField(prop)
+                }
+                description(prop)
+            }
+        } else if case .boolean = prop.kind {
+            // booleans read more naturally as "label ............ toggle" on one line
             VStack(alignment: .leading, spacing: 6) {
                 HStack(spacing: 6) {
                     nameLabel(prop)
@@ -176,7 +193,18 @@ struct DashboardArgsForm: View {
                 case .string(.some(let values)):
                     enumPicker(prop, values: values)
                 case .string(.none):
-                    stringField(prop)
+                    if let provider = dynamicProvider(for: prop.name) {
+                        DynamicEnumField(
+                            provider: provider,
+                            value: stringBinding(for: prop.name, defaultValue: prop.defaultValue),
+                            theme: theme,
+                            required: prop.required
+                        ) {
+                            stringField(prop)
+                        }
+                    } else {
+                        stringField(prop)
+                    }
                 case .integer:
                     numberField(prop, integerOnly: true)
                 case .number:
@@ -193,9 +221,26 @@ struct DashboardArgsForm: View {
         }
     }
 
+    /// returns the provider only for a string field that opts into the cascading
+    /// (account → mailbox) UI, which renders its own labels in place of the field name
+    private func cascadingProvider(for prop: ParsedProperty) -> DynamicOptionsProvider? {
+        guard case .string(.none) = prop.kind else { return nil }
+        guard let provider = dynamicProvider(for: prop.name), provider.cascading else { return nil }
+        return provider
+    }
+
+    /// friendlier field labels for the form only — the argument key sent to the tool is unchanged
+    private static let fieldDisplayNames: [String: String] = [
+        "mailbox_path": "mailbox"
+    ]
+    /// description overrides for fields whose schema text is too technical once we render a nicer control
+    private static let fieldDescriptions: [String: String] = [
+        "mailbox_path": "Pick the account, then the mailbox to show."
+    ]
+
     @ViewBuilder
     private func nameLabel(_ prop: ParsedProperty) -> some View {
-        Text(prop.name)
+        Text(Self.fieldDisplayNames[prop.name] ?? prop.name)
             .font(.system(size: 13, weight: .semibold, design: .monospaced))
             .foregroundColor(theme.primaryText)
         if prop.required {
@@ -207,8 +252,9 @@ struct DashboardArgsForm: View {
 
     @ViewBuilder
     private func description(_ prop: ParsedProperty) -> some View {
-        if let desc = prop.description, !desc.isEmpty {
-            Text(desc)
+        let text = Self.fieldDescriptions[prop.name] ?? prop.description
+        if let text, !text.isEmpty {
+            Text(text)
                 .font(.system(size: 12))
                 .foregroundColor(theme.tertiaryText)
                 .lineLimit(3)
@@ -347,6 +393,45 @@ struct DashboardArgsForm: View {
             )
     }
 
+    // MARK: - Dynamic dropdowns
+
+    /// describes how to populate a field's dropdown by running a companion tool and reading
+    /// `valueKey` out of each object in the `arrayKey` array of its result
+    struct DynamicOptionsProvider {
+        let sourceTool: String
+        let arrayKey: String
+        let valueKey: String
+        /// optional numeric field appended to each label as a badge (e.g. unread count)
+        let badgeKey: String?
+        /// when true, values shaped like "Account/Mailbox" are split into two cascading
+        /// dropdowns (pick the account first, then the mailbox within it)
+        let cascading: Bool
+        /// in cascading mode, the result field that holds a human-friendly account label
+        /// (e.g. the email address) so the account dropdown shows "you@work.com" rather than
+        /// the ambiguous account name. Falls back to the account name when absent.
+        let accountLabelKey: String?
+    }
+
+    /// field name → provider. Activated only when the source tool is actually registered,
+    /// so the dropdown appears for users who have the relevant plugin and falls back to a
+    /// plain text field otherwise.
+    private static let dynamicProviders: [String: DynamicOptionsProvider] = [
+        "mailbox_path": DynamicOptionsProvider(
+            sourceTool: "list_mailboxes",
+            arrayKey: "mailboxes",
+            valueKey: "mailbox_path",
+            badgeKey: "unread_count",
+            cascading: true,
+            accountLabelKey: "account_email"
+        )
+    ]
+
+    private func dynamicProvider(for fieldName: String) -> DynamicOptionsProvider? {
+        guard let provider = Self.dynamicProviders[fieldName] else { return nil }
+        let available = ToolRegistry.shared.listTools().contains { $0.name == provider.sourceTool }
+        return available ? provider : nil
+    }
+
     private func emptyState(_ message: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle")
@@ -455,3 +540,238 @@ struct DashboardArgsForm: View {
         return try? JSONDecoder().decode(JSONValue.self, from: data)
     }
 }
+
+// MARK: - Dynamic dropdown field
+
+/// Runs a companion tool (e.g. `list_mailboxes`) on appear and offers its results as a
+/// dropdown. While loading it shows a spinner; if the call fails or yields nothing it
+/// renders `fallback` (the plain text field) so the user is never blocked.
+private struct DynamicEnumField<Fallback: View>: View {
+    let provider: DashboardArgsForm.DynamicOptionsProvider
+    @Binding var value: String
+    let theme: ThemeProtocol
+    /// shows a "required" marker on each cascading sub-picker's caption
+    var required: Bool = false
+    @ViewBuilder var fallback: () -> Fallback
+
+    @State private var phase: Phase = .loading
+    /// selected account in cascading mode; the mailbox dropdown filters to this
+    @State private var account: String = ""
+
+    private enum Phase: Equatable {
+        case loading
+        case ready([Option])
+        case failed
+    }
+
+    /// one fetched option; `account` is the first path segment (used to build the path),
+    /// `accountLabel` is what we display for it (email when available), `leaf` the remainder
+    private struct Option: Hashable {
+        let value: String
+        let account: String
+        let accountLabel: String
+        let leaf: String
+        let badge: Int?
+    }
+
+    var body: some View {
+        Group {
+            switch phase {
+            case .loading:
+                HStack(spacing: 8) {
+                    ProgressView().scaleEffect(0.6).frame(width: 14, height: 14)
+                    Text("Loading options…")
+                        .font(.system(size: 13))
+                        .foregroundColor(theme.tertiaryText)
+                    Spacer()
+                }
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .background(RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground))
+            case .ready(let options) where !options.isEmpty:
+                if provider.cascading {
+                    cascadingPickers(options)
+                } else {
+                    flatPicker(options)
+                }
+            case .ready, .failed:
+                fallback()
+            }
+        }
+        .task { await load() }
+    }
+
+    // MARK: Cascading (account → mailbox)
+
+    private func cascadingPickers(_ options: [Option]) -> some View {
+        let accounts = orderedAccounts(options)
+        let mailboxes = options.filter { $0.account == account }
+
+        var accountOptions = accounts.map { (value: $0.name, label: $0.label) }
+        var mailboxOptions = mailboxes.map { (value: $0.value, label: label(for: $0)) }
+        // keep a saved value selectable even if it isn't in the fetched list
+        if !account.isEmpty, !accounts.contains(where: { $0.name == account }) {
+            accountOptions.insert((value: account, label: account), at: 0)
+        }
+        if !value.isEmpty, !mailboxes.contains(where: { $0.value == value }) {
+            mailboxOptions.insert((value: value, label: leafLabel(of: value)), at: 0)
+        }
+
+        return VStack(alignment: .leading, spacing: 12) {
+            labeledPicker("Account") {
+                Picker("", selection: accountBinding(options)) {
+                    ForEach(accountOptions, id: \.value) { opt in
+                        Text(opt.label).tag(opt.value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+            labeledPicker("Mailbox") {
+                Picker("", selection: $value) {
+                    Text("Select…").tag("")
+                    ForEach(mailboxOptions, id: \.value) { opt in
+                        Text(opt.label).tag(opt.value)
+                    }
+                }
+                .pickerStyle(.menu)
+                .labelsHidden()
+            }
+        }
+    }
+
+    /// a caption above a picker ("Account" / "Mailbox"), with an optional required marker
+    private func labeledPicker<Content: View>(
+        _ caption: String,
+        @ViewBuilder content: () -> Content
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            HStack(spacing: 6) {
+                Text(caption)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.secondaryText)
+                if required {
+                    Text("required")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(.orange)
+                }
+            }
+            content()
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    /// account selection: clears the mailbox when switching to a different account
+    private func accountBinding(_ options: [Option]) -> Binding<String> {
+        Binding(
+            get: { account.isEmpty ? (options.first?.account ?? "") : account },
+            set: { newAccount in
+                account = newAccount
+                if !value.hasPrefix(newAccount + "/") { value = "" }
+            }
+        )
+    }
+
+    /// distinct accounts in first-seen order; `name` builds the path, `label` is displayed
+    private func orderedAccounts(_ options: [Option]) -> [(name: String, label: String)] {
+        var seen = Set<String>()
+        var out: [(name: String, label: String)] = []
+        for opt in options where !seen.contains(opt.account) {
+            seen.insert(opt.account)
+            out.append((name: opt.account, label: opt.accountLabel))
+        }
+        return out
+    }
+
+    // MARK: Flat (single dropdown)
+
+    private func flatPicker(_ options: [Option]) -> some View {
+        var opts = options.map { (value: $0.value, label: fullLabel(for: $0)) }
+        if !value.isEmpty, !options.contains(where: { $0.value == value }) {
+            opts.insert((value: value, label: value), at: 0)
+        }
+        return Picker("", selection: $value) {
+            Text("Select…").tag("")
+            ForEach(opts, id: \.value) { opt in
+                Text(opt.label).tag(opt.value)
+            }
+        }
+        .pickerStyle(.menu)
+        .labelsHidden()
+    }
+
+    // MARK: Labels
+
+    private func label(for opt: Option) -> String {
+        var l = opt.leaf.replacingOccurrences(of: "/", with: " › ")
+        if let badge = opt.badge, badge > 0 { l += "  (\(badge))" }
+        return l
+    }
+
+    private func fullLabel(for opt: Option) -> String {
+        var l = opt.value.replacingOccurrences(of: "/", with: " › ")
+        if let badge = opt.badge, badge > 0 { l += "  (\(badge))" }
+        return l
+    }
+
+    private func leafLabel(of fullPath: String) -> String {
+        fullPath.split(separator: "/").dropFirst().joined(separator: " › ")
+    }
+
+    // MARK: Load
+
+    private func load() async {
+        guard
+            let raw = try? await ToolRegistry.shared.execute(
+                name: provider.sourceTool, argumentsJSON: "{}"
+            ),
+            !ToolEnvelope.isError(raw)
+        else {
+            phase = .failed
+            return
+        }
+
+        // accept both an `ok:true` envelope ({result: {...}}) and the plugin's raw object
+        let payload: Any? = ToolEnvelope.successPayload(raw) ?? jsonObject(raw)
+        guard let dict = payload as? [String: Any],
+            let array = dict[provider.arrayKey] as? [[String: Any]]
+        else {
+            phase = .failed
+            return
+        }
+
+        let options: [Option] = array.compactMap { item in
+            guard let v = item[provider.valueKey] as? String, !v.isEmpty else { return nil }
+            let segments = v.split(separator: "/").map(String.init)
+            guard let acct = segments.first else { return nil }
+            let leaf = segments.dropFirst().joined(separator: "/")
+            let badge = item[provider.badgeKey ?? ""] as? Int
+            // prefer the email label; fall back to the account name when the plugin
+            // doesn't supply one (older plugin builds)
+            let labelRaw = (item[provider.accountLabelKey ?? ""] as? String) ?? ""
+            let accountLabel = labelRaw.isEmpty ? acct : labelRaw
+            return Option(
+                value: v,
+                account: acct,
+                accountLabel: accountLabel,
+                leaf: leaf.isEmpty ? acct : leaf,
+                badge: badge
+            )
+        }
+
+        // seed the account from a previously-saved value, else the first account
+        if !value.isEmpty, let saved = value.split(separator: "/").first {
+            account = String(saved)
+        } else {
+            account = options.first?.account ?? ""
+        }
+
+        phase = options.isEmpty ? .failed : .ready(options)
+    }
+
+    private func jsonObject(_ raw: String) -> Any? {
+        guard let data = raw.data(using: .utf8) else { return nil }
+        return try? JSONSerialization.jsonObject(with: data)
+    }
+}
+
