@@ -55,6 +55,8 @@ struct DashboardAddWidgetSheet: View {
     @State private var arguments: JSONValue = .object([:])
     @State private var renderer: WidgetRenderer = .raw
     @State private var mapping: WidgetFieldMapping = WidgetFieldMapping()
+    /// optional caption for the Big Number renderer; blank falls back to an auto-derived label
+    @State private var statCaption: String = ""
     @State private var size: WidgetSize = .medium
     @State private var refreshInterval: RefreshInterval = .manual
     @State private var refreshInBackground: Bool = false
@@ -248,22 +250,30 @@ struct DashboardAddWidgetSheet: View {
             )
 
             HStack(alignment: .top, spacing: 20) {
-                // options on the left
-                VStack(alignment: .leading, spacing: 10) {
-                    Text("Display style")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(theme.tertiaryText)
-                    rendererChips
+                // options on the left — scrollable so a long style list (or the Big Number
+                // caption) never pushes past the fixed-height sheet
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 10) {
+                        Text("Display style")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(theme.tertiaryText)
+                        rendererChips
 
-                    Text("Size")
-                        .font(.system(size: 11, weight: .semibold))
-                        .foregroundColor(theme.tertiaryText)
-                        .padding(.top, 6)
-                    sizeChips
+                        Text("Size")
+                            .font(.system(size: 11, weight: .semibold))
+                            .foregroundColor(theme.tertiaryText)
+                            .padding(.top, 6)
+                        sizeChips
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
 
-                // preview on the right
+                // separator between options and preview
+                Rectangle()
+                    .fill(theme.cardBorder.opacity(0.6))
+                    .frame(width: 1)
+
+                // preview on the right — pinned, doesn't scroll with the options
                 VStack(spacing: 10) {
                     previewArea
                     Button {
@@ -285,6 +295,10 @@ struct DashboardAddWidgetSheet: View {
                     .buttonStyle(.plain)
                     .disabled(isLoading || selectedTool == nil)
                     Spacer(minLength: 0)
+                    Text("Widget Preview")
+                        .font(.system(size: 10, weight: .medium))
+                        .foregroundColor(theme.tertiaryText)
+                        .frame(maxWidth: .infinity)
                 }
                 .frame(width: 280)
             }
@@ -330,6 +344,11 @@ struct DashboardAddWidgetSheet: View {
         VStack(spacing: 6) {
             ForEach(consumerRenderers, id: \.self) { r in
                 rendererChip(r)
+                // the caption belongs to Big Number — reveal it directly under that chip
+                if r == .stat, renderer == .stat {
+                    captionField
+                        .padding(.leading, 12)
+                }
             }
         }
     }
@@ -339,6 +358,10 @@ struct DashboardAddWidgetSheet: View {
         let info = rendererInfo(r)
         return Button {
             renderer = r
+            // snap to a size this renderer supports (e.g. Big Number is small-only)
+            if !Self.isSize(size, allowedFor: r) {
+                size = Self.defaultSize(for: r)
+            }
         } label: {
             HStack(spacing: 10) {
                 Image(systemName: info.icon)
@@ -396,6 +419,34 @@ struct DashboardAddWidgetSheet: View {
         }
     }
 
+    /// optional label shown beneath the big number; blank falls back to an auto-derived caption
+    private var captionField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Caption")
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(theme.tertiaryText)
+            TextField("e.g. Unread emails", text: $statCaption)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14))
+                .foregroundColor(theme.primaryText)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 9)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
+                )
+            Text("Shown under the number. Leave blank to auto-label from the data.")
+                .font(.system(size: 11))
+                .foregroundColor(theme.tertiaryText)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        // fill the column (not the helper text's intrinsic single-line width, which
+        // would push the layout past the sheet edge) and keep clear of the next chip
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 4)
+        .padding(.bottom, 8)
+    }
+
     private func sizeChip(_ s: WidgetSize) -> some View {
         let isSelected = size == s
         let isDisabled = !Self.isSize(s, allowedFor: renderer)
@@ -436,10 +487,12 @@ struct DashboardAddWidgetSheet: View {
         .help(isDisabled ? "This size isn't supported for the selected renderer." : sizeHelp(s))
     }
 
-    /// calendar's week strip + event list don't fit in compact heights
+    /// calendar's week strip + event list need full width; a single big number only ever
+    /// warrants the small footprint
     private static func isSize(_ size: WidgetSize, allowedFor renderer: WidgetRenderer) -> Bool {
         switch renderer {
         case .calendar: return size == .large
+        case .stat: return size == .small
         default: return true
         }
     }
@@ -766,7 +819,13 @@ struct DashboardAddWidgetSheet: View {
             refreshSeconds: refreshInterval.seconds,
             refreshInBackground: refreshInBackground,
             agentId: agentOverride,
-            renderConfig: RenderConfig(renderer: renderer, mapping: mapping),
+            renderConfig: RenderConfig(
+                renderer: renderer,
+                mapping: mapping,
+                caption: renderer == .stat
+                    ? statCaption.trimmingCharacters(in: .whitespaces).nilIfEmpty
+                    : nil
+            ),
             size: size
         )
     }
@@ -833,7 +892,10 @@ struct DashboardAddWidgetSheet: View {
             arguments = editing.arguments
             renderer = editing.renderConfig.renderer
             mapping = editing.renderConfig.mapping
-            size = editing.size
+            statCaption = editing.renderConfig.caption ?? ""
+            size = Self.isSize(editing.size, allowedFor: editing.renderConfig.renderer)
+                ? editing.size
+                : Self.defaultSize(for: editing.renderConfig.renderer)
             refreshInterval = RefreshInterval.closest(to: editing.refreshSeconds)
             refreshInBackground = editing.refreshInBackground
             agentOverride = editing.agentId
@@ -902,6 +964,7 @@ struct DashboardAddWidgetSheet: View {
     private static func defaultSize(for renderer: WidgetRenderer) -> WidgetSize {
         switch renderer {
         case .calendar: return .large
+        case .stat: return .small
         default: return .medium
         }
     }
@@ -1128,4 +1191,9 @@ enum RefreshInterval: Int, CaseIterable, Hashable {
         let presets: [RefreshInterval] = [.oneMinute, .fiveMinutes, .fifteenMinutes, .oneHour]
         return presets.min(by: { abs($0.rawValue - seconds) < abs($1.rawValue - seconds) }) ?? .manual
     }
+}
+
+extension String {
+    /// nil when empty — keeps `caption: trimmed.nilIfEmpty` readable
+    fileprivate var nilIfEmpty: String? { isEmpty ? nil : self }
 }

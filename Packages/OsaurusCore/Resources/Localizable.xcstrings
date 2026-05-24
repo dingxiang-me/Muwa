@@ -3553,6 +3553,9 @@
     "Capabilities, generation overrides, and theme are editable after creation in the Configure tab." : {
 
     },
+    "Caption" : {
+
+    },
     "Catalog: ~%lld, Full: ~%lld tokens" : {
       "localizations" : {
         "en" : {
@@ -7243,6 +7246,9 @@
 
     },
     "e.g. Today's weather" : {
+
+    },
+    "e.g. Unread emails" : {
 
     },
     "e.g., Downloads Organizer" : {
@@ -18798,6 +18804,9 @@
     "Showing full ring buffer. Click to tail the most recent %lld lines." : {
 
     },
+    "Shown under the number. Leave blank to auto-label from the data." : {
+
+    },
     "Sidebar" : {
       "localizations" : {
         "de" : {
@@ -22886,6 +22895,9 @@
           }
         }
       }
+    },
+    "Widget Preview" : {
+
     },
     "Will be a tight fit" : {
       "localizations" : {

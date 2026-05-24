@@ -151,7 +151,8 @@ struct WidgetCard: View {
                 renderer: widget.renderConfig.renderer,
                 mapping: widget.renderConfig.mapping,
                 payload: payload,
-                size: widget.size
+                size: widget.size,
+                caption: widget.renderConfig.caption
             )
         }
     }
@@ -221,10 +222,13 @@ struct WidgetRendererView: View {
     /// drives how many rows list/table render before showing "+N more"
     var size: WidgetSize = .medium
 
+    /// user-set stat caption (overrides the auto-derived one)
+    var caption: String? = nil
+
     var body: some View {
         switch renderer {
         case .stat:
-            StatRenderer(payload: payload, mapping: mapping)
+            StatRenderer(payload: payload, mapping: mapping, caption: caption)
         case .keyValue:
             KeyValueRenderer(payload: payload)
         case .list:
@@ -270,16 +274,20 @@ private struct StatRenderer: View {
     @Environment(\.theme) private var theme
     let payload: JSONValue
     let mapping: WidgetFieldMapping
+    /// user-set caption; overrides the auto-derived label when non-empty
+    var caption: String? = nil
 
     var body: some View {
         let pair = extract()
+        // user caption wins; otherwise use whatever we could derive from the data
+        let label = caption?.trimmingCharacters(in: .whitespaces).nonEmpty ?? pair.label
         VStack(alignment: .leading, spacing: 4) {
             Text(pair.value)
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundColor(theme.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-            if let label = pair.label, !label.isEmpty {
+            if let label, !label.isEmpty {
                 Text(label)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(theme.tertiaryText)
@@ -308,12 +316,35 @@ private struct StatRenderer: View {
                 ?? ["label", "title", "name"].first(where: { dict[$0] != nil })
 
             let valueStr = valueKey.flatMap { dict[$0] }.flatMap { scalarString($0) } ?? "—"
-            let labelStr = labelKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
+            // explicit label field, else a noun derived from the data so the number isn't bare
+            let labelStr =
+                labelKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
+                ?? autoLabel(dict, valueKey: valueKey)
             return (valueStr, labelStr)
         default:
             return ("—", nil)
         }
     }
+
+    /// derives a caption when the payload has no label field: prefers the noun of a wrapped
+    /// collection (e.g. `{messages: [...], total: 83}` → "messages"), else the humanized value key
+    private func autoLabel(_ dict: [String: JSONValue], valueKey: String?) -> String? {
+        for key in ["messages", "items", "results", "data", "rows", "records", "events", "entries"] {
+            if case .array = dict[key] ?? .null { return humanizeKey(key) }
+        }
+        guard let valueKey, !["value"].contains(valueKey) else { return nil }
+        return humanizeKey(valueKey)
+    }
+
+    private func humanizeKey(_ key: String) -> String {
+        key.split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
+            .joined(separator: " ")
+    }
+}
+
+extension String {
+    /// nil when the string is empty, so `?? fallback` chains read cleanly
+    fileprivate var nonEmpty: String? { isEmpty ? nil : self }
 }
 
 // MARK: - .table

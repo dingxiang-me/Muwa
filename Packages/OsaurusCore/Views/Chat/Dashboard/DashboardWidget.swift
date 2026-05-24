@@ -47,10 +47,18 @@ struct WidgetFieldMapping: Codable, Equatable, Sendable {
 struct RenderConfig: Codable, Equatable, Sendable {
     var renderer: WidgetRenderer
     var mapping: WidgetFieldMapping
+    /// optional user-set caption for the `.stat` renderer; overrides the auto-derived label.
+    /// optional, so widgets stored before this field decode with `caption == nil`.
+    var caption: String?
 
-    init(renderer: WidgetRenderer, mapping: WidgetFieldMapping = WidgetFieldMapping()) {
+    init(
+        renderer: WidgetRenderer,
+        mapping: WidgetFieldMapping = WidgetFieldMapping(),
+        caption: String? = nil
+    ) {
         self.renderer = renderer
         self.mapping = mapping
+        self.caption = caption
     }
 }
 
