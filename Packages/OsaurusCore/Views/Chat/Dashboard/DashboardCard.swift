@@ -52,6 +52,9 @@ struct WidgetCard: View {
             RoundedRectangle(cornerRadius: 12)
                 .fill(theme.cardBackground)
         )
+        // keep renderer content inside the card border (matters when height is pinned,
+        // e.g. the live preview); in the grid the card grows to fit so nothing is clipped
+        .clipShape(RoundedRectangle(cornerRadius: 12))
         .overlay(
             RoundedRectangle(cornerRadius: 12)
                 .strokeBorder(
@@ -147,7 +150,8 @@ struct WidgetCard: View {
             WidgetRendererView(
                 renderer: widget.renderConfig.renderer,
                 mapping: widget.renderConfig.mapping,
-                payload: payload
+                payload: payload,
+                size: widget.size
             )
         }
     }
@@ -214,6 +218,8 @@ struct WidgetRendererView: View {
     let renderer: WidgetRenderer
     let mapping: WidgetFieldMapping
     let payload: JSONValue
+    /// drives how many rows list/table render before showing "+N more"
+    var size: WidgetSize = .medium
 
     var body: some View {
         switch renderer {
@@ -222,9 +228,9 @@ struct WidgetRendererView: View {
         case .keyValue:
             KeyValueRenderer(payload: payload)
         case .list:
-            ListRenderer(payload: payload, mapping: mapping)
+            ListRenderer(payload: payload, mapping: mapping, size: size)
         case .table:
-            TableRenderer(payload: payload, mapping: mapping)
+            TableRenderer(payload: payload, mapping: mapping, size: size)
         case .markdown:
             MarkdownRenderer(payload: payload)
         case .chart:
@@ -316,35 +322,43 @@ private struct TableRenderer: View {
     @Environment(\.theme) private var theme
     let payload: JSONValue
     let mapping: WidgetFieldMapping
+    var size: WidgetSize = .medium
 
     var body: some View {
         let (columns, rows) = build()
         if rows.isEmpty {
             EmptyRendererState(message: "No rows")
         } else {
+            let cap = maxRows(for: size, isTable: true)
+            let visible = Array(rows.prefix(cap))
+            let overflow = rows.count - visible.count
             VStack(alignment: .leading, spacing: 0) {
                 HStack(spacing: 8) {
                     ForEach(columns, id: \.self) { col in
                         Text(col)
                             .font(.system(size: 10, weight: .semibold))
                             .foregroundColor(theme.tertiaryText)
+                            .lineLimit(1)
+                            .truncationMode(.tail)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
                 .padding(.vertical, 4)
                 Divider().opacity(0.4)
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                ForEach(Array(visible.enumerated()), id: \.offset) { _, row in
                     HStack(spacing: 8) {
                         ForEach(columns, id: \.self) { col in
                             Text(row[col] ?? "—")
                                 .font(.system(size: 11))
                                 .foregroundColor(theme.primaryText)
                                 .lineLimit(1)
+                                .truncationMode(.tail)
                                 .frame(maxWidth: .infinity, alignment: .leading)
                         }
                     }
                     .padding(.vertical, 4)
                 }
+                if overflow > 0 { moreRow(overflow, theme: theme) }
             }
         }
     }
@@ -425,14 +439,18 @@ private struct ListRenderer: View {
     @Environment(\.theme) private var theme
     let payload: JSONValue
     let mapping: WidgetFieldMapping
+    var size: WidgetSize = .medium
 
     var body: some View {
         let rows = buildRows()
         if rows.isEmpty {
             EmptyRendererState(message: "No items")
         } else {
+            let cap = maxRows(for: size, isTable: false)
+            let visible = Array(rows.prefix(cap))
+            let overflow = rows.count - visible.count
             VStack(alignment: .leading, spacing: 8) {
-                ForEach(Array(rows.enumerated()), id: \.offset) { _, row in
+                ForEach(Array(visible.enumerated()), id: \.offset) { _, row in
                     HStack(alignment: .firstTextBaseline, spacing: 6) {
                         Circle()
                             .fill(theme.accentColor.opacity(0.7))
@@ -442,16 +460,20 @@ private struct ListRenderer: View {
                             Text(row.title)
                                 .font(.system(size: 12, weight: .medium))
                                 .foregroundColor(theme.primaryText)
-                                .lineLimit(2)
+                                .lineLimit(1)
+                                .truncationMode(.tail)
                             if let subtitle = row.subtitle, !subtitle.isEmpty {
                                 Text(subtitle)
                                     .font(.system(size: 10))
                                     .foregroundColor(theme.tertiaryText)
-                                    .lineLimit(2)
+                                    .lineLimit(1)
+                                    .truncationMode(.tail)
                             }
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
                 }
+                if overflow > 0 { moreRow(overflow, theme: theme) }
             }
         }
     }
@@ -566,6 +588,26 @@ private struct EmptyRendererState: View {
         .frame(maxWidth: .infinity)
         .padding(.vertical, 12)
     }
+}
+
+/// How many rows a list/table renders before collapsing the rest into a "+N more" line,
+/// scaled to the widget's height so content stays within the card.
+private func maxRows(for size: WidgetSize, isTable: Bool) -> Int {
+    switch size {
+    case .small: return isTable ? 3 : 2
+    case .medium: return isTable ? 6 : 4
+    case .large: return isTable ? 12 : 8
+    }
+}
+
+/// trailing "+N more" row shown when a list/table is capped
+@ViewBuilder
+private func moreRow(_ count: Int, theme: ThemeProtocol) -> some View {
+    Text("+\(count) more")
+        .font(.system(size: 10, weight: .medium))
+        .foregroundColor(theme.tertiaryText)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(.top, 2)
 }
 
 /// Unwraps the row array for list/table renderers. Accepts a top-level array, or finds the
