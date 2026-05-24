@@ -199,10 +199,10 @@ struct DashboardAddWidgetSheet: View {
                 fieldGroup("Widget name") {
                     TextField("e.g. Today's weather", text: $title)
                         .textFieldStyle(.plain)
-                        .font(.system(size: 13))
+                        .font(.system(size: 14))
                         .foregroundColor(theme.primaryText)
                         .padding(.horizontal, 10)
-                        .padding(.vertical, 8)
+                        .padding(.vertical, 9)
                         .background(
                             RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
                         )
@@ -966,7 +966,7 @@ struct DashboardAddWidgetSheet: View {
                 .font(.system(size: 18, weight: .semibold, design: .rounded))
                 .foregroundColor(theme.primaryText)
             Text(subtitle)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundColor(theme.secondaryText)
         }
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -976,9 +976,9 @@ struct DashboardAddWidgetSheet: View {
         _ title: String,
         @ViewBuilder content: () -> Content
     ) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        VStack(alignment: .leading, spacing: 8) {
             Text(title)
-                .font(.system(size: 11, weight: .semibold))
+                .font(.system(size: 13, weight: .semibold))
                 .foregroundColor(theme.tertiaryText)
             content()
         }

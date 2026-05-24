@@ -124,14 +124,14 @@ struct DashboardArgsForm: View {
             } else {
                 let required = props.filter { $0.required }
                 let optional = props.filter { !$0.required }
-                VStack(alignment: .leading, spacing: 16) {
+                VStack(alignment: .leading, spacing: 22) {
                     if !required.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 18) {
                             ForEach(required) { propertyRow($0) }
                         }
                     }
                     if !optional.isEmpty {
-                        VStack(alignment: .leading, spacing: 12) {
+                        VStack(alignment: .leading, spacing: 18) {
                             sectionHeader("Optional")
                             ForEach(optional) { propertyRow($0) }
                         }
@@ -146,7 +146,7 @@ struct DashboardArgsForm: View {
 
     private func sectionHeader(_ title: String) -> some View {
         Text(title)
-            .font(.system(size: 11, weight: .semibold))
+            .font(.system(size: 12, weight: .semibold))
             .foregroundColor(theme.secondaryText)
             .textCase(.uppercase)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -156,40 +156,62 @@ struct DashboardArgsForm: View {
 
     @ViewBuilder
     private func propertyRow(_ prop: ParsedProperty) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            HStack(spacing: 4) {
-                Text(prop.name)
-                    .font(.system(size: 11, weight: .semibold, design: .monospaced))
-                    .foregroundColor(theme.primaryText)
-                if prop.required {
-                    Text("required")
-                        .font(.system(size: 9, weight: .semibold))
-                        .foregroundColor(.orange)
+        // booleans read more naturally as "label ............ toggle" on one line
+        if case .boolean = prop.kind {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    nameLabel(prop)
+                    Spacer()
+                    booleanField(prop)
                 }
-                Spacer()
+                description(prop)
             }
-            switch prop.kind {
-            case .string(.some(let values)):
-                enumPicker(prop, values: values)
-            case .string(.none):
-                stringField(prop)
-            case .integer:
-                numberField(prop, integerOnly: true)
-            case .number:
-                numberField(prop, integerOnly: false)
-            case .boolean:
-                booleanField(prop)
-            case .stringArray:
-                stringArrayField(prop)
-            case .unknown:
-                unknownField(prop)
+        } else {
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    nameLabel(prop)
+                    Spacer()
+                }
+                switch prop.kind {
+                case .string(.some(let values)):
+                    enumPicker(prop, values: values)
+                case .string(.none):
+                    stringField(prop)
+                case .integer:
+                    numberField(prop, integerOnly: true)
+                case .number:
+                    numberField(prop, integerOnly: false)
+                case .boolean:
+                    EmptyView()  // handled in the branch above
+                case .stringArray:
+                    stringArrayField(prop)
+                case .unknown:
+                    unknownField(prop)
+                }
+                description(prop)
             }
-            if let desc = prop.description, !desc.isEmpty {
-                Text(desc)
-                    .font(.system(size: 10))
-                    .foregroundColor(theme.tertiaryText)
-                    .lineLimit(3)
-            }
+        }
+    }
+
+    @ViewBuilder
+    private func nameLabel(_ prop: ParsedProperty) -> some View {
+        Text(prop.name)
+            .font(.system(size: 13, weight: .semibold, design: .monospaced))
+            .foregroundColor(theme.primaryText)
+        if prop.required {
+            Text("required")
+                .font(.system(size: 10, weight: .semibold))
+                .foregroundColor(.orange)
+        }
+    }
+
+    @ViewBuilder
+    private func description(_ prop: ParsedProperty) -> some View {
+        if let desc = prop.description, !desc.isEmpty {
+            Text(desc)
+                .font(.system(size: 12))
+                .foregroundColor(theme.tertiaryText)
+                .lineLimit(3)
         }
     }
 
@@ -197,12 +219,12 @@ struct DashboardArgsForm: View {
         let binding = stringBinding(for: prop.name, defaultValue: prop.defaultValue)
         return TextField("", text: binding)
             .textFieldStyle(.plain)
-            .font(.system(size: 12))
+            .font(.system(size: 14))
             .foregroundColor(theme.primaryText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
             .background(
-                RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
             )
     }
 
@@ -225,12 +247,12 @@ struct DashboardArgsForm: View {
         )
         return TextField(integerOnly ? "0" : "0.0", text: binding)
             .textFieldStyle(.plain)
-            .font(.system(size: 12, design: .monospaced))
+            .font(.system(size: 14, design: .monospaced))
             .foregroundColor(theme.primaryText)
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
             .background(
-                RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
             )
     }
 
@@ -268,17 +290,17 @@ struct DashboardArgsForm: View {
             }
         )
         return TextEditor(text: binding)
-            .font(.system(size: 11, design: .monospaced))
+            .font(.system(size: 13, design: .monospaced))
             .frame(minHeight: 60, maxHeight: 120)
-            .padding(6)
+            .padding(8)
             .background(
-                RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
             )
             .overlay(alignment: .topLeading) {
                 Text("One value per line")
-                    .font(.system(size: 9))
+                    .font(.system(size: 11))
                     .foregroundColor(theme.tertiaryText)
-                    .padding(8)
+                    .padding(10)
                     .allowsHitTesting(false)
                     .opacity(emptyArray(prop.name) ? 1 : 0)
             }
@@ -297,11 +319,11 @@ struct DashboardArgsForm: View {
         )
         return TextField("JSON value", text: binding)
             .textFieldStyle(.plain)
-            .font(.system(size: 11, design: .monospaced))
-            .padding(.horizontal, 8)
-            .padding(.vertical, 6)
+            .font(.system(size: 13, design: .monospaced))
+            .padding(.horizontal, 10)
+            .padding(.vertical, 9)
             .background(
-                RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
             )
     }
 
@@ -317,21 +339,21 @@ struct DashboardArgsForm: View {
             }
         )
         return TextEditor(text: binding)
-            .font(.system(size: 11, design: .monospaced))
+            .font(.system(size: 13, design: .monospaced))
             .frame(minHeight: 80, maxHeight: 160)
             .padding(8)
             .background(
-                RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                RoundedRectangle(cornerRadius: 8).fill(theme.tertiaryBackground)
             )
     }
 
     private func emptyState(_ message: String) -> some View {
         HStack(spacing: 6) {
             Image(systemName: "info.circle")
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundColor(theme.tertiaryText)
             Text(message)
-                .font(.system(size: 11))
+                .font(.system(size: 13))
                 .foregroundColor(theme.tertiaryText)
             Spacer()
         }

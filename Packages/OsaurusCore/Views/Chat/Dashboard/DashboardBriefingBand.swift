@@ -8,6 +8,7 @@ import SwiftUI
 struct DashboardBriefingBand: View {
     @Environment(\.theme) private var theme
     @ObservedObject private var service = DashboardBriefingService.shared
+    @State private var isHovered = false
 
     var body: some View {
         Group {
@@ -19,6 +20,9 @@ struct DashboardBriefingBand: View {
             case .ready(let segments):
                 bandContainer { BriefingRenderer(payload: payloadFromSegments(segments)) }
             }
+        }
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering }
         }
     }
 
@@ -82,6 +86,8 @@ struct DashboardBriefingBand: View {
             .frame(width: 24)
             .help("Briefing frequency: \(service.cadence.displayName)")
         }
+        .opacity(isHovered ? 1 : 0)
+        .animation(.easeInOut(duration: 0.15), value: isHovered)
     }
 
     private var cadenceBinding: Binding<BriefingCadence> {
