@@ -49,6 +49,9 @@ struct DashboardAddWidgetSheet: View {
     // configuration state
     @State private var selectedTool: PickableTool?
     @State private var title: String = ""
+    /// the last title we auto-filled from a tool; lets us replace it when the tool changes
+    /// without clobbering a name the user typed themselves
+    @State private var autoFilledTitle: String = ""
     @State private var arguments: JSONValue = .object([:])
     @State private var renderer: WidgetRenderer = .raw
     @State private var mapping: WidgetFieldMapping = WidgetFieldMapping()
@@ -799,7 +802,12 @@ struct DashboardAddWidgetSheet: View {
     }
 
     private var consumerRenderers: [WidgetRenderer] {
-        var out: [WidgetRenderer] = [.stat, .keyValue, .list, .table, .markdown, .chart, .calendar]
+        var out: [WidgetRenderer] = [.stat, .keyValue, .list, .table, .markdown, .chart]
+        // calendar is a specialized layout — only offer it when the tool recommends it
+        // (or when editing a widget that already uses it), not for every tool
+        if recommendedRenderer == .calendar || renderer == .calendar {
+            out.append(.calendar)
+        }
         if renderer == .raw { out.append(.raw) }
         // surface plugin-recommended renderer first so it's the obvious default
         if let rec = recommendedRenderer, let idx = out.firstIndex(of: rec) {
@@ -839,7 +847,9 @@ struct DashboardAddWidgetSheet: View {
         if let prefill {
             if let tool = DashboardToolCatalog.buildCatalog().first(where: { $0.name == prefill.toolName }) {
                 selectedTool = tool
-                title = Self.defaultTitle(for: tool)
+                let defaultTitle = Self.defaultTitle(for: tool)
+                title = defaultTitle
+                autoFilledTitle = defaultTitle
             }
             arguments = prefill.arguments
         }
@@ -852,14 +862,22 @@ struct DashboardAddWidgetSheet: View {
         cachedPayload = nil
         inferenceApplied = false
         if editing == nil {
-            if title.isEmpty, let tool = selectedTool {
-                title = Self.defaultTitle(for: tool)
+            // refill the title when it's empty or still the previous tool's auto-name,
+            // but leave a name the user typed themselves untouched
+            if let tool = selectedTool, title.isEmpty || title == autoFilledTitle {
+                let newTitle = Self.defaultTitle(for: tool)
+                title = newTitle
+                autoFilledTitle = newTitle
             }
             arguments = .object([:])
-            // pre-select the plugin-recommended renderer so step 3 opens with it highlighted
+            // pre-select the plugin-recommended renderer so step 3 opens with it highlighted;
+            // otherwise reset to a safe generic default so a stale calendar selection doesn't linger
             if let rec = recommendedRenderer {
                 renderer = rec
                 size = Self.defaultSize(for: rec)
+            } else if renderer == .calendar {
+                renderer = .list
+                size = .medium
             }
         }
     }
