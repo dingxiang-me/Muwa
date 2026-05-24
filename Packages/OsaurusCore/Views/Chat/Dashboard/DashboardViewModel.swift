@@ -22,8 +22,34 @@ final class DashboardViewModel: ObservableObject {
     private var scenePhase: ScenePhase = .active
     private var cancellables: Set<AnyCancellable> = []
 
+    // MARK: - Diagnostics
+
+    private static let logFilePath = "/tmp/osaurus-dashboard.log"
+
+    private static func log(_ message: String) {
+        let ts = ISO8601DateFormatter().string(from: Date())
+        let line = "[\(ts)] \(message)\n"
+        NSLog("[Dashboard] \(message)")
+        guard let data = line.data(using: .utf8) else { return }
+        let url = URL(fileURLWithPath: logFilePath)
+        if FileManager.default.fileExists(atPath: logFilePath) {
+            if let handle = try? FileHandle(forWritingTo: url) {
+                defer { try? handle.close() }
+                try? handle.seekToEnd()
+                try? handle.write(contentsOf: data)
+            }
+        } else {
+            try? data.write(to: url)
+        }
+    }
+
+    private func isToolAvailable(_ name: String) -> Bool {
+        ToolRegistry.shared.listTools().contains { $0.name == name }
+    }
+
     private init() {
         widgets = DashboardStore.load()
+        Self.log("init: loaded \(widgets.count) widget(s): \(widgets.map { "\($0.title)[\($0.toolName)]" }.joined(separator: ", "))")
 
         NotificationCenter.default.publisher(for: .dashboardPinRequested)
             .receive(on: RunLoop.main)
@@ -42,6 +68,24 @@ final class DashboardViewModel: ObservableObject {
 
         for widget in widgets {
             scheduleIfNeeded(widget)
+        }
+        bootstrapInitialFetches()
+    }
+
+    /// On launch, plugin/MCP tools often aren't registered yet, so a manual (no-timer) widget
+    /// would sit idle until the user refreshes by hand. Fetch the ones whose tool is already
+    /// available; the rest are picked up by `reconcileAgainstRegistry` once `.toolsListChanged`
+    /// fires as their plugin finishes registering.
+    private func bootstrapInitialFetches() {
+        for widget in widgets {
+            let scheduled = (widget.refreshSeconds ?? 0) > 0
+            if scheduled { continue }  // scheduleIfNeeded already fires an immediate refresh
+            if isToolAvailable(widget.toolName) {
+                Self.log("bootstrap: '\(widget.toolName)' available — initial fetch")
+                Task { await refresh(id: widget.id) }
+            } else {
+                Self.log("bootstrap: '\(widget.toolName)' NOT yet registered — waiting for toolsListChanged")
+            }
         }
     }
 
@@ -121,15 +165,26 @@ final class DashboardViewModel: ObservableObject {
             ? CalendarWeekArgs.rewrite(widget.arguments, mapping: widget.renderConfig.mapping)
             : widget.arguments
         let argumentsJSON = encodeArgs(effectiveArgs)
+        Self.log("refresh: '\(widget.toolName)' token=\(token) available=\(isToolAvailable(widget.toolName)) args=\(argumentsJSON.prefix(200))")
         do {
             let raw = try await ToolRegistry.shared.execute(
                 name: widget.toolName,
                 argumentsJSON: argumentsJSON
             )
-            guard refreshTokens[id] == token else { return }
-            results[id] = parseEnvelope(raw)
+            guard refreshTokens[id] == token else {
+                Self.log("refresh: '\(widget.toolName)' token=\(token) stale — discarding")
+                return
+            }
+            let parsed = parseEnvelope(raw)
+            switch parsed {
+            case .success: Self.log("refresh: '\(widget.toolName)' → success (\(raw.count) bytes)")
+            case .error(let m, let k): Self.log("refresh: '\(widget.toolName)' → error kind=\(k ?? "nil") msg=\(m.prefix(120))")
+            default: break
+            }
+            results[id] = parsed
         } catch {
             guard refreshTokens[id] == token else { return }
+            Self.log("refresh: '\(widget.toolName)' threw: \(error.localizedDescription)")
             results[id] = .error(message: error.localizedDescription, kind: nil)
         }
     }
@@ -157,15 +212,29 @@ final class DashboardViewModel: ObservableObject {
         refreshTasks[id] = task
     }
 
-    /// flip widgets whose tool was unregistered into an error state; don't delete them
-    /// so the widget recovers automatically when the tool comes back
+    /// Reacts to the registry changing (plugins/MCP finishing registration, or being removed):
+    /// - tool now available + widget has no good data yet (idle/error) → fetch it. This is what
+    ///   makes plugin-backed widgets load on first launch and recover after the tool returns.
+    /// - tool gone → flip to an error state but keep the widget so it self-heals next time.
     private func reconcileAgainstRegistry() {
         let known = Set(ToolRegistry.shared.listTools().map { $0.name })
-        for widget in widgets where !known.contains(widget.toolName) {
-            results[widget.id] = .error(
-                message: "Tool '\(widget.toolName)' is not currently available.",
-                kind: "tool_not_found"
-            )
+        Self.log("reconcile: registry has \(known.count) tools; checking \(widgets.count) widget(s)")
+        for widget in widgets {
+            if known.contains(widget.toolName) {
+                switch results[widget.id] ?? .idle {
+                case .success, .loading:
+                    break  // already have / fetching data — don't stomp it
+                case .idle, .error:
+                    Self.log("reconcile: '\(widget.toolName)' now available — refreshing")
+                    Task { await refresh(id: widget.id) }
+                }
+            } else {
+                Self.log("reconcile: '\(widget.toolName)' missing — marking error")
+                results[widget.id] = .error(
+                    message: "Tool '\(widget.toolName)' is not currently available.",
+                    kind: "tool_not_found"
+                )
+            }
         }
     }
 
