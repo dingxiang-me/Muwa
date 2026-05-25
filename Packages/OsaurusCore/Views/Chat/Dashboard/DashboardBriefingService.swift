@@ -63,16 +63,7 @@ final class DashboardBriefingService: ObservableObject {
     private var cancellables: Set<AnyCancellable> = []
 
     private static let cadenceKey = "dashboard.briefing.cadence"
-    private static let cacheKey = "dashboard.briefing.cachedRaw"
-    private static let cacheTimestampKey = "dashboard.briefing.cachedAt"
     private static let logFilePath = "/tmp/osaurus-briefing.log"
-
-    /// YYYY-MM-DD for grounding the model on today's date (matches dateChip's `iso` format)
-    private nonisolated(unsafe) static let isoDay: ISO8601DateFormatter = {
-        let f = ISO8601DateFormatter()
-        f.formatOptions = [.withFullDate]
-        return f
-    }()
 
     private static func log(_ message: String) {
         let ts = ISO8601DateFormatter().string(from: Date())
@@ -98,7 +89,8 @@ final class DashboardBriefingService: ObservableObject {
             .flatMap(BriefingCadence.init(rawValue:))
         self.cadence = stored ?? .every30min
         Self.log("init: cadence=\(cadence.displayName), logFile=\(Self.logFilePath)")
-        rehydrateFromCache()
+        // no cache rehydrate: composing is instant and deterministic, so we just recompute once
+        // the dashboard appears and widgets have data (avoids showing a stale briefing)
 
         // when widget results land (often after the initial dashboard mount),
         // re-trigger if we're still waiting for data
@@ -179,62 +171,137 @@ final class DashboardBriefingService: ObservableObject {
         // suppress the loading flicker when we already have a cached briefing on screen
         if case .ready = state {} else { state = .loading }
 
-        let dataBlock = Self.encodeWidgetData(widgets: widgets, results: results)
-        guard !dataBlock.isEmpty else {
-            // widgets exist but none have a successful result yet — stay in .loading,
-            // results-observer will re-trigger us once data lands
+        // any widget produced data yet? (else stay in .loading; the results observer re-fires us)
+        let hasData = widgets.contains { w in
+            if case .success = results[w.id] ?? .idle { return true }
+            return false
+        }
+        guard hasData else {
             let statuses = widgets.map { w -> String in
-                let r = results[w.id] ?? .idle
-                switch r {
+                switch results[w.id] ?? .idle {
                 case .idle: return "\(w.title)=idle"
                 case .loading: return "\(w.title)=loading"
                 case .success: return "\(w.title)=success"
                 case .error(let m, _): return "\(w.title)=error(\(m.prefix(40)))"
                 }
             }
-            Self.log("data block empty — widgets not ready: \(statuses.joined(separator: ", "))")
+            Self.log("no widget data yet — waiting: \(statuses.joined(separator: ", "))")
             return
         }
-        Self.log("calling CoreModelService.generate (dataBlock bytes=\(dataBlock.count))\n\(dataBlock)")
 
-        let raw: String
-        do {
-            let today = Date().formatted(date: .complete, time: .omitted)
-            raw = try await CoreModelService.shared.generate(
-                prompt: "Today is \(today) (ISO: \(Self.isoDay.string(from: Date()))).\n\nLatest readings from the user's dashboard:\n\n\(dataBlock)\n\nCompose the briefing now.",
-                systemPrompt: Self.systemPrompt,
-                temperature: 0.6,
-                maxTokens: 600,
-                timeout: 25
-            )
-            Self.log("LLM returned \(raw.count) chars: \(raw.prefix(200))")
-        } catch {
-            Self.log("CoreModelService.generate FAILED: \(error)")
+        // compose deterministically from what each widget displays: accurate counts/dates, clean
+        // grammar, no model hallucinations (the local model couldn't follow the composition rules)
+        let segments = Self.composeSegments(widgets: widgets, results: results)
+        guard !segments.isEmpty else {
+            Self.log("composed no segments — hiding band")
             state = .hidden
             return
         }
-
-        guard let segments = Self.parseSegments(raw), !segments.isEmpty else {
-            Self.log("parse FAILED; raw=\(raw.prefix(400))")
-            state = .hidden
-            return
-        }
-        Self.log("parsed \(segments.count) segments — showing band")
-
+        Self.log("composed \(segments.count) segments — showing band")
         state = .ready(segments)
         lastRefreshedAt = Date()
-        UserDefaults.standard.set(raw, forKey: Self.cacheKey)
-        UserDefaults.standard.set(Date().timeIntervalSince1970, forKey: Self.cacheTimestampKey)
     }
 
-    private func rehydrateFromCache() {
-        guard let raw = UserDefaults.standard.string(forKey: Self.cacheKey),
-            let segments = Self.parseSegments(raw),
-            !segments.isEmpty
-        else { return }
-        state = .ready(segments)
-        let ts = UserDefaults.standard.double(forKey: Self.cacheTimestampKey)
-        if ts > 0 { lastRefreshedAt = Date(timeIntervalSince1970: ts) }
+    // MARK: - Deterministic composer
+    //
+    // Builds the briefing segments directly from what each widget renders. This replaces the LLM
+    // because the local model couldn't reliably follow the composition/grounding rules.
+
+    private static func composeSegments(widgets: [DashboardWidget], results: [UUID: WidgetResult]) -> [BriefingSegment] {
+        var countItems: [[BriefingSegment]] = []
+        var eventItems: [[BriefingSegment]] = []
+
+        let cal = Calendar.current
+        let today = cal.startOfDay(for: Date())
+
+        for widget in widgets {
+            guard case let .success(payload, _) = results[widget.id] ?? .idle else { continue }
+            let config = widget.renderConfig
+            switch config.renderer {
+            case .stat:
+                let pair = statHeadline(payload: payload, mapping: config.mapping, caption: config.caption)
+                if let n = Int(pair.value), let label = pair.label, !label.isEmpty {
+                    countItems.append([.count(value: n, label: label)])
+                }
+                // non-integer / unlabeled stats are skipped — the briefing is a count/event glance
+
+            case .list, .table:
+                let summary = widgetDisplaySummary(
+                    renderer: config.renderer, mapping: config.mapping, caption: nil, payload: payload
+                )
+                if let total = summary["totalItems"] as? Int, total > 0 {
+                    countItems.append([.count(value: total, label: collectionNoun(payload))])
+                }
+
+            case .calendar:
+                let events = CalendarPayloadAdapter.parse(payload, mapping: config.mapping)
+                    .filter { cal.startOfDay(for: $0.start) >= today }
+                    .prefix(3)
+                for event in events {
+                    eventItems.append(eventPhrase(event, today: today, calendar: cal))
+                }
+
+            default:
+                break  // markdown/keyValue/chart/raw don't summarize into a one-line glance
+            }
+        }
+
+        guard !countItems.isEmpty || !eventItems.isEmpty else { return [] }
+
+        var segments: [BriefingSegment] = [.text("You have")]
+        segments += joinItems(countItems, finalConnector: "and")
+        if !eventItems.isEmpty {
+            if !countItems.isEmpty { segments.append(.text("plus")) }
+            segments += joinItems(eventItems, finalConnector: "and")
+        }
+        return segments
+    }
+
+    /// `pill(title)` + timing: a bare word for today/tomorrow, else "on" + a date chip (never both)
+    private static func eventPhrase(_ event: CalendarEvent, today: Date, calendar: Calendar) -> [BriefingSegment] {
+        let diff = calendar.dateComponents([.day], from: today, to: calendar.startOfDay(for: event.start)).day ?? 0
+        var phrase: [BriefingSegment] = [.pill(label: event.title, tone: .accent)]
+        switch diff {
+        case 0: phrase.append(.text("today"))
+        case 1: phrase.append(.text("tomorrow"))
+        default:
+            phrase.append(.text("on"))
+            phrase.append(.dateChip(date: event.start, label: ""))
+        }
+        return phrase
+    }
+
+    /// the noun a list/table counts (e.g. `{messages:[…]}` → "messages")
+    private static func collectionNoun(_ payload: JSONValue) -> String {
+        if case .object(let dict) = payload {
+            for key in ["messages", "events", "results", "records", "entries", "items", "rows", "data"] {
+                if case .array = dict[key] ?? .null { return key }
+            }
+        }
+        return "items"
+    }
+
+    /// Joins phrases into grammatical English. Commas are baked onto a preceding text segment (the
+    /// flow layout would otherwise float a lone comma); the final pair gets `finalConnector`.
+    private static func joinItems(_ items: [[BriefingSegment]], finalConnector: String) -> [BriefingSegment] {
+        var out: [BriefingSegment] = []
+        for (i, item) in items.enumerated() {
+            if i > 0 {
+                let isLast = (i == items.count - 1)
+                if isLast {
+                    if items.count > 2, case .text(let t) = out[out.count - 1] {
+                        out[out.count - 1] = .text(t + ",")
+                    }
+                    out.append(.text(finalConnector))
+                } else if case .text(let t) = out[out.count - 1] {
+                    out[out.count - 1] = .text(t + ",")
+                } else {
+                    out.append(.text("·"))  // prev ended in a chip/count — use a separator glyph
+                }
+            }
+            out.append(contentsOf: item)
+        }
+        return out
     }
 
     // MARK: - Scheduling
@@ -255,151 +322,4 @@ final class DashboardBriefingService: ObservableObject {
         }
     }
 
-    // MARK: - Data block
-
-    /// compresses each pinned widget's latest result into a tiny JSON dump the LLM can summarize
-    private static func encodeWidgetData(widgets: [DashboardWidget], results: [UUID: WidgetResult]) -> String {
-        var entries: [[String: Any]] = []
-        for widget in widgets {
-            guard case let .success(payload, fetchedAt) = results[widget.id] ?? .idle else { continue }
-            // describe what the CARD shows (headline value, list items, event dates) rather than
-            // re-summarizing the raw payload — keeps the briefing in lockstep with the widgets
-            let snippet = widgetDisplaySummary(
-                renderer: widget.renderConfig.renderer,
-                mapping: widget.renderConfig.mapping,
-                caption: widget.renderConfig.caption,
-                payload: payload
-            )
-            let truncated = truncate(snippet, maxChars: 600)
-            entries.append([
-                "name": widget.title,
-                "tool": widget.toolName,
-                "fetchedAt": ISO8601DateFormatter().string(from: fetchedAt),
-                "data": truncated,
-            ])
-        }
-        guard !entries.isEmpty else { return "" }
-        guard let data = try? JSONSerialization.data(withJSONObject: entries, options: [.prettyPrinted]),
-            let s = String(data: data, encoding: .utf8)
-        else { return "" }
-        return s
-    }
-
-    /// hard cap on serialized snippet length so a large payload (e.g. a long event list) doesn't
-    /// blow out the prompt budget; the model only needs flavor, not the full document
-    private static func truncate(_ value: Any, maxChars: Int) -> Any {
-        guard let data = try? JSONSerialization.data(withJSONObject: value),
-            let s = String(data: data, encoding: .utf8)
-        else { return value }
-        if s.count <= maxChars { return value }
-        let endIndex = s.index(s.startIndex, offsetBy: maxChars)
-        return String(s[..<endIndex]) + "…"
-    }
-
-    // MARK: - Parsing
-
-    private static func parseSegments(_ raw: String) -> [BriefingSegment]? {
-        guard let json = extractJSONObject(from: raw),
-            let data = json.data(using: .utf8),
-            let parsed = try? JSONSerialization.jsonObject(with: data)
-        else { return nil }
-        let value = jsonValue(from: parsed)
-        let segments = BriefingSegment.parse(value)
-        return segments.isEmpty ? nil : segments
-    }
-
-    private static func jsonValue(from any: Any) -> JSONValue {
-        if any is NSNull { return .null }
-        if let b = any as? Bool { return .bool(b) }
-        if let n = any as? NSNumber { return .number(n.doubleValue) }
-        if let s = any as? String { return .string(s) }
-        if let arr = any as? [Any] { return .array(arr.map(jsonValue(from:))) }
-        if let dict = any as? [String: Any] {
-            var out: [String: JSONValue] = [:]
-            for (k, v) in dict { out[k] = jsonValue(from: v) }
-            return .object(out)
-        }
-        return .null
-    }
-
-    /// pulls the first balanced top-level `{...}` from a chatty LLM response (handles preambles + code fences)
-    private static func extractJSONObject(from raw: String) -> String? {
-        guard let firstBrace = raw.firstIndex(of: "{") else { return nil }
-        var depth = 0
-        var inString = false
-        var escape = false
-        var end: String.Index?
-        for idx in raw.indices[firstBrace...] {
-            let ch = raw[idx]
-            if escape { escape = false; continue }
-            if ch == "\\" { escape = true; continue }
-            if ch == "\"" { inString.toggle(); continue }
-            if inString { continue }
-            if ch == "{" { depth += 1 }
-            else if ch == "}" {
-                depth -= 1
-                if depth == 0 { end = raw.index(after: idx); break }
-            }
-        }
-        guard let end else { return nil }
-        return String(raw[firstBrace..<end])
-    }
-
-    // MARK: - Prompt
-
-    private static let systemPrompt = """
-        You compose a one-sentence personal briefing for the user's dashboard, returned as JSON segments.
-
-        Output EXACTLY this shape — a single JSON object, no Markdown, no code fences, no prose:
-        {
-          "segments": [
-            { "type": "text", "value": "..." },
-            ...
-          ]
-        }
-
-        Segment types:
-          { "type": "text",      "value": "..." }                           — plain connective words ONLY
-          { "type": "pill",      "label": "...", "tone": "success|warning|danger|accent|neutral" }  — a status/label
-          { "type": "count",     "value": 5, "label": "unread comments" }   — a number + what it counts
-          { "type": "icon",      "name": "<SF Symbol>", "tone": "accent" }   — a small leading glyph
-          { "type": "dateChip",  "iso": "YYYY-MM-DD" }                       — a calendar date
-
-        CRITICAL — the briefing's value comes from rich segments, not text. The text segments are
-        only the quiet glue between highlights. So:
-          • Every NUMBER must be a `count` segment — never write a digit inside a `text` value.
-          • Every DATE/deadline must be a `dateChip` — never write a date inside text.
-          • Every STATUS / state / category (e.g. "In Progress", "Overdue", "Done") must be a `pill`
-            with a fitting tone (success=good, warning=attention, danger=problem, accent=neutral-highlight).
-          • Lead a clause with an `icon` when a relevant SF Symbol fits (e.g. "envelope.fill" for mail,
-            "calendar" for events, "bubble.left.fill" for messages).
-
-        GROUNDING — accuracy matters more than richness. Violations make the briefing useless.
-        Each entry in the data block describes exactly what ONE widget shows the user:
-          • `displays: "a single headline value"` → use its `value` and `label` VERBATIM as one count
-            segment (value + label). Do not recompute or relabel it.
-          • `displays: "a list"/"a table"` → its `totalItems` is the true magnitude; `items` is only a
-            preview of the first rows. Report `totalItems`, never the length of `items`.
-          • `displays: "a calendar"` → each event has a `title`, a `date`, and a `when` field that is
-            ALREADY COMPUTED for you ("today", "tomorrow", "in N days", or "past"). Phrase timing using
-            `when` verbatim — NEVER compute it yourself and NEVER say "today" unless `when` is "today".
-            Emit the event's `date` in its `dateChip`. Skip events whose `when` is "past".
-          • Use ONLY numbers, names, labels, and dates present in the data. Do NOT invent qualifiers
-            like "unread", "new", or "overdue" unless the data explicitly carries that state.
-
-        Begin the briefing with a text segment whose value is exactly "You have".
-
-        The example below shows STRUCTURE ONLY. Never copy its placeholder names, numbers, or dates —
-        they are fake. Use only the real data block.
-          example data: a list {totalItems: 7}, a calendar {events:[{title:"Q3 Planning",date:"2031-02-14",when:"in 3 days"}]}
-          {"segments":[
-            {"type":"text","value":"You have"},
-            {"type":"count","value":7,"label":"open tasks, and"},
-            {"type":"pill","label":"Q3 Planning","tone":"accent"},
-            {"type":"text","value":"in 3 days on"},
-            {"type":"dateChip","iso":"2031-02-14"}
-          ]}
-
-        Use 3–8 segments. Be concise, friendly, factual. If the data is empty or unclear, return {"segments":[]}.
-        """
 }
