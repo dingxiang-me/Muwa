@@ -13,6 +13,8 @@ final class DashboardViewModel: ObservableObject {
 
     @Published private(set) var widgets: [DashboardWidget] = []
     @Published private(set) var results: [UUID: WidgetResult] = [:]
+    /// widgets with an in-flight fetch — drives the per-card spinner without discarding shown data
+    @Published private(set) var refreshing: Set<UUID> = []
     /// buffered by the chat-side pin notification when the dashboard isn't mounted yet
     @Published var pendingPinRequest: DashboardPinRequest?
 
@@ -158,7 +160,12 @@ final class DashboardViewModel: ObservableObject {
         guard let widget = widgets.first(where: { $0.id == id }) else { return }
         let token = (refreshTokens[id] ?? 0) + 1
         refreshTokens[id] = token
-        results[id] = .loading
+        refreshing.insert(id)
+        // clear the spinner only if a newer refresh hasn't taken over this widget
+        defer { if refreshTokens[id] == token { refreshing.remove(id) } }
+        // keep the last successful data on screen during a re-fetch; only show the empty
+        // "loading" placeholder when there's nothing to show yet (first load / after error)
+        if case .success = results[id] {} else { results[id] = .loading }
 
         // calendar widgets always fetch the current week so day-tap filtering has data
         let effectiveArgs: JSONValue = widget.renderConfig.renderer == .calendar

@@ -51,17 +51,24 @@ struct DashboardBriefingBand: View {
 
     private var controls: some View {
         HStack(spacing: 10) {
-            Button {
-                service.refresh()
-            } label: {
-                Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 12, weight: .semibold))
-                    .foregroundColor(theme.secondaryText)
+            if service.isRefreshing {
+                ProgressView()
+                    .controlSize(.small)
+                    .scaleEffect(0.7)
                     .frame(width: 22, height: 22)
-                    .contentShape(Rectangle())
+            } else {
+                Button {
+                    service.refresh()
+                } label: {
+                    Image(systemName: "arrow.clockwise")
+                        .font(.system(size: 12, weight: .semibold))
+                        .foregroundColor(theme.secondaryText)
+                        .frame(width: 22, height: 22)
+                        .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .help("Refresh briefing")
             }
-            .buttonStyle(.plain)
-            .help("Refresh briefing")
 
             Menu {
                 Picker("Update frequency", selection: cadenceBinding) {
@@ -81,8 +88,9 @@ struct DashboardBriefingBand: View {
             .fixedSize()
             .help("Briefing frequency: \(service.cadence.displayName)")
         }
-        .opacity(isHovered ? 1 : 0)
+        .opacity(isHovered || service.isRefreshing ? 1 : 0)
         .animation(.easeInOut(duration: 0.15), value: isHovered)
+        .animation(.easeInOut(duration: 0.15), value: service.isRefreshing)
     }
 
     private var cadenceBinding: Binding<BriefingCadence> {

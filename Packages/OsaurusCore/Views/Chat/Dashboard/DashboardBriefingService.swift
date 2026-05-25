@@ -52,7 +52,11 @@ final class DashboardBriefingService: ObservableObject {
         }
     }
     @Published private(set) var lastRefreshedAt: Date?
+    /// in-flight composition cue (shown even when a previous briefing stays on screen)
+    @Published private(set) var isRefreshing = false
 
+    /// bumped per `runRefresh` so a superseded run's cleanup can't clear a newer run's spinner
+    private var refreshGeneration = 0
     private var refreshTask: Task<Void, Never>?
     private var scheduledTask: Task<Void, Never>?
     private var dashboardVisible = false
@@ -157,6 +161,11 @@ final class DashboardBriefingService: ObservableObject {
     }
 
     private func runRefresh() async {
+        refreshGeneration += 1
+        let generation = refreshGeneration
+        isRefreshing = true
+        defer { if generation == refreshGeneration { isRefreshing = false } }
+
         let widgets = DashboardViewModel.shared.widgets
         let results = DashboardViewModel.shared.results
         Self.log("runRefresh: widgets=\(widgets.count), results=\(results.count)")

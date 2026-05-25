@@ -14,6 +14,8 @@ struct WidgetCard: View {
     let result: WidgetResult
     let onRefresh: () -> Void
     let onRemove: () -> Void
+    /// in-flight fetch cue; shown even while existing data stays on screen
+    var isRefreshing: Bool = false
     /// nil disables the "Edit" menu entry (preview-mode cards)
     var onEdit: (() -> Void)? = nil
     /// preview-mode override; bypasses the `WidgetSize`-based default
@@ -117,22 +119,27 @@ struct WidgetCard: View {
 
             Spacer(minLength: 8)
 
-            if case .loading = result {
-                ProgressView().scaleEffect(0.6).frame(width: 24, height: 24)
-            }
+            // top-right slot: the menu on hover, otherwise the refresh spinner when fetching
+            ZStack {
+                Menu { menuItems } label: {
+                    Image(systemName: "ellipsis")
+                        .font(.system(size: 11, weight: .semibold))
+                        .foregroundColor(theme.primaryText)
+                        .frame(width: 24, height: 24)
+                        .background(Circle().fill(theme.tertiaryBackground))
+                        .clipShape(Circle())
+                }
+                .menuStyle(.borderlessButton)
+                .menuIndicator(.hidden)
+                .opacity(isHovered ? 1 : 0)
 
-            Menu { menuItems } label: {
-                Image(systemName: "ellipsis")
-                    .font(.system(size: 11, weight: .semibold))
-                    .foregroundColor(theme.primaryText)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(theme.tertiaryBackground))
-                    .clipShape(Circle())
+                if isRefreshing && !isHovered {
+                    ProgressView()
+                        .controlSize(.small)
+                        .scaleEffect(0.6)
+                }
             }
-            .menuStyle(.borderlessButton)
-            .menuIndicator(.hidden)
-            .frame(width: 24)
-            .opacity(isHovered ? 1 : 0)
+            .frame(width: 24, height: 24)
             .animation(.easeInOut(duration: 0.15), value: isHovered)
         }
     }

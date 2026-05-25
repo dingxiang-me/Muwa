@@ -13,6 +13,9 @@ struct DashboardView: View {
     @State private var showAddSheet = false
     @State private var editingWidget: DashboardWidget?
     @State private var pinRequest: DashboardPinRequest?
+    // computed once per view lifetime so reordering widgets (which re-renders body)
+    // doesn't reroll the random greeting
+    @State private var greeting = DashboardView.makeGreeting()
 
     private var theme: ThemeProtocol { themeManager.currentTheme }
 
@@ -117,7 +120,7 @@ struct DashboardView: View {
         "captain", "champ", "chief", "boss", "wanderer", "night owl",
     ]
 
-    private var greetingText: String {
+    private static func makeGreeting() -> String {
         let hour = Calendar.current.component(.hour, from: Date())
         let period: String
         switch hour {
@@ -126,13 +129,13 @@ struct DashboardView: View {
         case 17..<22: period = "Good evening"
         default: period = "Hello"
         }
-        let noun = Self.greetingNouns.randomElement() ?? "stranger"
+        let noun = greetingNouns.randomElement() ?? "stranger"
         return "\(period), \(noun)"
     }
 
     private var greetingHeader: some View {
         HStack(alignment: .firstTextBaseline) {
-            Text(greetingText)
+            Text(greeting)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(theme.primaryText)
             Spacer()
@@ -208,6 +211,7 @@ struct DashboardView: View {
             onRemove: {
                 viewModel.removeWidget(id: widget.id)
             },
+            isRefreshing: viewModel.refreshing.contains(widget.id),
             onEdit: {
                 editingWidget = widget
                 showAddSheet = true
