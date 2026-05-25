@@ -21,9 +21,6 @@ struct DashboardBriefingBand: View {
                 bandContainer { BriefingRenderer(payload: payloadFromSegments(segments)) }
             }
         }
-        .onHover { hovering in
-            withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering }
-        }
     }
 
     private func bandContainer<Content: View>(@ViewBuilder content: () -> Content) -> some View {
@@ -33,6 +30,12 @@ struct DashboardBriefingBand: View {
             controls
         }
         .padding(.vertical, 14)
+        // make the whole band hit-testable so hover persists while the cursor crosses the empty
+        // gap to reach the controls — without a background, only drawn text would register otherwise
+        .contentShape(Rectangle())
+        .onHover { hovering in
+            withAnimation(.easeInOut(duration: 0.15)) { isHovered = hovering }
+        }
     }
 
     private var loadingBand: some View {
@@ -47,15 +50,15 @@ struct DashboardBriefingBand: View {
     }
 
     private var controls: some View {
-        HStack(spacing: 6) {
+        HStack(spacing: 10) {
             Button {
                 service.refresh()
             } label: {
                 Image(systemName: "arrow.clockwise")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(theme.secondaryText)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(theme.cardBackground))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
             }
             .buttonStyle(.plain)
             .help("Refresh briefing")
@@ -68,14 +71,14 @@ struct DashboardBriefingBand: View {
                 }
             } label: {
                 Image(systemName: "clock.arrow.circlepath")
-                    .font(.system(size: 11, weight: .semibold))
+                    .font(.system(size: 12, weight: .semibold))
                     .foregroundColor(theme.secondaryText)
-                    .frame(width: 24, height: 24)
-                    .background(Circle().fill(theme.cardBackground))
+                    .frame(width: 22, height: 22)
+                    .contentShape(Rectangle())
             }
             .menuStyle(.borderlessButton)
             .menuIndicator(.hidden)
-            .frame(width: 24)
+            .fixedSize()
             .help("Briefing frequency: \(service.cadence.displayName)")
         }
         .opacity(isHovered ? 1 : 0)

@@ -278,16 +278,14 @@ private struct StatRenderer: View {
     var caption: String? = nil
 
     var body: some View {
-        let pair = extract()
-        // user caption wins; otherwise use whatever we could derive from the data
-        let label = caption?.trimmingCharacters(in: .whitespaces).nonEmpty ?? pair.label
+        let pair = statHeadline(payload: payload, mapping: mapping, caption: caption)
         VStack(alignment: .leading, spacing: 4) {
             Text(pair.value)
                 .font(.system(size: 34, weight: .bold, design: .rounded))
                 .foregroundColor(theme.primaryText)
                 .lineLimit(1)
                 .minimumScaleFactor(0.5)
-            if let label, !label.isEmpty {
+            if let label = pair.label, !label.isEmpty {
                 Text(label)
                     .font(.system(size: 11, weight: .medium))
                     .foregroundColor(theme.tertiaryText)
@@ -296,50 +294,64 @@ private struct StatRenderer: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
     }
+}
 
-    private func extract() -> (value: String, label: String?) {
-        switch payload {
-        case .number(let n):
-            return (formatNumber(n), nil)
-        case .string(let s):
-            return (s, nil)
-        case .bool(let b):
-            return (b ? "Yes" : "No", nil)
-        case .object(let dict):
-            // explicit mapping first; otherwise fall back to "value"/"count" or first numeric field
-            let valueKey =
-                mapping.valueKey
-                ?? ["value", "count", "total", "amount"].first(where: { dict[$0] != nil })
-                ?? dict.first(where: { if case .number = $0.value { return true } else { return false } })?.key
-            let labelKey =
-                mapping.titleKey
-                ?? ["label", "title", "name"].first(where: { dict[$0] != nil })
+// MARK: - Shared display derivation
+//
+// These are the single source of truth for "what the card actually shows," used by both the
+// renderers above and the dashboard briefing (`widgetDisplaySummary`) so the briefing always
+// reports the same numbers/labels/dates the user sees — never a re-summarized raw payload.
 
-            let valueStr = valueKey.flatMap { dict[$0] }.flatMap { scalarString($0) } ?? "—"
-            // explicit label field, else a noun derived from the data so the number isn't bare
-            let labelStr =
-                labelKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
-                ?? autoLabel(dict, valueKey: valueKey)
-            return (valueStr, labelStr)
-        default:
-            return ("—", nil)
-        }
+/// the headline value + label a `.stat` card displays (caption override applied)
+func statHeadline(payload: JSONValue, mapping: WidgetFieldMapping, caption: String?) -> (value: String, label: String?) {
+    let pair = statExtract(payload, mapping: mapping)
+    // user caption wins; otherwise use whatever we could derive from the data
+    let label = caption?.trimmingCharacters(in: .whitespaces).nonEmpty ?? pair.label
+    return (pair.value, label)
+}
+
+private func statExtract(_ payload: JSONValue, mapping: WidgetFieldMapping) -> (value: String, label: String?) {
+    switch payload {
+    case .number(let n):
+        return (formatNumber(n), nil)
+    case .string(let s):
+        return (s, nil)
+    case .bool(let b):
+        return (b ? "Yes" : "No", nil)
+    case .object(let dict):
+        // explicit mapping first; otherwise fall back to "value"/"count" or first numeric field
+        let valueKey =
+            mapping.valueKey
+            ?? ["value", "count", "total", "amount"].first(where: { dict[$0] != nil })
+            ?? dict.first(where: { if case .number = $0.value { return true } else { return false } })?.key
+        let labelKey =
+            mapping.titleKey
+            ?? ["label", "title", "name"].first(where: { dict[$0] != nil })
+
+        let valueStr = valueKey.flatMap { dict[$0] }.flatMap { scalarString($0) } ?? "—"
+        // explicit label field, else a noun derived from the data so the number isn't bare
+        let labelStr =
+            labelKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
+            ?? autoStatLabel(dict, valueKey: valueKey)
+        return (valueStr, labelStr)
+    default:
+        return ("—", nil)
     }
+}
 
-    /// derives a caption when the payload has no label field: prefers the noun of a wrapped
-    /// collection (e.g. `{messages: [...], total: 83}` → "messages"), else the humanized value key
-    private func autoLabel(_ dict: [String: JSONValue], valueKey: String?) -> String? {
-        for key in ["messages", "items", "results", "data", "rows", "records", "events", "entries"] {
-            if case .array = dict[key] ?? .null { return humanizeKey(key) }
-        }
-        guard let valueKey, !["value"].contains(valueKey) else { return nil }
-        return humanizeKey(valueKey)
+/// derives a caption when the payload has no label field: prefers the noun of a wrapped
+/// collection (e.g. `{messages: [...], total: 83}` → "messages"), else the humanized value key
+private func autoStatLabel(_ dict: [String: JSONValue], valueKey: String?) -> String? {
+    for key in ["messages", "items", "results", "data", "rows", "records", "events", "entries"] {
+        if case .array = dict[key] ?? .null { return humanizeKey(key) }
     }
+    guard let valueKey, !["value"].contains(valueKey) else { return nil }
+    return humanizeKey(valueKey)
+}
 
-    private func humanizeKey(_ key: String) -> String {
-        key.split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
-            .joined(separator: " ")
-    }
+private func humanizeKey(_ key: String) -> String {
+    key.split(whereSeparator: { $0 == "_" || $0 == "-" || $0 == "." })
+        .joined(separator: " ")
 }
 
 extension String {
@@ -696,4 +708,139 @@ private func formatNumber(_ n: Double) -> String {
         return String(Int64(n))
     }
     return String(n)
+}
+
+// MARK: - Briefing summary
+
+/// Describes exactly *what a widget renders* (not its raw payload), so the dashboard briefing
+/// reports the same headline numbers, labels, list items, and event dates the user sees on the
+/// cards. Returned as JSON-serializable `Any` for the briefing's data block.
+func widgetDisplaySummary(
+    renderer: WidgetRenderer,
+    mapping: WidgetFieldMapping,
+    caption: String?,
+    payload: JSONValue
+) -> [String: Any] {
+    switch renderer {
+    case .stat:
+        let pair = statHeadline(payload: payload, mapping: mapping, caption: caption)
+        var out: [String: Any] = ["displays": "a single headline value", "value": pair.value]
+        if let label = pair.label, !label.isEmpty { out["label"] = label }
+        return out
+
+    case .list, .table:
+        let items = arrayItems(from: payload)
+        let shown = items.prefix(6).map { rowDisplay($0, mapping: mapping) }
+        return [
+            "displays": renderer == .table ? "a table" : "a list",
+            "totalItems": items.count,
+            "items": Array(shown),
+        ]
+
+    case .calendar:
+        return ["displays": "a calendar", "events": calendarEvents(payload, mapping: mapping)]
+
+    case .keyValue:
+        return ["displays": "key/value pairs", "pairs": keyValueDisplay(payload)]
+
+    case .markdown:
+        return ["displays": "text", "text": markdownDisplay(payload)]
+
+    case .chart:
+        return ["displays": "a chart", "points": arrayItems(from: payload).count]
+
+    case .raw:
+        return ["displays": "raw data", "data": jsonToAny(payload)]
+    }
+}
+
+/// title (+ subtitle) a list/table row shows, using the same key-picking as the renderers
+private func rowDisplay(_ item: JSONValue, mapping: WidgetFieldMapping) -> Any {
+    switch item {
+    case .string(let s): return prettyScalar(s)
+    case .number(let n): return formatNumber(n)
+    case .bool(let b): return b ? "true" : "false"
+    case .object(let dict):
+        let title =
+            mapping.titleKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
+            ?? DashboardInference.preferredTitleKey(in: dict).flatMap { dict[$0] }.flatMap { scalarString($0) }
+        let subtitle =
+            mapping.subtitleKey.flatMap { dict[$0] }.flatMap { scalarString($0) }
+            ?? DashboardInference.preferredSubtitleKey(in: dict, excluding: mapping.titleKey)
+                .flatMap { dict[$0] }.flatMap { scalarString($0) }
+        var out: [String: Any] = [:]
+        if let title { out["title"] = title }
+        if let subtitle { out["subtitle"] = subtitle }
+        return out.isEmpty ? "—" : out
+    case .array, .null:
+        return "—"
+    }
+}
+
+/// Parses events the SAME way the calendar card does (`CalendarPayloadAdapter` — which handles
+/// nested `{dateTime}`/`{date}` shapes and every start-key variant), then emits each as title +
+/// local `date` (yyyy-MM-dd) + a precomputed `when` (today/tomorrow/…). Doing the date math here
+/// rather than in the prompt is what fixes the "Eid is today" hallucination.
+private func calendarEvents(_ payload: JSONValue, mapping: WidgetFieldMapping) -> [[String: Any]] {
+    let events = CalendarPayloadAdapter.parse(payload, mapping: mapping)
+    let cal = Calendar.current
+    let today = cal.startOfDay(for: Date())
+    return events.prefix(20).map { ev in
+        let diff = cal.dateComponents([.day], from: today, to: cal.startOfDay(for: ev.start)).day ?? 0
+        let when: String
+        switch diff {
+        case ..<0: when = "past"
+        case 0: when = "today"
+        case 1: when = "tomorrow"
+        default: when = "in \(diff) days"
+        }
+        return [
+            "title": ev.title,
+            "date": briefingDayFormatter.string(from: ev.start),
+            "when": when,
+        ]
+    }
+}
+
+/// local-time yyyy-MM-dd so the emitted `date` matches the calendar day the user sees (not UTC)
+private nonisolated(unsafe) let briefingDayFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateFormat = "yyyy-MM-dd"
+    f.locale = Locale(identifier: "en_US_POSIX")
+    return f
+}()
+
+private func keyValueDisplay(_ payload: JSONValue) -> [String: String] {
+    guard case .object(let dict) = payload else { return [:] }
+    var out: [String: String] = [:]
+    for key in dict.keys.sorted() {
+        if let v = dict[key], let s = scalarString(v) { out[key] = s }
+    }
+    return out
+}
+
+private func markdownDisplay(_ payload: JSONValue) -> String {
+    switch payload {
+    case .string(let s): return s
+    case .object(let dict):
+        if case .string(let s) = dict["text"] ?? .null { return s }
+        if case .string(let s) = dict["markdown"] ?? .null { return s }
+        return ""
+    default: return ""
+    }
+}
+
+/// JSONValue → Foundation types for the raw fallback (truncated downstream)
+private func jsonToAny(_ value: JSONValue) -> Any {
+    switch value {
+    case .null: return NSNull()
+    case .bool(let b): return b
+    case .number(let n): return n
+    case .string(let s): return s
+    case .array(let arr): return arr.map(jsonToAny)
+    case .object(let dict):
+        var out: [String: Any] = [:]
+        for (k, v) in dict { out[k] = jsonToAny(v) }
+        return out
+    }
 }

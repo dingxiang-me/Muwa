@@ -288,7 +288,9 @@ private struct DateChipView: View {
                 .background(Color.red.opacity(0.9))
             Text(dayLabel)
                 .font(.system(size: 11, weight: .bold))
-                .foregroundColor(theme.primaryText)
+                // chip background is always white, so pin a dark color (theme.primaryText
+                // is white in dark mode → invisible day number)
+                .foregroundColor(Color(white: 0.1))
                 .padding(.horizontal, 4)
                 .padding(.vertical, 1)
         }

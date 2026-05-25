@@ -63,6 +63,13 @@ final class DashboardBriefingService: ObservableObject {
     private static let cacheTimestampKey = "dashboard.briefing.cachedAt"
     private static let logFilePath = "/tmp/osaurus-briefing.log"
 
+    /// YYYY-MM-DD for grounding the model on today's date (matches dateChip's `iso` format)
+    private nonisolated(unsafe) static let isoDay: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withFullDate]
+        return f
+    }()
+
     private static func log(_ message: String) {
         let ts = ISO8601DateFormatter().string(from: Date())
         let line = "[\(ts)] \(message)\n"
@@ -179,12 +186,13 @@ final class DashboardBriefingService: ObservableObject {
             Self.log("data block empty — widgets not ready: \(statuses.joined(separator: ", "))")
             return
         }
-        Self.log("calling CoreModelService.generate (dataBlock bytes=\(dataBlock.count))")
+        Self.log("calling CoreModelService.generate (dataBlock bytes=\(dataBlock.count))\n\(dataBlock)")
 
         let raw: String
         do {
+            let today = Date().formatted(date: .complete, time: .omitted)
             raw = try await CoreModelService.shared.generate(
-                prompt: "Latest readings from the user's dashboard:\n\n\(dataBlock)\n\nCompose the briefing now.",
+                prompt: "Today is \(today) (ISO: \(Self.isoDay.string(from: Date()))).\n\nLatest readings from the user's dashboard:\n\n\(dataBlock)\n\nCompose the briefing now.",
                 systemPrompt: Self.systemPrompt,
                 temperature: 0.6,
                 maxTokens: 600,
@@ -245,7 +253,14 @@ final class DashboardBriefingService: ObservableObject {
         var entries: [[String: Any]] = []
         for widget in widgets {
             guard case let .success(payload, fetchedAt) = results[widget.id] ?? .idle else { continue }
-            let snippet = summarize(from: payload)
+            // describe what the CARD shows (headline value, list items, event dates) rather than
+            // re-summarizing the raw payload — keeps the briefing in lockstep with the widgets
+            let snippet = widgetDisplaySummary(
+                renderer: widget.renderConfig.renderer,
+                mapping: widget.renderConfig.mapping,
+                caption: widget.renderConfig.caption,
+                payload: payload
+            )
             let truncated = truncate(snippet, maxChars: 600)
             entries.append([
                 "name": widget.title,
@@ -259,27 +274,6 @@ final class DashboardBriefingService: ObservableObject {
             let s = String(data: data, encoding: .utf8)
         else { return "" }
         return s
-    }
-
-    /// Collapses arrays into `{count, sample}` so the model sees magnitude (and sibling
-    /// scalars like `total` survive truncation) instead of a wall of rows that gets cut off
-    /// mid-array — which previously hid counts from the briefing entirely.
-    private static func summarize(from value: JSONValue) -> Any {
-        switch value {
-        case .null: return NSNull()
-        case .bool(let b): return b
-        case .number(let n): return n
-        case .string(let s): return s
-        case .array(let arr):
-            return [
-                "count": arr.count,
-                "sample": arr.prefix(3).map { summarize(from: $0) },
-            ]
-        case .object(let dict):
-            var out: [String: Any] = [:]
-            for (k, v) in dict { out[k] = summarize(from: v) }
-            return out
-        }
     }
 
     /// hard cap on serialized snippet length so a large payload (e.g. a long event list) doesn't
@@ -355,13 +349,48 @@ final class DashboardBriefingService: ObservableObject {
           ]
         }
 
-        Segment types you may use:
-          { "type": "text",      "value": "..." }                           — plain words
-          { "type": "pill",      "label": "...", "tone": "success|warning|danger|accent|neutral" }
-          { "type": "count",     "value": 5, "label": "unread comments" }   — bold number with trailing label
-          { "type": "icon",      "name": "<SF Symbol>", "tone": "accent" }
-          { "type": "dateChip",  "iso": "YYYY-MM-DD" }                      — calendar chip
-        Use 2–6 segments total. Be concise, friendly, factual. Never invent numbers or names — only use what's in the data block.
-        If the data is empty or unclear, return: {"segments":[]}
+        Segment types:
+          { "type": "text",      "value": "..." }                           — plain connective words ONLY
+          { "type": "pill",      "label": "...", "tone": "success|warning|danger|accent|neutral" }  — a status/label
+          { "type": "count",     "value": 5, "label": "unread comments" }   — a number + what it counts
+          { "type": "icon",      "name": "<SF Symbol>", "tone": "accent" }   — a small leading glyph
+          { "type": "dateChip",  "iso": "YYYY-MM-DD" }                       — a calendar date
+
+        CRITICAL — the briefing's value comes from rich segments, not text. The text segments are
+        only the quiet glue between highlights. So:
+          • Every NUMBER must be a `count` segment — never write a digit inside a `text` value.
+          • Every DATE/deadline must be a `dateChip` — never write a date inside text.
+          • Every STATUS / state / category (e.g. "In Progress", "Overdue", "Done") must be a `pill`
+            with a fitting tone (success=good, warning=attention, danger=problem, accent=neutral-highlight).
+          • Lead a clause with an `icon` when a relevant SF Symbol fits (e.g. "envelope.fill" for mail,
+            "calendar" for events, "bubble.left.fill" for messages).
+
+        GROUNDING — accuracy matters more than richness. Violations make the briefing useless.
+        Each entry in the data block describes exactly what ONE widget shows the user:
+          • `displays: "a single headline value"` → use its `value` and `label` VERBATIM as one count
+            segment (value + label). Do not recompute or relabel it.
+          • `displays: "a list"/"a table"` → its `totalItems` is the true magnitude; `items` is only a
+            preview of the first rows. Report `totalItems`, never the length of `items`.
+          • `displays: "a calendar"` → each event has a `title`, a `date`, and a `when` field that is
+            ALREADY COMPUTED for you ("today", "tomorrow", "in N days", or "past"). Phrase timing using
+            `when` verbatim — NEVER compute it yourself and NEVER say "today" unless `when` is "today".
+            Emit the event's `date` in its `dateChip`. Skip events whose `when` is "past".
+          • Use ONLY numbers, names, labels, and dates present in the data. Do NOT invent qualifiers
+            like "unread", "new", or "overdue" unless the data explicitly carries that state.
+
+        Begin the briefing with a text segment whose value is exactly "You have".
+
+        The example below shows STRUCTURE ONLY. Never copy its placeholder names, numbers, or dates —
+        they are fake. Use only the real data block.
+          example data: a list {totalItems: 7}, a calendar {events:[{title:"Q3 Planning",date:"2031-02-14",when:"in 3 days"}]}
+          {"segments":[
+            {"type":"text","value":"You have"},
+            {"type":"count","value":7,"label":"open tasks, and"},
+            {"type":"pill","label":"Q3 Planning","tone":"accent"},
+            {"type":"text","value":"in 3 days on"},
+            {"type":"dateChip","iso":"2031-02-14"}
+          ]}
+
+        Use 3–8 segments. Be concise, friendly, factual. If the data is empty or unclear, return {"segments":[]}.
         """
 }
