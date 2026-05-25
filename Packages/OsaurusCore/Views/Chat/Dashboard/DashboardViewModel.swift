@@ -129,6 +129,22 @@ final class DashboardViewModel: ObservableObject {
         DashboardStore.save(widgets)
     }
 
+    /// Moves `id` to occupy `targetId`'s slot, matching drag direction (dragging down lands the
+    /// widget after the target; dragging up lands it before). Used by interactive reordering.
+    func moveWidget(id: UUID, toIndexOf targetId: UUID) {
+        guard let from = widgets.firstIndex(where: { $0.id == id }),
+            let to = widgets.firstIndex(where: { $0.id == targetId }),
+            from != to
+        else { return }
+        let widget = widgets.remove(at: from)
+        if let t = widgets.firstIndex(where: { $0.id == targetId }) {
+            widgets.insert(widget, at: from < to ? t + 1 : t)
+        } else {
+            widgets.insert(widget, at: min(to, widgets.count))
+        }
+        DashboardStore.save(widgets)
+    }
+
     func updateWidget(_ widget: DashboardWidget) {
         guard let idx = widgets.firstIndex(where: { $0.id == widget.id }) else { return }
         widgets[idx] = widget
