@@ -133,7 +133,7 @@ struct DashboardView: View {
     private var greetingHeader: some View {
         HStack(alignment: .firstTextBaseline) {
             Text(greetingText)
-                .font(.system(size: 26, weight: .semibold))
+                .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(theme.primaryText)
             Spacer()
             Text(Date.now.formatted(date: .complete, time: .omitted))

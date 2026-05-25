@@ -142,8 +142,8 @@ struct BriefingRenderer: View {
             // split on whitespace so each word can wrap independently in the flow layout
             ForEach(splitWords(value), id: \.self) { word in
                 Text(word)
-                    .font(.system(size: 16, weight: .medium))
-                    .foregroundColor(theme.primaryText)
+                    .font(.system(size: 20, weight: .medium))
+                    .foregroundColor(theme.secondaryText)
             }
         case .pill(let label, let tone):
             PillView(label: label, color: tone.color(theme))
@@ -153,16 +153,16 @@ struct BriefingRenderer: View {
             AvatarStackView(urls: Array(urls.prefix(max)))
         case .icon(let name, let tone):
             Image(systemName: name)
-                .font(.system(size: 14, weight: .semibold))
+                .font(.system(size: 17, weight: .semibold))
                 .foregroundColor(tone.color(theme))
         case .count(let value, let label):
             HStack(spacing: 4) {
                 Text("\(value)")
-                    .font(.system(size: 16, weight: .bold))
+                    .font(.system(size: 20, weight: .bold))
                     .foregroundColor(theme.primaryText)
                 if let label, !label.isEmpty {
                     Text(label)
-                        .font(.system(size: 16, weight: .medium))
+                        .font(.system(size: 20, weight: .medium))
                         .foregroundColor(theme.primaryText)
                 }
             }
@@ -213,11 +213,11 @@ private struct PillView: View {
         HStack(spacing: 4) {
             Circle().fill(color).frame(width: 6, height: 6)
             Text(label)
-                .font(.system(size: 13, weight: .semibold))
+                .font(.system(size: 15, weight: .semibold))
                 .foregroundColor(color)
         }
-        .padding(.horizontal, 8)
-        .padding(.vertical, 3)
+        .padding(.horizontal, 9)
+        .padding(.vertical, 4)
         .background(Capsule().fill(color.opacity(0.18)))
     }
 }

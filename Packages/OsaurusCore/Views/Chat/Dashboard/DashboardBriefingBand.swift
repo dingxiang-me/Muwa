@@ -32,15 +32,7 @@ struct DashboardBriefingBand: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
             controls
         }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 14)
-                .fill(theme.accentColor.opacity(0.08))
-        )
-        .overlay(
-            RoundedRectangle(cornerRadius: 14)
-                .strokeBorder(theme.accentColor.opacity(0.18), lineWidth: 1)
-        )
+        .padding(.vertical, 14)
     }
 
     private var loadingBand: some View {

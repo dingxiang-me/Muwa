@@ -245,8 +245,8 @@ final class DashboardBriefingService: ObservableObject {
         var entries: [[String: Any]] = []
         for widget in widgets {
             guard case let .success(payload, fetchedAt) = results[widget.id] ?? .idle else { continue }
-            let snippet = anyValue(from: payload)
-            let truncated = truncate(snippet, maxChars: 400)
+            let snippet = summarize(from: payload)
+            let truncated = truncate(snippet, maxChars: 600)
             entries.append([
                 "name": widget.title,
                 "tool": widget.toolName,
@@ -261,16 +261,23 @@ final class DashboardBriefingService: ObservableObject {
         return s
     }
 
-    private static func anyValue(from value: JSONValue) -> Any {
+    /// Collapses arrays into `{count, sample}` so the model sees magnitude (and sibling
+    /// scalars like `total` survive truncation) instead of a wall of rows that gets cut off
+    /// mid-array — which previously hid counts from the briefing entirely.
+    private static func summarize(from value: JSONValue) -> Any {
         switch value {
         case .null: return NSNull()
         case .bool(let b): return b
         case .number(let n): return n
         case .string(let s): return s
-        case .array(let arr): return arr.map { anyValue(from: $0) }
+        case .array(let arr):
+            return [
+                "count": arr.count,
+                "sample": arr.prefix(3).map { summarize(from: $0) },
+            ]
         case .object(let dict):
             var out: [String: Any] = [:]
-            for (k, v) in dict { out[k] = anyValue(from: v) }
+            for (k, v) in dict { out[k] = summarize(from: v) }
             return out
         }
     }

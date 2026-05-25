@@ -660,12 +660,35 @@ private func arrayItems(from payload: JSONValue) -> [JSONValue] {
 /// returns nil for arrays/objects so callers can fall back to placeholder text
 private func scalarString(_ value: JSONValue) -> String? {
     switch value {
-    case .string(let s): return s
+    case .string(let s): return prettyScalar(s)
     case .number(let n): return formatNumber(n)
     case .bool(let b): return b ? "true" : "false"
     case .null: return "—"
     case .array, .object: return nil
     }
+}
+
+private enum ISODateFormat {
+    nonisolated(unsafe) static let fractional: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+        return f
+    }()
+    nonisolated(unsafe) static let plain: ISO8601DateFormatter = {
+        let f = ISO8601DateFormatter()
+        f.formatOptions = [.withInternetDateTime]
+        return f
+    }()
+}
+
+/// renders ISO 8601 timestamps (e.g. "2026-05-20T22:15:02Z") as a friendly date/time;
+/// leaves other strings untouched
+private func prettyScalar(_ s: String) -> String {
+    // cheap guard: ISO timestamps start with a digit and are at least "YYYY-MM-DD"
+    guard s.count >= 10, s.first?.isNumber == true else { return s }
+    guard let date = ISODateFormat.fractional.date(from: s) ?? ISODateFormat.plain.date(from: s)
+    else { return s }
+    return date.formatted(date: .abbreviated, time: .shortened)
 }
 
 private func formatNumber(_ n: Double) -> String {
