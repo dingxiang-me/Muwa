@@ -25,6 +25,8 @@ struct DashboardView: View {
     @State private var dragTranslation: CGSize = .zero
     /// the lifted widget's slot frame at lift time, to keep it under the cursor after reflow
     @State private var dragStartFrame: CGRect?
+    /// cursor location at the last reorder, for movement hysteresis (anti flip-flop)
+    @State private var lastReorderCursor: CGPoint?
     /// each card's stable slot frame (grid space), updated via preference
     @State private var cardFrames: [UUID: CGRect] = [:]
     private let gridSpace = "dashboard.grid"
@@ -178,7 +180,7 @@ struct DashboardView: View {
         let reorderable = viewModel.widgets.count > 1
         return DashboardGridLayout(spacing: 20) {
             ForEach(viewModel.widgets) { widget in
-                cell(for: widget, reorderable: reorderable)
+                cell(for: widget)
                     .widgetFullWidth(widget.size == .large)
                     .widgetSlotHeight(Self.slotHeight(for: widget.size))
             }
@@ -188,6 +190,9 @@ struct DashboardView: View {
         // depends on its own (animating) slot — that's what keeps it from wobbling on reflow
         .overlay(alignment: .topLeading) { draggedOverlay }
         .onPreferenceChange(WidgetFramesKey.self) { cardFrames = $0 }
+        // one gesture on the *stable* container (not per-cell): reordering a full-width widget
+        // reshuffles the cells, which would cancel a gesture hosted on a cell mid-drag
+        .gesture(gridDragGesture, including: reorderable ? .all : .subviews)
     }
 
     /// fixed row height per size (mirrors `WidgetCard.minHeight`), so the grid layout never has to
@@ -219,7 +224,7 @@ struct DashboardView: View {
     }
 
     @ViewBuilder
-    private func cell(for widget: DashboardWidget, reorderable: Bool) -> some View {
+    private func cell(for widget: DashboardWidget) -> some View {
         ZStack {
             // stable slot tracker — never transformed, so its measured frame is the true slot
             Color.clear
@@ -240,7 +245,6 @@ struct DashboardView: View {
                 .opacity(draggingId == widget.id ? 0 : 1)
         }
         .frame(maxWidth: .infinity)
-        .gesture(reorderGesture(for: widget), including: reorderable ? .all : .subviews)
     }
 
     /// the lifted card, following the cursor (start-slot center + raw translation = no slot math)
@@ -264,23 +268,30 @@ struct DashboardView: View {
 
     // MARK: Drag handling
 
-    private func reorderGesture(for widget: DashboardWidget) -> some Gesture {
-        // plain click-drag: on macOS this doesn't fight scrolling (that's the wheel/two-finger),
-        // and avoids the sequenced-gesture cancellation that froze the lifted card
+    private var gridDragGesture: some Gesture {
+        // plain click-drag: on macOS this doesn't fight scrolling (that's the wheel/two-finger)
         DragGesture(minimumDistance: 6, coordinateSpace: .named(gridSpace))
             .onChanged { value in
-                if draggingId != widget.id { beginDrag(widget) }
+                if draggingId == nil {
+                    // identify the lifted card by where the drag began
+                    guard let hit = cardFrames.first(where: { $0.value.contains(value.startLocation) })?.key
+                    else { return }
+                    beginDrag(id: hit)
+                }
+                guard draggingId != nil else { return }
                 dragTranslation = value.translation
                 updateReorder(cursor: value.location)
             }
-            .onEnded { _ in endDrag() }
+            .onEnded { _ in
+                if draggingId != nil { endDrag() }
+            }
     }
 
-    private func beginDrag(_ widget: DashboardWidget) {
-        guard draggingId != widget.id else { return }
-        draggingId = widget.id
-        dragStartFrame = cardFrames[widget.id]
+    private func beginDrag(id: UUID) {
+        draggingId = id
+        dragStartFrame = cardFrames[id]
         dragTranslation = .zero
+        lastReorderCursor = nil
         NSHapticFeedbackManager.defaultPerformer.perform(.levelChange, performanceTime: .now)
     }
 
@@ -288,7 +299,11 @@ struct DashboardView: View {
         guard let draggingId,
             let target = cardFrames.first(where: { $0.key != draggingId && $0.value.contains(cursor) })?.key
         else { return }
-        withAnimation(.spring(response: 0.34, dampingFraction: 0.78)) {
+        // hysteresis: require the cursor to have moved since the last reorder, so a big repack
+        // (a full-width widget breaking/forming pairs) can't flip-flop the order under a still cursor
+        if let last = lastReorderCursor, hypot(cursor.x - last.x, cursor.y - last.y) < 24 { return }
+        lastReorderCursor = cursor
+        withAnimation(.spring(response: 0.34, dampingFraction: 0.8)) {
             viewModel.moveWidget(id: draggingId, toIndexOf: target)
         }
         NSHapticFeedbackManager.defaultPerformer.perform(.alignment, performanceTime: .now)
@@ -313,6 +328,7 @@ struct DashboardView: View {
         draggingId = nil
         dragTranslation = .zero
         dragStartFrame = nil
+        lastReorderCursor = nil
     }
 }
 
