@@ -1656,6 +1656,12 @@ struct RuntimePolicySourceTests {
             "DSV4 first-turn required/named tool_choice may use the native action task rail, but multi-turn tool-result prompts must stay on the DSML directive path instead of leaking action metadata."
         )
         #expect(
+            tokenizerLoader.contains("if hasNemotronSentinel,")
+                && tokenizerLoader.contains("!(chatTemplateTools?.isEmpty ?? true)")
+                && tokenizerLoader.contains("label: \"NemotronMinimal\""),
+            "Nemotron native tokenizer templates can accept a tool render while omitting the tool schema; Osaurus must route Nemotron tool prompts through the checked fallback."
+        )
+        #expect(
             registry.contains("invalidToolArgumentsEnvelope")
                 && registry.contains("\"invalid_tool_arguments\""),
             "ToolRegistry must turn parser-side invalid tool arguments into a structured invalid_args envelope instead of executing the tool body."
