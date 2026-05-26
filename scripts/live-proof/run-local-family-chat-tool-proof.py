@@ -23,10 +23,14 @@ from typing import Any
 
 PROTOCOL_MARKERS = (
     "<｜",
+    "</｜",
+    "</s>",
     "DSML",
     ":json{",
     "tool_ccalls",
     "tool_crs",
+    "<|im_start|>",
+    "<|im_end|>",
     "<tool_call>",
     "</tool_call>",
 )
