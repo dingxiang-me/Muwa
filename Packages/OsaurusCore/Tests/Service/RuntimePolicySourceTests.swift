@@ -930,6 +930,24 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    @Test("ModelRuntime drops structured tool history when no active tools are routed")
+    func modelRuntimeDropsStructuredToolHistoryWithoutActiveTools() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(
+            runtime.contains("preserveStructuredToolHistory: !tools.isEmpty"),
+            "ModelRuntime must not preserve structured assistant/tool history when the request is routed with no active tool schemas."
+        )
+        #expect(
+            runtime.contains("let toolCalls = preserveStructuredToolHistory ? toMLXToolCalls(m.tool_calls) : nil"),
+            "Assistant tool_calls must be omitted from the MLX template context when structured tool history is disabled."
+        )
+        #expect(
+            runtime.contains("role: .user,\n                            content: \"Tool result: \\(content)\""),
+            "Tool-role results should be converted to ordinary text context when structured tool history is disabled, so follow-up answers can use the result without re-entering tool-call mode."
+        )
+    }
+
     /// Preflight tool selection is a background prompt-ranking call, not the user's
     /// answer. It can fall back to the active chat model, but must not apply a
     /// synthetic reasoning mode; runtime/model defaults remain authoritative unless
