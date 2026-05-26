@@ -1061,9 +1061,11 @@ struct MLXBatchAdapter {
             box.processorDoneAt = CFAbsoluteTimeGetCurrent()
             trace?.mark("batch_tokenization_done")
 
-            let tokens = MLXCacheIOLock.withSerializedMLXCacheIO {
-                lmInput.text.tokens.asArray(Int.self)
-            }
+            let tokens =
+                lmInput.text.tokenIds
+                ?? MLXCacheIOLock.withSerializedMLXCacheIO {
+                    lmInput.text.tokens.asArray(Int.self)
+                }
             box.tokenArrayDoneAt = CFAbsoluteTimeGetCurrent()
             box.promptTokenCount = tokens.count
             guard !tokens.isEmpty else {

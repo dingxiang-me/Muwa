@@ -849,9 +849,10 @@ struct RuntimePolicySourceTests {
         #expect(adapter.contains("acquireSoloLease"))
         #expect(adapter.contains("await soloLease.release()"))
         #expect(
-            adapter.contains("MLXCacheIOLock.withSerializedMLXCacheIO")
+            adapter.contains("lmInput.text.tokenIds")
+                && adapter.contains("?? MLXCacheIOLock.withSerializedMLXCacheIO")
                 && adapter.contains("lmInput.text.tokens.asArray(Int.self)"),
-            "prompt token array materialization must share vmlx's MLX cache-I/O lock so SSM companion disk stores cannot overlap the next request's token extraction"
+            "prompt token extraction must use vmlx's CPU tokenIds when available and fall back to the serialized MLX readback only for legacy processors"
         )
         #expect(
             adapter.contains("post-generation disk-cache store")
