@@ -278,7 +278,11 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         return accumulated.isEmpty ? nil : accumulated
     }
 
-    private static func canonicalToolArgumentsJSON(_ json: String, schema: JSONValue? = nil) -> String {
+    private static func canonicalToolArgumentsJSON(
+        _ json: String,
+        schema: JSONValue? = nil,
+        toolName: String? = nil
+    ) -> String {
         let candidates = [
             json,
             json.replacingOccurrences(of: #"\""#, with: #"""#),
@@ -296,7 +300,16 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         if let schema {
             let candidate = SchemaValidator.coerceArguments(normalized, against: schema)
             let result = SchemaValidator.validate(arguments: candidate, against: schema)
-            coerced = result.isValid ? candidate : normalized
+            if result.isValid {
+                coerced = candidate
+            } else if let invalid = invalidToolArgumentsJSON(
+                toolName: toolName,
+                result: result
+            ) {
+                return invalid
+            } else {
+                coerced = normalized
+            }
         } else {
             coerced = normalized
         }
@@ -305,6 +318,33 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             let string = String(data: data, encoding: .utf8)
         else {
             return json
+        }
+        return string
+    }
+
+    private static func invalidToolArgumentsJSON(
+        toolName: String?,
+        result: SchemaValidator.ValidationResult
+    ) -> String? {
+        var object: [String: Any] = [
+            "_error": "invalid_tool_arguments",
+            "_message": result.errorMessage ?? "invalid tool arguments",
+            "_expected": "schema-compliant arguments",
+        ]
+        if let field = result.field {
+            object["_field"] = field
+        }
+        if let toolName {
+            object["_tool"] = toolName
+        }
+        guard
+            let data = try? JSONSerialization.data(
+                withJSONObject: object,
+                options: .osaurusCanonical
+            ),
+            let string = String(data: data, encoding: .utf8)
+        else {
+            return nil
         }
         return string
     }
@@ -356,7 +396,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                     name: inv.toolName,
                     arguments: canonicalToolArgumentsJSON(
                         inv.jsonArguments,
-                        schema: schemasByName[inv.toolName] ?? nil
+                        schema: schemasByName[inv.toolName] ?? nil,
+                        toolName: inv.toolName
                     )
                 ),
                 geminiThoughtSignature: inv.geminiThoughtSignature

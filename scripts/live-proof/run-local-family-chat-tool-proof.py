@@ -162,6 +162,16 @@ def run(args: argparse.Namespace) -> int:
             summary["request1_tool_args"] = json.loads(args_raw) if isinstance(args_raw, str) else args_raw
         except json.JSONDecodeError:
             summary["request1_tool_args"] = {"_raw": args_raw}
+        tool_args = summary["request1_tool_args"]
+        if isinstance(tool_args, dict) and tool_args.get("path") == str(fixture):
+            summary["request1_tool_args_classification"] = "exact_path"
+        elif isinstance(tool_args, dict) and tool_args.get("_error") == "invalid_tool_arguments":
+            summary["request1_tool_args_classification"] = "invalid_tool_arguments"
+        else:
+            summary["request1_tool_args_classification"] = "missing_required_path"
+        summary["checks"]["request1_tool_args_path_or_invalid"] = (
+            summary["request1_tool_args_classification"] in ("exact_path", "invalid_tool_arguments")
+        )
 
         req2 = {
             "model": args.model,
