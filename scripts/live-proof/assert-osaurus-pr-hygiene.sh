@@ -66,8 +66,9 @@ CHAT_UI_REASONING_GUARD="$ROOT/scripts/live-proof/assert-chat-ui-reasoning-routi
 HTTP_CANCEL_GUARD="$ROOT/scripts/live-proof/assert-http-channel-load-cancellation.sh"
 TOOL_CHOICE_GUARD="$ROOT/scripts/live-proof/assert-tool-choice-required-routing.sh"
 MODEL_TOOL_CAPABILITY_GUARD="$ROOT/scripts/live-proof/assert-model-tool-capability-surfaces.sh"
+FAMILY_RUNTIME_MATRIX_GUARD="$ROOT/scripts/live-proof/assert-family-runtime-matrix-source.sh"
 
-for file in "$KEYCHAIN_GUARD" "$VMLX_READY" "$SAMPLER_GUARD" "$RESPONSES_GUARD" "$NO_FORCED_GUARD" "$SERVER_SETTINGS_GUARD" "$CHAT_REASONING_GUARD" "$CHAT_UI_REASONING_GUARD" "$HTTP_CANCEL_GUARD" "$TOOL_CHOICE_GUARD" "$MODEL_TOOL_CAPABILITY_GUARD"; do
+for file in "$KEYCHAIN_GUARD" "$VMLX_READY" "$SAMPLER_GUARD" "$RESPONSES_GUARD" "$NO_FORCED_GUARD" "$SERVER_SETTINGS_GUARD" "$CHAT_REASONING_GUARD" "$CHAT_UI_REASONING_GUARD" "$HTTP_CANCEL_GUARD" "$TOOL_CHOICE_GUARD" "$MODEL_TOOL_CAPABILITY_GUARD" "$FAMILY_RUNTIME_MATRIX_GUARD"; do
   require_file "$file" "${file#$ROOT/}"
 done
 
@@ -137,6 +138,12 @@ if "$MODEL_TOOL_CAPABILITY_GUARD"; then
   pass "model tool/capability surfaces"
 else
   fail_msg "model tool/capability surface guard failed"
+fi
+
+if "$FAMILY_RUNTIME_MATRIX_GUARD"; then
+  pass "family runtime matrix source gate"
+else
+  fail_msg "family runtime matrix source gate failed"
 fi
 
 echo "--- PR artifact hygiene ---"
