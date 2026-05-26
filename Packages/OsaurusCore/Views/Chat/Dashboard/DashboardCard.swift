@@ -108,6 +108,15 @@ struct WidgetCard: View {
         }
     }
 
+    /// renderer-specific accessory shown next to the title (e.g. "10 unread" for an inbox)
+    private var titleBadge: String? {
+        guard widget.renderConfig.renderer == .mail,
+            case let .success(payload, _) = result
+        else { return nil }
+        let unread = MailPayloadAdapter.unreadCount(payload, mapping: widget.renderConfig.mapping)
+        return unread > 0 ? "\(unread) unread" : nil
+    }
+
     // MARK: Header
 
     private var header: some View {
@@ -116,6 +125,17 @@ struct WidgetCard: View {
                 .font(.system(size: 14, weight: .semibold))
                 .foregroundColor(theme.primaryText)
                 .lineLimit(1)
+
+            if let badge = titleBadge {
+                Text("·")
+                    .font(.system(size: 13))
+                    .foregroundColor(theme.tertiaryText)
+                Text(badge)
+                    .font(.system(size: 12, weight: .medium))
+                    .foregroundColor(theme.secondaryText)
+                    .lineLimit(1)
+                    .layoutPriority(-1)
+            }
 
             Spacer(minLength: 8)
 
@@ -248,6 +268,8 @@ struct WidgetRendererView: View {
             ChartRenderer(payload: payload, mapping: mapping)
         case .calendar:
             CalendarRendererView(payload: payload, mapping: mapping)
+        case .mail:
+            MailRendererView(payload: payload, mapping: mapping, size: size)
         case .raw:
             RawRenderer(payload: payload)
         }
@@ -735,11 +757,11 @@ func widgetDisplaySummary(
         if let label = pair.label, !label.isEmpty { out["label"] = label }
         return out
 
-    case .list, .table:
+    case .list, .table, .mail:
         let items = arrayItems(from: payload)
         let shown = items.prefix(6).map { rowDisplay($0, mapping: mapping) }
         return [
-            "displays": renderer == .table ? "a table" : "a list",
+            "displays": renderer == .table ? "a table" : (renderer == .mail ? "an inbox" : "a list"),
             "totalItems": items.count,
             "items": Array(shown),
         ]

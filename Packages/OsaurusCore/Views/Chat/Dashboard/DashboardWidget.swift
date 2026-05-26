@@ -13,6 +13,7 @@ enum WidgetRenderer: String, Codable, Sendable, CaseIterable {
     case markdown
     case chart
     case calendar
+    case mail
     case raw
 }
 

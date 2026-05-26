@@ -50,6 +50,7 @@ enum DashboardToolCatalog {
     /// when the plugin manifest hasn't declared a `defaultRender`
     private static let builtInRendererFallbacks: [String: WidgetRenderer] = [
         "get_events": .calendar,
+        "list_messages": .mail,
     ]
 
     /// returns the plugin-declared renderer for a tool, falling back to osaurus's known

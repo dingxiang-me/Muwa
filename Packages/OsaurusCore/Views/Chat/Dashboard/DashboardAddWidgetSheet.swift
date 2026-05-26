@@ -493,6 +493,7 @@ struct DashboardAddWidgetSheet: View {
         switch renderer {
         case .calendar: return size == .large
         case .stat: return size == .small
+        case .mail: return size != .small  // rows are two-line; small is too cramped
         default: return true
         }
     }
@@ -863,10 +864,13 @@ struct DashboardAddWidgetSheet: View {
 
     private var consumerRenderers: [WidgetRenderer] {
         var out: [WidgetRenderer] = [.stat, .keyValue, .list, .table, .markdown, .chart]
-        // calendar is a specialized layout — only offer it when the tool recommends it
+        // calendar & inbox are specialized layouts — only offer them when the tool recommends it
         // (or when editing a widget that already uses it), not for every tool
         if recommendedRenderer == .calendar || renderer == .calendar {
             out.append(.calendar)
+        }
+        if recommendedRenderer == .mail || renderer == .mail {
+            out.append(.mail)
         }
         if renderer == .raw { out.append(.raw) }
         // surface plugin-recommended renderer first so it's the obvious default
@@ -938,7 +942,7 @@ struct DashboardAddWidgetSheet: View {
             if let rec = recommendedRenderer {
                 renderer = rec
                 size = Self.defaultSize(for: rec)
-            } else if renderer == .calendar {
+            } else if renderer == .calendar || renderer == .mail {
                 renderer = .list
                 size = .medium
             }
@@ -965,6 +969,7 @@ struct DashboardAddWidgetSheet: View {
         switch renderer {
         case .calendar: return .large
         case .stat: return .small
+        case .mail: return .large
         default: return .medium
         }
     }
@@ -1082,6 +1087,8 @@ struct DashboardAddWidgetSheet: View {
             return ("Chart", "Visualize numbers as a graph", "chart.bar.fill")
         case .calendar:
             return ("Calendar", "Week strip with today's events", "calendar")
+        case .mail:
+            return ("Inbox", "Sender, subject, and time per message", "envelope")
         case .raw:
             return ("Raw data", "Show the underlying response", "curlybraces")
         }

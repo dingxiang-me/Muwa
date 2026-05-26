@@ -148,7 +148,7 @@ struct DashboardView: View {
     }
 
     private var greetingHeader: some View {
-        HStack(alignment: .firstTextBaseline) {
+        HStack(alignment: .center) {
             Text(greeting)
                 .font(.system(size: 20, weight: .semibold))
                 .foregroundColor(theme.primaryText)
@@ -182,7 +182,7 @@ struct DashboardView: View {
             ForEach(viewModel.widgets) { widget in
                 cell(for: widget)
                     .widgetFullWidth(widget.size == .large)
-                    .widgetSlotHeight(Self.slotHeight(for: widget.size))
+                    .widgetSlotHeight(slotHeight(for: widget))
             }
         }
         .coordinateSpace(.named(gridSpace))
@@ -193,6 +193,26 @@ struct DashboardView: View {
         // one gesture on the *stable* container (not per-cell): reordering a full-width widget
         // reshuffles the cells, which would cancel a gesture hosted on a cell mid-drag
         .gesture(gridDragGesture, including: reorderable ? .all : .subviews)
+    }
+
+    /// Mail cards size to their content (a short inbox shouldn't leave a big empty gap); other
+    /// renderers keep the fixed per-size height. Still a pure computation (no view measurement),
+    /// so the reorder layout stays jank-free.
+    private func slotHeight(for widget: DashboardWidget) -> CGFloat {
+        let base = Self.slotHeight(for: widget.size)
+        guard widget.renderConfig.renderer == .mail,
+            case let .success(payload, _)? = viewModel.results[widget.id]
+        else { return base }
+        let count = MailPayloadAdapter.parse(payload, mapping: widget.renderConfig.mapping).count
+        guard count > 0 else { return base }
+        let cap = widget.size == .large ? 7 : 4
+        let rows = min(count, cap)
+        let rowHeight: CGFloat = 54
+        let rowSpacing: CGFloat = 8
+        // card chrome: 16+16 padding, title row, divider, the two 12pt VStack gaps, footer
+        let chrome: CGFloat = 96
+        let overflow: CGFloat = count > cap ? 20 : 0  // "+N more" line
+        return chrome + CGFloat(rows) * rowHeight + CGFloat(rows - 1) * rowSpacing + overflow
     }
 
     /// fixed row height per size (mirrors `WidgetCard.minHeight`), so the grid layout never has to
