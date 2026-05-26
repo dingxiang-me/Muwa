@@ -156,7 +156,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
 
         var adjustedContext = additionalContext
         if hasZayaVLVisionSentinel,
-            Self.messagesContainImageContent(messages),
+            (Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)),
             (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
         {
             return try fallback(

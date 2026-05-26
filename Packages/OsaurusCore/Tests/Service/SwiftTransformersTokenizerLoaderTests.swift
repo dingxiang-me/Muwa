@@ -85,6 +85,62 @@ struct SwiftTransformersTokenizerLoaderTests {
         #expect(decoded.contains("<|vision_end|>"), "Decoded: \(decoded)")
     }
 
+    @Test func zayaVLLocalTokenizerRendersTextOnlyToolsFromOsaurusFallback() async throws {
+        let defaultPath = "/Users/eric/models/Osaurus/ZAYA1-VL-8B-MXFP4"
+        let modelPath = ProcessInfo.processInfo.environment["OSAURUS_ZAYA_VL_TEST_MODEL"] ?? defaultPath
+        let modelURL = URL(fileURLWithPath: modelPath)
+        guard
+            FileManager.default.fileExists(
+                atPath: modelURL.appendingPathComponent("tokenizer.json").path
+            )
+        else {
+            return
+        }
+
+        let tokenizer = try await SwiftTransformersTokenizerLoader().load(from: modelURL)
+        let tool = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "line_count",
+                description: "Count newline-separated text lines.",
+                parameters: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "text": .object([
+                            "type": .string("string"),
+                            "description": .string("Text to count lines for."),
+                        ])
+                    ]),
+                    "required": .array([.string("text")]),
+                ])
+            )
+        )
+        let tokenIds = try tokenizer.applyChatTemplate(
+            messages: [
+                [
+                    "role": "user",
+                    "content": "Use line_count on red\ngreen\nblue.",
+                ]
+            ],
+            tools: [tool.toTokenizerToolSpec()],
+            additionalContext: [
+                "enable_thinking": false,
+                "tool_choice": "required",
+                "tool_choice_name": "line_count",
+            ]
+        )
+        let decoded = tokenizer.decode(tokenIds: tokenIds, skipSpecialTokens: false)
+
+        #expect(decoded.contains("<tools>"), "Decoded: \(decoded)")
+        #expect(decoded.contains("<name>line_count</name>"), "Decoded: \(decoded)")
+        #expect(decoded.contains("<name>text</name>"), "Decoded: \(decoded)")
+        #expect(decoded.contains("<type>string</type>"), "Decoded: \(decoded)")
+        #expect(decoded.contains("<required>[\"text\"]</required>"), "Decoded: \(decoded)")
+        #expect(decoded.contains("MUST be a tool call"), "Decoded: \(decoded)")
+        #expect(decoded.contains("Use the `line_count` function."), "Decoded: \(decoded)")
+        #expect(decoded.contains("Use line_count on red\ngreen\nblue."), "Decoded: \(decoded)")
+    }
+
     @Test func gemma4LocalTokenizerRendersUnionToolSchemaTypeNatively() async throws {
         let defaultPath = "/Users/eric/models/dealign.ai/Gemma-4-26B-A4B-it-JANG_4M-CRACK"
         let modelPath = ProcessInfo.processInfo.environment["OSAURUS_GEMMA4_TEST_MODEL"] ?? defaultPath
