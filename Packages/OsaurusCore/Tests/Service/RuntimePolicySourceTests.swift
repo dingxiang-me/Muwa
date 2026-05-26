@@ -406,7 +406,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "68f9cb80bf37efa03f1d3ab6e0f2a1f61045368f"
+        let expectedRuntimeHardenedRevision = "dbb5dde7fe9b4a06ae402ca2f11ff3e1ea2e12e4"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -712,8 +712,12 @@ struct RuntimePolicySourceTests {
         #expect(httpHandler.contains(#""block_disk_store""#))
         #expect(httpHandler.contains(#""disk_l2_hits""#))
         #expect(httpHandler.contains(#""prefix_hits""#))
+        #expect(httpHandler.contains(#""companion_cache""#))
+        #expect(httpHandler.contains(#""zaya_cca_companion_cache""#))
+        #expect(httpHandler.contains(#""zaya_cca_companion_hits""#))
         #expect(httpHandler.contains(#""cache_topology""#))
         #expect(httpHandler.contains("hybrid_pool_layer_count"))
+        #expect(httpHandler.contains("zaya_cca_layer_count"))
         #expect(httpHandler.contains("requires_disk_backed_restore"))
         #expect(!httpHandler.contains(#"aggregate["prefix_hits", default: 0] += diskStats.hits"#))
         #expect(!httpHandler.contains(#"aggregate["prefix_misses", default: 0] += diskStats.misses"#))
