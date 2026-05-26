@@ -744,21 +744,25 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 row["block_disk_store"] = disk
 
                 let ssm = stats.ssmStats
+                let companionKinds = summary.cacheTopology?.topologyTags.filter {
+                    $0.hasPrefix("companion=")
+                } ?? []
+                let hasSSMCompanion = companionKinds.contains("companion=ssm")
                 let hasZayaCCACompanion =
                     (summary.cacheTopology?.zayaCCALayerCount ?? 0) > 0
                 row["companion_cache"] = [
                     "hits": ssm.hits,
                     "misses": ssm.misses,
                     "rederives": ssm.reDerives,
-                    "kinds": summary.cacheTopology?.topologyTags.filter {
-                        $0.hasPrefix("companion=")
-                    } ?? [],
+                    "kinds": companionKinds,
                 ]
-                row["ssm_companion_cache"] = [
-                    "hits": ssm.hits,
-                    "misses": ssm.misses,
-                    "rederives": ssm.reDerives,
-                ]
+                if hasSSMCompanion {
+                    row["ssm_companion_cache"] = [
+                        "hits": ssm.hits,
+                        "misses": ssm.misses,
+                        "rederives": ssm.reDerives,
+                    ]
+                }
                 if hasZayaCCACompanion {
                     row["zaya_cca_companion_cache"] = [
                         "hits": ssm.hits,
@@ -769,9 +773,11 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 aggregate["companion_hits", default: 0] += ssm.hits
                 aggregate["companion_misses", default: 0] += ssm.misses
                 aggregate["companion_rederives", default: 0] += ssm.reDerives
-                aggregate["ssm_companion_hits", default: 0] += ssm.hits
-                aggregate["ssm_companion_misses", default: 0] += ssm.misses
-                aggregate["ssm_companion_rederives", default: 0] += ssm.reDerives
+                if hasSSMCompanion {
+                    aggregate["ssm_companion_hits", default: 0] += ssm.hits
+                    aggregate["ssm_companion_misses", default: 0] += ssm.misses
+                    aggregate["ssm_companion_rederives", default: 0] += ssm.reDerives
+                }
                 if hasZayaCCACompanion {
                     aggregate["zaya_cca_companion_hits", default: 0] += ssm.hits
                     aggregate["zaya_cca_companion_misses", default: 0] += ssm.misses

@@ -715,6 +715,8 @@ struct RuntimePolicySourceTests {
         #expect(httpHandler.contains(#""companion_cache""#))
         #expect(httpHandler.contains(#""zaya_cca_companion_cache""#))
         #expect(httpHandler.contains(#""zaya_cca_companion_hits""#))
+        #expect(httpHandler.contains(#"let hasSSMCompanion = companionKinds.contains("companion=ssm")"#))
+        #expect(httpHandler.contains("if hasSSMCompanion"))
         #expect(httpHandler.contains(#""cache_topology""#))
         #expect(httpHandler.contains("hybrid_pool_layer_count"))
         #expect(httpHandler.contains("zaya_cca_layer_count"))
