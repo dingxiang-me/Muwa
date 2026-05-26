@@ -398,12 +398,15 @@ struct RuntimePolicySourceTests {
         // bare-name key/value DSV4 tool attempts such as
         // `file_read\npath=...` being parsed as tools instead of visible text,
         // and Qwen multi-turn tool/cache matrix coverage staying present in
-        // the vMLX regression harness.
+        // the vMLX regression harness, plus the Nemotron Omni tool-template
+        // fallback that keeps tool schemas rendered through the model-native
+        // [AVAILABLE_TOOLS]/XML function-call contract instead of leaking
+        // role-token/DSML fragments in Osaurus tool turns.
         // That avoids Xcode PIF
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "a8a8e65451beebd0ef6e115f9e66bb9cde2988de"
+        let expectedRuntimeHardenedRevision = "f2d467a6d6ff62f09ca1501101e12b8c390d1d44"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
