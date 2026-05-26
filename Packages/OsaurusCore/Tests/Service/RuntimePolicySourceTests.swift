@@ -406,7 +406,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "15128709d0de5af5aa829bcbd5ac2a11aecbe293"
+        let expectedRuntimeHardenedRevision = "6f82fcff93a233ca94adcfdf3c452913b7c77816"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -1731,6 +1731,11 @@ struct RuntimePolicySourceTests {
         #expect(
             !adapter.contains("context[\"enable_thinking\"] = hasPositiveReasoningEffort\n            if hasPositiveReasoningEffort"),
             "Family-specific reasoning profiles must not force enable_thinking=false by writing a false boolean when no positive effort was requested."
+        )
+        #expect(
+            adapter.contains("if ModelFamilyNames.isZayaFamily(modelName)")
+                && adapter.contains("context[\"enable_thinking\"] = false"),
+            "ZAYA text bundles are the explicit exception: their profile default is a closed/no-thinking prompt, so omitted reasoning controls must reach vmlx as enable_thinking=false."
         )
         #expect(
             !adapter.contains("dsv4MaxReasoningRepetitionPenalty")

@@ -904,6 +904,15 @@ struct MLXBatchAdapterTests {
                 == nil
         )
 
+        let zayaUnspecified = MLXBatchAdapter.additionalContext(
+            for: unspecified,
+            modelName: "zaya1-8b-jangtq_k"
+        )
+        #expect(
+            zayaUnspecified["enable_thinking"] as? Bool == false,
+            "ZAYA text bundles default to closed/no-thinking prompts; omitting enable_thinking must not route direct answers into reasoning-only output."
+        )
+
         let staleOffEffort = MLXBatchAdapter.additionalContext(
             for: GenerationParameters(
                 temperature: nil,
@@ -1162,11 +1171,12 @@ struct MLXBatchAdapterTests {
         }
     }
 
-    /// ZAYA1 (Zyphra; `model_type=zaya`) is reasoning-capable but defaults
-    /// thinking off (`think_in_template=false`). When no request option is
-    /// present, preserve the bundle/template default by sending no synthetic
-    /// thinking kwarg; when the user/API explicitly opts in via
-    /// `disableThinking=false`, pass `enable_thinking=true`.
+    /// ZAYA1 text bundles (Zyphra; `model_type=zaya`) are reasoning-capable,
+    /// but their stable chat rail is the closed/no-thinking path. When no
+    /// request option is present, pass `enable_thinking=false` explicitly so a
+    /// direct follow-up does not decode into hidden reasoning-only output.
+    /// Explicit user/API opt-in via `disableThinking=false` still passes
+    /// `enable_thinking=true`.
     @Test func additionalContext_defaultsZayaThinkingOffButHonorsExplicitOptIn() {
         let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
         let userEnabled = GenerationParameters(
@@ -1187,8 +1197,8 @@ struct MLXBatchAdapterTests {
                 MLXBatchAdapter.additionalContext(
                     for: unspecified,
                     modelName: modelName
-                )["enable_thinking"] == nil,
-                "ZAYA should preserve its bundle/template thinking default: \(modelName)"
+                )["enable_thinking"] as? Bool == false,
+                "ZAYA text bundles should default to the closed/no-thinking rail: \(modelName)"
             )
             #expect(
                 MLXBatchAdapter.additionalContext(
