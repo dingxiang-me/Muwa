@@ -119,9 +119,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             && upstream.convertTokenToId("<|im_end|>") != nil
         let hasDSV4Sentinel =
             !hasZayaVLVisionSentinel
-            && (upstream.bosToken == Self.dsv4Bos
-                || (upstream.convertTokenToId(Self.dsv4Bos) != nil
-                    && upstream.convertTokenToId(Self.dsv4Eos) != nil))
+            && upstream.bosToken == Self.dsv4Bos
         if hasLagunaSentinel
             && (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
         {

@@ -243,6 +243,57 @@ struct SwiftTransformersTokenizerLoaderTests {
         )
     }
 
+    @Test func nemotronLocalTokenizerDoesNotRouteThroughDSV4Template() async throws {
+        let defaultPath = "/Users/eric/models/dealign.ai/Nemotron-Omni-Nano-JANGTQ-CRACK"
+        let modelPath = ProcessInfo.processInfo.environment["OSAURUS_NEMOTRON_TEST_MODEL"] ?? defaultPath
+        let modelURL = URL(fileURLWithPath: modelPath)
+        guard
+            FileManager.default.fileExists(
+                atPath: modelURL.appendingPathComponent("tokenizer.json").path
+            )
+        else {
+            return
+        }
+
+        let tokenizer = try await SwiftTransformersTokenizerLoader().load(from: modelURL)
+        let tool = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "line_count",
+                description: "Count newline-separated text lines.",
+                parameters: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "text": .object(["type": .string("string")])
+                    ]),
+                    "required": .array([.string("text")]),
+                ])
+            )
+        )
+        let tokenIds = try tokenizer.applyChatTemplate(
+            messages: [
+                [
+                    "role": "user",
+                    "content": "Use line_count on red\ngreen\nblue.",
+                ]
+            ],
+            tools: [tool.toTokenizerToolSpec()],
+            additionalContext: ["enable_thinking": false, "tool_choice": "required"]
+        )
+        let decoded = tokenizer.decode(tokenIds: tokenIds, skipSpecialTokens: false)
+
+        #expect(decoded.contains("<|im_start|>"), "Nemotron should keep its ChatML template. Decoded: \(decoded)")
+        #expect(decoded.contains("<tools>"), "Nemotron should render XML tools. Decoded: \(decoded)")
+        #expect(decoded.contains("<tool_call>"), "Nemotron should show XML tool call contract. Decoded: \(decoded)")
+        #expect(decoded.contains("line_count"), "Nemotron should include the requested tool schema. Decoded: \(decoded)")
+        #expect(
+            !decoded.contains("<\u{FF5C}DSML\u{FF5C}tool_calls>")
+                && !decoded.contains("$TOOL_NAME")
+                && !decoded.contains("<\u{FF5C}Assistant\u{FF5C}>"),
+            "Nemotron must not be misrouted through the DSV4 DSML template. Decoded: \(decoded)"
+        )
+    }
+
     @Test func dsv4LocalTokenizerRendersDSMLToolsFromOsaurusToolSpec() async throws {
         let defaultPath = "/Users/eric/models/JANGQ/DeepSeek-V4-Flash-JANGTQ-K"
         let modelPath = ProcessInfo.processInfo.environment["OSAURUS_DSV4_TEST_MODEL"] ?? defaultPath

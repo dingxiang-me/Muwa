@@ -1661,6 +1661,13 @@ struct RuntimePolicySourceTests {
                 && adapter.contains("case .required, .function(_)"),
             "Required or named local tool_choice must become template context instead of being reduced to a tools-available-only prompt."
         )
+        #expect(
+            adapter.contains("context[\"tool_choice_name\"] = toolChoiceName")
+                && adapter.contains("private static func requiredToolChoiceName(")
+                && adapter.contains("case .function(let target):")
+                && adapter.contains("guard let toolsSpec, toolsSpec.count == 1"),
+            "Required/named local tool_choice must pass the target tool name into vmlx template context so Nemotron-family required tool templates do not fall back to generic placeholders."
+        )
         let tokenizerLoader = try Self.source("Services/ModelRuntime/SwiftTransformersTokenizerLoader.swift")
         #expect(
             tokenizerLoader.contains("let toolChoiceRequired =")
@@ -1673,6 +1680,12 @@ struct RuntimePolicySourceTests {
                 && tokenizerLoader.contains("!dsv4HasPriorToolResult")
                 && tokenizerLoader.contains("dsv4Messages[idx].task = \"action\""),
             "DSV4 first-turn required/named tool_choice may use the native action task rail, but multi-turn tool-result prompts must stay on the DSML directive path instead of leaking action metadata."
+        )
+        #expect(
+            tokenizerLoader.contains("&& upstream.bosToken == Self.dsv4Bos")
+                && !tokenizerLoader.contains("convertTokenToId(Self.dsv4Bos)")
+                && !tokenizerLoader.contains("convertTokenToId(Self.dsv4Eos)"),
+            "DSV4 template routing must require the actual DSV4 BOS token; token-id convertibility is too broad and can misroute Nemotron Omni into DSML placeholders."
         )
         #expect(
             registry.contains("invalidToolArgumentsEnvelope")

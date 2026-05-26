@@ -1087,9 +1087,11 @@ struct MLXBatchAdapterTests {
                     type: "function",
                     function: ToolChoiceOption.Name(name: "file_read")
                 )
-            )
+            ),
+            toolChoiceName: "file_read"
         )
         #expect(namedFunction["tool_choice"] as? String == "required")
+        #expect(namedFunction["tool_choice_name"] as? String == "file_read")
 
         let auto = MLXBatchAdapter.additionalContext(
             for: generation,

@@ -667,11 +667,17 @@ struct MLXBatchAdapter {
     static func additionalContext(
         for generation: GenerationParameters,
         modelName: String,
-        toolChoice: ToolChoiceOption? = nil
+        toolChoice: ToolChoiceOption? = nil,
+        toolChoiceName: String? = nil
     ) -> [String: any Sendable] {
         var context: [String: any Sendable] = [:]
         if toolChoiceRequiresLocalCall(toolChoice) {
             context["tool_choice"] = "required"
+        }
+        if let toolChoiceName,
+           !toolChoiceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        {
+            context["tool_choice_name"] = toolChoiceName
         }
         let normalizedReasoningEffort: String? = {
             guard let effort = generation.modelOptions["reasoningEffort"]?.stringValue else {
@@ -785,6 +791,24 @@ struct MLXBatchAdapter {
             return true
         case .auto, .none:
             return false
+        }
+    }
+
+    private static func requiredToolChoiceName(
+        toolChoice: ToolChoiceOption?,
+        toolsSpec: [[String: any Sendable]]?
+    ) -> String? {
+        guard let toolChoice else { return nil }
+        switch toolChoice {
+        case .function(let target):
+            return target.function.name
+        case .required:
+            guard let toolsSpec, toolsSpec.count == 1 else { return nil }
+            let tool = toolsSpec[0]
+            let function = (tool["function"] as? [String: any Sendable]) ?? tool
+            return function["name"] as? String
+        case .auto, .none:
+            return nil
         }
     }
 
@@ -1024,6 +1048,9 @@ struct MLXBatchAdapter {
             let toolsSpec = buildToolsSpec()
             box.toolsBuiltAt = CFAbsoluteTimeGetCurrent()
             box.toolCount = toolsSpec?.count ?? 0
+            let requiredToolName = requiredToolChoiceName(
+                toolChoice: toolChoice,
+                toolsSpec: toolsSpec)
 
             // Reasoning template context. Only explicit request controls are
             // translated into model-specific template kwargs; omitted controls
@@ -1031,7 +1058,8 @@ struct MLXBatchAdapter {
             let additionalContext = additionalContext(
                 for: generation,
                 modelName: modelName,
-                toolChoice: toolChoice
+                toolChoice: toolChoice,
+                toolChoiceName: requiredToolName
             )
             box.contextBuiltAt = CFAbsoluteTimeGetCurrent()
             box.contextKeys = additionalContext.keys.sorted()
