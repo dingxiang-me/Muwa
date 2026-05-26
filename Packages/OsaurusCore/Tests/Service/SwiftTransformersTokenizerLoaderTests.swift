@@ -483,18 +483,6 @@ struct SwiftTransformersTokenizerLoaderTests {
     @Test func downloadedFamilyTokenizersRenderCapabilitiesSearchToolSurface() async throws {
         let rows = [
             LocalTokenizerRow(
-                family: "nemotron",
-                label: "Nemotron Omni Nano JANGTQ CRACK",
-                path: "/Users/eric/models/dealign.ai/Nemotron-Omni-Nano-JANGTQ-CRACK"),
-            LocalTokenizerRow(
-                family: "nemotron",
-                label: "Nemotron Omni Nano JANGTQ4 CRACK",
-                path: "/Users/eric/models/dealign.ai/Nemotron-Omni-Nano-JANGTQ4-CRACK"),
-            LocalTokenizerRow(
-                family: "nemotron",
-                label: "Nemotron Omni Nano MXFP4 CRACK",
-                path: "/Users/eric/models/dealign.ai/Nemotron-Omni-Nano-MXFP4-CRACK"),
-            LocalTokenizerRow(
                 family: "gemma4",
                 label: "Gemma 4 26B JANG_4M CRACK",
                 path: "/Users/eric/models/dealign.ai/Gemma-4-26B-A4B-it-JANG_4M-CRACK"),

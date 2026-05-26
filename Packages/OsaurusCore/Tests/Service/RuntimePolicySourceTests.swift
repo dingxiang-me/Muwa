@@ -406,7 +406,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "e133a947a2d364e815f1f0462462ab42a0743ed2"
+        let expectedRuntimeHardenedRevision = "fa7de3f1dbdfc8249249e823f0d6c17f691da129"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -1654,12 +1654,6 @@ struct RuntimePolicySourceTests {
                 && tokenizerLoader.contains("!dsv4HasPriorToolResult")
                 && tokenizerLoader.contains("dsv4Messages[idx].task = \"action\""),
             "DSV4 first-turn required/named tool_choice may use the native action task rail, but multi-turn tool-result prompts must stay on the DSML directive path instead of leaking action metadata."
-        )
-        #expect(
-            tokenizerLoader.contains("if hasNemotronSentinel,")
-                && tokenizerLoader.contains("!(chatTemplateTools?.isEmpty ?? true)")
-                && tokenizerLoader.contains("label: \"NemotronMinimal\""),
-            "Nemotron native tokenizer templates can accept a tool render while omitting the tool schema; Osaurus must route Nemotron tool prompts through the checked fallback."
         )
         #expect(
             registry.contains("invalidToolArgumentsEnvelope")

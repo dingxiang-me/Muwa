@@ -193,23 +193,6 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                 addGenerationPrompt: addGenerationPrompt
             )
         }
-        let hasNemotronSentinel =
-            upstream.convertTokenToId("<|im_start|>") != nil
-            || upstream.convertTokenToId("<|im_end|>") != nil
-        if hasNemotronSentinel,
-            !(chatTemplateTools?.isEmpty ?? true),
-            (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
-        {
-            return try fallback(
-                label: "NemotronMinimal",
-                template: MLXLMCommon.ChatTemplateFallbacks.nemotronMinimal,
-                messages: messages,
-                tools: chatTemplateTools,
-                additionalContext: adjustedContext,
-                addGenerationPrompt: addGenerationPrompt
-            )
-        }
-
         do {
             return try upstream.applyChatTemplate(
                 messages: messages,
@@ -288,6 +271,9 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                 throw error
             }
             let isGemma = upstream.bosToken == "<bos>"
+            let hasNemotronSentinel =
+                upstream.convertTokenToId("<|im_start|>") != nil
+                || upstream.convertTokenToId("<|im_end|>") != nil
             if isGemma {
                 throw error
             }
