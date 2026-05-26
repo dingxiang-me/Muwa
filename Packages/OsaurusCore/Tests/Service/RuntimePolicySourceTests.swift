@@ -1712,10 +1712,9 @@ struct RuntimePolicySourceTests {
             "DSV4 native prompt rendering must pass required tool_choice into DeepseekV4ChatEncoder so second-turn/named required tool calls keep the DSML must-call directive."
         )
         #expect(
-            tokenizerLoader.contains("let dsv4HasPriorToolResult = dsv4Messages.contains { $0.role == .tool }")
-                && tokenizerLoader.contains("!dsv4HasPriorToolResult")
+            !tokenizerLoader.contains("dsv4HasPriorToolResult")
                 && tokenizerLoader.contains("dsv4Messages[idx].task = \"action\""),
-            "DSV4 first-turn required/named tool_choice may use the native action task rail, but multi-turn tool-result prompts must stay on the DSML directive path instead of leaking action metadata."
+            "DSV4 required/named tool_choice must keep the native action task rail even after tool-result history so multi-turn required tool calls do not silently degrade to ordinary chat."
         )
         #expect(
             tokenizerLoader.contains("&& upstream.bosToken == Self.dsv4Bos")
