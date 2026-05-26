@@ -406,7 +406,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "37c1a05fa31f261695e2887b1c82c7b462435926"
+        let expectedRuntimeHardenedRevision = "6e6f8bbf1cb89e6d5ba03ca3361df153eca21cc6"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -848,6 +848,11 @@ struct RuntimePolicySourceTests {
         #expect(adapter.contains("maxBatchSize == 1"))
         #expect(adapter.contains("acquireSoloLease"))
         #expect(adapter.contains("await soloLease.release()"))
+        #expect(
+            adapter.contains("MLXCacheIOLock.withSerializedMLXCacheIO")
+                && adapter.contains("lmInput.text.tokens.asArray(Int.self)"),
+            "prompt token array materialization must share vmlx's MLX cache-I/O lock so SSM companion disk stores cannot overlap the next request's token extraction"
+        )
         #expect(
             adapter.contains("post-generation disk-cache store")
                 && adapter.contains("for await event in upstream")
