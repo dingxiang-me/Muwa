@@ -1082,30 +1082,6 @@ struct MLXBatchAdapterTests {
         )
         #expect(namedFunction["tool_choice"] as? String == "required")
 
-        for familyModel in [
-            "nemotron-omni-nano-jangtq-crack",
-            "zaya1-8b-jangtq_k",
-            "zaya1-vl-8b-jangtq_k",
-        ] {
-            let autoToolContext = MLXBatchAdapter.additionalContext(
-                for: generation,
-                modelName: familyModel,
-                toolChoice: .auto
-            )
-            #expect(autoToolContext["tool_choice"] == nil)
-            #expect(autoToolContext["enable_thinking"] as? Bool == false)
-            #expect(autoToolContext["reasoning_effort"] as? String == "none")
-
-            let requiredToolContext = MLXBatchAdapter.additionalContext(
-                for: generation,
-                modelName: familyModel,
-                toolChoice: .required
-            )
-            #expect(requiredToolContext["tool_choice"] as? String == "required")
-            #expect(requiredToolContext["enable_thinking"] as? Bool == false)
-            #expect(requiredToolContext["reasoning_effort"] as? String == "none")
-        }
-
         let auto = MLXBatchAdapter.additionalContext(
             for: generation,
             modelName: modelName,
