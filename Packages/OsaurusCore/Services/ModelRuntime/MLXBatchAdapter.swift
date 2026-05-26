@@ -670,7 +670,9 @@ struct MLXBatchAdapter {
         toolChoice: ToolChoiceOption? = nil
     ) -> [String: any Sendable] {
         var context: [String: any Sendable] = [:]
-        if toolChoiceRequiresLocalCall(toolChoice) {
+        let requiresLocalToolCall = toolChoiceRequiresLocalCall(toolChoice)
+        let hasLocalToolSurface = toolChoiceUsesLocalTools(toolChoice)
+        if requiresLocalToolCall {
             context["tool_choice"] = "required"
         }
         let normalizedReasoningEffort: String? = {
@@ -732,6 +734,10 @@ struct MLXBatchAdapter {
         }
 
         if ModelFamilyNames.isZayaVLFamily(modelName) {
+            if hasLocalToolSurface && (normalizedReasoningEffort == nil || directRailReasoningEffort) {
+                context["enable_thinking"] = false
+                context["reasoning_effort"] = "none"
+            }
             return context
         }
 
@@ -743,6 +749,11 @@ struct MLXBatchAdapter {
             return context
         }
         if ModelFamilyNames.isNemotronOmniFamily(modelName) {
+            if hasLocalToolSurface && (normalizedReasoningEffort == nil || directRailReasoningEffort) {
+                context["enable_thinking"] = false
+                context["reasoning_effort"] = "none"
+                return context
+            }
             if directRailReasoningEffort {
                 context["enable_thinking"] = false
                 return context
@@ -754,6 +765,11 @@ struct MLXBatchAdapter {
             return context
         }
         if ModelFamilyNames.isZayaFamily(modelName) {
+            if hasLocalToolSurface && (normalizedReasoningEffort == nil || directRailReasoningEffort) {
+                context["enable_thinking"] = false
+                context["reasoning_effort"] = "none"
+                return context
+            }
             if directRailReasoningEffort {
                 context["enable_thinking"] = false
                 return context
@@ -782,6 +798,16 @@ struct MLXBatchAdapter {
         case .required, .function(_):
             return true
         case .auto, .none:
+            return false
+        }
+    }
+
+    private static func toolChoiceUsesLocalTools(_ toolChoice: ToolChoiceOption?) -> Bool {
+        guard let toolChoice else { return false }
+        switch toolChoice {
+        case .auto, .required, .function(_):
+            return true
+        case .none:
             return false
         }
     }
