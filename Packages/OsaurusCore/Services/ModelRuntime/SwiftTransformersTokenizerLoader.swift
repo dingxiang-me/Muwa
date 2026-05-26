@@ -191,6 +191,20 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                 addGenerationPrompt: addGenerationPrompt
             )
         }
+        if !(chatTemplateTools?.isEmpty ?? true),
+            upstream.bosToken == "<s>",
+            upstream.convertTokenToId("<|im_end|>") != nil,
+            (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
+        {
+            return try fallback(
+                label: "NemotronMinimal",
+                template: MLXLMCommon.ChatTemplateFallbacks.nemotronMinimal,
+                messages: messages,
+                tools: chatTemplateTools,
+                additionalContext: adjustedContext,
+                addGenerationPrompt: addGenerationPrompt
+            )
+        }
         do {
             return try upstream.applyChatTemplate(
                 messages: messages,

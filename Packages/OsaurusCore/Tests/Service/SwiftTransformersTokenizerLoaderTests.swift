@@ -287,6 +287,14 @@ struct SwiftTransformersTokenizerLoaderTests {
         #expect(decoded.contains("<tool_call>"), "Nemotron should show XML tool call contract. Decoded: \(decoded)")
         #expect(decoded.contains("line_count"), "Nemotron should include the requested tool schema. Decoded: \(decoded)")
         #expect(
+            decoded.contains("one available tool and no prose before the tool result"),
+            "Nemotron required tool_choice must use the strict fallback contract, not the permissive native template. Decoded: \(decoded)"
+        )
+        #expect(
+            !decoded.contains("optional reasoning for your function call"),
+            "Nemotron required tool_choice must not keep the native template's optional reasoning-before-tool allowance. Decoded: \(decoded)"
+        )
+        #expect(
             !decoded.contains("<\u{FF5C}DSML\u{FF5C}tool_calls>")
                 && !decoded.contains("$TOOL_NAME")
                 && !decoded.contains("<\u{FF5C}Assistant\u{FF5C}>"),

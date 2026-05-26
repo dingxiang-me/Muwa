@@ -173,50 +173,69 @@ def run_model(args: argparse.Namespace, model: str, root: pathlib.Path) -> dict[
     calls1 = msg1.get("tool_calls") or []
     call1 = calls1[0] if calls1 else {}
     args1 = parse_args(call1.get("function", {}).get("arguments"))
+    history_valid = finish(resp1) == "tool_calls" and len(calls1) == 1 and bool(call1.get("id"))
 
-    req2 = {
-        "model": model,
-        "messages": [
-            req1["messages"][0],
-            {"role": "assistant", "content": msg1.get("content"), "tool_calls": calls1},
-            {
-                "role": "tool",
-                "tool_call_id": call1.get("id"),
-                "content": json.dumps({"lines": 3}, sort_keys=True),
-            },
-            {
-                "role": "user",
-                "content": "How many lines were counted? Answer plainly in one short sentence. Do not call another tool.",
-            },
-        ],
-        "tools": [tool],
-        "tool_choice": "none",
-        "max_tokens": args.max_tokens,
-    }
-    resp2, elapsed2 = call_chat(args.base_url, req2, args.timeout)
-    save(root / f"{label}_02_none_followup.request.json", req2)
-    save(root / f"{label}_02_none_followup.response.json", resp2)
-    msg2 = message(resp2)
-    content2 = msg2.get("content") or ""
+    if history_valid:
+        req2 = {
+            "model": model,
+            "messages": [
+                req1["messages"][0],
+                {"role": "assistant", "content": msg1.get("content"), "tool_calls": calls1},
+                {
+                    "role": "tool",
+                    "tool_call_id": call1.get("id"),
+                    "content": json.dumps({"lines": 3}, sort_keys=True),
+                },
+                {
+                    "role": "user",
+                    "content": "How many lines were counted? Answer plainly in one short sentence. Do not call another tool.",
+                },
+            ],
+            "tools": [tool],
+            "tool_choice": "none",
+            "max_tokens": args.max_tokens,
+        }
+        resp2, elapsed2 = call_chat(args.base_url, req2, args.timeout)
+        save(root / f"{label}_02_none_followup.request.json", req2)
+        save(root / f"{label}_02_none_followup.response.json", resp2)
+        msg2 = message(resp2)
+        content2 = msg2.get("content") or ""
 
-    req3 = {
-        "model": model,
-        "messages": [
-            *req2["messages"],
-            {"role": "assistant", "content": content2},
-            {"role": "user", "content": "Now use line_count on this exact text: one\ntwo"},
-        ],
-        "tools": [tool],
-        "tool_choice": "required",
-        "max_tokens": args.max_tokens,
-    }
-    resp3, elapsed3 = call_chat(args.base_url, req3, args.timeout)
-    save(root / f"{label}_03_required_again.request.json", req3)
-    save(root / f"{label}_03_required_again.response.json", resp3)
-    msg3 = message(resp3)
-    calls3 = msg3.get("tool_calls") or []
-    call3 = calls3[0] if calls3 else {}
-    args3 = parse_args(call3.get("function", {}).get("arguments"))
+        req3 = {
+            "model": model,
+            "messages": [
+                *req2["messages"],
+                {"role": "assistant", "content": content2},
+                {"role": "user", "content": "Now use line_count on this exact text: one\ntwo"},
+            ],
+            "tools": [tool],
+            "tool_choice": "required",
+            "max_tokens": args.max_tokens,
+        }
+        resp3, elapsed3 = call_chat(args.base_url, req3, args.timeout)
+        save(root / f"{label}_03_required_again.request.json", req3)
+        save(root / f"{label}_03_required_again.response.json", resp3)
+        msg3 = message(resp3)
+        calls3 = msg3.get("tool_calls") or []
+        call3 = calls3[0] if calls3 else {}
+        args3 = parse_args(call3.get("function", {}).get("arguments"))
+    else:
+        req2 = {"skipped": "turn1 did not produce a valid structured tool call"}
+        req3 = {"skipped": "turn1 did not produce a valid structured tool call"}
+        resp2 = {"choices": [{"message": {}, "finish_reason": "skipped"}], "usage": {}}
+        resp3 = {"choices": [{"message": {}, "finish_reason": "skipped"}], "usage": {}}
+        elapsed2 = 0.0
+        elapsed3 = 0.0
+        msg2 = {}
+        msg3 = {}
+        content2 = ""
+        calls3 = []
+        call3 = {}
+        args3 = {}
+        save(root / f"{label}_02_none_followup.request.json", req2)
+        save(root / f"{label}_02_none_followup.response.json", resp2)
+        save(root / f"{label}_03_required_again.request.json", req3)
+        save(root / f"{label}_03_required_again.response.json", resp3)
 
     time.sleep(args.settle_seconds)
     health_after = request_json(args.base_url, "GET", "/health", timeout=30)
@@ -233,6 +252,7 @@ def run_model(args: argparse.Namespace, model: str, root: pathlib.Path) -> dict[
         "turn1_args_exact": args1.get("text") == "red\ngreen\nblue",
         "turn1_no_visible_content": msg1.get("content") in (None, ""),
         "turn1_no_protocol_leak": marker_leaks(resp1) == [],
+        "history_valid_after_turn1": history_valid,
         "turn2_no_tool_calls": not msg2.get("tool_calls"),
         "turn2_visible_mentions_3": "3" in content2 or "three" in content2.lower(),
         "turn2_not_length_stop": finish(resp2) != "length",
