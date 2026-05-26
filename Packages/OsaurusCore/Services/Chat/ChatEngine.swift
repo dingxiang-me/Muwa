@@ -239,6 +239,13 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         return s
     }
 
+    private static func allowsLocalToolDispatch(_ toolChoice: ToolChoiceOption?) -> Bool {
+        if case .some(.none) = toolChoice {
+            return false
+        }
+        return true
+    }
+
     /// Build the response body to log for a streamed chat completion.
     /// Prefers a JSON envelope when the stream resolved to a tool call so
     /// the Insights Response tab still shows something meaningful (the
@@ -427,7 +434,9 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             let innerStream: AsyncThrowingStream<String, Error>
 
             // If tools were provided and supported, use message-based tool streaming
-            if let tools = request.tools, !tools.isEmpty, let toolSvc = service as? ToolCapableService {
+            if Self.allowsLocalToolDispatch(request.tool_choice),
+                let tools = request.tools, !tools.isEmpty, let toolSvc = service as? ToolCapableService
+            {
                 let stopSequences = request.stop ?? []
                 debugLog("[ChatEngine] streamChat: calling streamWithTools tools=\(tools.count)")
                 trace?.mark("chatengine_streamWithTools_start")
@@ -765,7 +774,9 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                 Task { await InferenceLoadCoordinator.shared.endChatGeneration() }
             }
             // If tools were provided and the service supports them, use the message-based API
-            if let tools = request.tools, !tools.isEmpty, let toolSvc = service as? ToolCapableService {
+            if Self.allowsLocalToolDispatch(request.tool_choice),
+                let tools = request.tools, !tools.isEmpty, let toolSvc = service as? ToolCapableService
+            {
                 let stopSequences = request.stop ?? []
                 do {
                     let stream = try await toolSvc.streamWithTools(

@@ -918,6 +918,18 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    @Test("ChatEngine honors tool choice none by bypassing local tool dispatch")
+    func chatEngineHonorsToolChoiceNoneBypassingLocalToolDispatch() throws {
+        let chatEngine = try Self.source("Services/Chat/ChatEngine.swift")
+
+        #expect(chatEngine.contains("private static func allowsLocalToolDispatch"))
+        #expect(chatEngine.contains("if case .some(.none) = toolChoice"))
+        #expect(
+            chatEngine.contains("if Self.allowsLocalToolDispatch(request.tool_choice),\n                let tools = request.tools"),
+            "ChatEngine must not route tool_choice none requests through local streamWithTools just because tool schemas are present."
+        )
+    }
+
     /// Preflight tool selection is a background prompt-ranking call, not the user's
     /// answer. It can fall back to the active chat model, but must not apply a
     /// synthetic reasoning mode; runtime/model defaults remain authoritative unless
