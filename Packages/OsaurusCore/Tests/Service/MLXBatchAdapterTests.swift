@@ -1251,10 +1251,11 @@ struct MLXBatchAdapterTests {
         }
     }
 
-    /// Nemotron Omni call/audio workloads should default to visible assistant
-    /// content according to their bundle/template defaults. Osaurus must not
-    /// synthesize hidden reasoning defaults; explicit user/API opt-in still
-    /// enables thinking and explicit direct/off efforts still disable it.
+    /// Nemotron Omni call/audio workloads default to the closed/no-thinking
+    /// rail for ordinary chat. Live JANGTQ rows otherwise stream only hidden
+    /// reasoning_content and length-stop with empty visible content. Explicit
+    /// user/API opt-in still enables thinking and explicit direct/off efforts
+    /// still disable it.
     @Test func additionalContext_defaultsNemotronOmniThinkingOffButHonorsExplicitOptIn() {
         let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
         let userEnabled = GenerationParameters(
@@ -1272,8 +1273,8 @@ struct MLXBatchAdapterTests {
                 MLXBatchAdapter.additionalContext(
                     for: unspecified,
                     modelName: modelName
-                )["enable_thinking"] == nil,
-                "Nemotron Omni should preserve its bundle/template thinking default: \(modelName)"
+                )["enable_thinking"] as? Bool == false,
+                "Nemotron Omni should default to the closed/no-thinking rail: \(modelName)"
             )
             #expect(
                 MLXBatchAdapter.additionalContext(

@@ -756,6 +756,8 @@ struct MLXBatchAdapter {
             if hasPositiveReasoningEffort, let normalizedReasoningEffort {
                 context["enable_thinking"] = true
                 context["reasoning_effort"] = normalizedReasoningEffort
+            } else {
+                context["enable_thinking"] = false
             }
             return context
         }
