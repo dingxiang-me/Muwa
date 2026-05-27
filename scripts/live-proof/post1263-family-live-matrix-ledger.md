@@ -26,6 +26,7 @@ Each promoted row needs current-head evidence for:
 - DSV4: CSA/HSA/SWA hybrid-pool topology plus disk restore/hit proof; TurboQuant KV is not a substitute.
 - Gemma rotating/SWA: rotating topology plus disk restore/reuse proof; no Zyphra/Gemma XML leak from reasoning or content.
 - HY3/Hunyuan/MiMo-style SWA/CCA paths: run only against an actual local model id and require topology-specific companion or SWA proof.
+- MiMo V2.5: expected source topology is 9 full-attention KV layers plus 39 SWA rotating layers. Prefix/L2 disk proof is required; TurboQuant KV is allowed only for full-attention `KVCacheSimple` layers when explicitly enabled and must not replace SWA rotating state.
 
 ## Current starting boundary
 
@@ -46,6 +47,10 @@ Each promoted row needs current-head evidence for:
 | Ling JANGTQ2 | pass | `/tmp/osaurus-pr1264-009688d3-ling-jangtq2-20260527-075413/SUMMARY.json` | exact multi-turn `line_count`, no protocol leak, `disk_l2_hits +1`, `ssm_companion_hits +1`, 32 layers with 4 KV + 28 arrays/SSM, TurboQuant KV 0 |
 | Ling MXFP4 | pass | `/tmp/osaurus-pr1264-009688d3-ling-mxfp4-20260527-075431/SUMMARY.json` | exact multi-turn `line_count`, no protocol leak, `disk_l2_hits +1`, `ssm_companion_hits +1`, 32 layers with 4 KV + 28 arrays/SSM, TurboQuant KV 0 |
 | ZAYA text/VL | pending | | VL must use real media payload before promotion |
-| DSV4 variants | pending | | must cover JANGTQ2 and sibling rows with hybrid-pool cache proof |
+| DSV4 JANGTQ2 | warm pass | `/tmp/osaurus-pr1264-c2108825-dsv4-jangtq2-warm-20260527-075623/SUMMARY.json` | exact multi-turn `line_count`, no DSML/protocol leak, 43 layers with 41 hybrid-pool/rotating-wrapper + 2 rotating KV, `disk_l2_hits +1`, TurboQuant KV 0 |
+| DSV4 JANGTQ-K | warm pass | `/tmp/osaurus-pr1264-c2108825-dsv4-jangtq-k-warm-20260527-075727/SUMMARY.json` | exact multi-turn `line_count`, no DSML/protocol leak, 43 layers with 41 hybrid-pool/rotating-wrapper + 2 rotating KV, `disk_l2_hits +1`, TurboQuant KV 0 |
 | Qwen 27B/35B variants | pending | | must cover SSM companion/cache and generation_config defaults |
+| MiniMax M2.7 Small JANGTQ | pending | | local bundle exists at `/Users/eric/models/JANGQ/MiniMax-M2.7-Small-JANGTQ`; must cover XML tool parser, reasoning rail separation, prefix/L2 disk reuse, and no compiled-decode fallback |
+| MiniMax M2.7 JANGTQ_K / JANG_K | pending | | local sibling bundles exist under `/Users/eric/models/dealign.ai`; run only with memory budget |
+| MiMo V2.5 | source-only pass, live blocked | `/Users/eric/jang`: `uv run --project jang-tools pytest -q jang-tools/tests/mimo_v2_contract_test.py` | 3 passed against mounted source; no converted/imported Osaurus model bundle found, so live Osaurus cache/tool row is blocked until a bundle exists |
 | HY3/Hunyuan/MiMo local rows | pending | | run only if actual local model id exists |
