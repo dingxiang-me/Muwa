@@ -623,8 +623,12 @@ struct SwiftTransformersTokenizerLoaderTests {
             "DSV4 must merge the prior tool result and the next user request into one content block. Decoded: \(decoded)"
         )
         #expect(
-            decoded.hasSuffix("<\u{FF5C}Assistant\u{FF5C}></think><\u{FF5C}action\u{FF5C}>"),
-            "DSV4 required/named tool_choice must preserve the action task after tool-result history. Decoded: \(decoded)"
+            decoded.hasSuffix("<\u{FF5C}Assistant\u{FF5C}></think>"),
+            "DSV4 required/named tool_choice must keep the ordinary assistant tail; the action task rail can leak as visible model text after tool-result history. Decoded: \(decoded)"
+        )
+        #expect(
+            !decoded.contains("<\u{FF5C}action\u{FF5C}>"),
+            "DSV4 required/named tool_choice must not inject the action task token after live repeat rows showed it can leak as visible text. Decoded: \(decoded)"
         )
     }
 
