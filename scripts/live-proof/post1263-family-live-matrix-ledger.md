@@ -40,7 +40,9 @@ Each promoted row needs current-head evidence for:
 | Row | Status | Artifact | Notes |
 | --- | --- | --- | --- |
 | Gemma 4 26B JANG_4M | current-head API pass, cache-hit depth partial | `/tmp/osaurus-pr1263-3b2a4f38-gemma4-current-head-proof-20260527-074030/SUMMARY.json` | exact tool args, no protocol leak, disk L2 stores but no hit in short cold proof |
-| Nemo Omni variants | pending | | must cover JANGTQ/JANGTQ4/MXFP4 and assistant-header loop risk |
+| Nemo Omni MXFP4 | warm pass | `/tmp/osaurus-pr1264-c66a0913-nemotron-mxfp4-warm-20260527-075223/SUMMARY.json` | exact multi-turn `line_count`, no assistant-header/protocol leak, `disk_l2_hits +3`, `ssm_companion_hits +3`, 29 layers with 6 KV + 23 Mamba, TurboQuant KV 0 |
+| Nemo Omni JANGTQ | warm pass | `/tmp/osaurus-pr1264-c66a0913-nemotron-jangtq-warm-20260527-075247/SUMMARY.json` | exact multi-turn `line_count`, no assistant-header/protocol leak, `disk_l2_hits +3`, `ssm_companion_hits +3`, 29 layers with 6 KV + 23 Mamba, TurboQuant KV 0 |
+| Nemo Omni JANGTQ4 | warm pass | `/tmp/osaurus-pr1264-c66a0913-nemotron-jangtq4-warm-20260527-075313/SUMMARY.json` | exact multi-turn `line_count`, no assistant-header/protocol leak, `disk_l2_hits +3`, `ssm_companion_hits +3`, 29 layers with 6 KV + 23 Mamba, TurboQuant KV 0 |
 | Ling variants | pending | | must cover JANGTQ2 and MXFP4 hybrid companion/cache proof |
 | ZAYA text/VL | pending | | VL must use real media payload before promotion |
 | DSV4 variants | pending | | must cover JANGTQ2 and sibling rows with hybrid-pool cache proof |
