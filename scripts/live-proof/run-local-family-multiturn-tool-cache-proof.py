@@ -115,15 +115,59 @@ def aggregate(cache: dict[str, Any] | None) -> dict[str, int]:
     return value if isinstance(value, dict) else {}
 
 
-def delta(before: dict[str, Any] | None, after: dict[str, Any] | None) -> dict[str, int]:
-    left = aggregate(before)
-    right = aggregate(after)
+def model_entry(cache: dict[str, Any] | None, model: str) -> dict[str, Any]:
+    if not isinstance(cache, dict):
+        return {}
+    models = cache.get("models")
+    if not isinstance(models, list):
+        return {}
+    for entry in models:
+        if isinstance(entry, dict) and entry.get("name") == model:
+            return entry
+    return {}
+
+
+def flatten_cache_counters(entry: dict[str, Any]) -> dict[str, int]:
+    counters: dict[str, int] = {}
+
+    def add(prefix: str, value: Any) -> None:
+        if not isinstance(value, dict):
+            return
+        for key, raw in value.items():
+            if isinstance(raw, int):
+                counters[f"{prefix}_{key}"] = raw
+
+    add("block_disk", entry.get("block_disk_store"))
+    add("paged", entry.get("paged_cache"))
+    add("companion", entry.get("companion_cache"))
+    add("ssm_companion", entry.get("ssm_companion_cache"))
+    add("zaya_cca_companion", entry.get("zaya_cca_companion_cache"))
+    topology = entry.get("cache_topology")
+    if isinstance(topology, dict):
+        for key, raw in topology.items():
+            if isinstance(raw, int):
+                counters[f"topology_{key}"] = raw
+    return counters
+
+
+def counter_delta(left: dict[str, int], right: dict[str, int]) -> dict[str, int]:
     keys = sorted(set(left) | set(right))
     out: dict[str, int] = {}
     for key in keys:
         if isinstance(left.get(key, 0), int) and isinstance(right.get(key, 0), int):
             out[key] = int(right.get(key, 0)) - int(left.get(key, 0))
     return out
+
+
+def aggregate_delta(before: dict[str, Any] | None, after: dict[str, Any] | None) -> dict[str, int]:
+    return counter_delta(aggregate(before), aggregate(after))
+
+
+def model_delta(before: dict[str, Any] | None, after: dict[str, Any] | None, model: str) -> dict[str, int]:
+    return counter_delta(
+        flatten_cache_counters(model_entry(before, model)),
+        flatten_cache_counters(model_entry(after, model)),
+    )
 
 
 def call_chat(base_url: str, payload: dict[str, Any], timeout: int) -> tuple[dict[str, Any], float]:
@@ -282,7 +326,8 @@ def run_model(args: argparse.Namespace, model: str, root: pathlib.Path) -> dict[
                 "turn3_finish": finish(resp3),
                 "turn3_args": args3,
             },
-            "cache_delta": delta(cache_before, cache_after),
+            "cache_delta": model_delta(cache_before, cache_after, model),
+            "aggregate_cache_delta": aggregate_delta(cache_before, cache_after),
             "cache_after": cache_after,
             "health_after": health_after,
             "passed": all(checks.values()),
