@@ -207,6 +207,8 @@ struct SwiftTransformersTokenizerLoaderTests {
         let afterFinalUser = decoded[finalUserRange.upperBound...]
 
         #expect(afterFinalUser.contains(reminder), "Decoded: \(decoded)")
+        #expect(decoded.contains("Previous tool result available."), "Decoded: \(decoded)")
+        #expect(!decoded.contains(#"<zyphra_tool_response>\n{"lines":3}"#), "Decoded: \(decoded)")
         #expect(!afterFinalUser.contains("<|im_start|>system\n<IMPORTANT>"), "Decoded: \(decoded)")
         #expect(decoded.hasSuffix("<|im_start|>assistant\n"), "Decoded: \(decoded)")
     }
