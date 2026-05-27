@@ -406,7 +406,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "b1cbb034f047a45a52513c5d5f56320c9c369996"
+        let expectedRuntimeHardenedRevision = "7823bd1c1c81c4a8e62a8540d7ece1d4d15d857d"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -1721,6 +1721,12 @@ struct RuntimePolicySourceTests {
                 && !tokenizerLoader.contains("convertTokenToId(Self.dsv4Bos)")
                 && !tokenizerLoader.contains("convertTokenToId(Self.dsv4Eos)"),
             "DSV4 template routing must require the actual DSV4 BOS token; token-id convertibility is too broad and can misroute Nemotron Omni into DSML placeholders."
+        )
+        #expect(
+            tokenizerLoader.contains("NemotronMinimalRequiredTools")
+                && tokenizerLoader.contains("Self.deepseekV4String(adjustedContext?[\"tool_choice\"]) == \"required\"")
+                && tokenizerLoader.contains("chatTemplateTools?.isEmpty == false"),
+            "Nemotron required tool_choice must bypass native placeholder examples and render the concrete fallback tool skeleton."
         )
         #expect(
             registry.contains("invalidToolArgumentsEnvelope")

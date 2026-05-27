@@ -286,6 +286,8 @@ struct SwiftTransformersTokenizerLoaderTests {
         #expect(decoded.contains("<tools>"), "Nemotron should render XML tools. Decoded: \(decoded)")
         #expect(decoded.contains("<tool_call>"), "Nemotron should show XML tool call contract. Decoded: \(decoded)")
         #expect(decoded.contains("line_count"), "Nemotron should include the requested tool schema. Decoded: \(decoded)")
+        #expect(decoded.contains("<function=line_count>"), "Required Nemotron prompt should show the concrete function name. Decoded: \(decoded)")
+        #expect(!decoded.contains("example_function_name"), "Required Nemotron prompt must not leave placeholder function names for the model to copy. Decoded: \(decoded)")
         #expect(
             !decoded.contains("<\u{FF5C}DSML\u{FF5C}tool_calls>")
                 && !decoded.contains("$TOOL_NAME")
