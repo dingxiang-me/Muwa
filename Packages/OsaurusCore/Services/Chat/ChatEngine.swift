@@ -829,6 +829,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                         requestedModel: request.model
                     )
                     var text = ""
+                    var reasoning = ""
                     var terminalStopReason = "stop"
                     for try await delta in stream {
                         if let stats = StreamingStatsHint.decode(delta) {
@@ -837,8 +838,11 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                             }
                             continue
                         }
+                        if let reasoningDelta = StreamingReasoningHint.decode(delta) {
+                            reasoning += reasoningDelta
+                            continue
+                        }
                         if StreamingToolHint.isSentinel(delta) { continue }
-                        if StreamingReasoningHint.decode(delta) != nil { continue }
                         text += delta
                     }
                     let outputTokens = TokenEstimator.estimate(text)
@@ -848,7 +852,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                             role: "assistant",
                             content: text,
                             tool_calls: nil,
-                            tool_call_id: nil
+                            tool_call_id: nil,
+                            reasoning_content: reasoning.isEmpty ? nil : reasoning
                         ),
                         finish_reason: terminalStopReason
                     )
@@ -928,6 +933,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                 stopSequences: stopSequences
             )
             var text = ""
+            var reasoning = ""
             var terminalStopReason = "stop"
             var authoritativeOutputTokens: Int?
             for try await delta in stream {
@@ -938,14 +944,23 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                     }
                     continue
                 }
+                if let reasoningDelta = StreamingReasoningHint.decode(delta) {
+                    reasoning += reasoningDelta
+                    continue
+                }
                 if StreamingToolHint.isSentinel(delta) { continue }
-                if StreamingReasoningHint.decode(delta) != nil { continue }
                 text += delta
             }
             let outputTokens = authoritativeOutputTokens ?? TokenEstimator.estimate(text)
             let choice = ChatChoice(
                 index: 0,
-                message: ChatMessage(role: "assistant", content: text, tool_calls: nil, tool_call_id: nil),
+                message: ChatMessage(
+                    role: "assistant",
+                    content: text,
+                    tool_calls: nil,
+                    tool_call_id: nil,
+                    reasoning_content: reasoning.isEmpty ? nil : reasoning
+                ),
                 finish_reason: terminalStopReason
             )
             let usage = Usage(

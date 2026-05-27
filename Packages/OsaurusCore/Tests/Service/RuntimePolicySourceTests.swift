@@ -1533,6 +1533,37 @@ struct RuntimePolicySourceTests {
         #expect(yieldReasoning.lowerBound < textEstimate.lowerBound)
     }
 
+    @Test("ChatEngine completeChat preserves reasoning_content before generic sentinel filtering")
+    func chatEngineCompleteChatPreservesReasoningContentBeforeSentinelFiltering() throws {
+        let chatEngine = try Self.source("Services/Chat/ChatEngine.swift")
+
+        let toolStreamStart = try #require(chatEngine.range(of: "let stream = try await toolSvc.streamWithTools("))
+        let toolResponseStart = try #require(
+            chatEngine.range(
+                of: "let outputTokens = TokenEstimator.estimate(text)",
+                range: toolStreamStart.upperBound ..< chatEngine.endIndex
+            )
+        )
+        let toolSlice = chatEngine[toolStreamStart.lowerBound ..< toolResponseStart.lowerBound]
+        let toolReasoning = try #require(toolSlice.range(of: "if let reasoningDelta = StreamingReasoningHint.decode(delta)"))
+        let toolSentinel = try #require(toolSlice.range(of: "if StreamingToolHint.isSentinel(delta)"))
+        #expect(toolReasoning.lowerBound < toolSentinel.lowerBound)
+
+        let plainStreamStart = try #require(chatEngine.range(of: "let stream = try await service.streamDeltas("))
+        let plainResponseStart = try #require(
+            chatEngine.range(
+                of: "let outputTokens = authoritativeOutputTokens",
+                range: plainStreamStart.upperBound ..< chatEngine.endIndex
+            )
+        )
+        let plainSlice = chatEngine[plainStreamStart.lowerBound ..< plainResponseStart.lowerBound]
+        let plainReasoning = try #require(plainSlice.range(of: "if let reasoningDelta = StreamingReasoningHint.decode(delta)"))
+        let plainSentinel = try #require(plainSlice.range(of: "if StreamingToolHint.isSentinel(delta)"))
+        #expect(plainReasoning.lowerBound < plainSentinel.lowerBound)
+
+        #expect(chatEngine.contains("reasoning_content: reasoning.isEmpty ? nil : reasoning"))
+    }
+
     @Test("ModelRuntime wires idle residency around model leases")
     func modelRuntimeWiresIdleResidencyAroundLeases() throws {
         let runtime = try Self.source("Services/ModelRuntime.swift")
