@@ -126,6 +126,15 @@
     "notes": "JANGTQ_K sibling with per-projection routed-expert bits; run when memory budget allows."
   },
   {
+    "id": "minimax-m27-jang-k-crack",
+    "model": "minimax-m2.7-jang_k-crack",
+    "family": "minimax",
+    "topology": "full-kv-moe-jang-k",
+    "required_cache_evidence": ["cache_topology", "disk_l2_hits"],
+    "priority": "optional-local",
+    "notes": "JANG_K sibling of the MiniMax M2.7 routed path; run when memory budget allows and do not infer from JANGTQ_K."
+  },
+  {
     "id": "mimo-v25-local-if-present",
     "model": "mimo-v2.5",
     "family": "mimo",
