@@ -32,6 +32,7 @@ Each promoted row needs current-head evidence for:
 
 - Base head at creation: `3b2a4f38fdbc08d5a195cf40689414dc469ab5f2`.
 - vMLX pin at creation: `531439a05bb3c5334aa551a07481fc5234644329`.
+- Current MiMo-aware vMLX pin staged for this branch: `d69a12168fe6d5c89cb2756ca478f0ea7e18c7d3`.
 - `#1263` is still open on GitHub at creation time; this PR is stacked rather than post-merge until GitHub state changes.
 - Do not merge by agent.
 - Do not apply forced-behavior fixes, hidden sampler overrides, forced thinking/tool wrappers, or broad parser masks to make rows look green.
@@ -51,7 +52,7 @@ Each promoted row needs current-head evidence for:
 | DSV4 JANGTQ-K | warm pass | `/tmp/osaurus-pr1264-c2108825-dsv4-jangtq-k-warm-20260527-075727/SUMMARY.json` | exact multi-turn `line_count`, no DSML/protocol leak, 43 layers with 41 hybrid-pool/rotating-wrapper + 2 rotating KV, `disk_l2_hits +1`, TurboQuant KV 0 |
 | Qwen 27B MXFP4 MTP | red | cold `/tmp/osaurus-pr1264-8b0ac7b0-qwen27-mxfp4-mtp-20260527-075836/SUMMARY.json`; warm `/tmp/osaurus-pr1264-8b0ac7b0-qwen27-mxfp4-mtp-warm-20260527-075926/SUMMARY.json`; named probe `/tmp/osaurus-pr1264-qwen27-specific-toolchoice-20260527-080024/response.json` | cold row had exact tools/no leak but no L2 hit; warm row had `disk_l2_hits +1` and `ssm_companion_hits +1` but first required tool turn stopped at `length` with reasoning-only planning text and no `tool_calls`; named tool-choice reproduced it |
 | Qwen 35B variants | pending | | must cover SSM companion/cache and generation_config defaults after Qwen 27B warm-cache red row is understood |
-| MiniMax M2.7 Small JANGTQ | pending | | local bundle exists at `/Users/eric/models/JANGQ/MiniMax-M2.7-Small-JANGTQ`; must cover XML tool parser, reasoning rail separation, prefix/L2 disk reuse, and no compiled-decode fallback |
-| MiniMax M2.7 JANGTQ_K / JANG_K | pending | | local sibling bundles exist under `/Users/eric/models/dealign.ai`; run only with memory budget |
-| MiMo V2.5 | source-only pass, live blocked | `/Users/eric/jang`: `uv run --project jang-tools pytest -q jang-tools/tests/mimo_v2_contract_test.py` | 3 passed against mounted source; no converted/imported Osaurus model bundle found, so live Osaurus cache/tool row is blocked until a bundle exists |
+| MiniMax M2.7 Small JANGTQ | pending | | local bundle exists at `/Users/eric/models/JANGQ/MiniMax-M2.7-Small-JANGTQ`; matrix row now requires XML tool parser, reasoning rail separation, prefix/L2 disk reuse, and no compiled-decode fallback |
+| MiniMax M2.7 JANGTQ_K / JANG_K | pending | | local sibling bundles exist under `/Users/eric/models/dealign.ai`; matrix row for JANGTQ_K is present; run only with memory budget |
+| MiMo V2.5 | source/vMLX guard pass, live blocked | `/Users/eric/jang`: `uv run --project jang-tools pytest -q jang-tools/tests/mimo_v2_contract_test.py`; vMLX `d69a12168fe6d5c89cb2756ca478f0ea7e18c7d3` | JANG source contract passed; vMLX guard pins `mimo_v2_flash` topology as 9 full-attention `KVCacheSimple` layers plus 39 SWA `RotatingKVCache` layers, with TurboQuant KV limited to full-attention KV layers only. No converted/imported Osaurus model bundle found, so live Osaurus cache/tool row is blocked until a bundle exists |
 | HY3/Hunyuan/MiMo local rows | pending | | run only if actual local model id exists |
