@@ -1257,7 +1257,13 @@ public actor ModelRuntime {
         )
         let augmented = ModelRuntime.applyJSONMode(forcedToolMessages, jsonMode: parameters.jsonMode)
         let events = try await generateEventStream(
-            chatBuilder: { ModelRuntime.mapOpenAIChatToMLX(augmented, trace: parameters.ttftTrace) },
+            chatBuilder: {
+                ModelRuntime.mapOpenAIChatToMLX(
+                    augmented,
+                    trace: parameters.ttftTrace,
+                    preserveStructuredToolHistory: !tools.isEmpty
+                )
+            },
             parameters: parameters,
             stopSequences: stopSequences,
             tools: tools,
@@ -1356,7 +1362,13 @@ public actor ModelRuntime {
         )
         let augmented = ModelRuntime.applyJSONMode(forcedToolMessages, jsonMode: parameters.jsonMode)
         let events = try await generateEventStream(
-            chatBuilder: { ModelRuntime.mapOpenAIChatToMLX(augmented, trace: parameters.ttftTrace) },
+            chatBuilder: {
+                ModelRuntime.mapOpenAIChatToMLX(
+                    augmented,
+                    trace: parameters.ttftTrace,
+                    preserveStructuredToolHistory: !tools.isEmpty
+                )
+            },
             parameters: parameters,
             stopSequences: stopSequences,
             tools: tools,
@@ -1647,7 +1659,8 @@ public actor ModelRuntime {
     /// previous assistant message with a tool call!"` on MiniMax).
     nonisolated static func mapOpenAIChatToMLX(
         _ msgs: [ChatMessage],
-        trace: TTFTTrace? = nil
+        trace: TTFTTrace? = nil,
+        preserveStructuredToolHistory: Bool = true
     ) -> [MLXLMCommon.Chat.Message] {
         var out: [MLXLMCommon.Chat.Message] = []
         out.reserveCapacity(max(6, msgs.count))
@@ -1680,7 +1693,7 @@ public actor ModelRuntime {
             case "assistant":
                 let content = (m.content ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
                 let reasoningContent = m.reasoning_content?.trimmingCharacters(in: .whitespacesAndNewlines)
-                let toolCalls = toMLXToolCalls(m.tool_calls)
+                let toolCalls = preserveStructuredToolHistory ? toMLXToolCalls(m.tool_calls) : nil
                 // Skip fully-empty assistant turns. Reasoning-only assistant
                 // turns are NOT empty for local MLX templates: ZAYA,
                 // Nemotron-H/Omni, MiniMax and DSV4 read
@@ -1705,17 +1718,29 @@ public actor ModelRuntime {
                     )
                 )
             case "tool":
-                out.append(
-                    MLXLMCommon.Chat.Message(
-                        role: .tool,
-                        content: m.content ?? "",
-                        images: images,
-                        videos: videos,
-                        audios: audios,
-                        toolCalls: nil,
-                        toolCallId: m.tool_call_id
+                if preserveStructuredToolHistory {
+                    out.append(
+                        MLXLMCommon.Chat.Message(
+                            role: .tool,
+                            content: m.content ?? "",
+                            images: images,
+                            videos: videos,
+                            audios: audios,
+                            toolCalls: nil,
+                            toolCallId: m.tool_call_id
+                        )
                     )
-                )
+                } else if let content = m.content, !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                    out.append(
+                        MLXLMCommon.Chat.Message(
+                            role: .user,
+                            content: "Tool result: \(content)",
+                            images: images,
+                            videos: videos,
+                            audios: audios
+                        )
+                    )
+                }
             default:
                 out.append(
                     MLXLMCommon.Chat.Message(

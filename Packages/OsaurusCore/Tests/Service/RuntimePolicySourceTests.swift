@@ -398,12 +398,15 @@ struct RuntimePolicySourceTests {
         // bare-name key/value DSV4 tool attempts such as
         // `file_read\npath=...` being parsed as tools instead of visible text,
         // and Qwen multi-turn tool/cache matrix coverage staying present in
-        // the vMLX regression harness.
+        // the vMLX regression harness, plus the Nemotron Omni tool-template
+        // fallback that keeps tool schemas rendered through the model-native
+        // [AVAILABLE_TOOLS]/XML function-call contract instead of leaking
+        // role-token/DSML fragments in Osaurus tool turns.
         // That avoids Xcode PIF
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "a8a8e65451beebd0ef6e115f9e66bb9cde2988de"
+        let expectedRuntimeHardenedRevision = "239186e475b59451d66838ec2c4e6a088efdd24a"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -709,8 +712,14 @@ struct RuntimePolicySourceTests {
         #expect(httpHandler.contains(#""block_disk_store""#))
         #expect(httpHandler.contains(#""disk_l2_hits""#))
         #expect(httpHandler.contains(#""prefix_hits""#))
+        #expect(httpHandler.contains(#""companion_cache""#))
+        #expect(httpHandler.contains(#""zaya_cca_companion_cache""#))
+        #expect(httpHandler.contains(#""zaya_cca_companion_hits""#))
+        #expect(httpHandler.contains(#"let hasSSMCompanion = companionKinds.contains("companion=ssm")"#))
+        #expect(httpHandler.contains("if hasSSMCompanion"))
         #expect(httpHandler.contains(#""cache_topology""#))
         #expect(httpHandler.contains("hybrid_pool_layer_count"))
+        #expect(httpHandler.contains("zaya_cca_layer_count"))
         #expect(httpHandler.contains("requires_disk_backed_restore"))
         #expect(!httpHandler.contains(#"aggregate["prefix_hits", default: 0] += diskStats.hits"#))
         #expect(!httpHandler.contains(#"aggregate["prefix_misses", default: 0] += diskStats.misses"#))
@@ -849,6 +858,12 @@ struct RuntimePolicySourceTests {
         #expect(adapter.contains("acquireSoloLease"))
         #expect(adapter.contains("await soloLease.release()"))
         #expect(
+            adapter.contains("lmInput.text.tokenIds")
+                && adapter.contains("?? MLXCacheIOLock.withSerializedMLXCacheIO")
+                && adapter.contains("lmInput.text.tokens.asArray(Int.self)"),
+            "prompt token extraction must use vmlx's CPU tokenIds when available and fall back to the serialized MLX readback only for legacy processors"
+        )
+        #expect(
             adapter.contains("post-generation disk-cache store")
                 && adapter.contains("for await event in upstream")
                 && adapter.contains(
@@ -910,6 +925,36 @@ struct RuntimePolicySourceTests {
                 "for try await delta in inner {\n                    // Check for task cancellation to allow early termination\n                    if Task.isCancelled"
             ),
             "ChatEngine stream logging wrapper must pass StreamingStatsHint through before honoring cancellation"
+        )
+    }
+
+    @Test("ChatEngine honors tool choice none by bypassing local tool dispatch")
+    func chatEngineHonorsToolChoiceNoneBypassingLocalToolDispatch() throws {
+        let chatEngine = try Self.source("Services/Chat/ChatEngine.swift")
+
+        #expect(chatEngine.contains("private static func allowsLocalToolDispatch"))
+        #expect(chatEngine.contains("if case .some(.none) = toolChoice"))
+        #expect(
+            chatEngine.contains("if Self.allowsLocalToolDispatch(request.tool_choice),\n                let tools = request.tools"),
+            "ChatEngine must not route tool_choice none requests through local streamWithTools just because tool schemas are present."
+        )
+    }
+
+    @Test("ModelRuntime drops structured tool history when no active tools are routed")
+    func modelRuntimeDropsStructuredToolHistoryWithoutActiveTools() throws {
+        let runtime = try Self.source("Services/ModelRuntime.swift")
+
+        #expect(
+            runtime.contains("preserveStructuredToolHistory: !tools.isEmpty"),
+            "ModelRuntime must not preserve structured assistant/tool history when the request is routed with no active tool schemas."
+        )
+        #expect(
+            runtime.contains("let toolCalls = preserveStructuredToolHistory ? toMLXToolCalls(m.tool_calls) : nil"),
+            "Assistant tool_calls must be omitted from the MLX template context when structured tool history is disabled."
+        )
+        #expect(
+            runtime.contains("role: .user,\n                            content: \"Tool result: \\(content)\""),
+            "Tool-role results should be converted to ordinary text context when structured tool history is disabled, so follow-up answers can use the result without re-entering tool-call mode."
         )
     }
 
@@ -1656,6 +1701,13 @@ struct RuntimePolicySourceTests {
                 && adapter.contains("case .required, .function(_)"),
             "Required or named local tool_choice must become template context instead of being reduced to a tools-available-only prompt."
         )
+        #expect(
+            adapter.contains("context[\"tool_choice_name\"] = toolChoiceName")
+                && adapter.contains("private static func requiredToolChoiceName(")
+                && adapter.contains("case .function(let target):")
+                && adapter.contains("guard let toolsSpec, toolsSpec.count == 1"),
+            "Required/named local tool_choice must pass the target tool name into vmlx template context so Nemotron-family required tool templates do not fall back to generic placeholders."
+        )
         let tokenizerLoader = try Self.source("Services/ModelRuntime/SwiftTransformersTokenizerLoader.swift")
         #expect(
             tokenizerLoader.contains("let toolChoiceRequired =")
@@ -1666,10 +1718,15 @@ struct RuntimePolicySourceTests {
             "DSV4 native prompt rendering must pass required tool_choice into DeepseekV4ChatEncoder so second-turn/named required tool calls keep the DSML must-call directive."
         )
         #expect(
-            tokenizerLoader.contains("let dsv4HasPriorToolResult = dsv4Messages.contains { $0.role == .tool }")
-                && tokenizerLoader.contains("!dsv4HasPriorToolResult")
+            !tokenizerLoader.contains("dsv4HasPriorToolResult")
                 && tokenizerLoader.contains("dsv4Messages[idx].task = \"action\""),
-            "DSV4 first-turn required/named tool_choice may use the native action task rail, but multi-turn tool-result prompts must stay on the DSML directive path instead of leaking action metadata."
+            "DSV4 required/named tool_choice must keep the native action task rail even after tool-result history so multi-turn required tool calls do not silently degrade to ordinary chat."
+        )
+        #expect(
+            tokenizerLoader.contains("&& upstream.bosToken == Self.dsv4Bos")
+                && !tokenizerLoader.contains("convertTokenToId(Self.dsv4Bos)")
+                && !tokenizerLoader.contains("convertTokenToId(Self.dsv4Eos)"),
+            "DSV4 template routing must require the actual DSV4 BOS token; token-id convertibility is too broad and can misroute Nemotron Omni into DSML placeholders."
         )
         #expect(
             registry.contains("invalidToolArgumentsEnvelope")
@@ -1749,6 +1806,16 @@ struct RuntimePolicySourceTests {
                 "context[\"enable_thinking\"] = hasPositiveReasoningEffort\n            if hasPositiveReasoningEffort"
             ),
             "Family-specific reasoning profiles must not force enable_thinking=false by writing a false boolean when no positive effort was requested."
+        )
+        #expect(
+            adapter.contains("if ModelFamilyNames.isZayaFamily(modelName)")
+                && adapter.contains("context[\"enable_thinking\"] = false"),
+            "ZAYA text bundles are the explicit exception: their profile default is a closed/no-thinking prompt, so omitted reasoning controls must reach vmlx as enable_thinking=false."
+        )
+        #expect(
+            adapter.contains("if ModelFamilyNames.isNemotronOmniFamily(modelName)")
+                && adapter.contains("context[\"enable_thinking\"] = false"),
+            "Nemotron Omni bundles are the explicit multimodal exception: live ordinary chat must default to the closed/no-thinking rail instead of hidden reasoning-only output."
         )
         #expect(
             !adapter.contains("dsv4MaxReasoningRepetitionPenalty")

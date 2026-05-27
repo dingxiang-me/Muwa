@@ -110,18 +110,18 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             && upstream.convertTokenToId("</assistant>") != nil
             && upstream.convertTokenToId("<think>") != nil
             && upstream.convertTokenToId("</think>") != nil
-        let hasZayaVLVisionSentinel =
+        let hasZayaVLChatSentinel =
             upstream.bosToken == "<bos>"
+            && upstream.convertTokenToId("<|im_start|>") != nil
+            && upstream.convertTokenToId("<|im_end|>") != nil
+        let hasZayaVLVisionSentinel =
+            hasZayaVLChatSentinel
             && upstream.convertTokenToId("<|vision_start|>") != nil
             && upstream.convertTokenToId("<image>") != nil
             && upstream.convertTokenToId("<|vision_end|>") != nil
-            && upstream.convertTokenToId("<|im_start|>") != nil
-            && upstream.convertTokenToId("<|im_end|>") != nil
         let hasDSV4Sentinel =
             !hasZayaVLVisionSentinel
-            && (upstream.bosToken == Self.dsv4Bos
-                || (upstream.convertTokenToId(Self.dsv4Bos) != nil
-                    && upstream.convertTokenToId(Self.dsv4Eos) != nil))
+            && upstream.bosToken == Self.dsv4Bos
         if hasLagunaSentinel
             && (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
         {
@@ -157,8 +157,8 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
         }
 
         var adjustedContext = additionalContext
-        if hasZayaVLVisionSentinel,
-            Self.messagesContainImageContent(messages),
+        if hasZayaVLChatSentinel,
+            (Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)),
             (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
         {
             return try fallback(
@@ -193,7 +193,20 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                 addGenerationPrompt: addGenerationPrompt
             )
         }
-
+        if !(chatTemplateTools?.isEmpty ?? true),
+            upstream.bosToken == "<s>",
+            upstream.convertTokenToId("<|im_end|>") != nil,
+            (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
+        {
+            return try fallback(
+                label: "NemotronMinimal",
+                template: MLXLMCommon.ChatTemplateFallbacks.nemotronMinimal,
+                messages: messages,
+                tools: chatTemplateTools,
+                additionalContext: adjustedContext,
+                addGenerationPrompt: addGenerationPrompt
+            )
+        }
         do {
             return try upstream.applyChatTemplate(
                 messages: messages,
@@ -230,7 +243,9 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                     addGenerationPrompt: addGenerationPrompt
                 )
             }
-            if hasZayaVLVisionSentinel, Self.messagesContainImageContent(messages) {
+            if hasZayaVLChatSentinel,
+                Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)
+            {
                 return try fallback(
                     label: "Zaya1VLVisionToolMinimal",
                     template: MLXLMCommon.ChatTemplateFallbacks.zayaVLVisionToolMinimal,
@@ -281,7 +296,9 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             let ordered: [(label: String, template: String)]
             if hasLagunaSentinel {
                 ordered = [("LagunaMinimal", MLXLMCommon.ChatTemplateFallbacks.lagunaMinimal)]
-            } else if hasZayaVLVisionSentinel, Self.messagesContainImageContent(messages) {
+            } else if hasZayaVLChatSentinel,
+                Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)
+            {
                 ordered = [
                     (
                         "Zaya1VLVisionToolMinimal",
@@ -584,9 +601,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
 
         let toolChoiceRequired =
             Self.deepseekV4String(additionalContext?["tool_choice"]) == "required"
-        let dsv4HasPriorToolResult = dsv4Messages.contains { $0.role == .tool }
         if toolChoiceRequired,
-            !dsv4HasPriorToolResult,
             let idx = dsv4Messages.lastIndex(where: { $0.role == .user || $0.role == .developer }),
             dsv4Messages[idx].task == nil
         {

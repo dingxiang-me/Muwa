@@ -158,6 +158,50 @@ struct ChatEngineTests {
         #expect(args == #"{"path":"/Users/eric/Desktop/testmandel/mandelbrot.py"}"#)
     }
 
+    @Test func toolCallResponse_marksMissingRequiredArgumentsInvalid() throws {
+        let tool = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "line_count",
+                description: "Count newline-separated lines in a local text file.",
+                parameters: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "path": .object(["type": .string("string")])
+                    ]),
+                    "required": .array([.string("path")]),
+                    "additionalProperties": .bool(false),
+                ])
+            )
+        )
+
+        let response = ChatEngine.makeToolCallResponse(
+            invocations: [
+                ServiceToolInvocation(
+                    toolName: "line_count",
+                    jsonArguments: #"{}"#
+                )
+            ],
+            responseId: "chatcmpl-test",
+            created: 1,
+            effectiveModel: "fake",
+            inputTokens: 10,
+            startTime: Date(timeIntervalSince1970: 1),
+            inferenceSource: .httpAPI,
+            temperature: nil,
+            maxTokens: 128,
+            tools: [tool]
+        )
+
+        let args = try #require(response.choices.first?.message.tool_calls?.first?.function.arguments)
+        let data = try #require(args.data(using: .utf8))
+        let object = try #require(try JSONSerialization.jsonObject(with: data) as? [String: Any])
+
+        #expect(object["_error"] as? String == "invalid_tool_arguments")
+        #expect(object["_field"] as? String == "path")
+        #expect(object["_tool"] as? String == "line_count")
+    }
+
     @Test func streamChat_yields_deltas_success() async throws {
         let svc = FakeModelService(deltas: ["a", "b", "c"])
         let engine = ChatEngine(services: [svc], installedModelsProvider: { [] })
