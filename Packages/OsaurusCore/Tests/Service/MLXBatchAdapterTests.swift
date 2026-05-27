@@ -901,7 +901,7 @@ struct MLXBatchAdapterTests {
         )
         #expect(
             MLXBatchAdapter.additionalContext(for: unspecified, modelName: modelName)["enable_thinking"] as? Bool
-                == nil
+                == false
         )
 
         let zayaUnspecified = MLXBatchAdapter.additionalContext(
@@ -1169,6 +1169,80 @@ struct MLXBatchAdapterTests {
                     for: unspecified,
                     modelName: modelName
                 )["enable_thinking"] == nil
+            )
+        }
+    }
+
+    /// Qwen 3.5/3.6 reasoning-capable bundles expose an `enable_thinking`
+    /// template branch. Live Qwen 27B MXFP4 MTP tool-history proof showed the
+    /// default thinking rail can spend the whole response budget in
+    /// `reasoning_content` after a tool result, while the explicit
+    /// no-thinking rail returns the visible answer immediately. Keep ordinary
+    /// local chat on the closed/no-thinking rail by default, while preserving
+    /// explicit user/API opt-in for thinking.
+    @Test func additionalContext_defaultsQwenThinkingOffButHonorsExplicitOptIn() {
+        let unspecified = GenerationParameters(temperature: nil, maxTokens: 16)
+        let userEnabled = GenerationParameters(
+            temperature: nil,
+            maxTokens: 16,
+            modelOptions: ["disableThinking": .bool(false)]
+        )
+
+        for modelName in [
+            "qwen3.6-27b-mxfp4-crack-mtp",
+            "Qwen3.6-35B-A3B-MXFP4",
+            "OsaurusAI/Qwen3.5-35B-A3B-JANGTQ-CRACK",
+            "dealign.ai/Qwen3.6-27B-JANG_4M-CRACK",
+        ] {
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: unspecified,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == false,
+                "Qwen local chat should default to the closed/no-thinking rail: \(modelName)"
+            )
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: userEnabled,
+                    modelName: modelName
+                )["enable_thinking"] as? Bool == true,
+                "Qwen must honor explicit thinking opt-in: \(modelName)"
+            )
+
+            let directOff = MLXBatchAdapter.additionalContext(
+                for: GenerationParameters(
+                    temperature: nil,
+                    maxTokens: 16,
+                    modelOptions: ["reasoningEffort": .string("no_think")]
+                ),
+                modelName: modelName
+            )
+            #expect(directOff["enable_thinking"] as? Bool == false)
+            #expect(directOff["reasoning_effort"] == nil)
+
+            let apiReasoning = MLXBatchAdapter.additionalContext(
+                for: GenerationParameters(
+                    temperature: nil,
+                    maxTokens: 16,
+                    modelOptions: ["reasoningEffort": .string("high")]
+                ),
+                modelName: modelName
+            )
+            #expect(apiReasoning["enable_thinking"] as? Bool == true)
+            #expect(apiReasoning["reasoning_effort"] as? String == "high")
+        }
+
+        for modelName in [
+            "notqwen-7b",
+            "dataset/antiqwen",
+            "quwen3.6-typo",
+        ] {
+            #expect(
+                MLXBatchAdapter.additionalContext(
+                    for: unspecified,
+                    modelName: modelName
+                )["enable_thinking"] == nil,
+                "non-Qwen substring match must not synthesize a thinking kwarg: \(modelName)"
             )
         }
     }

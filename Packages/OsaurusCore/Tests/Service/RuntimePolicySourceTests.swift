@@ -408,7 +408,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "d69a12168fe6d5c89cb2756ca478f0ea7e18c7d3"
+        let expectedRuntimeHardenedRevision = "54bbf805c756b28f12136f24b6794f87069136e7"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -1848,6 +1848,11 @@ struct RuntimePolicySourceTests {
             adapter.contains("if ModelFamilyNames.isZayaFamily(modelName)")
                 && adapter.contains("context[\"enable_thinking\"] = false"),
             "ZAYA text bundles are the explicit exception: their profile default is a closed/no-thinking prompt, so omitted reasoning controls must reach vmlx as enable_thinking=false."
+        )
+        #expect(
+            adapter.contains("if ModelFamilyNames.isQwenFamily(modelName)")
+                && adapter.contains("context[\"enable_thinking\"] = false"),
+            "Qwen local chat is an explicit exception: live tool-history rows must default to the closed/no-thinking rail instead of hidden reasoning-only length stops."
         )
         #expect(
             adapter.contains("if ModelFamilyNames.isNemotronOmniFamily(modelName)")

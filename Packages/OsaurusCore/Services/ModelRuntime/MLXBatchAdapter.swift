@@ -748,6 +748,19 @@ struct MLXBatchAdapter {
             }
             return context
         }
+        if ModelFamilyNames.isQwenFamily(modelName) {
+            if directRailReasoningEffort {
+                context["enable_thinking"] = false
+                return context
+            }
+            if hasPositiveReasoningEffort, let normalizedReasoningEffort {
+                context["enable_thinking"] = true
+                context["reasoning_effort"] = normalizedReasoningEffort
+            } else {
+                context["enable_thinking"] = false
+            }
+            return context
+        }
         if ModelFamilyNames.isNemotronOmniFamily(modelName) {
             if directRailReasoningEffort {
                 context["enable_thinking"] = false
@@ -1160,7 +1173,7 @@ struct MLXBatchAdapter {
 
     private static func safeContextSummary(_ context: [String: any Sendable]) -> String {
         context.keys.sorted().compactMap { key in
-            guard key == "enable_thinking" || key == "reasoning_effort" || key == "tool_choice" else {
+            guard key == "enable_thinking" || key == "reasoning_effort" || key == "tool_choice" || key == "tool_choice_name" else {
                 return nil
             }
             let value = context[key]
