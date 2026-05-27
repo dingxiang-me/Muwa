@@ -381,7 +381,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         temperature: Float?,
         maxTokens: Int,
         requestBodyJSON: String? = nil,
-        tools: [Tool]? = nil
+        tools: [Tool]? = nil,
+        wireProbe: WireTransportProbe? = nil
     ) -> ChatCompletionResponse {
         let schemasByName = Dictionary(
             uniqueKeysWithValues: (tools ?? []).map { ($0.function.name, $0.function.parameters) }
@@ -423,6 +424,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
 
         if inferenceSource == .chatUI {
             let durationMs = Date().timeIntervalSince(startTime) * 1000
+            let wireSnapshot = wireProbe?.snapshot()
             InsightsService.logInference(
                 source: inferenceSource,
                 model: effectiveModel,
@@ -436,7 +438,9 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                 },
                 finishReason: .toolCalls,
                 requestBody: requestBodyJSON,
-                responseBody: serializeResponseForLog(response)
+                responseBody: serializeResponseForLog(response),
+                wireRequestBody: wireSnapshot?.request,
+                wireResponseBody: wireSnapshot?.response
             )
         }
 
@@ -473,6 +477,16 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         switch route {
         case .service(let service, let effectiveModel):
             let innerStream: AsyncThrowingStream<String, Error>
+            // Wire-verification probe captures the post-scrub
+            // request body + pre-unscrub response bytes. Installed
+            // for every inference source (chatUI, httpAPI, plugin,
+            // agent) so the Insights "Wire" tab can show exactly
+            // what hit the network on any route — that's the only
+            // way users can verify the Privacy Filter scrub
+            // actually happened. Memory cost is bounded by
+            // `WireTransportProbe.maxResponseBytes` (1 MiB) per
+            // in-flight request.
+            let probe: WireTransportProbe? = WireTransportProbe()
 
             // If tools were provided and supported, use message-based tool streaming
             if Self.allowsLocalToolDispatch(request.tool_choice),
@@ -481,25 +495,29 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                 let stopSequences = request.stop ?? []
                 debugLog("[ChatEngine] streamChat: calling streamWithTools tools=\(tools.count)")
                 trace?.mark("chatengine_streamWithTools_start")
-                innerStream = try await toolSvc.streamWithTools(
-                    messages: messages,
-                    parameters: params,
-                    stopSequences: stopSequences,
-                    tools: tools,
-                    toolChoice: request.tool_choice,
-                    requestedModel: request.model
-                )
+                innerStream = try await WireTransportProbe.$current.withValue(probe) {
+                    try await toolSvc.streamWithTools(
+                        messages: messages,
+                        parameters: params,
+                        stopSequences: stopSequences,
+                        tools: tools,
+                        toolChoice: request.tool_choice,
+                        requestedModel: request.model
+                    )
+                }
                 trace?.mark("chatengine_streamWithTools_done")
                 debugLog("[ChatEngine] streamChat: streamWithTools returned")
             } else {
                 debugLog("[ChatEngine] streamChat: calling streamDeltas")
                 trace?.mark("chatengine_streamDeltas_start")
-                innerStream = try await service.streamDeltas(
-                    messages: messages,
-                    parameters: params,
-                    requestedModel: request.model,
-                    stopSequences: request.stop ?? []
-                )
+                innerStream = try await WireTransportProbe.$current.withValue(probe) {
+                    try await service.streamDeltas(
+                        messages: messages,
+                        parameters: params,
+                        requestedModel: request.model,
+                        stopSequences: request.stop ?? []
+                    )
+                }
                 trace?.mark("chatengine_streamDeltas_done")
                 debugLog("[ChatEngine] streamChat: streamDeltas returned")
             }
@@ -521,7 +539,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                 inputTokens: inputTokens,
                 temperature: temp,
                 maxTokens: maxTok,
-                requestBodyJSON: requestBodyJSON
+                requestBodyJSON: requestBodyJSON,
+                wireProbe: probe
             )
 
         case .none:
@@ -539,7 +558,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
         inputTokens: Int,
         temperature: Float?,
         maxTokens: Int,
-        requestBodyJSON: String? = nil
+        requestBodyJSON: String? = nil,
+        wireProbe: WireTransportProbe? = nil
     ) -> AsyncThrowingStream<String, Error> {
         let (stream, continuation) = AsyncThrowingStream<String, Error>.makeStream()
 
@@ -744,6 +764,13 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             if source == .chatUI {
                 let durationMs = Date().timeIntervalSince(startTime) * 1000
                 let toolCallsLog = toolInvocation.map { [ToolCallLog(name: $0.name, arguments: $0.args)] }
+                // Wire-level bodies (post-scrub request + raw pre-
+                // unscrub response). Snapshotted here AFTER the
+                // stream finishes so the captured response includes
+                // every chunk we observed. Nil snapshot means the
+                // route was MLX/Foundation (no probe installed) or
+                // the request never reached URLSession.
+                let wireSnapshot = wireProbe?.snapshot()
 
                 InsightsService.logInference(
                     source: source,
@@ -760,7 +787,9 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                     responseBody: Self.streamResponseBody(
                         accumulated: responseAccumulator,
                         toolInvocation: toolInvocation
-                    )
+                    ),
+                    wireRequestBody: wireSnapshot?.request,
+                    wireResponseBody: wireSnapshot?.response
                 )
             }
         }
@@ -814,20 +843,29 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             defer {
                 Task { await InferenceLoadCoordinator.shared.endChatGeneration() }
             }
+            // Wire-verification probe — same contract as the
+            // streaming path, installed for every inference source
+            // so HTTP / plugin / agent completes also surface their
+            // wire bodies in Insights. Bound around every call into
+            // the service so the remote layer can pick up the
+            // binding via task-local lookup.
+            let probe: WireTransportProbe? = WireTransportProbe()
             // If tools were provided and the service supports them, use the message-based API
             if Self.allowsLocalToolDispatch(request.tool_choice),
                 let tools = request.tools, !tools.isEmpty, let toolSvc = service as? ToolCapableService
             {
                 let stopSequences = request.stop ?? []
                 do {
-                    let stream = try await toolSvc.streamWithTools(
-                        messages: messages,
-                        parameters: params,
-                        stopSequences: stopSequences,
-                        tools: tools,
-                        toolChoice: request.tool_choice,
-                        requestedModel: request.model
-                    )
+                    let stream = try await WireTransportProbe.$current.withValue(probe) {
+                        try await toolSvc.streamWithTools(
+                            messages: messages,
+                            parameters: params,
+                            stopSequences: stopSequences,
+                            tools: tools,
+                            toolChoice: request.tool_choice,
+                            requestedModel: request.model
+                        )
+                    }
                     var text = ""
                     var terminalStopReason = "stop"
                     for try await delta in stream {
@@ -870,6 +908,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                     // Log the inference (only for Chat UI - HTTP requests are logged by HTTPHandler)
                     if inferenceSource == .chatUI {
                         let durationMs = Date().timeIntervalSince(startTime) * 1000
+                        let wireSnapshot = probe?.snapshot()
                         InsightsService.logInference(
                             source: inferenceSource,
                             model: effectiveModel,
@@ -880,7 +919,9 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                             maxTokens: maxTokens,
                             finishReason: RequestLog.FinishReason(rawValue: terminalStopReason) ?? .stop,
                             requestBody: requestBodyJSON,
-                            responseBody: Self.serializeResponseForLog(response)
+                            responseBody: Self.serializeResponseForLog(response),
+                            wireRequestBody: wireSnapshot?.request,
+                            wireResponseBody: wireSnapshot?.response
                         )
                     }
 
@@ -897,7 +938,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                         temperature: temperature,
                         maxTokens: maxTokens,
                         requestBodyJSON: requestBodyJSON,
-                        tools: tools
+                        tools: tools,
+                        wireProbe: probe
                     )
                 } catch let inv as ServiceToolInvocation {
                     return Self.makeToolCallResponse(
@@ -911,7 +953,8 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                         temperature: temperature,
                         maxTokens: maxTokens,
                         requestBodyJSON: requestBodyJSON,
-                        tools: tools
+                        tools: tools,
+                        wireProbe: probe
                     )
                 }
             }
@@ -921,12 +964,14 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             // sentinel preserves vmlx's authoritative token count and stop
             // reason (`length` vs natural `stop`).
             let stopSequences = request.stop ?? []
-            let stream = try await service.streamDeltas(
-                messages: messages,
-                parameters: params,
-                requestedModel: request.model,
-                stopSequences: stopSequences
-            )
+            let stream = try await WireTransportProbe.$current.withValue(probe) {
+                try await service.streamDeltas(
+                    messages: messages,
+                    parameters: params,
+                    requestedModel: request.model,
+                    stopSequences: stopSequences
+                )
+            }
             var text = ""
             var terminalStopReason = "stop"
             var authoritativeOutputTokens: Int?
@@ -966,6 +1011,7 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
             // Log the inference (only for Chat UI - HTTP requests are logged by HTTPHandler)
             if inferenceSource == .chatUI {
                 let durationMs = Date().timeIntervalSince(startTime) * 1000
+                let wireSnapshot = probe?.snapshot()
                 InsightsService.logInference(
                     source: inferenceSource,
                     model: effectiveModel,
@@ -976,7 +1022,9 @@ actor ChatEngine: Sendable, ChatEngineProtocol {
                     maxTokens: maxTokens,
                     finishReason: RequestLog.FinishReason(rawValue: terminalStopReason) ?? .stop,
                     requestBody: requestBodyJSON,
-                    responseBody: Self.serializeResponseForLog(response)
+                    responseBody: Self.serializeResponseForLog(response),
+                    wireRequestBody: wireSnapshot?.request,
+                    wireResponseBody: wireSnapshot?.response
                 )
             }
 
