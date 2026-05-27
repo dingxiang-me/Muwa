@@ -632,6 +632,76 @@ struct SwiftTransformersTokenizerLoaderTests {
         )
     }
 
+    @Test func dsv4RequiredToolChoiceCompactsClosedToolHistoryBeforeNextToolCall() async throws {
+        let defaultPath = "/Users/eric/models/JANGQ/DeepSeek-V4-Flash-JANGTQ2"
+        let modelPath = ProcessInfo.processInfo.environment["OSAURUS_DSV4_TEST_MODEL"] ?? defaultPath
+        let modelURL = URL(fileURLWithPath: modelPath)
+        guard
+            FileManager.default.fileExists(
+                atPath: modelURL.appendingPathComponent("tokenizer.json").path
+            )
+        else {
+            return
+        }
+
+        let tokenizer = try await SwiftTransformersTokenizerLoader().load(from: modelURL)
+        let lineCountTool = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: "line_count",
+                description: "Count newline-separated text lines.",
+                parameters: .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "text": .object(["type": .string("string")])
+                    ]),
+                    "required": .array([.string("text")]),
+                ])
+            )
+        )
+        let priorLineCountCall: [String: any Sendable] = [
+            "id": "call_line_count_1",
+            "type": "function",
+            "function": [
+                "name": "line_count",
+                "arguments": ["text": "red\ngreen\nblue"] as [String: any Sendable],
+            ] as [String: any Sendable],
+        ]
+        let tokenIds = try tokenizer.applyChatTemplate(
+            messages: [
+                ["role": "user", "content": "Use line_count on red green blue."],
+                ["role": "assistant", "content": "", "tool_calls": [priorLineCountCall]],
+                ["role": "tool", "content": "{\"lines\":3}", "tool_call_id": "call_line_count_1"],
+                ["role": "user", "content": "How many lines were counted?"],
+                ["role": "assistant", "content": "The line_count tool counted 3 lines."],
+                ["role": "user", "content": "Now use line_count on this exact text: one\ntwo"],
+            ],
+            tools: [lineCountTool.toTokenizerToolSpec()],
+            additionalContext: [
+                "enable_thinking": false,
+                "tool_choice": "required",
+                "tool_choice_name": "line_count",
+            ]
+        )
+        let decoded = tokenizer.decode(tokenIds: tokenIds, skipSpecialTokens: false)
+
+        #expect(
+            !decoded.contains("<\u{FF5C}DSML\u{FF5C}tool_calls>"),
+            "Closed historical DSV4 tool calls must not be replayed before a later required tool call. Decoded: \(decoded)"
+        )
+        #expect(
+            !decoded.contains("<tool_result>{\"lines\":3}</tool_result>"),
+            "Closed historical DSV4 tool results must not poison the next required tool-call turn. Decoded: \(decoded)"
+        )
+        #expect(decoded.contains("The line_count tool counted 3 lines."))
+        #expect(decoded.contains("Now use line_count on this exact text: one\ntwo"))
+        #expect(decoded.contains("Use the `line_count` function."))
+        #expect(
+            decoded.hasSuffix("<\u{FF5C}Assistant\u{FF5C}></think>"),
+            "DSV4 compacted history must still leave the ordinary assistant tail. Decoded: \(decoded)"
+        )
+    }
+
     @Test func dsv4LocalTokenizerPreservesRawMaxPromptPath() async throws {
         let defaultPath = "/Users/eric/models/JANGQ/DeepSeek-V4-Flash-JANGTQ-K"
         let modelPath = ProcessInfo.processInfo.environment["OSAURUS_DSV4_TEST_MODEL"] ?? defaultPath

@@ -549,6 +549,12 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                 task: Self.deepseekV4String(raw["task"])
             )
         }
+        let toolChoiceRequired =
+            Self.deepseekV4String(additionalContext?["tool_choice"]) == "required"
+        let toolChoiceName = Self.deepseekV4String(additionalContext?["tool_choice_name"])
+        if toolChoiceRequired || !(toolChoiceName?.isEmpty ?? true) {
+            dsv4Messages = Self.compactCompletedDSV4ToolHistory(dsv4Messages)
+        }
 
         if let tools, !tools.isEmpty {
             if let idx = dsv4Messages.firstIndex(where: {
@@ -599,10 +605,6 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             effort = nil
         }
 
-        let toolChoiceRequired =
-            Self.deepseekV4String(additionalContext?["tool_choice"]) == "required"
-        let toolChoiceName = Self.deepseekV4String(additionalContext?["tool_choice_name"])
-
         var prompt = MLXLMCommon.DeepseekV4ChatEncoder().encode(
             messages: dsv4Messages,
             thinkingMode: thinkingMode,
@@ -625,6 +627,73 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             }
         }
         return upstream.encode(text: prompt, addSpecialTokens: false)
+    }
+
+    private static func compactCompletedDSV4ToolHistory(
+        _ messages: [MLXLMCommon.DeepseekV4ChatEncoder.Message]
+    ) -> [MLXLMCommon.DeepseekV4ChatEncoder.Message] {
+        guard let latestUserIndex = messages.lastIndex(where: {
+            $0.role == .user || $0.role == .developer
+        }) else {
+            return messages
+        }
+
+        let hasLaterAssistantAnswerBeforeLatestUser: (Int) -> Bool = { index in
+            guard index + 1 < latestUserIndex else { return false }
+            return messages[(index + 1)..<latestUserIndex].contains { message in
+                guard message.role == .assistant else { return false }
+                if let content = message.content,
+                   !content.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                {
+                    return true
+                }
+                if let reasoning = message.reasoningContent,
+                   !reasoning.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                {
+                    return true
+                }
+                return false
+            }
+        }
+
+        var compacted: [MLXLMCommon.DeepseekV4ChatEncoder.Message] = []
+        compacted.reserveCapacity(messages.count)
+        var droppingClosedToolResult = false
+
+        for (index, message) in messages.enumerated() {
+            if index >= latestUserIndex {
+                compacted.append(message)
+                continue
+            }
+
+            if message.role == .assistant,
+               let toolCalls = message.toolCalls,
+               !toolCalls.isEmpty,
+               hasLaterAssistantAnswerBeforeLatestUser(index)
+            {
+                droppingClosedToolResult = true
+                let content = message.content?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                let reasoning = message.reasoningContent?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+                guard !content.isEmpty || !reasoning.isEmpty else {
+                    continue
+                }
+                var copy = message
+                copy.toolCalls = nil
+                compacted.append(copy)
+                continue
+            }
+
+            if message.role == .tool, droppingClosedToolResult {
+                continue
+            }
+
+            if message.role != .tool {
+                droppingClosedToolResult = false
+            }
+            compacted.append(message)
+        }
+
+        return compacted
     }
 
     private func fallback(
