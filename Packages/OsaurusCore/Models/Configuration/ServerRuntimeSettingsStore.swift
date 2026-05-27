@@ -39,6 +39,8 @@ public enum ServerRuntimeSettingsStore {
     private static let fileName = "server-runtime.json"
     private static let cacheDefaultsMigrationMarkerName =
         ".server-runtime-cache-defaults-v2-migrated"
+    private static let engineSelectedCacheRepairMarkerName =
+        ".server-runtime-engine-selected-cache-v3-repaired"
 
     // MARK: - Load / Save
 
@@ -152,6 +154,10 @@ public enum ServerRuntimeSettingsStore {
             normalized.cache.enableSSMReDerive = true
             writeCacheDefaultsMigrationMarker()
         }
+        if shouldRepairAutoMigratedEngineSelectedCacheDefault(normalized.cache) {
+            normalized.cache.liveKVCodec = .native
+            writeEngineSelectedCacheRepairMarker()
+        }
         return normalized
     }
 
@@ -183,8 +189,46 @@ public enum ServerRuntimeSettingsStore {
             && cache.enableSSMReDerive == false
     }
 
+    private nonisolated static func shouldRepairAutoMigratedEngineSelectedCacheDefault(
+        _ cache: VMLXServerCacheSettings
+    ) -> Bool {
+        let fileManager = FileManager.default
+        guard fileManager.fileExists(atPath: cacheDefaultsMigrationMarkerURL().path),
+            !fileManager.fileExists(atPath: engineSelectedCacheRepairMarkerURL().path)
+        else {
+            return false
+        }
+        return cache.prefix.enabled
+            && cache.prefix.legacyEntryCountCache == false
+            && cache.prefix.memoryLimitMB == nil
+            && cache.prefix.memoryPercent == 15.0
+            && cache.prefix.ttlMinutes == nil
+            && cache.pagedKV.enabled
+            && cache.pagedKV.blockSize == nil
+            && cache.pagedKV.maxBlocks == nil
+            && cache.liveKVCodec == .engineSelected
+            && cache.turboQuantKeyBits == nil
+            && cache.turboQuantValueBits == nil
+            && cache.defaultMaxKVSize == 65536
+            && cache.longPromptMultiplier == 2.0
+            && cache.storedKVCodec == .auto
+            && cache.legacyDisk.enabled == false
+            && cache.legacyDisk.maxSizeGB == nil
+            && cache.legacyDisk.directory == nil
+            && cache.blockDisk.enabled
+            && cache.blockDisk.maxSizeGB == nil
+            && cache.blockDisk.directory == nil
+            && cache.enableSSMReDerive
+    }
+
     private nonisolated static func writeCacheDefaultsMigrationMarker() {
         let url = cacheDefaultsMigrationMarkerURL()
+        OsaurusPaths.ensureExistsSilent(url.deletingLastPathComponent())
+        try? Data().write(to: url, options: [.atomic])
+    }
+
+    private nonisolated static func writeEngineSelectedCacheRepairMarker() {
+        let url = engineSelectedCacheRepairMarkerURL()
         OsaurusPaths.ensureExistsSilent(url.deletingLastPathComponent())
         try? Data().write(to: url, options: [.atomic])
     }
@@ -336,6 +380,10 @@ public enum ServerRuntimeSettingsStore {
 
     private nonisolated static func cacheDefaultsMigrationMarkerURL() -> URL {
         directoryURL().appendingPathComponent(cacheDefaultsMigrationMarkerName)
+    }
+
+    private nonisolated static func engineSelectedCacheRepairMarkerURL() -> URL {
+        directoryURL().appendingPathComponent(engineSelectedCacheRepairMarkerName)
     }
 
     private nonisolated static func legacyConfigurationFileURL() -> URL {

@@ -698,6 +698,10 @@ struct RuntimePolicySourceTests {
             "Legacy cache migration must not silently flip existing users to engine-selected TurboQuant KV"
         )
         #expect(
+            store.contains("shouldRepairAutoMigratedEngineSelectedCacheDefault"),
+            "ServerRuntimeSettingsStore must demote the old auto-migrated engine-selected cache default back to native/fp16"
+        )
+        #expect(
             store.contains("shouldRepairLegacyCacheDefaults"),
             "ServerRuntimeSettingsStore must still repair stale persisted hybrid cache companion defaults"
         )

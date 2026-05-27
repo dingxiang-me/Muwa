@@ -183,6 +183,60 @@ struct ServerRuntimeSettingsStoreTests {
         }
     }
 
+    @Test @MainActor func load_repairsAutoMigratedEngineSelectedCacheDefaultToNative() async throws {
+        let dir = try makeTempDirectory()
+        try await withOverriddenDirectory(dir) {
+            var autoMigrated = VMLXServerRuntimeSettings()
+            autoMigrated.cache.liveKVCodec = .engineSelected
+            autoMigrated.cache.enableSSMReDerive = true
+            autoMigrated.cache.defaultMaxKVSize = 65536
+            autoMigrated.cache.longPromptMultiplier = 2.0
+            autoMigrated.cache.legacyDisk = VMLXDiskCacheSettings(
+                enabled: false,
+                maxSizeGB: nil,
+                directory: nil
+            )
+            autoMigrated.cache.blockDisk = VMLXBlockDiskCacheSettings(
+                enabled: true,
+                maxSizeGB: nil,
+                directory: nil
+            )
+            try writeSettings(autoMigrated, to: dir)
+            try Data().write(
+                to: dir.appendingPathComponent(".server-runtime-cache-defaults-v2-migrated"),
+                options: [.atomic]
+            )
+
+            ServerRuntimeSettingsStore.invalidateSnapshot()
+            let loaded = try #require(ServerRuntimeSettingsStore.load())
+            #expect(loaded.cache.liveKVCodec == .native)
+            #expect(loaded.cache.enableSSMReDerive == true)
+
+            let data = try Data(contentsOf: dir.appendingPathComponent("server-runtime.json"))
+            let persisted = try JSONDecoder().decode(VMLXServerRuntimeSettings.self, from: data)
+            #expect(persisted.cache.liveKVCodec == .native)
+            #expect(
+                FileManager.default.fileExists(
+                    atPath: dir.appendingPathComponent(".server-runtime-engine-selected-cache-v3-repaired").path
+                )
+            )
+        }
+    }
+
+    @Test @MainActor func load_preservesExplicitEngineSelectedWithoutMigrationMarker() async throws {
+        let dir = try makeTempDirectory()
+        try await withOverriddenDirectory(dir) {
+            var explicitEngineSelected = VMLXServerRuntimeSettings()
+            explicitEngineSelected.cache.liveKVCodec = .engineSelected
+            explicitEngineSelected.cache.enableSSMReDerive = true
+            try writeSettings(explicitEngineSelected, to: dir)
+
+            ServerRuntimeSettingsStore.invalidateSnapshot()
+            let loaded = try #require(ServerRuntimeSettingsStore.load())
+            #expect(loaded.cache.liveKVCodec == .engineSelected)
+        }
+    }
+
     @Test func migratedFromLegacy_projectsCorsAndPort() async throws {
         var legacy = ServerConfiguration.default
         legacy.port = 9000
