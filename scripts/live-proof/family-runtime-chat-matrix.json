@@ -90,6 +90,15 @@
     "notes": "Known red row: hybrid SSM/cache reuse produced hidden-reasoning length stop; rerun only when intentionally investigating Qwen."
   },
   {
+    "id": "qwen35-mxfp4-mtp",
+    "model": "qwen3.6-35b-a3b-mxfp4-crack-mtp",
+    "family": "qwen",
+    "topology": "hybrid-ssm",
+    "required_cache_evidence": ["ssm_companion_cache", "disk_l2_hits", "cache_topology"],
+    "priority": "required",
+    "notes": "35B sibling of the Qwen reasoning/tool-history red row; must prove visible post-tool answer, exact tool calls, SSM companion cache, and disk L2 reuse."
+  },
+  {
     "id": "gemma4-26b-jang4m",
     "model": "gemma-4-26b-a4b-it-jang_4m-crack",
     "family": "gemma",
