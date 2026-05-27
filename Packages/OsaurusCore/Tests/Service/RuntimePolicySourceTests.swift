@@ -401,12 +401,14 @@ struct RuntimePolicySourceTests {
         // the vMLX regression harness, plus the Nemotron Omni tool-template
         // fallback that keeps tool schemas rendered through the model-native
         // [AVAILABLE_TOOLS]/XML function-call contract instead of leaking
-        // role-token/DSML fragments in Osaurus tool turns.
+        // role-token/DSML fragments in Osaurus tool turns, plus the Gemma4
+        // Zyphra XML tool-call parser used by live JANG_4M multiline tool
+        // envelopes.
         // That avoids Xcode PIF
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "a11cbbf51e60ab654e9713cf178bfa9c0fb6b8d8"
+        let expectedRuntimeHardenedRevision = "447c6fba690ea80c5226480be6c940bc80d22c80"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
