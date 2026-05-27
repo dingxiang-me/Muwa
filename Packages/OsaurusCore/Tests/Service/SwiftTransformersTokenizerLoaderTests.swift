@@ -126,7 +126,6 @@ struct SwiftTransformersTokenizerLoaderTests {
             additionalContext: [
                 "enable_thinking": false,
                 "tool_choice": "required",
-                "tool_choice_name": "line_count",
             ]
         )
         let decoded = tokenizer.decode(tokenIds: tokenIds, skipSpecialTokens: false)

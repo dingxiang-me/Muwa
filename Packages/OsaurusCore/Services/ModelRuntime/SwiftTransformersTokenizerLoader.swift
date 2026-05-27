@@ -110,13 +110,15 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             && upstream.convertTokenToId("</assistant>") != nil
             && upstream.convertTokenToId("<think>") != nil
             && upstream.convertTokenToId("</think>") != nil
-        let hasZayaVLVisionSentinel =
+        let hasZayaVLChatSentinel =
             upstream.bosToken == "<bos>"
+            && upstream.convertTokenToId("<|im_start|>") != nil
+            && upstream.convertTokenToId("<|im_end|>") != nil
+        let hasZayaVLVisionSentinel =
+            hasZayaVLChatSentinel
             && upstream.convertTokenToId("<|vision_start|>") != nil
             && upstream.convertTokenToId("<image>") != nil
             && upstream.convertTokenToId("<|vision_end|>") != nil
-            && upstream.convertTokenToId("<|im_start|>") != nil
-            && upstream.convertTokenToId("<|im_end|>") != nil
         let hasDSV4Sentinel =
             !hasZayaVLVisionSentinel
             && upstream.bosToken == Self.dsv4Bos
@@ -155,7 +157,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
         }
 
         var adjustedContext = additionalContext
-        if hasZayaVLVisionSentinel,
+        if hasZayaVLChatSentinel,
             (Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)),
             (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
         {
@@ -241,7 +243,9 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                     addGenerationPrompt: addGenerationPrompt
                 )
             }
-            if hasZayaVLVisionSentinel, Self.messagesContainImageContent(messages) {
+            if hasZayaVLChatSentinel,
+                Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)
+            {
                 return try fallback(
                     label: "Zaya1VLVisionToolMinimal",
                     template: MLXLMCommon.ChatTemplateFallbacks.zayaVLVisionToolMinimal,
@@ -292,7 +296,9 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             let ordered: [(label: String, template: String)]
             if hasLagunaSentinel {
                 ordered = [("LagunaMinimal", MLXLMCommon.ChatTemplateFallbacks.lagunaMinimal)]
-            } else if hasZayaVLVisionSentinel, Self.messagesContainImageContent(messages) {
+            } else if hasZayaVLChatSentinel,
+                Self.messagesContainImageContent(messages) || !(chatTemplateTools?.isEmpty ?? true)
+            {
                 ordered = [
                     (
                         "Zaya1VLVisionToolMinimal",
