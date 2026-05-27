@@ -127,6 +127,69 @@ def model_entry(cache: dict[str, Any] | None, model: str) -> dict[str, Any]:
     return {}
 
 
+def current_health_model_matches(health: dict[str, Any], model: str) -> bool:
+    if health.get("current_model") == model:
+        return True
+    loaded = health.get("loaded")
+    if isinstance(loaded, list) and model in loaded:
+        return True
+    return False
+
+
+def cache_evidence_checks(
+    required: list[str],
+    cache_after: dict[str, Any],
+    delta: dict[str, int],
+    model: str,
+) -> dict[str, bool]:
+    entry = model_entry(cache_after, model)
+    topology = entry.get("cache_topology") if isinstance(entry, dict) else None
+    topology = topology if isinstance(topology, dict) else {}
+    block_disk = entry.get("block_disk_store") if isinstance(entry, dict) else None
+    block_disk = block_disk if isinstance(block_disk, dict) else {}
+    companion = entry.get("companion_cache") if isinstance(entry, dict) else None
+    companion = companion if isinstance(companion, dict) else {}
+    ssm = entry.get("ssm_companion_cache") if isinstance(entry, dict) else None
+    ssm = ssm if isinstance(ssm, dict) else {}
+    zaya = entry.get("zaya_cca_companion_cache") if isinstance(entry, dict) else None
+    zaya = zaya if isinstance(zaya, dict) else {}
+
+    checks: dict[str, bool] = {}
+    for name in required:
+        if name == "cache_topology":
+            checks["cache_evidence_cache_topology"] = bool(topology) and topology.get("layer_count", 0) > 0
+        elif name == "disk_l2_hits":
+            checks["cache_evidence_disk_l2_hits"] = delta.get("block_disk_hits", 0) > 0
+        elif name == "requires_disk_backed_restore":
+            checks["cache_evidence_requires_disk_backed_restore"] = topology.get("requires_disk_backed_restore") is True
+        elif name == "ssm_companion_cache":
+            checks["cache_evidence_ssm_companion_cache"] = (
+                topology.get("requires_ssm_companion_state") is True
+                and (bool(ssm) or "companion=ssm" in (companion.get("kinds") or []))
+            )
+        elif name == "companion_cache":
+            checks["cache_evidence_companion_cache"] = (
+                bool(companion.get("kinds"))
+                or companion.get("hits", 0) > 0
+                or companion.get("rederives", 0) > 0
+                or topology.get("requires_ssm_companion_state") is True
+                or topology.get("zaya_cca_layer_count", 0) > 0
+            )
+        elif name == "zaya_cca_companion_cache":
+            checks["cache_evidence_zaya_cca_companion_cache"] = (
+                bool(zaya)
+                or topology.get("zaya_cca_layer_count", 0) > 0
+                or "companion=zaya_cca" in (companion.get("kinds") or [])
+            )
+        elif name == "hybrid_pool_layer_count":
+            checks["cache_evidence_hybrid_pool_layer_count"] = topology.get("hybrid_pool_layer_count", 0) > 0
+        elif name == "rotating_kv_layer_count":
+            checks["cache_evidence_rotating_kv_layer_count"] = topology.get("rotating_kv_layer_count", 0) > 0
+        else:
+            checks[f"cache_evidence_unknown_{name}"] = False
+    return checks
+
+
 def flatten_cache_counters(entry: dict[str, Any]) -> dict[str, int]:
     counters: dict[str, int] = {}
 
@@ -287,9 +350,13 @@ def run_model(args: argparse.Namespace, model: str, root: pathlib.Path) -> dict[
     save(root / f"{label}_health_after.json", health_after)
     save(root / f"{label}_cache_after.json", cache_after)
 
+    delta = model_delta(cache_before, cache_after, model)
     checks = {
+        "no_inflight_before": not health_before.get("inflight"),
         "server_healthy_after": health_after.get("status") == "healthy",
         "no_inflight_after": not health_after.get("inflight"),
+        "requested_model_current_after": current_health_model_matches(health_after, model),
+        "requested_model_cache_entry_after": bool(model_entry(cache_after, model)),
         "turn1_finish_tool_calls": finish(resp1) == "tool_calls",
         "turn1_has_one_tool_call": len(calls1) == 1,
         "turn1_name_line_count": call1.get("function", {}).get("name") == "line_count",
@@ -308,6 +375,7 @@ def run_model(args: argparse.Namespace, model: str, root: pathlib.Path) -> dict[
         "turn3_no_visible_content": msg3.get("content") in (None, ""),
         "turn3_no_protocol_leak": marker_leaks(resp3) == [],
     }
+    checks.update(cache_evidence_checks(args.required_cache_evidence, cache_after, delta, model))
     summary.update(
         {
             "checks": checks,
@@ -326,7 +394,8 @@ def run_model(args: argparse.Namespace, model: str, root: pathlib.Path) -> dict[
                 "turn3_finish": finish(resp3),
                 "turn3_args": args3,
             },
-            "cache_delta": model_delta(cache_before, cache_after, model),
+            "required_cache_evidence": args.required_cache_evidence,
+            "cache_delta": delta,
             "aggregate_cache_delta": aggregate_delta(cache_before, cache_after),
             "cache_after": cache_after,
             "health_after": health_after,
@@ -346,6 +415,7 @@ def main() -> int:
     parser.add_argument("--max-tokens", type=int, default=384)
     parser.add_argument("--timeout", type=int, default=1200)
     parser.add_argument("--settle-seconds", type=float, default=2)
+    parser.add_argument("--required-cache-evidence", action="append", default=[])
     args = parser.parse_args()
 
     root = pathlib.Path(args.artifact_root)

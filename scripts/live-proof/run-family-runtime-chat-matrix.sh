@@ -96,6 +96,7 @@ for row in rows:
         row.get("family", ""),
         row.get("topology", ""),
         row.get("priority", ""),
+        ",".join(row.get("required_cache_evidence") or []),
     ]))
 PY
 
@@ -117,7 +118,7 @@ curl -fsS --max-time 10 "$BASE_URL/health" >"$ARTIFACT_ROOT/health-before.json"
 curl -fsS --max-time 20 "$BASE_URL/admin/cache-stats" >"$ARTIFACT_ROOT/cache-before.json" || true
 
 fail=0
-while IFS=$'\t' read -r row_id model family topology priority; do
+while IFS=$'\t' read -r row_id model family topology priority required_cache_evidence; do
   row_root="$ARTIFACT_ROOT/$row_id"
   mkdir -p "$row_root"
   {
@@ -126,16 +127,25 @@ while IFS=$'\t' read -r row_id model family topology priority; do
     echo "family=$family"
     echo "topology=$topology"
     echo "priority=$priority"
+    echo "required_cache_evidence=$required_cache_evidence"
   } >"$row_root/row.txt"
 
   echo "--- running $row_id ($model) ---"
+  cache_args=()
+  IFS=',' read -r -a cache_items <<<"$required_cache_evidence"
+  for item in "${cache_items[@]}"; do
+    if [[ -n "$item" ]]; then
+      cache_args+=(--required-cache-evidence "$item")
+    fi
+  done
   if "$HARNESS" \
     --base-url "$BASE_URL" \
     --artifact-root "$row_root" \
     --model "$model" \
     --max-tokens "$MAX_TOKENS" \
     --timeout "$TIMEOUT_SECONDS" \
-    --settle-seconds "$SETTLE_SECONDS"; then
+    --settle-seconds "$SETTLE_SECONDS" \
+    "${cache_args[@]}"; then
     echo "PASS $row_id" | tee "$row_root/status.txt"
   else
     echo "FAIL $row_id" | tee "$row_root/status.txt"
