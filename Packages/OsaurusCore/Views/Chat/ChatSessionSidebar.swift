@@ -575,6 +575,8 @@ private struct SessionRow: View {
         }
         .padding(6)
         .frame(minWidth: 180)
+        .background(theme.cardBackground)
+        .presentationBackground(theme.cardBackground)
     }
 
     // MARK: - Export Format Chooser
