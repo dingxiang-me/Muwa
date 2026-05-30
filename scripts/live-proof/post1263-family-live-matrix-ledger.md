@@ -39,6 +39,28 @@ Each promoted row needs current-head evidence for:
 - Do not merge by agent.
 - Do not apply forced-behavior fixes, hidden sampler overrides, forced thinking/tool wrappers, or broad parser masks to make rows look green.
 
+## Current #1300 merge boundary
+
+### 2026-05-30 03:30 PDT LFM2.5 native-tool repin green, Step tools blocked by capability policy
+
+- Osaurus PR head at check: `9ebeca8192d3483c9895c9f716c4f5432e7c801c`.
+- vMLX main / Osaurus pin: `c3501ec92aa630102ff2c0083b96bd22c4989c29`.
+- No-sign app path: `build/DerivedData-lfm-native-nosign-9ebeca81/Build/Products/Release/osaurus.app`.
+- Launch boundary: app was launched through LaunchServices with keychain disabled via launchd env: `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, `OSAURUS_TEST_ROOT=/tmp/osaurus-pr1300-9ebeca81-lfm-native-ui-20260530-032559`, and `OSU_MODELS_DIR=/Users/eric/.mlxstudio/models`.
+- Source and PR guards passed before live proof: `git diff --check`, `RuntimePolicySourceTests/vmlxPinIncludesRuntimeHardening`, `SwiftTransformersTokenizerLoaderTests/lfm2LocalTokenizerUsesStrictRequiredToolFallback`, `assert-tool-choice-required-routing.sh`, `assert-server-settings-runtime-wiring.sh`, `assert-keychain-free-proof-path.sh`, `assert-osaurus-no-forced-behavior-pr.sh`, `assert-osaurus-vmlx-pr-readiness.sh`, and `assert-osaurus-pr-hygiene.sh`.
+- GitHub checks passed on the same head: `test-core`, `test-cli`, `swiftlint`, `shellcheck`, and `update_release_draft`; PR #1300 was non-draft and mergeable.
+- LFM cold artifact: `/tmp/osaurus-pr1300-9ebeca81-lfm25-jang2l-native-cold-20260530-032614`.
+- LFM warm flake artifact: `/tmp/osaurus-pr1300-9ebeca81-lfm25-jang2l-native-warm-20260530-032757`.
+- LFM warm pass artifact: `/tmp/osaurus-pr1300-9ebeca81-lfm25-jang2l-native-warm-rerun-20260530-032938`.
+- LFM cold result: `lfm2.5-8b-a1b-jang_2l` passed strict required/none/required tool history. Turn 1 emitted exact structured `line_count` args `red\ngreen\nblue`; turn 2 emitted visible answer `Three lines were counted.`; turn 3 emitted exact structured `line_count` args `one\ntwo`; no protocol marker leaked, no visible loop occurred, no length-stop fake pass occurred, and `/health` stayed healthy with no in-flight request.
+- LFM warm pass result: the immediate warm rerun passed the same strict required/none/required checks and proved cache reuse with `disk_l2_hits +1`, `ssm_companion_hits +1`, and `companion_hits +1`.
+- LFM topology: 24 layers, 6 KV layers, 18 Mamba/SSM companion layers, `companion=ssm`, disk-backed restore required, SSM companion state required, paged-cache incompatible, block disk L2 enabled, and TurboQuant KV layer count 0.
+- LFM token/s: cold visible follow-up emitted 343 completion tokens at 147.00 tok/s; warm-pass visible follow-up emitted 304 completion tokens at 106.47 tok/s. Structured tool-call turns emitted zero completion tokens as expected for OpenAI-compatible tool-call responses.
+- LFM boundary: one first warm run proved disk/SSM companion hits but failed turn 3 with `finish_reason: "length"` while the model stayed in `reasoning_content`. The immediate warm rerun passed exact tool behavior with the same hit requirements, so the current PR row is green for this confidence pass but should not be overstated as deterministic coverage for every LFM prompt shape or MXFP sibling.
+- Step boundary: `/v1/models` lists `step-3.7-flash-jang_2l`, but a required-tool request is rejected with HTTP 400 because local MLX runtime policy reports tool calling unsupported. This PR does not prove Step tool/parser/cache E2E behavior, and no parser bypass should be added to make it look supported.
+- Cache policy boundary: engine-selected cache remains topology-gated. LFM and DSV4 rows report TurboQuant KV layer count 0, so this proof covers native hybrid cache plus L2/SSM companion reuse, not TurboQuant KV for LFM/DSV4.
+- Verdict: LFM2.5 JANG_2L is green for the exact #1300 no-sign Osaurus app row. Step tools, LFM MXFP4/MXFP8, LFM VL, and broader prompt contexts remain follow-up rows.
+
 ## Current #1268 merge boundary
 
 ### 2026-05-28 10:28 PDT Nemotron Omni MXFP4 live red row

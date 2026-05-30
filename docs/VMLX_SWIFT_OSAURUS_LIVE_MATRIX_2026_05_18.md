@@ -13,6 +13,25 @@ repo-local live-gate artifacts. The user's requested VL/cache/UI/API/parser/
 defaults/carryover proof still requires real Osaurus app/API evidence before a
 row is production-clear.
 
+## 2026-05-30 PR #1300 LFM2.5 native-tool repin and Step boundary
+
+- Osaurus PR head at check: `9ebeca8192d3483c9895c9f716c4f5432e7c801c`.
+- vMLX main / Osaurus pin: `c3501ec92aa630102ff2c0083b96bd22c4989c29`.
+- No-sign app path: `build/DerivedData-lfm-native-nosign-9ebeca81/Build/Products/Release/osaurus.app`.
+- Launch boundary: app was launched keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, `OSAURUS_TEST_ROOT=/tmp/osaurus-pr1300-9ebeca81-lfm-native-ui-20260530-032559`, and `OSU_MODELS_DIR=/Users/eric/.mlxstudio/models`.
+- Source/guard boundary: `git diff --check`, `RuntimePolicySourceTests/vmlxPinIncludesRuntimeHardening`, `SwiftTransformersTokenizerLoaderTests/lfm2LocalTokenizerUsesStrictRequiredToolFallback`, `assert-tool-choice-required-routing.sh`, `assert-server-settings-runtime-wiring.sh`, `assert-keychain-free-proof-path.sh`, `assert-osaurus-no-forced-behavior-pr.sh`, `assert-osaurus-vmlx-pr-readiness.sh`, and `assert-osaurus-pr-hygiene.sh` passed before the app proof.
+- GitHub status: PR #1300 was non-draft, mergeable, and green for `test-core`, `test-cli`, `swiftlint`, `shellcheck`, and `update_release_draft` on this head.
+- LFM cold artifact: `/tmp/osaurus-pr1300-9ebeca81-lfm25-jang2l-native-cold-20260530-032614`.
+- LFM warm flake artifact: `/tmp/osaurus-pr1300-9ebeca81-lfm25-jang2l-native-warm-20260530-032757`.
+- LFM warm pass artifact: `/tmp/osaurus-pr1300-9ebeca81-lfm25-jang2l-native-warm-rerun-20260530-032938`.
+- LFM result: `lfm2.5-8b-a1b-jang_2l` passed the strict three-turn required/none/required harness on the cold row and the warm rerun. Turn 1 produced exact structured `line_count` args `red\ngreen\nblue`; turn 2 produced a visible answer and no tool call; turn 3 produced exact structured `line_count` args `one\ntwo`; tool-call turns had no visible content, no protocol marker leaked, no visible loop occurred, no length-stop fake pass occurred, and `/health` stayed healthy with no in-flight request.
+- LFM topology/cache result: 24 layers, 6 KV layers, 18 Mamba/SSM companion layers, `companion=ssm`, disk-backed restore required, SSM companion state required, paged-cache incompatible, block disk L2 enabled, and TurboQuant KV layer count 0. The warm pass proved reuse with `disk_l2_hits +1`, `ssm_companion_hits +1`, and `companion_hits +1`.
+- LFM token/s: cold visible follow-up emitted 343 completion tokens at 147.00 tok/s; warm-pass visible follow-up emitted 304 completion tokens at 106.47 tok/s. Structured tool-call turns emitted zero completion tokens.
+- LFM honesty boundary: the first warm run proved `disk_l2_hits +1`, `ssm_companion_hits +1`, and `companion_hits +1`, but failed turn 3 with `finish_reason: "length"` after spending the turn in `reasoning_content`. The immediate warm rerun passed exact tool behavior with the same cache-hit requirements, so the row is green for this PR confidence pass but not a blanket deterministic guarantee for every LFM prompt shape or sibling bundle.
+- Step boundary: `step-3.7-flash-jang_2l` is listed by `/v1/models`, but a required-tool request is intentionally rejected with HTTP 400 because local MLX runtime capability detection reports tool calling unsupported. Do not claim Step tool/parser/cache E2E proof from this PR. This is a capability-policy boundary, not a hidden parser bypass.
+- TurboQuant boundary: LFM and DSV4 rows report TurboQuant KV layer count 0. The PR keeps engine-selected cache policy topology-gated; do not claim TurboQuant KV is proven for LFM, Step, or DSV4 from these rows.
+- Verdict: PR #1300 is green for the LFM2.5 JANG_2L no-sign Osaurus app row, including native tool parsing, reasoning separation, hybrid SSM topology, disk L2 reuse, and SSM companion reuse. Step tools, LFM MXFP4/MXFP8, LFM VL, and broader prompt contexts remain follow-up coverage.
+
 ## 2026-05-30 LFM2.5 JANG_2L final required-tool and warm cache pass
 
 - Osaurus PR head at check: `ccc57314f928801ded7d7fe6f0affcb758ee6432`.
