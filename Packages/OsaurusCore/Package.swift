@@ -37,10 +37,10 @@ let package = Package(
             revision: "25f8111552005fdc6ef12cd2c8298a782d4e2052"
         ),
         // FluidAudio 0.14.3 added a breaking `language:` parameter to TTS
-        // calls that osaurus's `TTSService` doesn't pass. Pinning to the
-        // last working version until osaurus catches up. Bumping requires
-        // a paired osaurus-side TTSService update.
-        .package(url: "https://github.com/FluidInference/FluidAudio.git", "0.14.0" ..< "0.14.2"),
+        // calls, enabling multi-language PocketTTS. `TTSService` now passes
+        // the configured language through `ensureModels`/`PocketTtsManager`,
+        // so we track the 0.14.x line (currently 0.14.8).
+        .package(url: "https://github.com/FluidInference/FluidAudio.git", "0.14.3" ..< "0.15.0"),
         // Pinned by commit (was `branch: "main"`) — same reasoning as the
         // consolidated vmlx-swift pin above.
         .package(

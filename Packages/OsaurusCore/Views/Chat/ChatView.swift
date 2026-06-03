@@ -3172,6 +3172,10 @@ struct ChatView: View {
     // What's New modal
     @State private var pendingWhatsNew: WhatsNewRelease? = nil
     @State private var showAutoSpeakPrompt: Bool = false
+    /// Turn the user asked to hear while the TTS model was still downloading.
+    /// Replayed once `.ttsModelDidBecomeReady` arrives so the tap that kicked
+    /// off the download ultimately plays its message.
+    @State private var pendingSpeakTurnId: UUID? = nil
     /// Privacy-filter review sheet payload. Set by the
     /// `PrivacyReviewService` presenter registration in `.onAppear`;
     /// presented via `.sheet(item:)` below. Identifiable so SwiftUI
@@ -3279,6 +3283,11 @@ struct ChatView: View {
             .overlay { promptOverlayLayer }
             .onChange(of: session.lastCompletedAssistantTurnId) { _, newValue in
                 handleAssistantTurnCompleted(turnId: newValue)
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .ttsModelDidBecomeReady)) { _ in
+                guard let pending = pendingSpeakTurnId else { return }
+                pendingSpeakTurnId = nil
+                speakTurnContent(turnId: pending)
             }
     }
 
@@ -4223,11 +4232,20 @@ extension ChatView {
         session.regenerate(turnId: turnId)
     }
 
-    /// Read the assistant turn aloud via PocketTTS. If the model isn't downloaded,
-    /// TTSService posts a notification that opens the TTS settings tab.
+    /// Read the assistant turn aloud via PocketTTS. If the model isn't ready,
+    /// auto-start the download/upgrade and surface progress in an inline,
+    /// dismissible dialog instead of playing.
     private func speakTurnContent(turnId: UUID) {
         guard let turn = session.turns.first(where: { $0.id == turnId }) else { return }
         guard !turn.contentIsBlank else { return }
+
+        guard TTSService.shared.isModelReady else {
+            pendingSpeakTurnId = turnId
+            TTSService.shared.ensureModelLoaded()
+            TTSDownloadPrompt.present(scope: .chat(windowState.windowId))
+            return
+        }
+
         let isStartingPlayback = TTSService.shared.playingMessageId != turnId
         if isStartingPlayback && !session.hasAskedAutoSpeak {
             session.hasAskedAutoSpeak = true
@@ -4247,11 +4265,19 @@ extension ChatView {
         guard let turnId else { return }
         guard session.autoSpeakAssistant else { return }
         guard TTSConfigurationStore.load().enabled else { return }
-        guard TTSService.shared.isModelReady else { return }
-        guard TTSService.shared.playingMessageId == nil else { return }
         guard let turn = session.turns.first(where: { $0.id == turnId }),
             !turn.contentIsBlank
         else { return }
+
+        guard TTSService.shared.isModelReady else {
+            // Auto-speak wants to play but the model isn't ready — kick off the
+            // download/upgrade and surface progress, same as a manual tap.
+            pendingSpeakTurnId = turnId
+            TTSService.shared.ensureModelLoaded()
+            TTSDownloadPrompt.present(scope: .chat(windowState.windowId))
+            return
+        }
+        guard TTSService.shared.playingMessageId == nil else { return }
         TTSService.shared.toggleSpeak(
             text: turn.visibleContent,
             messageId: turnId,

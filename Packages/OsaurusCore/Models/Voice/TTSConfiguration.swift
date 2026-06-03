@@ -18,7 +18,20 @@ public struct TTSConfiguration: Codable, Equatable, Sendable {
     /// Generation temperature (0.1 – 1.2). Higher = more variation.
     public var temperature: Double
 
+    /// Base PocketTTS language identifier — `"english"`, `"french"`,
+    /// `"german"`, `"italian"`, `"portuguese"`, or `"spanish"`. The concrete
+    /// FluidAudio language pack (6-layer vs 24-layer) is resolved from this
+    /// plus `highQuality` by `TTSService`. There is no automatic language
+    /// detection; the user picks the pack matching their text.
+    public var language: String
+
+    /// When true, load the higher-quality 24-layer pack for languages that
+    /// ship one (German/Italian/Portuguese/Spanish). Ignored for English
+    /// (6-layer only) and French (24-layer only).
+    public var highQuality: Bool
+
     public static let defaultVoice = "alba"
+    public static let defaultLanguage = "english"
 
     public init(from decoder: Decoder) throws {
         let container = try decoder.container(keyedBy: CodingKeys.self)
@@ -27,16 +40,24 @@ public struct TTSConfiguration: Codable, Equatable, Sendable {
         self.voice = try container.decodeIfPresent(String.self, forKey: .voice) ?? defaults.voice
         self.temperature =
             try container.decodeIfPresent(Double.self, forKey: .temperature) ?? defaults.temperature
+        self.language =
+            try container.decodeIfPresent(String.self, forKey: .language) ?? defaults.language
+        self.highQuality =
+            try container.decodeIfPresent(Bool.self, forKey: .highQuality) ?? defaults.highQuality
     }
 
     public init(
         enabled: Bool = true,
         voice: String = TTSConfiguration.defaultVoice,
-        temperature: Double = 0.7
+        temperature: Double = 0.7,
+        language: String = TTSConfiguration.defaultLanguage,
+        highQuality: Bool = false
     ) {
         self.enabled = enabled
         self.voice = voice
         self.temperature = temperature
+        self.language = language
+        self.highQuality = highQuality
     }
 
     public static var `default`: TTSConfiguration { TTSConfiguration() }

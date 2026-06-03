@@ -38,6 +38,22 @@ struct TTSModeSettingsTab: View {
         TTSConfigurationStore.save(config)
     }
 
+    /// Switching language auto-selects that language's natively-recorded
+    /// voice for the most idiomatic prosody, then rebuilds the model for the
+    /// new pack. `highQuality` is left untouched — it has no effect for
+    /// English (6-layer only) or French (24-layer only) and the toggle is
+    /// simply hidden for those.
+    private func onLanguageChanged(_ newLanguage: String) {
+        config.voice = PocketTTSLanguageCatalog.nativeVoice(for: newLanguage)
+        saveSettings()
+        TTSService.shared.languageDidChange()
+    }
+
+    private func onQualityChanged() {
+        saveSettings()
+        TTSService.shared.languageDidChange()
+    }
+
     private var canPreview: Bool {
         config.enabled && ttsService.isModelReady
             && !previewText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
@@ -47,6 +63,10 @@ struct TTSModeSettingsTab: View {
         ScrollView {
             VStack(spacing: 24) {
                 enableCard
+
+                if config.enabled {
+                    languageCard
+                }
 
                 modelCard
 
@@ -122,7 +142,7 @@ struct TTSModeSettingsTab: View {
                     .foregroundColor(theme.accentColor)
 
                 Text(
-                    "Powered by FluidAudio PocketTTS. English only. Streams audio as it's synthesized.",
+                    "Powered by FluidAudio PocketTTS. Choose a language below. Streams audio as it's synthesized.",
                     bundle: .module
                 )
                 .font(.system(size: 12))
@@ -264,6 +284,76 @@ struct TTSModeSettingsTab: View {
                 Capsule().fill(theme.successColor.opacity(0.1))
             )
         }
+    }
+
+    // MARK: - Language Card
+
+    private var languageCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("Language", bundle: .module)
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(theme.primaryText)
+
+            HStack {
+                Text("Language", bundle: .module)
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.secondaryText)
+                Spacer()
+                Picker("", selection: $config.language) {
+                    ForEach(PocketTTSLanguageCatalog.availableLanguages, id: \.self) { lang in
+                        Text(PocketTTSLanguageCatalog.displayName(for: lang)).tag(lang)
+                    }
+                }
+                .labelsHidden()
+                .pickerStyle(MenuPickerStyle())
+                .frame(maxWidth: 180)
+                .onChange(of: config.language) { _, newValue in onLanguageChanged(newValue) }
+            }
+
+            if PocketTTSLanguageCatalog.supportsQualityToggle(config.language) {
+                HStack(alignment: .top) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Higher quality (24-layer)", bundle: .module)
+                            .font(.system(size: 12))
+                            .foregroundColor(theme.secondaryText)
+                        Text(
+                            "More natural prosody, but a larger download and slower playback.",
+                            bundle: .module
+                        )
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.tertiaryText)
+                    }
+                    Spacer()
+                    Toggle("", isOn: $config.highQuality)
+                        .toggleStyle(SwitchToggleStyle(tint: theme.accentColor))
+                        .labelsHidden()
+                        .onChange(of: config.highQuality) { _, _ in onQualityChanged() }
+                }
+            } else if PocketTTSLanguageCatalog.isAlwaysHighQuality(config.language) {
+                HStack(spacing: 6) {
+                    Image(systemName: "sparkles")
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.accentColor)
+                    Text("High quality (24-layer) only", bundle: .module)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.tertiaryText)
+                }
+            }
+
+            HStack(alignment: .top, spacing: 8) {
+                Image(systemName: "info.circle")
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.accentColor)
+                Text(
+                    "Each language is a separate model download. There's no automatic detection — pick the one matching your text.",
+                    bundle: .module
+                )
+                .font(.system(size: 11))
+                .foregroundColor(theme.secondaryText)
+            }
+        }
+        .padding(20)
+        .background(cardBackground(selected: false))
     }
 
     // MARK: - Voice Card
