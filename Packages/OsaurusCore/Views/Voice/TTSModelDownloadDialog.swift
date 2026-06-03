@@ -86,7 +86,7 @@ struct TTSModelDownloadContent: View {
         case .failed:
             return "Download failed"
         case .downloading, .notReady:
-            return "Downloading the voice model…"
+            return plan.isUpgrade ? "Updating the voice model…" : "Downloading the voice model…"
         }
     }
 
@@ -164,9 +164,10 @@ enum TTSDownloadPrompt {
         let id = UUID()
         let dismiss: () -> Void = { ThemedAlertCenter.shared.dismiss(scope: scope, id: id) }
 
+        let title = plan.isUpgrade ? "Updating Text-to-Speech Model" : "Downloading Text-to-Speech Model"
         let request = ThemedAlertRequest(
             id: id,
-            title: "Text-to-Speech Setup",
+            title: title,
             message: nil,
             buttons: [.cancel("Close")],
             showsCloseButton: true,

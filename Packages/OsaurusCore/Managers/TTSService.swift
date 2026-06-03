@@ -362,8 +362,31 @@ public final class TTSService: ObservableObject {
         }
     }
 
-    /// Approximate download size for the inline download dialog's copy.
+    /// True when pre-v2 flat-layout English model files are still on disk —
+    /// i.e. this user had TTS working before the FluidAudio bump and is now
+    /// replacing it. Used **only** to phrase the dialog as "Updating" rather
+    /// than "Downloading"; the download is a clean full fetch either way.
+    /// (The flat files are removed by `cleanupLegacyFlatCache` after the first
+    /// successful load, so this reads true only during the upgrade window.)
+    private static func hasLegacyFlatEnglishCache() -> Bool {
+        let repo = pocketTtsRepoDir()
+        let fm = FileManager.default
+        let flatModels = [
+            ModelNames.PocketTTS.condStepFile,
+            ModelNames.PocketTTS.flowlmStepFile,
+            ModelNames.PocketTTS.flowDecoderFile,
+        ]
+        return flatModels.allSatisfy {
+            fm.fileExists(atPath: repo.appendingPathComponent($0).path)
+        }
+    }
+
+    /// Copy inputs for the inline download dialog.
     public struct TTSDownloadPlan: Sendable {
+        /// True when an existing pre-v2 English install is being replaced, so
+        /// the dialog reads "Updating…" instead of "Downloading…". Behavior is
+        /// identical (a clean full download) — this only drives wording.
+        public let isUpgrade: Bool
         /// Human-readable approximate download size, or `nil` when unknown
         /// (24-layer packs vary and aren't quoted to avoid over-promising).
         public let sizeText: String?
@@ -372,12 +395,14 @@ public final class TTSService: ObservableObject {
     /// Plan for the currently-configured language. Each language is a full,
     /// independent download — there is no partial/in-place upgrade path.
     public static func plannedDownload() -> TTSDownloadPlan {
+        let language = currentLanguage()
+        // Only English used the legacy flat layout, so an "update" only applies
+        // when English is the target and its old files are still present.
+        let isUpgrade = (language == .english) && hasLegacyFlatEnglishCache()
         // 6-layer packs (incl. English) are ~770 MB; 24-layer packs are larger
         // and not quoted to avoid an inaccurate number.
-        if currentLanguage().transformerLayers == 6 {
-            return TTSDownloadPlan(sizeText: "about 770 MB")
-        }
-        return TTSDownloadPlan(sizeText: nil)
+        let sizeText: String? = (language.transformerLayers == 6) ? "about 770 MB" : nil
+        return TTSDownloadPlan(isUpgrade: isUpgrade, sizeText: sizeText)
     }
 
     // MARK: - Playback

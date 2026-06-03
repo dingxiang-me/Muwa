@@ -4232,19 +4232,44 @@ extension ChatView {
         session.regenerate(turnId: turnId)
     }
 
+    /// Handle a speak request when the TTS model isn't ready yet. Returns true
+    /// when the not-ready case was handled (caller should stop); false when the
+    /// model is ready and the caller should proceed to play.
+    ///
+    /// Routing:
+    /// - Download already running → show live progress (don't restart).
+    /// - Existing install being updated (legacy cache present) → auto-start the
+    ///   re-download and show progress.
+    /// - Never downloaded → send the user to Voice settings to start the large
+    ///   first download deliberately (only for explicit taps; auto-speak stays
+    ///   silent so it doesn't repeatedly yank the user into settings).
+    private func handleTTSNotReadyIfNeeded(turnId: UUID, allowSettingsNavigation: Bool) -> Bool {
+        if TTSService.shared.isModelReady { return false }
+
+        let isDownloading: Bool
+        if case .downloading = TTSService.shared.modelState {
+            isDownloading = true
+        } else {
+            isDownloading = false
+        }
+
+        if isDownloading || TTSService.plannedDownload().isUpgrade {
+            pendingSpeakTurnId = turnId
+            if !isDownloading { TTSService.shared.ensureModelLoaded() }
+            TTSDownloadPrompt.present(scope: .chat(windowState.windowId))
+        } else if allowSettingsNavigation {
+            NotificationCenter.default.post(name: .openTTSSettingsRequested, object: nil)
+        }
+        return true
+    }
+
     /// Read the assistant turn aloud via PocketTTS. If the model isn't ready,
-    /// auto-start the download/upgrade and surface progress in an inline,
-    /// dismissible dialog instead of playing.
+    /// route to the download dialog or settings (see `handleTTSNotReadyIfNeeded`).
     private func speakTurnContent(turnId: UUID) {
         guard let turn = session.turns.first(where: { $0.id == turnId }) else { return }
         guard !turn.contentIsBlank else { return }
 
-        guard TTSService.shared.isModelReady else {
-            pendingSpeakTurnId = turnId
-            TTSService.shared.ensureModelLoaded()
-            TTSDownloadPrompt.present(scope: .chat(windowState.windowId))
-            return
-        }
+        if handleTTSNotReadyIfNeeded(turnId: turnId, allowSettingsNavigation: true) { return }
 
         let isStartingPlayback = TTSService.shared.playingMessageId != turnId
         if isStartingPlayback && !session.hasAskedAutoSpeak {
@@ -4269,14 +4294,9 @@ extension ChatView {
             !turn.contentIsBlank
         else { return }
 
-        guard TTSService.shared.isModelReady else {
-            // Auto-speak wants to play but the model isn't ready — kick off the
-            // download/upgrade and surface progress, same as a manual tap.
-            pendingSpeakTurnId = turnId
-            TTSService.shared.ensureModelLoaded()
-            TTSDownloadPrompt.present(scope: .chat(windowState.windowId))
-            return
-        }
+        // Auto-speak never navigates to settings (it would re-trigger on every
+        // reply); it only continues/updates an in-flight or existing model.
+        if handleTTSNotReadyIfNeeded(turnId: turnId, allowSettingsNavigation: false) { return }
         guard TTSService.shared.playingMessageId == nil else { return }
         TTSService.shared.toggleSpeak(
             text: turn.visibleContent,
