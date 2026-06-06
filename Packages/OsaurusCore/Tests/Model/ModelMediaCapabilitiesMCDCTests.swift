@@ -64,6 +64,41 @@ struct ModelMediaCapabilitiesMCDCTests {
         )
     }
 
+    @Test("D1 boundary: Nemotron 3 Ultra is text-only unless it is Omni")
+    func d1_nemotronUltraTextOnly() throws {
+        let tmp = FileManager.default.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: tmp, withIntermediateDirectories: true)
+        defer { try? FileManager.default.removeItem(at: tmp) }
+        try #"{"model_type":"nemotron_h","vision_config":{"hidden_size":1280}}"#
+            .write(to: tmp.appendingPathComponent("config.json"), atomically: true, encoding: .utf8)
+
+        let cap = ModelMediaCapabilities.from(
+            directory: tmp,
+            modelId: "nvidia-nemotron-3-ultra-550b-a55b-jangtq_1l"
+        )
+
+        #expect(cap == .textOnly)
+    }
+
+    @Test("D1 boundary: Nemotron 3 Ultra composer fallback stays text-only")
+    func d1_nemotronUltraComposerFallbackTextOnly() {
+        for modelId in [
+            "nvidia/NVIDIA-Nemotron-3-Ultra-550B-A55B-JANGTQ_1L",
+            "NVIDIA-Nemotron-3-Ultra-550B-A55B-JANGTQ_1L",
+            "nemotron-3-ultra-550b-a55b-jangtq-1l",
+        ] {
+            let cap = ModelMediaCapabilities.composerCapabilities(
+                modelId: modelId,
+                fallbackSupportsImages: true
+            )
+            #expect(
+                cap == .textOnly,
+                "explicit text-only Nemotron Ultra must not inherit stale image fallback: \(modelId)"
+            )
+        }
+    }
+
     @Test("Step 3.7 text runtime does not advertise media")
     func step37TextRuntimeDoesNotAdvertiseMedia() {
         #expect(ModelMediaCapabilities.from(modelId: "JANGQ-AI/Step-3.7-Flash-JANG_2L") == .textOnly)

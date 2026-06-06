@@ -194,6 +194,12 @@ public enum ModelMediaCapabilities {
         }
 
         let detected = from(modelId: modelId)
+        if detected == .textOnly,
+            ModelFamilyNames.isNemotronThinkingFamily(modelId),
+            !ModelFamilyNames.isNemotronOmniFamily(modelId)
+        {
+            return .textOnly
+        }
         guard fallbackSupportsImages, !detected.supportsImage else {
             return detected
         }
@@ -222,6 +228,12 @@ public enum ModelMediaCapabilities {
             let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any]
         else {
             return from(modelId: modelId)
+        }
+
+        if ModelFamilyNames.isNemotronThinkingFamily(modelId)
+            && !ModelFamilyNames.isNemotronOmniFamily(modelId)
+        {
+            return .textOnly
         }
 
         let modelType = (json["model_type"] as? String)?.lowercased() ?? ""

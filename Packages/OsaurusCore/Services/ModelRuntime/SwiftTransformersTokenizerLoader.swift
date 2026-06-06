@@ -250,6 +250,9 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             || normalizedModelType == "lfm2_moe"
             || normalizedModelType == "lfm2-vl"
             || normalizedModelType == "lfm2_vl"
+        let modelTypeIsNemotron =
+            normalizedModelType == "nemotron"
+            || normalizedModelType == "nemotron_h"
         let hasZayaChatTokens =
             upstream.bosToken == "<bos>"
             && upstream.convertTokenToId("<|im_start|>") != nil
@@ -380,7 +383,25 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                 addGenerationPrompt: addGenerationPrompt
             )
         }
-        if (modelTypeIsGemma4 || upstream.bosToken == "<bos>" || hasGemma4NativeToolSentinels),
+        if modelTypeIsNemotron,
+            !(chatTemplateTools?.isEmpty ?? true),
+            (env["VMLX_CHAT_TEMPLATE_FALLBACK_DISABLE"] ?? "0") != "1"
+        {
+            let fallbackMessages =
+                Self.requiresToolChoice(adjustedContext)
+                ? Self.compactCompletedToolHistoryForRequiredChoice(messages)
+                : messages
+            return try fallback(
+                label: "NemotronMinimal",
+                template: MLXLMCommon.ChatTemplateFallbacks.nemotronMinimal,
+                messages: fallbackMessages,
+                tools: chatTemplateTools,
+                additionalContext: adjustedContext,
+                addGenerationPrompt: addGenerationPrompt
+            )
+        }
+        if (modelTypeIsGemma4 || (!modelTypeIsNemotron && upstream.bosToken == "<bos>")
+            || (!modelTypeIsNemotron && hasGemma4NativeToolSentinels)),
             !(chatTemplateTools?.isEmpty ?? true),
             !modelTypeIsGemma3n,
             Self.requiresToolChoice(adjustedContext),
@@ -389,7 +410,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
             return try fallback(
                 label: "Gemma4RequiredTool",
                 template: MLXLMCommon.ChatTemplateFallbacks.gemma4WithTools,
-                messages: Self.compactGemma4CompletedToolHistoryForRequiredChoice(messages),
+                messages: Self.compactCompletedToolHistoryForRequiredChoice(messages),
                 tools: chatTemplateTools,
                 additionalContext: adjustedContext,
                 addGenerationPrompt: addGenerationPrompt
@@ -489,7 +510,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
                     : MLXLMCommon.ChatTemplateFallbacks.gemma4WithTools
                 let fallbackMessages =
                     Self.requiresToolChoice(adjustedContext)
-                    ? Self.compactGemma4CompletedToolHistoryForRequiredChoice(messages)
+                    ? Self.compactCompletedToolHistoryForRequiredChoice(messages)
                     : messages
                 let fallbackTools = modelTypeIsGemma3n ? nil : chatTemplateTools
                 return try fallback(
@@ -581,7 +602,7 @@ private struct TokenizerBridge: MLXLMCommon.GenerationPromptControllableTokenize
         return false
     }
 
-    private static func compactGemma4CompletedToolHistoryForRequiredChoice(
+    private static func compactCompletedToolHistoryForRequiredChoice(
         _ messages: [[String: any Sendable]]
     ) -> [[String: any Sendable]] {
         guard

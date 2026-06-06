@@ -277,16 +277,13 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             PluginRepositoryService.shared.startBackgroundRefresh()
         }
 
-        // Pre-warm caches immediately for instant first window (no async deps).
-        // The unified prewarm builds the picker with whatever is currently
-        // available; once remote providers finish connecting below they post
-        // .remoteProviderModelsChanged and the cache rebuilds automatically.
+        // Pre-warm cheap caches immediately for instant first window.
         _ = SpeechConfigurationStore.load()
-        ModelPickerItemCache.shared.prewarm()
 
         // Bind the local HTTP server before heavier optional startup work such
-        // as provider connection, scheduler DB polling, sandbox registration,
-        // or Parakeet/CoreML auto-load can occupy the main actor or accelerator.
+        // as provider connection, model-picker bundle metadata scans,
+        // scheduler DB polling, sandbox registration, or Parakeet/CoreML
+        // auto-load can occupy the main actor or accelerator.
         let serverStartupTask = Task { @MainActor in
             await serverController.startServer()
         }
@@ -297,6 +294,12 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         Task { @MainActor in
             await serverStartupTask.value
             serverController.markLaunchComplete()
+            // The unified prewarm builds the picker with whatever is currently
+            // available; once remote providers finish connecting below they post
+            // .remoteProviderModelsChanged and the cache rebuilds automatically.
+            // Keep this after server bind so very large local bundles cannot
+            // block `/health` and API startup while their config is inspected.
+            ModelPickerItemCache.shared.prewarm()
         }
 
         Task.detached(priority: .utility) {
@@ -371,9 +374,7 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
 
             await SkillSearchService.shared.initialize()
 
-            await ToolIndexService.shared.syncFromRegistry()
-            await SkillSearchService.shared.rebuildIndex()
-            await MethodSearchService.shared.rebuildIndex()
+            await ToolIndexService.shared.syncFromRegistry(rebuildVectorIndex: false)
         }
         // Start activity tracking, drain any pending sessions left over from
         // the previous launch, and arm the periodic consolidator.
@@ -539,15 +540,15 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
         }
     }
 
-    /// Fire-and-forget launch prewarm. Skipped when the global AI
-    /// greetings toggle is off, when no last-active context was ever
-    /// recorded (fresh install), or when that agent is no longer in
-    /// the store (it was deleted between launches).
+    /// Fire-and-forget launch prewarm. Skipped when the last-active
+    /// agent has generative greetings off, when no last-active context
+    /// was ever recorded (fresh install), or when that agent is no
+    /// longer in the store (it was deleted between launches).
     @MainActor
     private func prewarmGreetingPoolIfEnabled() {
-        guard AppConfiguration.shared.chatConfig.generativeGreetingsEnabled,
-            let last = GenerativeGreetingPool.lastActiveContext(),
-            let agent = AgentManager.shared.agents.first(where: { $0.id == last.agentId })
+        guard let last = GenerativeGreetingPool.lastActiveContext(),
+            let agent = AgentManager.shared.agents.first(where: { $0.id == last.agentId }),
+            agent.shouldUseGenerativeGreetings
         else { return }
         Task.detached(priority: .utility) { [agent, model = last.model] in
             await GenerativeGreetingPool.shared.warmUp(for: agent, model: model)

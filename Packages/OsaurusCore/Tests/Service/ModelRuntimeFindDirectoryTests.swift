@@ -116,6 +116,107 @@ struct ModelRuntimeFindDirectoryTests {
         #expect(resolved == nil)
     }
 
+    @Test("Hybrid JANGTQ RAM headroom is derived from attention topology, not disk bytes")
+    func hybridJANGTQHeadroomUsesConfigTopology() throws {
+        let dir = try makeIsolatedDir()
+        let config = """
+            {
+              "model_type": "nemotron_h",
+              "num_hidden_layers": 8,
+              "layers_block_type": ["mamba", "moe", "mamba", "attention", "moe", "mamba", "moe", "attention"],
+              "num_attention_heads": 64,
+              "num_key_value_heads": 2,
+              "head_dim": 128,
+              "max_position_embeddings": 262144,
+              "mamba_num_heads": 128,
+              "mamba_head_dim": 128,
+              "ssm_state_size": 128,
+              "conv_kernel": 4,
+              "mamba_ssm_cache_dtype": "float32",
+              "weight_format": "mxtq"
+            }
+            """
+        try Data(config.utf8).write(to: dir.appendingPathComponent("config.json"))
+
+        let weights: Int64 = 100 * 1024 * 1024 * 1024
+        let fallback = ModelRuntime.estimatedKVHeadroomBytes(forWeights: weights)
+        let topology = ModelRuntime.estimatedKVHeadroomBytes(
+            forWeights: weights,
+            modelDirectory: dir
+        )
+
+        #expect(fallback == 20 * 1024 * 1024 * 1024)
+        #expect(topology < 2 * 1024 * 1024 * 1024)
+        #expect(topology >= 512 * 1024 * 1024)
+    }
+
+    @Test("Routed JANGTQ pre-load RAM gate uses MLXPress hot working set")
+    func routedJANGTQLoadFootprintUsesCompressionHotSet() throws {
+        let dir = try makeIsolatedDir()
+        let config = """
+            {
+              "model_type": "nemotron_h",
+              "weight_format": "mxtq",
+              "n_routed_experts": 512,
+              "num_experts_per_tok": 22
+            }
+            """
+        let jang = """
+            {
+              "weight_format": "mxtq",
+              "quantization": {
+                "profile": "JANGTQ_1L",
+                "actions": { "routed_tq": 49152 }
+              },
+              "mxtq_bits": {
+                "routed_expert": { "up_proj": 1, "down_proj": 1 }
+              }
+            }
+            """
+        try Data(config.utf8).write(to: dir.appendingPathComponent("config.json"))
+        try Data(jang.utf8).write(to: dir.appendingPathComponent("jang_config.json"))
+        try Data([0]).write(to: dir.appendingPathComponent("jangtq_runtime.safetensors"))
+
+        let raw: Int64 = 100 * 1024 * 1024 * 1024
+        let effective = ModelRuntime.effectiveLoadFootprintBytes(
+            rawWeightsBytes: raw,
+            modelDirectory: dir,
+            modelName: "NVIDIA-Nemotron-3-Ultra-550B-A55B-JANGTQ_1L"
+        )
+
+        #expect(effective == 30 * 1024 * 1024 * 1024)
+    }
+
+    @Test("Non-JANGTQ and missing-sidecar models keep raw pre-load RAM budget")
+    func nonJANGTQLoadFootprintKeepsRawBudget() throws {
+        let plain = try makeIsolatedDir()
+        try Data(#"{"model_type":"gemma4","num_hidden_layers":48}"#.utf8)
+            .write(to: plain.appendingPathComponent("config.json"))
+
+        let missingSidecar = try makeIsolatedDir()
+        try Data(#"{"model_type":"nemotron_h","weight_format":"mxtq","n_routed_experts":512}"#.utf8)
+            .write(to: missingSidecar.appendingPathComponent("config.json"))
+        try Data(#"{"weight_format":"mxtq","quantization":{"profile":"JANGTQ_1L"}}"#.utf8)
+            .write(to: missingSidecar.appendingPathComponent("jang_config.json"))
+
+        let raw: Int64 = 100 * 1024 * 1024 * 1024
+
+        #expect(
+            ModelRuntime.effectiveLoadFootprintBytes(
+                rawWeightsBytes: raw,
+                modelDirectory: plain,
+                modelName: "gemma-4-12b-it-mxfp8"
+            ) == raw
+        )
+        #expect(
+            ModelRuntime.effectiveLoadFootprintBytes(
+                rawWeightsBytes: raw,
+                modelDirectory: missingSidecar,
+                modelName: "NVIDIA-Nemotron-3-Ultra-550B-A55B-JANGTQ_1L"
+            ) == raw
+        )
+    }
+
     // MARK: - JANGTQ sidecar preflight
     //
     // vmlx's LLMModelFactory dispatches to the JANGTQ class purely on

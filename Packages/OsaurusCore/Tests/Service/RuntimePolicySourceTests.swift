@@ -78,12 +78,35 @@ struct RuntimePolicySourceTests {
     @Test("AppDelegate starts storage-heavy embedding init off the main actor")
     func appDelegateDoesNotBlockServerStartupOnEmbeddingStorageInit() throws {
         let source = try Self.source("AppDelegate.swift")
+        let toolIndex = try Self.source("Services/Tool/ToolIndexService.swift")
 
         #expect(source.contains("let embeddingInitTask = Task.detached(priority: .utility)"))
         #expect(source.contains("await serverController.startServer()"))
+        #expect(source.contains("syncFromRegistry(rebuildVectorIndex: false)"))
+        #expect(!source.contains("rebuildSearchIndexesInBackground()"))
         #expect(
             source.range(of: "let embeddingInitTask = Task {") == nil,
             "startup memory/vector initialization must not inherit MainActor and block server startup"
+        )
+        #expect(
+            source.range(
+                of:
+                    "await ToolIndexService.shared.syncFromRegistry()\n            await SkillSearchService.shared.rebuildIndex()"
+            ) == nil,
+            "startup must not await the full VecturaKit tool/skill/method rebuild before health/API can respond"
+        )
+        let registerStart = try #require(toolIndex.range(of: "public func onToolRegistered("))
+        let registerEnd = try #require(
+            toolIndex.range(
+                of: "/// Remove a tool from the index when unregistered",
+                range: registerStart.upperBound ..< toolIndex.endIndex
+            )
+        )
+        let registerBody = String(toolIndex[registerStart.lowerBound ..< registerEnd.lowerBound])
+        #expect(registerBody.contains("ToolDatabase.shared.upsertEntry(entry)"))
+        #expect(
+            !registerBody.contains("ToolSearchService.shared.indexEntry"),
+            "live tool registration must update the SQL/BM25 catalog without loading the embedding model on the launch path"
         )
     }
 
@@ -131,6 +154,8 @@ struct RuntimePolicySourceTests {
         let store = try Self.source("Models/Chat/ChatSessionStore.swift")
         #expect(store.contains("StorageKeyManager.shared.hasCachedKey"))
         #expect(store.contains("Chat history unavailable: storage key is not already unlocked"))
+        #expect(!store.contains("prewarmCurrentKey()"))
+        #expect(store.contains("Sentry APPLE-MACOS-40/41/42"))
     }
 
     @Test("chat history writer skips persistence unless storage key is already unlocked")
@@ -252,6 +277,30 @@ struct RuntimePolicySourceTests {
         #expect(source.contains("cachedPreflight: allowPreflight ? nil : .empty"))
         #expect(source.contains("memorySection: composed.memorySection"))
         #expect(source.contains("SystemPromptComposer.injectMemoryPrefix(ctx.memorySection, into: &messages)"))
+    }
+
+    @Test("plugin host inference defaults to a real tool loop")
+    func pluginHostInferenceDefaultsToMultiIterationTools() throws {
+        let source = try Self.source("Services/Plugin/PluginHostAPI.swift")
+
+        #expect(
+            source.contains("private static let defaultMaxIterations = 30"),
+            "Plugin complete/complete_stream callers that omit max_iterations must get the same real multi-step budget as HTTP chat; Qwen-style tool/result loops can exceed a tiny default."
+        )
+        #expect(
+            source.contains("private static let maxIterationsCap = 120"),
+            "Plugin callers that explicitly request a deeper tool loop need headroom above the default without making the loop unbounded."
+        )
+        #expect(!source.contains("private static let defaultMaxIterations = 1"))
+        #expect(!source.contains("private static let defaultMaxIterations = 8"))
+
+        let chatConfig = try Self.source("Models/Chat/ChatConfiguration.swift")
+        #expect(chatConfig.contains("maxToolAttempts: 30"))
+
+        let http = try Self.source("Networking/HTTPHandler.swift")
+        #expect(http.contains("await MainActor.run"))
+        #expect(http.contains("ChatConfigurationStore.load().maxToolAttempts ?? 30"))
+        #expect(http.contains("let maxIterations = max(1, min(configuredMaxToolAttempts, 120))"))
     }
 
     @Test("HTTP chat persistence runs after response path")
@@ -459,12 +508,23 @@ struct RuntimePolicySourceTests {
         // envelopes, plus Gemma4 unified 12B config dispatch, processor
         // tool-schema preservation, quoted native call:value parsing, the
         // explicit unsupported boundary for unproven unified image/audio/video,
-        // and Gemma4 proportional RoPE support needed by full-attention layers.
+        // and Gemma4 proportional RoPE support needed by full-attention layers,
+        // plus safe auto-enabled Nemotron Ultra JANGTQ streaming dispatch that
+        // avoids full expert materialization for 512-expert stacked-only models,
+        // with Nemotron Ultra BF16 activation retention, weighted MoE
+        // fast-path controls wired behind explicit disable env vars, and the
+        // native Nemotron XML tool fallback preserving required parameter
+        // metadata for strict tool choice, plus the Nemotron Ultra resident
+        // perf harness load split and mmap growing-cache proof for
+        // disk-backed hybrid SSM companion hits, plus the Nemotron Ultra
+        // mamba_projection role alias so Osaurus auto-settings consume the
+        // same 8-bit affine Mamba projection metadata as mamba_proj-stamped
+        // bundles.
         // That avoids Xcode PIF
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "525fc6dc17650efd420e7f9adfc1c37e40650a73"
+        let expectedRuntimeHardenedRevision = "6fc0a55d3ac10e032aa12e6a7431983cad0d645d"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -472,7 +532,7 @@ struct RuntimePolicySourceTests {
         #expect(manifestRevision == appRevision)
         #expect(
             manifestRevision == expectedRuntimeHardenedRevision,
-            "Osaurus must consume the pushed vmlx-swift runtime-hardening revision proven by the Qwen/Gemma/DSV4/Step matrix, Gemma4 proportional RoPE live rows, and Gemma4 quoted tool-key parser coverage; an internally-consistent older pin is still not wired"
+            "Osaurus must consume the pushed vmlx-swift runtime-hardening revision proven by the Qwen/Gemma/DSV4/Step matrix, Gemma4 proportional RoPE live rows, Gemma4 quoted tool-key parser coverage, Nemotron Ultra JANGTQ streaming plus BF16/weighted-MoE fast-path guards plus native XML required-tool metadata, the Nemotron Ultra resident/mmap cache-proof harness, mmap graph-breakdown documentation, the Nemotron Ultra mamba_projection role alias, mmap quantized-matmul trace, README resident-vs-mmap speed-boundary guard, hybrid SSM rederive boundary clarification, and Ultra no-load speed-gate boundary; an internally-consistent older pin is still not wired"
         )
         #expect(manifest.contains("https://github.com/osaurus-ai/vmlx-swift"))
         #expect(!manifest.contains("https://github.com/osaurus-ai/vmlx-swift-lm"))
@@ -1639,11 +1699,15 @@ struct RuntimePolicySourceTests {
 
         #expect(runtime.contains("loadConfiguration: mtpPlan.loadConfiguration"))
         #expect(runtime.contains("resolvedLoadConfiguration("))
+        #expect(runtime.contains("base: .osaurusProduction"))
+        #expect(runtime.contains("loadConfiguration: .osaurusProduction"))
+        #expect(!runtime.contains("base: .default"))
+        #expect(!runtime.contains("loadConfiguration: .default"))
         #expect(
             !runtime.contains(
                 "loadModelContainer(\n                from: localURL,\n                using: tokenizerLoader\n            )"
             ),
-            "ModelRuntime must not use the plain local-directory load overload; it bypasses vmlx LoadConfiguration.default, including load-time memory caps, mmap safetensors, and JANGTQ prestack/alignment"
+            "ModelRuntime must not use the plain local-directory load overload; it bypasses vmlx LoadConfiguration.osaurusProduction, including load-time memory caps, mmap safetensors, and routed MLXPress auto policy"
         )
     }
 
@@ -1662,6 +1726,11 @@ struct RuntimePolicySourceTests {
             !body.contains("enumerator("),
             "Weight-size preflight must not recursively walk huge model bundles or symlinked cache folders on the request path."
         )
+        #expect(
+            body.contains("model-%05d-of-%05d.safetensors")
+                && body.contains("fileURL.pathExtension.lowercased() == \"safetensors\""),
+            "Weight-size preflight must count known numbered shards and fall back to a shallow safetensors sum so unknown layouts cannot report 0 bytes."
+        )
 
         let loadStart = try #require(runtime.range(of: "func loadContainer(id: String, name: String)"))
         let loadEnd = try #require(
@@ -1675,16 +1744,33 @@ struct RuntimePolicySourceTests {
         // reservation both need the incoming bundle's footprint up front.
         #expect(loadPreflight.contains("if policy == .manualMultiModel"))
         #expect(loadPreflight.contains("let weightsBytes = Self.computeWeightsSizeBytes(at: localURL)"))
+        #expect(
+            loadPreflight.contains("let loadFootprintBytes = Self.effectiveLoadFootprintBytes("),
+            "Routed mmap/JANGTQ loads must feed the RAM gate with vMLX's effective hot working set, not the whole safetensors shard total."
+        )
         // Feasibility gate + concurrent-load reservation must run before the
         // load task is allocated, so a cold load can't bypass RAM accounting.
         #expect(
-            loadPreflight.contains("inflightLoadWeights[name] = weightsBytes"),
+            loadPreflight.contains("inflightLoadWeights[name] = loadFootprintBytes"),
             "Cold loads must reserve their footprint before the feasibility gate so a parallel load of another model can't double-book unified memory."
         )
         #expect(
             loadPreflight.contains("checkRAMFeasibility("),
             "All policies must pass the pre-load RAM feasibility gate before vmlx starts loading."
         )
+        #expect(
+            runtime.contains("availableMemoryBytes()")
+                && runtime.contains("requiredAvailable > available")
+                && runtime.contains("incomingLoadFootprintBytes")
+                && runtime.contains("availableBytes=")
+                && runtime.contains("Clear memory, unload other models, or choose a smaller/more-quantized model."),
+            "The load gate must stop low-available-memory launches before Metal OOMs and expose a user-actionable resource message, not a fatal C++ exception."
+        )
+
+        let health = try Self.source("Networking/HTTPHandler.swift")
+        #expect(health.contains("\"available_memory_bytes\": f.availableMemoryBytes"))
+        #expect(health.contains("\"required_available_bytes\": f.requiredAvailableBytes"))
+        #expect(health.contains("\"incoming_load_footprint_bytes\": f.incomingLoadFootprintBytes"))
     }
 
     @Test("MTP bundles auto-resolve vmlx tuning into load and generation")
@@ -1977,7 +2063,8 @@ struct RuntimePolicySourceTests {
         #expect(
             toolsView.contains("RuntimeManagedToolEntryRow")
                 && toolsView.contains("badge: runtimeBadge(for: entry)")
-                && toolsView.contains("badge: \"Sandbox\""),
+                && (toolsView.contains("badge: \"Sandbox\"")
+                    || toolsView.contains("badge: L(\"Sandbox\")")),
             "Runtime-managed tools must be visible as operational rows without pretending they are normal plugin toggle rows."
         )
         #expect(
@@ -2292,5 +2379,17 @@ struct RuntimePolicySourceTests {
             let message = failures.joined(separator: "\n")
             Issue.record("\(message)")
         }
+    }
+
+    @Test("Sentry inference breadcrumbs expose token count without prompt-content filtering")
+    func sentryInferenceBreadcrumbsExposeTokenCountWithoutPromptFilter() throws {
+        let adapter = try Self.source("Services/ModelRuntime/MLXBatchAdapter.swift")
+
+        #expect(adapter.contains("input_tokens=\\(prepared.promptTokens.count)"))
+        #expect(
+            !adapter.contains("message: \"begin model=\\(modelName) promptTokens="),
+            "Sentry scrubs breadcrumbs containing prompt-like fields as content; token counts must remain visible for OOM/context-growth triage"
+        )
+        #expect(adapter.contains("submit model=\\(modelName) batch=\\(maxBatchSize)"))
     }
 }
