@@ -242,7 +242,8 @@ actor MLXService: ToolCapableService {
         messages: [ChatMessage],
         parameters: GenerationParameters,
         tools: [Tool],
-        runtime: VMLXServerRuntimeSettings
+        runtime: VMLXServerRuntimeSettings,
+        modelDirectory: URL? = nil
     ) throws {
         let modalities = requestedModalities(
             messages: messages,
@@ -257,7 +258,10 @@ actor MLXService: ToolCapableService {
         )
 
         var issues = serverResult.issues.map { $0.message }
-        let mediaDescriptor = mediaCapabilityDescriptor(modelId: modelId)
+        let mediaDescriptor = mediaCapabilityDescriptor(
+            modelId: modelId,
+            modelDirectory: modelDirectory
+        )
         let media = mediaDescriptor.capabilities
         if modalities.contains(.vision), !media.supportsImage {
             issues.append(mediaDescriptor.descriptor(for: .image).reason)
@@ -269,7 +273,11 @@ actor MLXService: ToolCapableService {
             issues.append(mediaDescriptor.descriptor(for: .audio).reason)
         }
         if !tools.isEmpty,
-            !supportsLocalToolCalling(modelName: modelName, modelId: modelId)
+            !supportsLocalToolCalling(
+                modelName: modelName,
+                modelId: modelId,
+                modelDirectory: modelDirectory
+            )
         {
             issues.append("Model capability detection reports tool calling as unsupported.")
         }
@@ -449,7 +457,8 @@ actor MLXService: ToolCapableService {
     }
 
     private nonisolated static func mediaCapabilityDescriptor(
-        modelId: String
+        modelId: String,
+        modelDirectory: URL? = nil
     ) -> ModelMediaCapabilities.Descriptor {
         if isKnownMediaTextOnlyJANGRuntimeFamily(modelId: modelId) {
             // MiMo JANG/JANGTQ text/tool rows are supported through the vMLX
@@ -484,10 +493,13 @@ actor MLXService: ToolCapableService {
             // external-bundle metadata reads.
             return ModelMediaCapabilities.descriptor(modelId: modelId)
         }
-        let parts = modelId.split(separator: "/").map(String.init)
-        let localDirectory = parts.reduce(DirectoryPickerService.effectiveModelsDirectory()) {
-            $0.appendingPathComponent($1, isDirectory: true)
-        }
+        let localDirectory =
+            modelDirectory
+            ?? modelId.split(separator: "/").map(String.init).reduce(
+                DirectoryPickerService.effectiveModelsDirectory()
+            ) {
+                $0.appendingPathComponent($1, isDirectory: true)
+            }
         if FileManager.default.fileExists(atPath: localDirectory.path) {
             return ModelMediaCapabilities.descriptor(directory: localDirectory, modelId: modelId)
         }

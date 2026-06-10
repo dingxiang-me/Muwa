@@ -228,6 +228,12 @@ struct MLXServiceRuntimePolicyTests {
     }
 
     @Test func n2JANGTQMediaPreflightUsesBundleVisionConfig() throws {
+        let bundle = try Self.makeMediaCapabilityBundle(
+            modelType: "qwen3_5_moe",
+            hasVisionConfig: true
+        )
+        defer { try? FileManager.default.removeItem(at: bundle) }
+
         let message = ChatMessage(
             role: "user",
             content: "describe this",
@@ -244,7 +250,8 @@ struct MLXServiceRuntimePolicyTests {
             messages: [message],
             parameters: GenerationParameters(temperature: nil, maxTokens: 16),
             tools: [],
-            runtime: VMLXServerRuntimeSettings()
+            runtime: VMLXServerRuntimeSettings(),
+            modelDirectory: bundle
         )
     }
 
@@ -293,5 +300,22 @@ struct MLXServiceRuntimePolicyTests {
                 ])
             )
         )
+    }
+
+    private static func makeMediaCapabilityBundle(
+        modelType: String,
+        hasVisionConfig: Bool
+    ) throws -> URL {
+        let directory = FileManager.default.temporaryDirectory
+            .appendingPathComponent("osaurus-media-cap-\(UUID().uuidString)", isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+
+        var config: [String: Any] = ["model_type": modelType]
+        if hasVisionConfig {
+            config["vision_config"] = ["image_size": 224]
+        }
+        let data = try JSONSerialization.data(withJSONObject: config, options: [.sortedKeys])
+        try data.write(to: directory.appendingPathComponent("config.json"))
+        return directory
     }
 }
