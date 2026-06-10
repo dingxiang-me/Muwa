@@ -33,6 +33,8 @@ What is not claimed:
 
 - `TEAM_WIRING_NOTES.md`: fields, state machine, endpoints, UI data contract,
   and fallback check ladder the app team should wire against.
+- `DISCOVERY_JSON_CONTRACT.md`: concrete blocked, partial, and ready JSON
+  examples for panel/API wiring.
 - `TESTING_STATUS.md`: current smoke/proof matrix and blockers.
 - `../RDMA_TB5_NODE_DISCOVERY_PRODUCT_SPEC_2026_06_10.md`: product behavior
   and UX spec.

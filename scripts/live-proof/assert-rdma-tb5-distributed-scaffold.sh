@@ -31,9 +31,10 @@ DOC="$ROOT/docs/RDMA_TB5_TENSOR_PARALLEL_OSAURUS_SCAFFOLD_2026_06_10.md"
 SPEC="$ROOT/docs/RDMA_TB5_NODE_DISCOVERY_PRODUCT_SPEC_2026_06_10.md"
 NOTES_README="$ROOT/docs/rdma-tb5/README.md"
 NOTES_WIRING="$ROOT/docs/rdma-tb5/TEAM_WIRING_NOTES.md"
+NOTES_JSON="$ROOT/docs/rdma-tb5/DISCOVERY_JSON_CONTRACT.md"
 NOTES_TESTING="$ROOT/docs/rdma-tb5/TESTING_STATUS.md"
 
-for file in "$SOURCE" "$TESTS" "$DOC" "$SPEC" "$NOTES_README" "$NOTES_WIRING" "$NOTES_TESTING"; do
+for file in "$SOURCE" "$TESTS" "$DOC" "$SPEC" "$NOTES_README" "$NOTES_WIRING" "$NOTES_JSON" "$NOTES_TESTING"; do
   [[ -f "$file" ]] || fail_msg "missing ${file#$ROOT/}"
 done
 
@@ -85,10 +86,16 @@ require_text "$SPEC" 'A size-1 fallback never appears as distributed-ready' "spe
 
 require_text "$NOTES_README" 'PARTIAL' "notes README records partial status"
 require_text "$NOTES_README" 'No Qwen model is distributed-ready' "notes README avoids Qwen ready claim"
+require_text "$NOTES_README" 'DISCOVERY_JSON_CONTRACT.md' "notes README links JSON contract"
 require_text "$NOTES_WIRING" 'Candidate fields must not be treated as proof fields' "wiring notes separate candidates from proof"
 require_text "$NOTES_WIRING" 'DistributedNodeDiscoveryRecord' "wiring notes name source discovery record"
 require_text "$NOTES_WIRING" 'readiness\.readiness_state' "wiring notes document JSON state"
 require_text "$NOTES_WIRING" 'Tailscale/control plane' "wiring notes block Tailscale data-plane"
+require_text "$NOTES_JSON" '"node_id"' "JSON contract documents node id"
+require_text "$NOTES_JSON" '"readiness_state": "blocked"' "JSON contract documents blocked state"
+require_text "$NOTES_JSON" '"readiness_state": "partial"' "JSON contract documents partial state"
+require_text "$NOTES_JSON" '"readiness_state": "ready"' "JSON contract documents ready state"
+require_text "$NOTES_JSON" 'Tailscale `100.x` is always control-plane only' "JSON contract documents Tailscale boundary"
 require_text "$NOTES_TESTING" 'Qwen Status' "testing notes include Qwen status"
 require_text "$NOTES_TESTING" 'BLOCKED' "testing notes record blocked Qwen RDMA TP status"
 require_text "$NOTES_TESTING" 'jacclAvailable.*false' "testing notes record JACCL unavailable"
