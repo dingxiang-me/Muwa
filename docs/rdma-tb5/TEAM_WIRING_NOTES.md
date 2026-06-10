@@ -35,6 +35,20 @@ Current Osaurus-side source contract is `DistributedNodeDiscoveryRecord` and
 state that can enable cluster start; `partial` means warnings exist and must be
 shown as missing proof, not as usable runtime.
 
+The JSON contract is snake_case for app and web consumers:
+
+- `node_id`
+- `device_name`
+- `osaurus_version`
+- `osaurus_commit`
+- `vmlx_pin`
+- `distributed_capability_version`
+- `control_endpoints`
+- `data_plane_candidates`
+- `readiness.readiness_state`
+- `readiness.is_runnable`
+- `readiness.endpoints[].address_class`
+
 ## Endpoint Rules
 
 Allowed as tensor data-plane candidates:

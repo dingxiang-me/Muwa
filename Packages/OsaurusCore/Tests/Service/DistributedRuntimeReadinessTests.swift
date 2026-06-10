@@ -119,8 +119,18 @@ struct DistributedRuntimeReadinessTests {
         )
 
         let data = try JSONEncoder().encode(record)
+        let json = try #require(String(data: data, encoding: .utf8))
         let decoded = try JSONDecoder().decode(DistributedNodeDiscoveryRecord.self, from: data)
 
+        #expect(json.contains("\"node_id\""))
+        #expect(json.contains("\"device_name\""))
+        #expect(json.contains("\"vmlx_pin\""))
+        #expect(json.contains("\"distributed_capability_version\""))
+        #expect(json.contains("\"control_endpoints\""))
+        #expect(json.contains("\"data_plane_candidates\""))
+        #expect(json.contains("\"readiness_state\":\"blocked\""))
+        #expect(json.contains("\"is_runnable\":false"))
+        #expect(json.contains("\"address_class\":\"thunderboltLoopback\""))
         #expect(decoded.nodeID == "node-a")
         #expect(decoded.vmlxPin == "7e69522f85f5a384d69f1673ab45c98d60d28375")
         #expect(decoded.roles == [.coordinator, .rankWorker])

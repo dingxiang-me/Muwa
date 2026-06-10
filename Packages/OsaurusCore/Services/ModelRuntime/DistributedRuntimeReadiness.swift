@@ -39,6 +39,13 @@ public struct DistributedTensorEndpoint: Codable, Sendable, Equatable, Hashable 
         addressClass.isAllowedForTensorDataPlane
     }
 
+    enum CodingKeys: String, CodingKey {
+        case rawValue = "raw_value"
+        case host
+        case port
+        case addressClass = "address_class"
+    }
+
     private static func parse(_ rawValue: String) -> (host: String, port: UInt16?) {
         let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return ("", nil) }
@@ -153,6 +160,55 @@ public struct DistributedRuntimeReadinessReport: Codable, Sendable, Equatable {
     public var isRunnable: Bool {
         readinessState == .ready
     }
+
+    enum CodingKeys: String, CodingKey {
+        case endpoints
+        case worldSize = "world_size"
+        case librdmaLoadable = "librdma_loadable"
+        case jacclAvailable = "jaccl_available"
+        case ibvDevicesConfigured = "ibv_devices_configured"
+        case findings
+        case readinessState = "readiness_state"
+        case isRunnable = "is_runnable"
+    }
+
+    public init(
+        endpoints: [DistributedTensorEndpoint],
+        worldSize: Int,
+        librdmaLoadable: Bool?,
+        jacclAvailable: Bool?,
+        ibvDevicesConfigured: Bool?,
+        findings: [DistributedRuntimeFinding]
+    ) {
+        self.endpoints = endpoints
+        self.worldSize = worldSize
+        self.librdmaLoadable = librdmaLoadable
+        self.jacclAvailable = jacclAvailable
+        self.ibvDevicesConfigured = ibvDevicesConfigured
+        self.findings = findings
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        self.endpoints = try container.decode([DistributedTensorEndpoint].self, forKey: .endpoints)
+        self.worldSize = try container.decode(Int.self, forKey: .worldSize)
+        self.librdmaLoadable = try container.decodeIfPresent(Bool.self, forKey: .librdmaLoadable)
+        self.jacclAvailable = try container.decodeIfPresent(Bool.self, forKey: .jacclAvailable)
+        self.ibvDevicesConfigured = try container.decodeIfPresent(Bool.self, forKey: .ibvDevicesConfigured)
+        self.findings = try container.decode([DistributedRuntimeFinding].self, forKey: .findings)
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(endpoints, forKey: .endpoints)
+        try container.encode(worldSize, forKey: .worldSize)
+        try container.encodeIfPresent(librdmaLoadable, forKey: .librdmaLoadable)
+        try container.encodeIfPresent(jacclAvailable, forKey: .jacclAvailable)
+        try container.encodeIfPresent(ibvDevicesConfigured, forKey: .ibvDevicesConfigured)
+        try container.encode(findings, forKey: .findings)
+        try container.encode(readinessState, forKey: .readinessState)
+        try container.encode(isRunnable, forKey: .isRunnable)
+    }
 }
 
 public enum DistributedRuntimeState: String, Codable, Sendable, Equatable, Hashable {
@@ -205,6 +261,19 @@ public struct DistributedNodeDiscoveryRecord: Codable, Sendable, Equatable {
         self.controlEndpoints = controlEndpoints
         self.dataPlaneCandidates = dataPlaneCandidates.map(DistributedTensorEndpoint.init)
         self.readiness = readiness
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case nodeID = "node_id"
+        case deviceName = "device_name"
+        case osaurusVersion = "osaurus_version"
+        case osaurusCommit = "osaurus_commit"
+        case vmlxPin = "vmlx_pin"
+        case distributedCapabilityVersion = "distributed_capability_version"
+        case roles
+        case controlEndpoints = "control_endpoints"
+        case dataPlaneCandidates = "data_plane_candidates"
+        case readiness
     }
 }
 

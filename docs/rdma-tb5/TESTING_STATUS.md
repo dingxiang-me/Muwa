@@ -38,6 +38,8 @@ Result:
 - Passed warning-only readiness behavior: unproven private/Wi-Fi-style
   addresses are `partial`, not runnable.
 - Passed stable JSON encoding/decoding for `DistributedNodeDiscoveryRecord`.
+- Passed wire-key assertions for `node_id`, `vmlx_pin`, `readiness_state`,
+  `is_runnable`, and endpoint `address_class`.
 
 ## vMLX Main Smoke Evidence
 

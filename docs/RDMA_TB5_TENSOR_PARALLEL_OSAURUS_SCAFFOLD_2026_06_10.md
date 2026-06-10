@@ -26,7 +26,7 @@ probe output.
 - `DistributedRuntimeState` separates `blocked`, `partial`, and `ready`; only
   `ready` is runnable.
 - `DistributedNodeDiscoveryRecord` provides the first Codable handoff shape for
-  future node discovery and panel wiring.
+  future node discovery and panel wiring, encoded as stable snake_case JSON.
 - `10.20.0.x` Thunderbolt loopbacks and `10.10.x.x` direct Thunderbolt links are
   accepted as tensor data-plane addresses.
 - `100.x` Tailscale addresses are rejected for tensor data-plane use.

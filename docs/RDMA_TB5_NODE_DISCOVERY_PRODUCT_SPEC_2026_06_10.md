@@ -78,6 +78,8 @@ not usable until the verifier marks it as a passing data-plane route.
 
 The source contract for the first non-UI scaffold is
 `DistributedNodeDiscoveryRecord` with a nested `DistributedRuntimeReadinessReport`.
+It encodes as stable snake_case JSON so the future SwiftUI panel, API surface,
+and web/debug tooling can consume the same fields without local key mapping.
 The report state maps to the UI state as:
 
 - `blocked`: one or more hard errors.
