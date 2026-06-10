@@ -170,6 +170,8 @@ private extension ManagementView {
             ToolsManagerView()
         case .skills:
             SkillsView()
+        case .workflows:
+            WorkflowsView()
         case .commands:
             SlashCommandsView()
         case .memory:

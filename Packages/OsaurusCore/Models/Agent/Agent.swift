@@ -443,6 +443,10 @@ public struct AgentCapabilities: Sendable, Equatable {
     /// Self-scheduling tools (`schedule_next_run` / `cancel_next_run` /
     /// `notify`) exposed to the model.
     public var selfSchedulingEnabled: Bool
+    /// Workflow tools (`workflow_save` / `workflow_run`) exposed to the
+    /// model, plus the workflow lane in `capabilities_discover` /
+    /// `capabilities_load`.
+    public var workflowsEnabled: Bool
 
     public init(
         toolsEnabled: Bool,
@@ -451,7 +455,8 @@ public struct AgentCapabilities: Sendable, Equatable {
         renderChartEnabled: Bool,
         speakEnabled: Bool,
         searchMemoryEnabled: Bool,
-        selfSchedulingEnabled: Bool
+        selfSchedulingEnabled: Bool,
+        workflowsEnabled: Bool
     ) {
         self.toolsEnabled = toolsEnabled
         self.memoryEnabled = memoryEnabled
@@ -460,6 +465,7 @@ public struct AgentCapabilities: Sendable, Equatable {
         self.speakEnabled = speakEnabled
         self.searchMemoryEnabled = searchMemoryEnabled
         self.selfSchedulingEnabled = selfSchedulingEnabled
+        self.workflowsEnabled = workflowsEnabled
     }
 }
 
@@ -679,6 +685,11 @@ public struct AgentSettings: Codable, Sendable, Equatable {
     /// Default off so a fresh agent never carries the scheduler trio in its
     /// always-loaded schema.
     public var selfSchedulingEnabled: Bool
+    /// Per-agent opt-in for the workflows feature: the `workflow_save` /
+    /// `workflow_run` tools and the workflow lane in capability
+    /// discovery/loading. Default off so a fresh agent never carries the
+    /// workflow tools in its always-loaded schema.
+    public var workflowsEnabled: Bool
 
     public init(
         dbEnabled: Bool,
@@ -689,7 +700,8 @@ public struct AgentSettings: Codable, Sendable, Equatable {
         renderChartEnabled: Bool = false,
         speakEnabled: Bool = false,
         searchMemoryEnabled: Bool = false,
-        selfSchedulingEnabled: Bool = false
+        selfSchedulingEnabled: Bool = false,
+        workflowsEnabled: Bool = false
     ) {
         self.dbEnabled = dbEnabled
         self.schedule = schedule
@@ -700,6 +712,7 @@ public struct AgentSettings: Codable, Sendable, Equatable {
         self.speakEnabled = speakEnabled
         self.searchMemoryEnabled = searchMemoryEnabled
         self.selfSchedulingEnabled = selfSchedulingEnabled
+        self.workflowsEnabled = workflowsEnabled
     }
 
     public init(from decoder: Decoder) throws {
@@ -734,6 +747,7 @@ public struct AgentSettings: Codable, Sendable, Equatable {
         // Default off (consistent with the other built-in tool gates). Existing
         // agents that relied on self-scheduling must re-enable it explicitly.
         selfSchedulingEnabled = try c.decodeIfPresent(Bool.self, forKey: .selfSchedulingEnabled) ?? false
+        workflowsEnabled = try c.decodeIfPresent(Bool.self, forKey: .workflowsEnabled) ?? false
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -746,6 +760,7 @@ public struct AgentSettings: Codable, Sendable, Equatable {
         case speakEnabled
         case searchMemoryEnabled
         case selfSchedulingEnabled
+        case workflowsEnabled
         // Read-only legacy key — never encoded after migration.
         case generativeGreetings
     }
@@ -761,6 +776,7 @@ public struct AgentSettings: Codable, Sendable, Equatable {
         try c.encode(speakEnabled, forKey: .speakEnabled)
         try c.encode(searchMemoryEnabled, forKey: .searchMemoryEnabled)
         try c.encode(selfSchedulingEnabled, forKey: .selfSchedulingEnabled)
+        try c.encode(workflowsEnabled, forKey: .workflowsEnabled)
     }
 
     /// Default settings for newly created agents (and for back-compat decoding of
@@ -775,7 +791,8 @@ public struct AgentSettings: Codable, Sendable, Equatable {
             renderChartEnabled: false,
             speakEnabled: false,
             searchMemoryEnabled: false,
-            selfSchedulingEnabled: false
+            selfSchedulingEnabled: false,
+            workflowsEnabled: false
         )
     }
 }

@@ -930,6 +930,25 @@ public struct SystemPromptComposer: Sendable {
             )
         }
 
+        // Workflow-save nudge: tells the model to propose distilling a
+        // successful multi-step task into a reusable workflow (user
+        // confirms in chat before `workflow_save` runs). Gated on the
+        // actual schema so agents without the tool never see the prompt,
+        // and on the same trivial-first-turn suppression as the
+        // discovery nudge.
+        if toolset.capabilityPromptSectionsEnabled,
+            !effectiveToolsOff,
+            tools.contains(where: { $0.function.name == "workflow_save" })
+        {
+            composer.append(
+                .static(
+                    id: "workflowSaveNudge",
+                    label: "Saving Workflows",
+                    content: SystemPromptTemplates.workflowSaveNudge
+                )
+            )
+        }
+
         // Enabled capabilities manifest: the grounded answer to "do you
         // have X". The schema only carries a fixed hot subset of the agent's
         // enabled tools; without this block a small model looks at its
@@ -1332,6 +1351,15 @@ public struct SystemPromptComposer: Sendable {
     /// doesn't pay the schema/token cost for tools it won't use.
     static let schedulerToolNames: Set<String> = [
         "schedule_next_run", "cancel_next_run", "notify",
+    ]
+
+    /// Workflow authoring/execution tools. Registered as built-ins but
+    /// gated on `AgentConfigSnapshot.workflowsEnabled` (a per-agent
+    /// opt-in) in `resolveTools`, so an agent that hasn't enabled
+    /// workflows doesn't pay the schema/token cost for tools it can't
+    /// use anyway (execution is also rejected at runtime).
+    static let workflowToolNames: Set<String> = [
+        "workflow_save", "workflow_run",
     ]
 
     /// Render the schema snapshot block injected after the onboarding
@@ -1805,6 +1833,18 @@ public struct SystemPromptComposer: Sendable {
         //   - In auto mode, a tool pulled in via `additionalToolNames`
         //     (a `capabilities_load`) survives — a deliberate "I want this"
         //     signal. The gate only trims the default baseline, not picks.
+        //
+        // Workflows are the one exception: a hard per-agent feature gate
+        // with no carve-outs. When off, `workflow_save` / `workflow_run`
+        // are stripped even from manual selections and `capabilities_load`
+        // picks — execution is rejected at runtime anyway, so leaving them
+        // in the schema would only invite doomed calls.
+        if !snapshot.workflowsEnabled {
+            for name in workflowToolNames {
+                byName.removeValue(forKey: name)
+            }
+        }
+
         if !isManual {
             let keep = additionalToolNames
             if !snapshot.dbEnabled {

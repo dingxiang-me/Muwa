@@ -20,21 +20,21 @@ public enum EvalInstalledPluginBootstrapPreference: Sendable, Equatable {
 }
 
 /// Search-index lanes needed by the selected capability-search cases.
-/// Keeping this scoped avoids making a method-only eval wait on tool
+/// Keeping this scoped avoids making a workflow-only eval wait on tool
 /// registry sync or SKILL.md rebuilds that cannot affect its verdict.
 public struct EvalSearchIndexBootstrapScope: Sendable, Equatable {
     public let tools: Bool
-    public let methods: Bool
+    public let workflows: Bool
     public let skills: Bool
 
-    public init(tools: Bool = false, methods: Bool = false, skills: Bool = false) {
+    public init(tools: Bool = false, workflows: Bool = false, skills: Bool = false) {
         self.tools = tools
-        self.methods = methods
+        self.workflows = workflows
         self.skills = skills
     }
 
     public var isEmpty: Bool {
-        !tools && !methods && !skills
+        !tools && !workflows && !skills
     }
 
     public static let empty = EvalSearchIndexBootstrapScope()
@@ -59,7 +59,7 @@ public struct EvalBootstrapPlan: Sendable, Equatable {
         self.init(
             loadInstalledPlugins: loadInstalledPlugins,
             searchIndexScope: initializeSearchIndices
-                ? EvalSearchIndexBootstrapScope(tools: true, methods: true, skills: true)
+                ? EvalSearchIndexBootstrapScope(tools: true, workflows: true, skills: true)
                 : .empty
         )
     }
@@ -74,7 +74,7 @@ public struct EvalBootstrapPlan: Sendable, Equatable {
 
     /// True when the selected cases only need derived search indices.
     /// Those runs should stay hermetic so fixture writes cannot touch
-    /// the developer's real method database or block on Keychain.
+    /// the developer's real workflow database or block on Keychain.
     public var usesIsolatedSearchStorage: Bool {
         !loadInstalledPlugins && !searchIndexScope.isEmpty
     }
@@ -153,9 +153,9 @@ public enum EvalBootstrap {
             await ToolIndexService.shared.syncFromRegistry()
         }
 
-        if scope.methods {
-            try? MethodDatabase.shared.open()
-            await MethodSearchService.shared.initialize()
+        if scope.workflows {
+            try? WorkflowDatabase.shared.open()
+            await WorkflowSearchService.shared.initialize()
         }
 
         if scope.skills {
@@ -183,7 +183,7 @@ public extension EvalSuite {
         filter: String?
     ) -> EvalSearchIndexBootstrapScope {
         var needsTools = false
-        var needsMethods = false
+        var needsWorkflows = false
         var needsSkills = false
 
         for testCase in selectedCases(filter: filter) {
@@ -192,10 +192,10 @@ public extension EvalSuite {
 
             let expect = testCase.expect.capabilitySearch
             needsTools = needsTools || expect?.expectedTools != nil
-            needsMethods =
-                needsMethods
-                || expect?.expectedMethods != nil
-                || !(testCase.fixtures.seedMethods?.isEmpty ?? true)
+            needsWorkflows =
+                needsWorkflows
+                || expect?.expectedWorkflows != nil
+                || !(testCase.fixtures.seedWorkflows?.isEmpty ?? true)
             needsSkills =
                 needsSkills
                 || expect?.expectedSkills != nil
@@ -204,7 +204,7 @@ public extension EvalSuite {
 
         return EvalSearchIndexBootstrapScope(
             tools: needsTools,
-            methods: needsMethods,
+            workflows: needsWorkflows,
             skills: needsSkills
         )
     }

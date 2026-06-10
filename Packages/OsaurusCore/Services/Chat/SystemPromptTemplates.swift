@@ -130,6 +130,22 @@ public enum SystemPromptTemplates {
         work around the gap or tell the user the capability is unavailable.
         """
 
+    /// Static guidance appended to the system prompt when `workflow_save`
+    /// is in the active tool set. Tells the model to propose distilling a
+    /// successful multi-step task into a reusable workflow — with the user
+    /// confirming in chat before the save happens — so smaller models can
+    /// later discover and execute it via `workflow_run`.
+    public static let workflowSaveNudge = """
+        ## Saving workflows
+
+        After completing a reusable multi-step task, you may propose saving \
+        it as a workflow; once the user confirms, call `workflow_save` with \
+        the steps you ran, promoting task-specific values to parameters. \
+        Saved workflows are discoverable via `capabilities_discover` and \
+        runnable by any model with `workflow_run`. Skip one-off or trivial \
+        tasks.
+        """
+
     /// Sandbox-mode variant of the discovery nudge. Keeps the discover/load
     /// explanation and the "don't invent" line, then replaces the terminal
     /// "tell the user it is unavailable" sentence with an escalation ladder

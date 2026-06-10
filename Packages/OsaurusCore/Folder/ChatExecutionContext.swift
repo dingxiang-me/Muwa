@@ -4,7 +4,7 @@
 //
 //  TaskLocal context populated by the chat engine before dispatching every
 //  tool call so per-session state (the agent todo, file-operation undo
-//  log, method telemetry, etc.) can be addressed by the active session.
+//  log, workflow telemetry, etc.) can be addressed by the active session.
 //
 
 import Foundation
@@ -15,7 +15,7 @@ import Foundation
 /// them picks up the right scope without an explicit parameter.
 public enum ChatExecutionContext {
     /// The current chat session id whose tool calls are running. Tools that
-    /// need per-conversation state (todo store, file-op undo log, method
+    /// need per-conversation state (todo store, file-op undo log, workflow
     /// telemetry) key off this.
     @TaskLocal public static var currentSessionId: String?
 

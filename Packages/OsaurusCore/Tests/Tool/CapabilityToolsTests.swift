@@ -266,10 +266,10 @@ struct CapabilitiesLoadToolTests {
         #expect(result.contains("Unknown type"))
     }
 
-    @Test func methodNotFoundReturnsError() async throws {
+    @Test func workflowNotFoundReturnsError() async throws {
         let tool = CapabilitiesLoadTool()
         let result = try await tool.execute(
-            argumentsJSON: "{\"ids\": [\"method/nonexistent-method-id\"]}"
+            argumentsJSON: "{\"ids\": [\"workflow/nonexistent-workflow-id\"]}"
         )
         #expect(result.contains("Error") || result.contains("not found"))
     }
@@ -297,10 +297,10 @@ struct CapabilitiesLoadToolTests {
         let tool = CapabilitiesLoadTool()
         let result = try await tool.execute(
             argumentsJSON: """
-                {"ids": ["method/fake-m", "tool/fake-t", "skill/fake-s"]}
+                {"ids": ["workflow/fake-w", "tool/fake-t", "skill/fake-s"]}
                 """
         )
-        #expect(result.contains("method") || result.contains("Method"))
+        #expect(result.contains("workflow") || result.contains("Workflow"))
         #expect(result.contains("tool") || result.contains("Tool"))
         #expect(result.contains("skill") || result.contains("Skill"))
     }

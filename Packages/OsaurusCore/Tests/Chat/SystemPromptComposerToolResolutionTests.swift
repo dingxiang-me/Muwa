@@ -470,6 +470,9 @@ struct SystemPromptComposerToolResolutionTests {
             #expect(!names.contains("schedule_next_run"))
             #expect(!names.contains("cancel_next_run"))
             #expect(!names.contains("notify"))
+            // Workflows default off → workflow tools stripped.
+            #expect(!names.contains("workflow_save"))
+            #expect(!names.contains("workflow_run"))
         }
     }
 
@@ -488,6 +491,7 @@ struct SystemPromptComposerToolResolutionTests {
             agent.settings.speakEnabled = true
             agent.settings.searchMemoryEnabled = true
             agent.settings.selfSchedulingEnabled = true
+            agent.settings.workflowsEnabled = true
             manager.update(agent)
 
             let names = Set(
@@ -501,6 +505,9 @@ struct SystemPromptComposerToolResolutionTests {
             #expect(names.contains("schedule_next_run"))
             #expect(names.contains("cancel_next_run"))
             #expect(names.contains("notify"))
+            // Workflows on → workflow tools present.
+            #expect(names.contains("workflow_save"))
+            #expect(names.contains("workflow_run"))
         }
     }
 

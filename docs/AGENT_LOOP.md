@@ -335,6 +335,6 @@ above), so their `AgentTaskState` lives for the single request/invocation.
 ## Related Documentation
 
 - [Sandbox Guide](SANDBOX.md) — Linux VM, sandbox tool inventory, plugin recipes
-- [Skills Guide](SKILLS.md) — Reusable AI capabilities and methods
+- [Skills Guide](SKILLS.md) — Reusable AI capabilities and workflows
 - [Plugin Authoring Guide](plugins/README.md) — Building tools and dispatching tasks
 - [Features Overview](FEATURES.md) — Complete feature inventory

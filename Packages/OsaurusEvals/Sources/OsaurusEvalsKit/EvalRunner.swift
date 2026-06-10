@@ -653,7 +653,7 @@ public enum EvalRunner {
     ///
     /// Tools-lane threshold precedence: CLI `--threshold` > per-case
     /// `thresholdOverride` > `CapabilitySearch.minimumFusedScore`.
-    /// Methods + skills lanes always use their own per-lane cosine
+    /// Workflows + skills lanes always use their own per-lane cosine
     /// constants — see `CapabilitySearchEvaluator.evaluate` doc.
     /// Honours the existing `requirePlugins` skip behaviour so a host
     /// without the relevant plugin gets `skipped + missing plugins`
@@ -689,14 +689,14 @@ public enum EvalRunner {
             }
         }
 
-        // Per-case fixture setup. Both `seedMethods` and `enableSkills`
+        // Per-case fixture setup. Both `seedWorkflows` and `enableSkills`
         // mutate persistent state (SQLite + on-disk skill files) — the
         // wrap snapshots prior state and restores it after the case
-        // body runs. Crashes mid-case can leak `eval-` prefixed methods
+        // body runs. Crashes mid-case can leak `eval-` prefixed workflows
         // and toggled-on skills into the developer's local state; we
         // accept this as a cost of running fixtures against the live
         // DB rather than building an isolated test harness.
-        let seededMethods = await applySeedMethods(testCase.fixtures.seedMethods)
+        let seededWorkflows = await applySeedWorkflows(testCase.fixtures.seedWorkflows)
         let priorSkillState = await applyEnableSkills(testCase.fixtures.enableSkills)
 
         let threshold = cliThresholdOverride ?? exp.thresholdOverride
@@ -708,23 +708,23 @@ public enum EvalRunner {
         )
 
         await restoreSkillEnabledState(priorSkillState)
-        await cleanupSeededMethods(seededMethods)
+        await cleanupSeededWorkflows(seededWorkflows)
 
         var notes: [String] = []
         var passed = true
 
         let acceptedToolNames = Set(observed.toolHits.filter(\.acceptedByThreshold).map(\.name))
-        let acceptedMethodNames = Set(observed.methodHits.filter(\.acceptedByThreshold).map(\.name))
+        let acceptedWorkflowNames = Set(observed.workflowHits.filter(\.acceptedByThreshold).map(\.name))
         let acceptedSkillNames = Set(observed.skillHits.filter(\.acceptedByThreshold).map(\.name))
-        let acceptedTotal = acceptedToolNames.count + acceptedMethodNames.count + acceptedSkillNames.count
+        let acceptedTotal = acceptedToolNames.count + acceptedWorkflowNames.count + acceptedSkillNames.count
 
         if let m = exp.expectedTools {
             let result = scoreAnyOf(matcher: m, accepted: acceptedToolNames, kind: "tools")
             passed = passed && result.passed
             notes.append(result.note)
         }
-        if let m = exp.expectedMethods {
-            let result = scoreAnyOf(matcher: m, accepted: acceptedMethodNames, kind: "methods")
+        if let m = exp.expectedWorkflows {
+            let result = scoreAnyOf(matcher: m, accepted: acceptedWorkflowNames, kind: "workflows")
             passed = passed && result.passed
             notes.append(result.note)
         }
@@ -745,16 +745,16 @@ public enum EvalRunner {
         // Always include a one-line forensic summary so a failing case
         // in `--verbose` (or `--report-forensics`) reads at a glance.
         // Tools use the hybrid `appliedMinFusedScore` (RRF cutoff);
-        // methods + skills carry independent embed-cosine cutoffs
+        // workflows + skills carry independent embed-cosine cutoffs
         // post-PR-A (split out of the legacy single `appliedThreshold`,
-        // which now mirrors `appliedMethodsThreshold` for back-compat).
+        // which now mirrors `appliedWorkflowsThreshold` for back-compat).
         notes.append(
             "summary: tools raw=\(observed.toolHits.count) accepted=\(acceptedToolNames.count) | "
-                + "methods raw=\(observed.methodHits.count) accepted=\(acceptedMethodNames.count) | "
+                + "workflows raw=\(observed.workflowHits.count) accepted=\(acceptedWorkflowNames.count) | "
                 + "skills raw=\(observed.skillHits.count) accepted=\(acceptedSkillNames.count) | "
                 + "registry=\(observed.registrySize) index=\(observed.indexSize) "
                 + "minFusedScore=\(String(format: "%.3f", observed.appliedMinFusedScore)) "
-                + "methodsThreshold=\(String(format: "%.3f", observed.appliedMethodsThreshold)) "
+                + "workflowsThreshold=\(String(format: "%.3f", observed.appliedWorkflowsThreshold)) "
                 + "skillsThreshold=\(String(format: "%.3f", observed.appliedSkillsThreshold))"
         )
 
@@ -1036,29 +1036,29 @@ public enum EvalRunner {
 
     // MARK: - Capability search fixture seeding
 
-    /// Insert each `SeedMethod` into the live `MethodDatabase` and
-    /// the `MethodSearchService` index. Returns the ids of methods
+    /// Insert each `SeedWorkflow` into the live `WorkflowDatabase` and
+    /// the `WorkflowSearchService` index. Returns the ids of workflows
     /// that were actually inserted (skipping any that pre-existed) so
-    /// `cleanupSeededMethods` only deletes what this case created —
+    /// `cleanupSeededWorkflows` only deletes what this case created —
     /// a developer who happens to have a real `eval-pdf-summary`
-    /// method on disk doesn't lose it because their fixture name
+    /// workflow on disk doesn't lose it because their fixture name
     /// collided.
     ///
     /// Index errors are logged via `notes` but do not fail the case
     /// here; a missing index hit becomes a real recall miss in the
-    /// observed `methodHits` count, which is exactly the signal the
+    /// observed `workflowHits` count, which is exactly the signal the
     /// case is designed to surface.
-    private static func applySeedMethods(_ seeds: [EvalCase.SeedMethod]?) async -> [String] {
+    private static func applySeedWorkflows(_ seeds: [EvalCase.SeedWorkflow]?) async -> [String] {
         guard let seeds, !seeds.isEmpty else { return [] }
         var insertedIds: [String] = []
         for seed in seeds {
             // Skip when the id already exists so we never clobber a
-            // real user method that happens to share the test slug.
-            // `loadMethod` returns `Method?` and throws — flatten the
+            // real user workflow that happens to share the test slug.
+            // `loadWorkflow` returns `Workflow?` and throws — flatten the
             // double-optional from `try?` into a single existence check.
-            let existing = (try? MethodDatabase.shared.loadMethod(id: seed.id)) ?? nil
+            let existing = (try? WorkflowDatabase.shared.loadWorkflow(id: seed.id)) ?? nil
             if existing != nil { continue }
-            let method = Method(
+            let workflow = Workflow(
                 id: seed.id,
                 name: seed.name,
                 description: seed.description,
@@ -1067,8 +1067,8 @@ public enum EvalRunner {
                 source: .user
             )
             do {
-                try MethodDatabase.shared.insertMethod(method)
-                await MethodSearchService.shared.indexMethod(method)
+                try WorkflowDatabase.shared.insertWorkflow(workflow)
+                await WorkflowSearchService.shared.indexWorkflow(workflow)
                 insertedIds.append(seed.id)
             } catch {
                 // Best-effort: continue. The case will read back fewer
@@ -1079,14 +1079,14 @@ public enum EvalRunner {
         return insertedIds
     }
 
-    /// Reverse of `applySeedMethods`. Tolerates missing rows (a crash
+    /// Reverse of `applySeedWorkflows`. Tolerates missing rows (a crash
     /// mid-cleanup on a previous run could have already removed some)
     /// so re-running a case after a crash converges back to a clean
     /// state.
-    private static func cleanupSeededMethods(_ ids: [String]) async {
+    private static func cleanupSeededWorkflows(_ ids: [String]) async {
         for id in ids {
-            try? MethodDatabase.shared.deleteMethod(id: id)
-            await MethodSearchService.shared.removeMethod(id: id)
+            try? WorkflowDatabase.shared.deleteWorkflow(id: id)
+            await WorkflowSearchService.shared.removeWorkflow(id: id)
         }
     }
 

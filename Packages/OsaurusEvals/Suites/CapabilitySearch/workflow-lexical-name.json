@@ -1,11 +1,11 @@
 {
-  "id": "capability_search.method-lexical-name",
+  "id": "capability_search.workflow-lexical-name",
   "domain": "capability_search",
-  "label": "capability search • method • lexical name match",
+  "label": "capability search • workflow • lexical name match",
   "query": "summarize this PDF for me",
-  "notes": "Probes the BM25-would-help class on the methods lane: query contains 'PDF' and 'summarize' as plain English while the seeded method's id is the snake_case literal `eval-summarize-pdf` and its name carries the `summarize_pdf` token. Pure embedding (potion-base-4M) frequently undershoots when the strongest signal is a snake_case identifier match — a BM25 mirror would lift this case.",
+  "notes": "Probes the BM25-would-help class on the workflows lane: query contains 'PDF' and 'summarize' as plain English while the seeded workflow's id is the snake_case literal `eval-summarize-pdf` and its name carries the `summarize_pdf` token. Pure embedding (potion-base-4M) frequently undershoots when the strongest signal is a snake_case identifier match — a BM25 mirror would lift this case.",
   "fixtures": {
-    "seedMethods": [
+    "seedWorkflows": [
       {
         "id": "eval-summarize-pdf",
         "name": "summarize_pdf",
@@ -28,7 +28,7 @@
   },
   "expect": {
     "capabilitySearch": {
-      "expectedMethods": {
+      "expectedWorkflows": {
         "anyOf": ["summarize_pdf"],
         "minMatches": 1
       }

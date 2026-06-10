@@ -1,11 +1,11 @@
 {
-  "id": "capability_search.method-multi-match",
+  "id": "capability_search.workflow-multi-match",
   "domain": "capability_search",
-  "label": "capability search • method • multi-match ranking",
+  "label": "capability search • workflow • multi-match ranking",
   "query": "I have a PDF I need to work with",
-  "notes": "Probes ranking quality: three PDF-related methods are seeded and the broad query should surface at least two of them. A single-hit pass means the embedder picked one PDF method and dropped the others; we want to see whether the lane preserves multiple related candidates above the acceptance floor.",
+  "notes": "Probes ranking quality: three PDF-related workflows are seeded and the broad query should surface at least two of them. A single-hit pass means the embedder picked one PDF workflow and dropped the others; we want to see whether the lane preserves multiple related candidates above the acceptance floor.",
   "fixtures": {
-    "seedMethods": [
+    "seedWorkflows": [
       {
         "id": "eval-summarize-pdf-multi",
         "name": "summarize_pdf",
@@ -34,7 +34,7 @@
   },
   "expect": {
     "capabilitySearch": {
-      "expectedMethods": {
+      "expectedWorkflows": {
         "anyOf": ["summarize_pdf", "extract_pdf_tables", "redact_pdf_pii"],
         "minMatches": 2
       }

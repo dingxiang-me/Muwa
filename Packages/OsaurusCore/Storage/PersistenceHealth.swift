@@ -56,7 +56,7 @@ public final class PersistenceHealth: @unchecked Sendable {
     }
 
     /// Record a launch-time database open failure for `subsystem` (e.g.
-    /// "method", "tool"). Surfaces the degraded subsystem in `/health`.
+    /// "workflow", "tool"). Surfaces the degraded subsystem in `/health`.
     public func recordDatabaseOpenFailure(subsystem: String, error: Error) {
         state.withLock {
             $0.databaseOpenFailures[subsystem, default: 0] += 1

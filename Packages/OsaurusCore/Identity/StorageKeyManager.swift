@@ -357,7 +357,7 @@ public final class StorageKeyManager: @unchecked Sendable {
         let encryptedArtifacts = [
             OsaurusPaths.chatHistoryDatabaseFile(),
             OsaurusPaths.memoryDatabaseFile(),
-            OsaurusPaths.methodsDatabaseFile(),
+            OsaurusPaths.workflowsDatabaseFile(),
             OsaurusPaths.toolIndexDatabaseFile(),
             OsaurusPaths.workDatabaseFile(),
         ]

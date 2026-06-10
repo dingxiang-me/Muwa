@@ -90,6 +90,12 @@ public struct AgentConfigSnapshot: Sendable, Equatable {
     /// stripped from the model-visible schema.
     public let selfSchedulingEnabled: Bool
 
+    /// Per-agent opt-in for the workflows feature (`workflow_save` /
+    /// `workflow_run` + the workflow lane in capability discovery).
+    /// When false the workflow tools are stripped from the
+    /// model-visible schema.
+    public let workflowsEnabled: Bool
+
     public init(
         agentId: UUID,
         toolsDisabled: Bool,
@@ -103,7 +109,8 @@ public struct AgentConfigSnapshot: Sendable, Equatable {
         renderChartEnabled: Bool = false,
         speakEnabled: Bool = false,
         searchMemoryEnabled: Bool = false,
-        selfSchedulingEnabled: Bool = false
+        selfSchedulingEnabled: Bool = false,
+        workflowsEnabled: Bool = false
     ) {
         self.agentId = agentId
         self.toolsDisabled = toolsDisabled
@@ -118,6 +125,7 @@ public struct AgentConfigSnapshot: Sendable, Equatable {
         self.speakEnabled = speakEnabled
         self.searchMemoryEnabled = searchMemoryEnabled
         self.selfSchedulingEnabled = selfSchedulingEnabled
+        self.workflowsEnabled = workflowsEnabled
     }
 
     /// Read every `effective*` field in one MainActor batch.
@@ -153,7 +161,8 @@ public struct AgentConfigSnapshot: Sendable, Equatable {
             renderChartEnabled: caps.renderChartEnabled,
             speakEnabled: caps.speakEnabled,
             searchMemoryEnabled: caps.searchMemoryEnabled,
-            selfSchedulingEnabled: caps.selfSchedulingEnabled
+            selfSchedulingEnabled: caps.selfSchedulingEnabled,
+            workflowsEnabled: caps.workflowsEnabled
         )
     }
 }

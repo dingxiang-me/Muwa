@@ -2,7 +2,7 @@
 //  CapabilitySearch.swift
 //  osaurus
 //
-//  Hybrid (BM25 + vector) search across indexed methods, tools, and skills.
+//  Hybrid (BM25 + vector) search across indexed workflows, tools, and skills.
 //  Backs the `capabilities_discover` tool so the agent can find capabilities
 //  it isn't currently holding in its schema and load them via
 //  `capabilities_load`.
@@ -16,32 +16,33 @@ private let logger = Logger(subsystem: "ai.osaurus", category: "CapabilitySearch
 // MARK: - Result Types
 
 struct CapabilitySearchResults {
-    let methods: [MethodSearchResult]
+    let workflows: [WorkflowSearchResult]
     let tools: [ToolSearchResult]
     let skills: [SkillSearchResult]
 
     var isEmpty: Bool {
-        methods.isEmpty && tools.isEmpty && skills.isEmpty
+        workflows.isEmpty && tools.isEmpty && skills.isEmpty
     }
 }
 
 // MARK: - Capability Search (used by capabilities_discover tool)
 
 enum CapabilitySearch {
-    /// Embed-cosine acceptance floor for the **methods** lane.
-    /// Calibrated against `Suites/CapabilitySearch/method-*.json`
-    /// (PR-A baseline, 2026-05-07): lowest expected-hit was
-    /// `plot_data` at 0.281; highest abstain noise was 0.179.
-    /// 0.25 sits 40% above abstain noise and 12% below the
-    /// tightest recall hit — the only band that flips every
-    /// PR-A method case to PASS without re-admitting abstain.
-    /// Was a single global `0.7` until PR-A showed that value
-    /// dropped every method/skill true positive (top hits land
-    /// at 0.28-0.59 on `potion-base-4M`, not 0.7+).
-    static let minimumRelevanceScoreMethods: Float = 0.25
+    /// Embed-cosine acceptance floor for the **workflows** lane.
+    /// Calibrated against `Suites/CapabilitySearch/workflow-*.json`
+    /// (PR-A baseline, 2026-05-07, recorded against the pre-rename
+    /// method fixtures): lowest expected-hit was `plot_data` at
+    /// 0.281; highest abstain noise was 0.179. 0.25 sits 40% above
+    /// abstain noise and 12% below the tightest recall hit — the
+    /// only band that flips every PR-A workflow case to PASS
+    /// without re-admitting abstain. Was a single global `0.7`
+    /// until PR-A showed that value dropped every workflow/skill
+    /// true positive (top hits land at 0.28-0.59 on
+    /// `potion-base-4M`, not 0.7+).
+    static let minimumRelevanceScoreWorkflows: Float = 0.25
 
     /// Embed-cosine acceptance floor for the **skills** lane.
-    /// Held identical to `…Methods` because the embedder is
+    /// Held identical to `…Workflows` because the embedder is
     /// shared (`potion-base-4M`) and PR-A surfaced no signal
     /// arguing for a different floor. Kept as a separate
     /// constant so a future eval pass can move one lane
@@ -80,14 +81,14 @@ enum CapabilitySearch {
 
     /// Env var that swaps the inner per-lane search calls for their
     /// diagnostic variants (`searchHybridWithDiagnostic` for tools,
-    /// `searchWithDiagnostic` for methods + skills) and emits a single
+    /// `searchWithDiagnostic` for workflows + skills) and emits a single
     /// multi-line `Logger.notice` block per call with per-component
     /// BM25 + embed scores. Doubles the embed cost of
     /// `capabilities_discover` while set — only flip it during a manual
     /// recall repro.
     private static let debugTraceEnvVar = "OSAURUS_DEBUG_CAPABILITY_SEARCH"
 
-    /// Tools-only fast path. Skips the methods + skills lanes entirely
+    /// Tools-only fast path. Skips the workflows + skills lanes entirely
     /// for callers that have already restricted themselves to the tools
     /// universe (default-agent configure surface today). Avoids burning
     /// embedder / BM25 work on hits we'd discard anyway.
@@ -105,15 +106,15 @@ enum CapabilitySearch {
             minFusedScore: minimumFusedScore,
             allowedNames: allowedToolNames
         )
-        return CapabilitySearchResults(methods: [], tools: tools, skills: [])
+        return CapabilitySearchResults(workflows: [], tools: tools, skills: [])
     }
 
     static func search(
         query: String,
-        topK: (methods: Int, tools: Int, skills: Int),
+        topK: (workflows: Int, tools: Int, skills: Int),
         allowedToolNames: Set<String>? = nil
     ) async -> CapabilitySearchResults {
-        let methodsThreshold = minimumRelevanceScoreMethods
+        let workflowsThreshold = minimumRelevanceScoreWorkflows
         let skillsThreshold = minimumRelevanceScoreSkills
         let fusedCutoff = minimumFusedScore
 
@@ -128,16 +129,16 @@ enum CapabilitySearch {
                 query: query,
                 topK: topK,
                 allowedToolNames: allowedToolNames,
-                methodsThreshold: methodsThreshold,
+                workflowsThreshold: workflowsThreshold,
                 skillsThreshold: skillsThreshold,
                 fusedCutoff: fusedCutoff
             )
         }
 
-        async let methodHits = MethodSearchService.shared.search(
+        async let workflowHits = Self.searchWorkflowsLane(
             query: query,
-            topK: topK.methods,
-            threshold: methodsThreshold
+            topK: topK.workflows,
+            threshold: workflowsThreshold
         )
         async let toolHits = ToolSearchService.shared.searchHybrid(
             query: query,
@@ -151,15 +152,31 @@ enum CapabilitySearch {
             threshold: skillsThreshold
         )
 
-        // Methods + skills double-filter mirrors the in-actor cutoff
+        // Workflows + skills double-filter mirrors the in-actor cutoff
         // (kept from the diagnostics PR — collapsing it crosses the
         // Phase 1 instrumentation boundary; tracked as an out-of-scope
         // tidy). Tools come from `searchHybrid` which has already
         // applied `minFusedScore` — no outer filter needed.
         return CapabilitySearchResults(
-            methods: (await methodHits).filter { $0.searchScore >= methodsThreshold },
+            workflows: (await workflowHits).filter { $0.searchScore >= workflowsThreshold },
             tools: await toolHits,
             skills: (await skillHits).filter { $0.searchScore >= skillsThreshold }
+        )
+    }
+
+    /// Workflow lane with a zero-topK short-circuit: `topK == 0` means
+    /// the caller's agent has the workflows feature off — skip the lane
+    /// instead of burning embedder work on hits that would be discarded.
+    private static func searchWorkflowsLane(
+        query: String,
+        topK: Int,
+        threshold: Float
+    ) async -> [WorkflowSearchResult] {
+        guard topK > 0 else { return [] }
+        return await WorkflowSearchService.shared.search(
+            query: query,
+            topK: topK,
+            threshold: threshold
         )
     }
 
@@ -171,16 +188,16 @@ enum CapabilitySearch {
     /// only fires when `OSAURUS_DEBUG_CAPABILITY_SEARCH=1`.
     private static func searchWithVerboseTrace(
         query: String,
-        topK: (methods: Int, tools: Int, skills: Int),
+        topK: (workflows: Int, tools: Int, skills: Int),
         allowedToolNames: Set<String>?,
-        methodsThreshold: Float,
+        workflowsThreshold: Float,
         skillsThreshold: Float,
         fusedCutoff: Float
     ) async -> CapabilitySearchResults {
-        async let methodPair = MethodSearchService.shared.searchWithDiagnostic(
+        async let workflowPair = WorkflowSearchService.shared.searchWithDiagnostic(
             query: query,
-            topK: topK.methods,
-            threshold: methodsThreshold
+            topK: topK.workflows,
+            threshold: workflowsThreshold
         )
         async let toolPair = ToolSearchService.shared.searchHybridWithDiagnostic(
             query: query,
@@ -195,7 +212,7 @@ enum CapabilitySearch {
         )
         async let healthSnapshot = CapabilitySearchDiagnostics.snapshot(mode: .full)
 
-        let (methodResults, methodDiag) = await methodPair
+        let (workflowResults, workflowDiag) = await workflowPair
         let (toolResults, toolDiag) = await toolPair
         let (skillResults, skillDiag) = await skillPair
         let health = await healthSnapshot
@@ -204,10 +221,10 @@ enum CapabilitySearch {
         logger.notice(
             """
             CapabilitySearch query=\(query, privacy: .private(mask: .hash))
-            methodsThreshold=\(methodsThreshold, privacy: .public) skillsThreshold=\(skillsThreshold, privacy: .public) fusedCutoff=\(fusedCutoff, privacy: .public)
+            workflowsThreshold=\(workflowsThreshold, privacy: .public) skillsThreshold=\(skillsThreshold, privacy: .public) fusedCutoff=\(fusedCutoff, privacy: .public)
             health=\(healthSummary, privacy: .public)
-            methods raw=\(formatHits(methodDiag.rawHits), privacy: .public)
-            methods accepted=\(formatHits(methodDiag.acceptedHits), privacy: .public)
+            workflows raw=\(formatHits(workflowDiag.rawHits), privacy: .public)
+            workflows accepted=\(formatHits(workflowDiag.acceptedHits), privacy: .public)
             tools bm25Available=\(toolDiag.bm25Available, privacy: .public) all=\(formatHybridHits(toolDiag.allHits), privacy: .public)
             tools accepted=\(formatHybridHits(toolDiag.acceptedHits), privacy: .public)
             tools filteredByAllowlist=\(formatNames(toolDiag.filteredByAllowlist), privacy: .public)
@@ -217,7 +234,7 @@ enum CapabilitySearch {
         )
 
         return CapabilitySearchResults(
-            methods: methodResults.filter { $0.searchScore >= methodsThreshold },
+            workflows: workflowResults.filter { $0.searchScore >= workflowsThreshold },
             tools: toolResults,
             skills: skillResults.filter { $0.searchScore >= skillsThreshold }
         )
@@ -241,7 +258,7 @@ fileprivate protocol DiagnosticHit {
 }
 
 extension ToolSearchDiagnostic.Hit: DiagnosticHit {}
-extension MethodSearchDiagnostic.Hit: DiagnosticHit {}
+extension WorkflowSearchDiagnostic.Hit: DiagnosticHit {}
 extension SkillSearchDiagnostic.Hit: DiagnosticHit {}
 
 fileprivate func formatHits<H: DiagnosticHit>(_ hits: [H]) -> String {

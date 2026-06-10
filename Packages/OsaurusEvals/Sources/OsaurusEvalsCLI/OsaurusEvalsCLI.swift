@@ -278,20 +278,20 @@ struct OsaurusEvalsCLI {
             guard row.domain == "capability_search",
                 let cs = row.capabilitySearch
             else { return nil }
-            let raw = cs.toolHits.count + cs.methodHits.count + cs.skillHits.count
+            let raw = cs.toolHits.count + cs.workflowHits.count + cs.skillHits.count
             let accepted =
                 cs.toolHits.filter(\.acceptedByThreshold).count
-                + cs.methodHits.filter(\.acceptedByThreshold).count
+                + cs.workflowHits.filter(\.acceptedByThreshold).count
                 + cs.skillHits.filter(\.acceptedByThreshold).count
             let topFused =
-                (cs.toolHits + cs.methodHits + cs.skillHits)
+                (cs.toolHits + cs.workflowHits + cs.skillHits)
                 .map(\.fusedScore)
                 .max()
             let topFusedString = topFused.map { String(format: "%.3f", $0) } ?? "n/a"
 
             // Expected names for the H4/H5 nullability check. Pulled
             // from the case fixture's `expectedTools.anyOf` (the
-            // tools-lane assertion); methods/skills `expected*` could
+            // tools-lane assertion); workflows/skills `expected*` could
             // be added similarly when those lanes go hybrid.
             let expectedToolNames = Set(
                 casesById[row.id]?
@@ -407,7 +407,7 @@ struct OsaurusEvalsCLI {
         /// Capability-search **tools-lane** RRF cutoff sweep value.
         /// Forwarded to `EvalRunner.run(thresholdOverride:)`; no-op
         /// for other domains. `nil` keeps the production
-        /// `CapabilitySearch.minimumFusedScore`. Methods + skills
+        /// `CapabilitySearch.minimumFusedScore`. Workflows + skills
         /// lanes always use their own embed-cosine constants (see
         /// `CapabilitySearchEvaluator.evaluate` doc) — sweeping one
         /// scale into the other silently disables the cosine gate.
@@ -553,9 +553,9 @@ struct OsaurusEvalsCLI {
                                       for each case.
                 --threshold <float>   Override the **tools-lane** RRF cutoff
                                       (`minFusedScore`) for this run. The
-                                      methods + skills lanes always use their
+                                      workflows + skills lanes always use their
                                       own production embed-cosine constants
-                                      (`minimumRelevanceScoreMethods` /
+                                      (`minimumRelevanceScoreWorkflows` /
                                       `…Skills`) regardless of this flag —
                                       fused-score and cosine values live on
                                       different scales (RRF max ≈ 0.033 vs

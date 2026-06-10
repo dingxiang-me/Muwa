@@ -45,10 +45,10 @@ public enum EvalHostBootstrap {
     /// - **tools index** — open `ToolDatabase`, init
     ///   `ToolSearchService`, sync from registry. Without these,
     ///   `capabilities_discover` cannot surface installed tools.
-    /// - **methods + skills indices** — open `MethodDatabase`, init
-    ///   `MethodSearchService`, force `SkillManager.refresh()` +
+    /// - **workflows + skills indices** — open `WorkflowDatabase`, init
+    ///   `WorkflowSearchService`, force `SkillManager.refresh()` +
     ///   `SkillSearchService` init/rebuild. Without these, every
-    ///   method/skill recall fixture would silently report 0 raw
+    ///   workflow/skill recall fixture would silently report 0 raw
     ///   hits, making "infrastructure not booted" indistinguishable
     ///   from "real recall miss". The explicit `refresh()` await
     ///   replaces relying on `SkillManager`'s eager init Task —
@@ -61,8 +61,8 @@ public enum EvalHostBootstrap {
         await ToolSearchService.shared.initialize()
         await ToolIndexService.shared.syncFromRegistry()
 
-        try? MethodDatabase.shared.open()
-        await MethodSearchService.shared.initialize()
+        try? WorkflowDatabase.shared.open()
+        await WorkflowSearchService.shared.initialize()
         await SkillManager.shared.refresh()
         await SkillSearchService.shared.initialize()
         await SkillSearchService.shared.rebuildIndex()

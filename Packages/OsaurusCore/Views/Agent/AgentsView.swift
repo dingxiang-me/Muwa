@@ -928,6 +928,7 @@ struct AgentDetailView: View {
     @State private var speakEnabled: Bool = false
     @State private var searchMemoryEnabled: Bool = false
     @State private var selfSchedulingEnabled: Bool = false
+    @State private var workflowsEnabled: Bool = false
     /// Per-agent on/off for the chat empty-state generative greeting.
     /// Default off, like the other capability flags; the agent opts in
     /// from the Features tab. Drives whether the Empty State section
@@ -2855,6 +2856,12 @@ struct AgentDetailView: View {
                         "Autonomy",
                         description: "Let the agent act between your messages."
                     ) {
+                        featureToggleRow(
+                            title: "Workflows",
+                            subtitle:
+                                "Let the agent save reusable multi-step procedures and run saved workflows on demand. Manage them in the Workflows tab.",
+                            isOn: $workflowsEnabled
+                        )
                         featureToggleRow(
                             title: "Self-scheduling",
                             subtitle:
@@ -4931,6 +4938,7 @@ struct AgentDetailView: View {
         speakEnabled = agent.settings.speakEnabled
         searchMemoryEnabled = agent.settings.searchMemoryEnabled
         selfSchedulingEnabled = agent.settings.selfSchedulingEnabled
+        workflowsEnabled = agent.settings.workflowsEnabled
         generativeGreetingsEnabled = agent.settings.generativeGreetingsEnabled
         // Hydrate the Personality editor with the resolved default
         // (global persona, falling back to built-in) when the agent has
@@ -5136,7 +5144,8 @@ struct AgentDetailView: View {
                 renderChartEnabled: renderChartEnabled,
                 speakEnabled: speakEnabled,
                 searchMemoryEnabled: searchMemoryEnabled,
-                selfSchedulingEnabled: selfSchedulingEnabled
+                selfSchedulingEnabled: selfSchedulingEnabled,
+                workflowsEnabled: workflowsEnabled
             )
         )
 

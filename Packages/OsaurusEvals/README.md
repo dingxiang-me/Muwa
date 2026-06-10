@@ -57,7 +57,7 @@ swift run osaurus-evals run --suite Suites/CapabilitySearch --bootstrap-plugins
 
 Startup bootstrap is domain-aware. Suites that require installed native plugins
 load them and rebuild search indices so they mirror the host app. `capability_search`
-suites initialize only the selected tool / method / skill index lanes without
+suites initialize only the selected tool / workflow / skill index lanes without
 loading native plugins; those index-only runs use isolated temporary storage so
 fixtures never touch the user's real encrypted databases. Debug builds also use
 a deterministic in-process storage key; release builds still use OsaurusCore's
@@ -95,23 +95,23 @@ A case with empty `expect: {}` is a valid smoke test — it records what the run
 
 ### `capability_search` domain
 
-Index-only recall measurements over the tools / methods / skills lanes. No LLM, fast (~10 ms/case), deterministic. Drives `CapabilitySearchEvaluator.evaluate` and pins recall + abstain behaviour against `expect.capabilitySearch`. The CLI initializes only the selected index lanes for this domain and does not load installed native plugins by default; pass `--bootstrap-plugins` when you intentionally want local plugin tools included.
+Index-only recall measurements over the tools / workflows / skills lanes. No LLM, fast (~10 ms/case), deterministic. Drives `CapabilitySearchEvaluator.evaluate` and pins recall + abstain behaviour against `expect.capabilitySearch`. The CLI initializes only the selected index lanes for this domain and does not load installed native plugins by default; pass `--bootstrap-plugins` when you intentionally want local plugin tools included.
 
 ```json
 {
-  "id": "capability_search.method-paraphrase",
+  "id": "capability_search.workflow-paraphrase",
   "domain": "capability_search",
-  "label": "capability search • method • paraphrase / synonym bridge",
+  "label": "capability search • workflow • paraphrase / synonym bridge",
   "query": "make a chart from this data",
-  "notes": "Probes the embed-still-needed class on the methods lane …",
+  "notes": "Probes the embed-still-needed class on the workflows lane …",
   "fixtures": {
-    "seedMethods": [
+    "seedWorkflows": [
       { "id": "eval-plot-data", "name": "plot_data", "description": "Render a graph from tabular numbers" }
     ]
   },
   "expect": {
     "capabilitySearch": {
-      "expectedMethods": { "anyOf": ["plot_data"], "minMatches": 1 }
+      "expectedWorkflows": { "anyOf": ["plot_data"], "minMatches": 1 }
     }
   }
 }
@@ -119,11 +119,11 @@ Index-only recall measurements over the tools / methods / skills lanes. No LLM, 
 
 Field notes:
 
-- `fixtures.seedMethods` — methods to insert into `MethodDatabase` before the case runs (and remove after). Each entry is `{ id, name, description, triggerText?, body? }`. Methods have no built-in seed so a fixture has to bring its own. Prefer `eval-<slug>` ids — the runner skips inserts when the id already exists, so a real user method on disk won't get clobbered if your slug collides.
+- `fixtures.seedWorkflows` — workflows to insert into `WorkflowDatabase` before the case runs (and remove after). Each entry is `{ id, name, description, triggerText?, body? }`. Workflows have no built-in seed so a fixture has to bring its own. Prefer `eval-<slug>` ids — the runner skips inserts when the id already exists, so a real user workflow on disk won't get clobbered if your slug collides.
 - `fixtures.enableSkills` — array of skill **display names** to flip `enabled = true` on for the duration of the case (and restore after). Built-in skills ship disabled-by-default and the search post-filters disabled skills out, so a recall fixture against e.g. `"Debug Assistant"` silently returns 0 unless we toggle it on first. Restoration is best-effort, not crash-safe — re-running any case that names the same skill converges back.
-- `expect.capabilitySearch.expectedTools` / `expectedMethods` / `expectedSkills` — `{ anyOf: [...names], minMatches: N }` matchers. Each matched name must appear in the **accepted** hit set for its lane (i.e. above the lane's threshold).
+- `expect.capabilitySearch.expectedTools` / `expectedWorkflows` / `expectedSkills` — `{ anyOf: [...names], minMatches: N }` matchers. Each matched name must appear in the **accepted** hit set for its lane (i.e. above the lane's threshold).
 - `expect.capabilitySearch.maxAccepted` — caps total accepted hits across all three lanes. `0` is the abstain-style assertion: any accepted hit fails the case.
-- `expect.capabilitySearch.thresholdOverride` — per-case sweep value. **Tools-lane only** (RRF fused-score scale, max ≈ 0.033). Methods + skills lanes always use their own production embed-cosine constants — sweeping a fused-score value into the cosine lane would silently disable the cosine quality gate.
+- `expect.capabilitySearch.thresholdOverride` — per-case sweep value. **Tools-lane only** (RRF fused-score scale, max ≈ 0.033). Workflows + skills lanes always use their own production embed-cosine constants — sweeping a fused-score value into the cosine lane would silently disable the cosine quality gate.
 
 ### `capability_claims` domain
 

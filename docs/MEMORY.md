@@ -186,7 +186,7 @@ That's the entire surface. v1's 18 knobs (`mmrLambda`, `mmrFetchMultiplier`, `ve
 
 ## Storage
 
-All memory data is stored in a local SQLite database with WAL mode. Since 0.17.7 the database is **encrypted at rest** with [SQLCipher](STORAGE.md) using a key kept in your macOS Keychain — the same key chat history, methods, and tool indexes use.
+All memory data is stored in a local SQLite database with WAL mode. Since 0.17.7 the database is **encrypted at rest** with [SQLCipher](STORAGE.md) using a key kept in your macOS Keychain — the same key chat history, workflows, and tool indexes use.
 
 **Location:** `~/.osaurus/memory/memory.sqlite` (SQLCipher)
 

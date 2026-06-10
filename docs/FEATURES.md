@@ -19,7 +19,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 | Tools & Plugins                  | Stable    | "Tools & Plugins"  | plugins/README.md             | Tools/, Managers/Plugin/PluginManager.swift, Services/Plugin/PluginHostAPI.swift, Storage/PluginDatabase.swift, Models/Plugin/PluginHTTP.swift, Views/Plugin/PluginConfigView.swift |
 | Skills                           | Stable    | "Skills"           | SKILLS.md                     | Managers/SkillManager.swift, Views/Skill/SkillsView.swift, Services/Skill/SkillSearchService.swift |
 | Claude Plugin Import             | Stable    | "Plugins"          | CLAUDE_PLUGINS.md             | Services/GitHubSkillService.swift, Services/Skill/ClaudePluginInstaller.swift, Services/Skill/ClaudePluginManifestStore.swift, Services/Skill/ClaudePluginVariableExpander.swift, Services/Plugin/InstalledClaudePluginsAggregator.swift, Views/Plugin/GitHubImportSheet.swift, Views/Plugin/ClaudePluginCard.swift, Views/Plugin/ClaudePluginDetailView.swift, Views/Plugin/ClaudePluginUserConfigSheet.swift |
-| Methods                          | Stable    | "Skills & Methods" | SKILLS.md                     | Models/Method/Method.swift, Services/Method/MethodService.swift, Services/Method/MethodSearchService.swift, Storage/MethodDatabase.swift |
+| Workflows                        | Stable    | "Skills & Workflows" | SKILLS.md                   | Models/Workflow/Workflow.swift, Services/Workflow/WorkflowService.swift, Services/Workflow/WorkflowSearchService.swift, Services/Workflow/WorkflowRunner.swift, Tools/WorkflowTools.swift, Storage/WorkflowDatabase.swift |
 | Context Management               | Stable    | -                  | SKILLS.md                     | Services/Context/CapabilitySearch.swift, Tools/CapabilityTools.swift, Services/Tool/ToolSearchService.swift, Services/Tool/ToolIndexService.swift |
 | Memory                           | Stable    | "Key Features"     | MEMORY.md                     | Services/Memory/MemoryService.swift, Services/Memory/MemorySearchService.swift, Services/Memory/MemoryContextAssembler.swift |
 | Privacy Filter                   | Experimental | "Key Features"  | PRIVACY_FILTER.md             | PrivacyFilter/Core/PrivacyFilterPipeline.swift, PrivacyFilter/Core/PrivacyFilterEngine.swift, PrivacyFilter/Core/RegexEntityDetector.swift, PrivacyFilter/Store/PrivacyFilterStore.swift, PrivacyFilter/Views/PrivacyView.swift, PrivacyFilter/Views/RedactionReviewSheet.swift, Services/Provider/WireTransportProbe.swift, Views/Chat/RedactionHighlighter.swift, Views/Chat/RedactionHoverController.swift |
@@ -102,9 +102,10 @@ Canonical reference for all Osaurus features, their status, and documentation.
 │  │   ├── SkillSearchService (RAG-based skill search)                     │
 │  │   ├── GitHubSkillService (Plugin discovery + marketplace parsing)     │
 │  │   └── ClaudePluginInstaller (Full Claude plugin install/uninstall)    │
-│  ├── Methods                                                             │
-│  │   ├── MethodService (Method CRUD and scoring)                         │
-│  │   └── MethodSearchService (RAG-based method search)                   │
+│  ├── Workflows                                                           │
+│  │   ├── WorkflowService (Workflow CRUD and scoring)                     │
+│  │   ├── WorkflowRunner (Deterministic step execution)                   │
+│  │   └── WorkflowSearchService (RAG-based workflow search)               │
 │  ├── Context                                                             │
 │  │   ├── CapabilitySearch (Index search for capabilities_discover)       │
 │  │   ├── ToolSearchService (RAG-based tool search)                       │
@@ -468,7 +469,7 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 **Features:**
 
 - **Custom System Prompts** — Define unique instructions for each agent
-- **Automated Capabilities** — Tools, skills, and methods are automatically selected via RAG search based on the task
+- **Automated Capabilities** — Tools, skills, and workflows are automatically selected via RAG search based on the task
 - **Per-Agent Feature Gates** — Configure → Features groups every capability by purpose and keeps extra ones off by default to keep the tool list lean (see below)
 - **Visual Themes** — Assign a custom theme that activates with the agent
 - **Generation Settings** — Configure default model, temperature, and max tokens
@@ -948,61 +949,71 @@ Stored on each artifact as `Skill.pluginId`, `Schedule.parameters["pluginId"]`, 
 
 ---
 
-### Methods
+### Workflows
 
-**Purpose:** Reusable, scored workflows that agents save and learn from over time.
+**Purpose:** Reusable, parameterized, scored procedures that capable models distill from completed tasks and any model can execute deterministically.
 
-Methods are YAML sequences of tool-call steps that represent learned procedures. When an agent discovers an effective approach, it saves the workflow as a method. Methods are indexed for RAG search and scored based on success rate and recency, so high-quality procedures surface automatically in future tasks.
+A workflow captures the tool-call sequence that solved a task: declared **parameters** (typed inputs), structured **steps** (deterministic tool calls plus free-text guidance steps), and a human/model-readable YAML body. A frontier model saves one in chat with `workflow_save` after the user confirms; smaller models then discover it via `capabilities_discover` and execute it with `workflow_run`. Workflows are indexed for RAG search and scored on success rate and recency, so high-quality procedures surface automatically.
 
 **Components:**
 
-- `Models/Method/Method.swift` — Method data model with scoring and event tracking
-- `Storage/MethodDatabase.swift` — SQLite storage (methods, events, scores)
-- `Services/Method/MethodService.swift` — CRUD orchestrator, YAML extraction, scoring
-- `Services/Method/MethodSearchService.swift` — VecturaKit hybrid search (BM25 + vector)
-- `Utils/MethodLogger.swift` — Structured logging
+- `Models/Workflow/Workflow.swift` — Workflow data model: parameters, steps, scoring, event tracking
+- `Storage/WorkflowDatabase.swift` — SQLCipher storage (workflows, events, scores)
+- `Services/Workflow/WorkflowService.swift` — CRUD orchestrator, dependency extraction, scoring
+- `Services/Workflow/WorkflowSearchService.swift` — VecturaKit hybrid search (BM25 + vector)
+- `Services/Workflow/WorkflowRunner.swift` — Deterministic step executor (param validation, templating, guidance handoff)
+- `Tools/WorkflowTools.swift` — `workflow_save` / `workflow_run` chat tools
+- `Views/Workflow/WorkflowsView.swift` — Management tab with score badges and editor sheet
+- `Utils/WorkflowLogger.swift` — Structured logging
 
 **Features:**
 
-- **YAML Workflows** — Methods store step-by-step tool-call sequences as YAML
-- **Auto-Extraction** — Tool and skill references are automatically extracted from the YAML body
-- **Scoring System** — Each method tracks success rate and recency; a composite score ranks methods in search results
-- **RAG Search** — Methods are indexed by description and trigger text for hybrid BM25 + vector search
-- **Trigger Text** — Optional phrases that activate a method (e.g., "deploy to staging")
+- **Parameterized Steps** — Tool steps carry an `argsTemplate` with `{{params.<name>}}` and `{{steps.<n>.output}}` placeholders the runner substitutes at execution time
+- **Guidance Handoff** — When a step needs judgment, a `guidance` step stops the runner and returns completed-step outputs plus remaining instructions to the calling model
+- **Chat Authoring** — `workflow_save` lets a model distill its task trace into a workflow (user confirms in chat first)
+- **Deterministic Execution** — `workflow_run` validates arguments against the declared parameter schema and executes tool steps sequentially via the tool registry
+- **Auto-Extraction** — Tool and skill references derive from structured steps (legacy YAML bodies are scraped as a fallback)
+- **Scoring System** — Each workflow tracks success rate and recency; a composite score ranks workflows in search results
+- **RAG Search** — Workflows are indexed by name, description, and trigger text for hybrid BM25 + vector search
+- **Trigger Text** — Optional phrases that surface a workflow (e.g., "deploy to staging")
 
-**Method Properties:**
+**Workflow Properties:**
 
-| Property       | Description                                   |
-| -------------- | --------------------------------------------- |
-| `name`         | Display name (required)                       |
-| `description`  | Brief description of what the method does     |
-| `triggerText`  | Optional phrases that trigger this method     |
-| `body`         | YAML steps (the workflow definition)          |
-| `toolsUsed`    | Auto-extracted tool references from YAML      |
-| `skillsUsed`   | Auto-extracted skill references from YAML     |
-| `tokenCount`   | Estimated token count for context budgeting   |
-| `version`      | Incremented on each update                    |
+| Property       | Description                                       |
+| -------------- | ------------------------------------------------- |
+| `name`         | Display name (required)                           |
+| `description`  | Brief description of what the workflow does       |
+| `triggerText`  | Optional phrases that surface this workflow       |
+| `parameters`   | Declared typed inputs (string/number/boolean)     |
+| `steps`        | Structured tool/guidance steps                    |
+| `body`         | YAML rendering (the guided-context fallback)      |
+| `toolsUsed`    | Tool references derived from steps                |
+| `skillsUsed`   | Skill references derived from steps               |
+| `tokenCount`   | Estimated token count for context budgeting       |
+| `version`      | Incremented on each update                        |
 
 **Scoring:**
 
-Methods are scored using a recency-weighted success rate:
+Workflows are scored using a recency-weighted success rate:
 
 ```
 score = successRate × recencyWeight
 recencyWeight = 1.0 / (1.0 + daysSinceUsed / 30.0)
 ```
 
-Each time a method is used, a `MethodEvent` is recorded (`loaded`, `succeeded`, `failed`), and the score is recalculated.
+Each run records a `WorkflowEvent` (`loaded`, `succeeded`, `failed`) and recalculates the score. The runner reports outcomes automatically.
 
-**Agent Tools:** Methods are loaded by the agent indirectly via `capabilities_discover` / `capabilities_load` (loading a method auto-loads its referenced tools and skills). The dedicated `methods_save` / `methods_report` tools were removed from the schema — recording method outcomes is now an internal observation, not an agent-facing concern.
+**Agent Tools:** `workflow_save` distills a completed task into a workflow; `workflow_run` executes one by id with arguments. `capabilities_load` with `workflow/<id>` remains the non-executing fallback that injects the steps as guided context (and auto-loads referenced tools and skills). All three are rejected for the default/configuration agent.
 
-**Storage:** `~/.osaurus/methods/methods.db` (SQLite with WAL mode)
+**Per-Agent Toggle:** Workflows are an opt-in feature per agent (Agents → Features → Autonomy → Workflows, default off). With the toggle off, `workflow_save` / `workflow_run` are stripped from the model's schema and rejected at execution, and the workflow lane is skipped in `capabilities_discover` / `capabilities_load`.
+
+**Storage:** `~/.osaurus/workflows/workflows.sqlite` (SQLCipher).
 
 ---
 
 ### Context Management
 
-**Purpose:** Give the agent a complete, statically-ordered view of every enabled capability (methods, tools, and skills) and let it load the ones it needs on demand.
+**Purpose:** Give the agent a complete, statically-ordered view of every enabled capability (workflows, tools, and skills) and let it load the ones it needs on demand.
 
 Context management replaces manual per-turn tool selection with a static, session-frozen design. The system prompt carries an enabled-capabilities manifest that lists every capability the agent is allowed to use; only a fixed "hot set" of tools is loaded into the schema up front. The agent pulls in additional capabilities mid-session with `capabilities_discover` / `capabilities_load`. The manifest and hot set are frozen at session start so the static prompt prefix stays byte-stable across turns (KV-cache reuse), and there is no per-turn LLM picker.
 
@@ -1020,7 +1031,7 @@ For on-demand discovery during a session, agents can use:
 
 | Tool                  | Description                                                       |
 | --------------------- | ----------------------------------------------------------------- |
-| `capabilities_discover` | Search methods, tools, and skills across all indexes in parallel  |
+| `capabilities_discover` | Search workflows, tools, and skills across all indexes in parallel  |
 | `capabilities_load`   | Load a capability by ID into the active session (tools become callable immediately) |
 
 When `capabilities_load` is called, new tool specs are queued in a `CapabilityLoadBuffer` and drained after the invocation. Loaded tools are callable immediately (the registry dispatches by name), but the rendered tool schema stays frozen until the next user turn — hot-patching it mid-run would rewrite the prompt prefix and bust the KV cache. The loaded names persist on the session's tool state, so the next compose includes their full schemas.
@@ -1029,11 +1040,11 @@ When `capabilities_load` is called, new tool specs are queued in a `CapabilityLo
 
 All three search services use VecturaKit (hybrid BM25 + vector search):
 
-| Service               | Indexes                            |
-| --------------------- | ---------------------------------- |
-| `MethodSearchService` | Method descriptions + trigger text |
-| `ToolSearchService`   | Tool names + descriptions          |
-| `SkillSearchService`  | Skill names + descriptions         |
+| Service                 | Indexes                              |
+| ----------------------- | ------------------------------------ |
+| `WorkflowSearchService` | Workflow descriptions + trigger text |
+| `ToolSearchService`     | Tool names + descriptions            |
+| `SkillSearchService`    | Skill names + descriptions           |
 
 ---
 
@@ -1346,7 +1357,7 @@ The post-scrub invariant only re-scans categories whose built-in regex toggle is
 | [REMOTE_MCP_PROVIDERS.md](REMOTE_MCP_PROVIDERS.md)             | Remote MCP provider setup                         |
 | [DEVELOPER_TOOLS.md](DEVELOPER_TOOLS.md)                       | Insights and Server Explorer guide                |
 | [VOICE_INPUT.md](VOICE_INPUT.md)                               | Voice input, FluidAudio, and VAD mode guide       |
-| [SKILLS.md](SKILLS.md)                                         | Skills, methods, and context management guide    |
+| [SKILLS.md](SKILLS.md)                                         | Skills, workflows, and context management guide  |
 | [CLAUDE_PLUGINS.md](CLAUDE_PLUGINS.md)                         | Importing Claude plugins from GitHub             |
 | [MEMORY.md](MEMORY.md)                                         | Memory system and configuration guide            |
 | [PRIVACY_FILTER.md](PRIVACY_FILTER.md)                         | Privacy Filter architecture, detection layers, settings, and verification |

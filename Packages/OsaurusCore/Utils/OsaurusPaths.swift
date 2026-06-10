@@ -259,9 +259,9 @@ public enum OsaurusPaths {
         root().appendingPathComponent("memory", isDirectory: true)
     }
 
-    /// Methods system data directory
-    public static func methods() -> URL {
-        root().appendingPathComponent("methods", isDirectory: true)
+    /// Workflows system data directory
+    public static func workflows() -> URL {
+        root().appendingPathComponent("workflows", isDirectory: true)
     }
 
     /// Tool index data directory
@@ -442,7 +442,7 @@ public enum OsaurusPaths {
     public static func chatHistoryDatabaseFile() -> URL {
         chatHistory().appendingPathComponent("history.sqlite")
     }
-    public static func methodsDatabaseFile() -> URL { methods().appendingPathComponent("methods.sqlite") }
+    public static func workflowsDatabaseFile() -> URL { workflows().appendingPathComponent("workflows.sqlite") }
     public static func toolIndexDatabaseFile() -> URL { toolIndex().appendingPathComponent("tool_index.sqlite") }
     public static func memoryConfigFile() -> URL { config().appendingPathComponent("memory.json") }
     public static func relayConfigFile() -> URL { config().appendingPathComponent("relay.json") }

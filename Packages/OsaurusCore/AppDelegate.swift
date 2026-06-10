@@ -359,11 +359,11 @@ public final class AppDelegate: NSObject, NSApplicationDelegate, NSPopoverDelega
             }
 
             do {
-                try MethodDatabase.shared.open()
+                try WorkflowDatabase.shared.open()
             } catch {
-                PersistenceHealth.shared.recordDatabaseOpenFailure(subsystem: "method", error: error)
+                PersistenceHealth.shared.recordDatabaseOpenFailure(subsystem: "workflow", error: error)
             }
-            await MethodSearchService.shared.initialize()
+            await WorkflowSearchService.shared.initialize()
 
             do {
                 try ToolDatabase.shared.open()

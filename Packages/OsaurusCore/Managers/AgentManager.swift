@@ -705,7 +705,8 @@ extension AgentManager {
                 renderChartEnabled: false,
                 speakEnabled: false,
                 searchMemoryEnabled: false,
-                selfSchedulingEnabled: false
+                selfSchedulingEnabled: false,
+                workflowsEnabled: false
             )
         }
 
@@ -717,7 +718,8 @@ extension AgentManager {
             renderChartEnabled: agent.settings.renderChartEnabled,
             speakEnabled: agent.settings.speakEnabled,
             searchMemoryEnabled: agent.settings.searchMemoryEnabled,
-            selfSchedulingEnabled: agent.settings.selfSchedulingEnabled
+            selfSchedulingEnabled: agent.settings.selfSchedulingEnabled,
+            workflowsEnabled: agent.settings.workflowsEnabled
         )
     }
 

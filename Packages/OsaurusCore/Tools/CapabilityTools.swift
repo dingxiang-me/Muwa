@@ -3,7 +3,7 @@
 //  osaurus
 //
 //  Unified capability search and load tools. capabilities_discover queries
-//  methods, skills, and tools in one call. capabilities_load injects the
+//  workflows, skills, and tools in one call. capabilities_load injects the
 //  selected items into the active session with cascading dependencies.
 //
 
@@ -74,8 +74,8 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
     /// at the historical (5,5,3) so a single-query call returns the
     /// same shaped result as before; the multi-query path lets the
     /// merged set grow naturally up to `maxQueries × topK` minus dedup.
-    private static let perQueryTopK: (methods: Int, tools: Int, skills: Int) =
-        (methods: 5, tools: 5, skills: 3)
+    private static let perQueryTopK: (workflows: Int, tools: Int, skills: Int) =
+        (workflows: 5, tools: 5, skills: 3)
 
     func execute(argumentsJSON: String) async throws -> String {
         let argsReq = requireArgumentsDictionary(argumentsJSON, tool: name)
@@ -109,6 +109,7 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
         let agentContextId = Self.resolveAgentContextId(explicit: agentId)
         let isDefaultAgent = agentContextId == Agent.defaultId
         let baseAllowedToolNames = await Self.allowedToolNames(for: agentContextId)
+        let workflowsAllowed = await WorkflowFeatureGate.isEnabled(for: agentContextId)
 
         // Phase C scoping:
         //   * Default agent: results restricted to the configure writes
@@ -140,7 +141,7 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
         // doesn't recognise. The whole point of accepting an array is
         // "OR these searches", not "concatenate them".
         //
-        // Default agent takes the tools-only fast path: methods and
+        // Default agent takes the tools-only fast path: workflows and
         // skills are off-limits on that surface, so ranking them is
         // pure wasted embedder work.
         let perQueryResults: [CapabilitySearchResults] = await withTaskGroup(
@@ -155,9 +156,16 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
                             allowedToolNames: effectiveAllowedToolNames
                         )
                     }
+                    // Agents with the workflows feature off skip the
+                    // workflow lane entirely — its hits couldn't be
+                    // loaded or run anyway.
                     return await CapabilitySearch.search(
                         query: q,
-                        topK: Self.perQueryTopK,
+                        topK: (
+                            workflows: workflowsAllowed ? Self.perQueryTopK.workflows : 0,
+                            tools: Self.perQueryTopK.tools,
+                            skills: Self.perQueryTopK.skills
+                        ),
                         allowedToolNames: effectiveAllowedToolNames
                     )
                 }
@@ -208,13 +216,17 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
         }
 
         let results: [ScoredResult] =
-            (hits.methods.map {
-                ScoredResult(
-                    id: "method/\($0.method.id)",
-                    type: "method",
-                    description: "\($0.method.name): \($0.method.description)",
+            (hits.workflows.map {
+                var extraLines = ["tools_used: \($0.workflow.toolsUsed.joined(separator: ", "))"]
+                if !$0.workflow.steps.isEmpty {
+                    extraLines.append("runnable: use `workflow_run` with `{\"id\": \"\($0.workflow.id)\"}`")
+                }
+                return ScoredResult(
+                    id: "workflow/\($0.workflow.id)",
+                    type: "workflow",
+                    description: "\($0.workflow.name): \($0.workflow.description)",
                     score: $0.score,
-                    extraLines: ["tools_used: \($0.method.toolsUsed.joined(separator: ", "))"]
+                    extraLines: extraLines
                 )
             }
             + hits.tools.map {
@@ -371,7 +383,7 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
     /// keeping the entry with the highest `searchScore` per (type, id).
     /// `searchScore` is the embedding similarity in every lane and is
     /// directly comparable across queries (same embedder, same vector
-    /// space). Methods carry an extra `score: Double` used downstream
+    /// space). Workflows carry an extra `score: Double` used downstream
     /// for cross-type ranking; that field follows the kept entry, so
     /// the existing display sort remains stable.
     ///
@@ -381,16 +393,16 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
     private static func mergeHits(
         _ results: [CapabilitySearchResults]
     ) -> CapabilitySearchResults {
-        var methodsById: [String: MethodSearchResult] = [:]
+        var workflowsById: [String: WorkflowSearchResult] = [:]
         var toolsById: [String: ToolSearchResult] = [:]
         var skillsByName: [String: SkillSearchResult] = [:]
 
         for r in results {
-            for m in r.methods {
-                if let existing = methodsById[m.method.id], existing.searchScore >= m.searchScore {
+            for w in r.workflows {
+                if let existing = workflowsById[w.workflow.id], existing.searchScore >= w.searchScore {
                     continue
                 }
-                methodsById[m.method.id] = m
+                workflowsById[w.workflow.id] = w
             }
             for t in r.tools {
                 if let existing = toolsById[t.entry.id], existing.searchScore >= t.searchScore {
@@ -407,7 +419,7 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
         }
 
         return CapabilitySearchResults(
-            methods: methodsById.values.sorted { $0.searchScore > $1.searchScore },
+            workflows: workflowsById.values.sorted { $0.searchScore > $1.searchScore },
             tools: toolsById.values.sorted { $0.searchScore > $1.searchScore },
             skills: skillsByName.values.sorted { $0.searchScore > $1.searchScore }
         )
@@ -432,7 +444,7 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
                 "type": .string("array"),
                 "items": .object(["type": .string("string")]),
                 "description": .string(
-                    "IDs from the Enabled capabilities list or capabilities_discover results (e.g. 'method/abc', 'tool/sandbox_exec', 'skill/swift-best-practices')"
+                    "IDs from the Enabled capabilities list or capabilities_discover results (e.g. 'workflow/abc', 'tool/sandbox_exec', 'skill/plot-data')"
                 ),
             ])
         ]),
@@ -473,8 +485,8 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
 
             let outcome: LoadOutcome
             switch typePrefix {
-            case "method":
-                outcome = await loadMethod(rawId)
+            case "workflow":
+                outcome = await loadWorkflow(rawId)
             case "tool":
                 outcome = await loadTool(rawId)
             case "skill":
@@ -485,7 +497,7 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
                         kind: .invalidArgs,
                         message:
                             "Unknown type '\(typePrefix)' in ID '\(id)' "
-                            + "(expected `tool`, `skill`, or `method`)."
+                            + "(expected `tool`, `skill`, or `workflow`)."
                     )
                 )
             }
@@ -533,49 +545,60 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
 
     // MARK: - Loaders
 
-    private func loadMethod(_ methodId: String) async -> LoadOutcome {
+    private func loadWorkflow(_ workflowId: String) async -> LoadOutcome {
         if ChatExecutionContext.currentAgentId == Agent.defaultId {
             return .failure(
                 LoadFailure(
                     kind: .rejected,
                     message:
-                        "Method loading is disabled for the configuration agent. "
+                        "Workflow loading is disabled for the configuration agent. "
                         + "Use `capabilities_discover` to find a configuration tool (osaurus_*_<verb>) "
                         + "and load it directly."
                 )
             )
         }
+        // Per-agent feature gate: mirror the discover lane so a stale or
+        // hand-written `workflow/<id>` can't bypass the toggle.
+        if await !WorkflowFeatureGate.isEnabled(for: ChatExecutionContext.currentAgentId) {
+            return .failure(
+                LoadFailure(kind: .rejected, message: WorkflowFeatureGate.disabledMessage)
+            )
+        }
         do {
-            guard let method = try await MethodService.shared.load(id: methodId) else {
+            guard let workflow = try await WorkflowService.shared.load(id: workflowId) else {
                 return .failure(
-                    LoadFailure(kind: .notFound, message: "Method '\(methodId)' not found.")
+                    LoadFailure(kind: .notFound, message: "Workflow '\(workflowId)' not found.")
                 )
             }
 
             let sessionId = ChatExecutionContext.currentSessionId
-            try await MethodService.shared.reportOutcome(
-                methodId: methodId,
+            try await WorkflowService.shared.reportOutcome(
+                workflowId: workflowId,
                 outcome: .loaded,
                 agentId: sessionId
             )
 
-            var output = "# Method: \(method.name)\n\n"
-            output += "Description: \(method.description)\n"
-            output += "Version: \(method.version) | Source: \(method.source.rawValue)\n"
-            if !method.toolsUsed.isEmpty {
-                output += "Tools: \(method.toolsUsed.joined(separator: ", "))\n"
+            var output = "# Workflow: \(workflow.name)\n\n"
+            output += "Description: \(workflow.description)\n"
+            output += "Version: \(workflow.version) | Source: \(workflow.source.rawValue)\n"
+            if !workflow.toolsUsed.isEmpty {
+                output += "Tools: \(workflow.toolsUsed.joined(separator: ", "))\n"
+            }
+            if !workflow.steps.isEmpty {
+                output +=
+                    "Runnable: `workflow_run` with `{\"id\": \"\(workflow.id)\"}` executes the steps below automatically.\n"
             }
             output += "\n---\n\n"
-            output += method.body
+            output += workflow.body
             output += "\n\n"
 
-            if !method.toolsUsed.isEmpty {
+            if !workflow.toolsUsed.isEmpty {
                 let allowedNames = await grantedToolNamesForCurrentAgent()
                 let (loadableToolNames, blockedToolNames) = await MainActor.run {
                     () -> ([String], [String]) in
                     var allowed: [String] = []
                     var blocked: [String] = []
-                    for name in method.toolsUsed {
+                    for name in workflow.toolsUsed {
                         let isBuiltIn = ToolRegistry.shared.builtInToolNames.contains(name)
                         if isBuiltIn || (allowedNames?.contains(name) ?? true) {
                             allowed.append(name)
@@ -591,9 +614,9 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
                 }
             }
 
-            if !method.skillsUsed.isEmpty {
+            if !workflow.skillsUsed.isEmpty {
                 let skills: [(String, String)] = await MainActor.run {
-                    method.skillsUsed.compactMap { name in
+                    workflow.skillsUsed.compactMap { name in
                         SkillManager.shared.skill(named: name).map { (name, $0.instructions) }
                     }
                 }
@@ -609,7 +632,7 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
             return .failure(
                 LoadFailure(
                     kind: .executionError,
-                    message: "Error loading method '\(methodId)': \(error.localizedDescription)"
+                    message: "Error loading workflow '\(workflowId)': \(error.localizedDescription)"
                 )
             )
         }

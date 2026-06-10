@@ -184,6 +184,10 @@ final class ToolRegistry: ObservableObject {
             // Capability discovery (search -> load) for mid-session growth.
             CapabilitiesDiscoverTool(),
             CapabilitiesLoadTool(),
+            // Workflows: save a completed task's tool trace as a reusable
+            // procedure; run a saved workflow's deterministic steps.
+            WorkflowSaveTool(),
+            WorkflowRunTool(),
             // Persistent memory recall — one tool, dispatched by `scope`.
             SearchMemoryTool(),
             // Inline data visualization rendered as a chart card.

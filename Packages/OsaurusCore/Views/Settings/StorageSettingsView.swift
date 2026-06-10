@@ -108,7 +108,7 @@ public struct StorageSettingsView: View {
                 aboutRow(
                     icon: "doc.text.magnifyingglass",
                     text:
-                        "Chats, long-term memory, methods, tool indexes, and configuration files are encrypted at rest with AES-256 (SQLCipher)."
+                        "Chats, long-term memory, workflows, tool indexes, and configuration files are encrypted at rest with AES-256 (SQLCipher)."
                 )
                 aboutRow(
                     icon: "key.fill",

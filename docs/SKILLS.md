@@ -194,13 +194,13 @@ Osaurus gives the agent a complete, statically-ordered view of every enabled cap
 
 ### How It Works
 
-Each agent session's system prompt carries an **enabled-capabilities manifest** that lists every skill (as well as methods and tools) the agent is allowed to use. The manifest is frozen at session start so the static prompt prefix stays byte-stable across turns. Skill instructions themselves are not all injected up front — the agent pulls in the ones it needs at runtime via `capabilities_discover` / `capabilities_load`, which use hybrid BM25 + vector matching over the indexed catalog.
+Each agent session's system prompt carries an **enabled-capabilities manifest** that lists every skill (as well as workflows and tools) the agent is allowed to use. The manifest is frozen at session start so the static prompt prefix stays byte-stable across turns. Skill instructions themselves are not all injected up front — the agent pulls in the ones it needs at runtime via `capabilities_discover` / `capabilities_load`, which use hybrid BM25 + vector matching over the indexed catalog.
 
 ### Runtime Discovery
 
 During a conversation, the AI discovers and loads capabilities on demand:
 
-1. **`capabilities_discover`** — Searches all indexed methods, tools, and skills in parallel
+1. **`capabilities_discover`** — Searches all indexed workflows, tools, and skills in parallel
 2. **`capabilities_load`** — Loads a specific capability into the active session
 
 The AI starts with the manifest plus a fixed "hot set" of always-loaded tools, then dynamically expands its capabilities as the conversation evolves.
@@ -211,7 +211,7 @@ The AI starts with the manifest plus a fixed "hot set" of always-loaded tools, t
 - **Better focus** — Only loaded capabilities ride in the schema, keeping context lean
 - **Adaptive** — The AI can discover additional skills mid-conversation if the topic shifts
 - **Cache-friendly** — Freezing the manifest keeps the static prompt prefix stable for KV-cache reuse
-- **Works with Methods** — Learned workflows (methods) are searchable alongside skills, so the AI benefits from past experience
+- **Works with Workflows** — Learned workflows are searchable alongside skills, so the AI benefits from past experience
 
 ---
 
@@ -265,5 +265,5 @@ No per-agent skill configuration is needed. The system automatically matches the
 - [Agents](../README.md#agents) — Custom AI assistants
 - [Tools & Plugins](plugins/README.md) — Extend with custom tools
 - [Agent Skills Specification](https://agentskills.io/) — Open format documentation
-- [Features: Methods](FEATURES.md#methods) — Reusable learned workflows
+- [Features: Workflows](FEATURES.md#workflows) — Reusable learned procedures
 - [Features: Context Management](FEATURES.md#context-management) — Automated capability selection

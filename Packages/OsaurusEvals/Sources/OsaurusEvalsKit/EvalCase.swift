@@ -9,7 +9,7 @@
 //      "capability_claims", "schema"). It selects which runner
 //      code-path executes the case.
 //    - `fixtures` describes the world the case should run against
-//      (required plugins, seeded methods, enabled skills/tools). The
+//      (required plugins, seeded workflows, enabled skills/tools). The
 //      runner uses `requirePlugins` to skip cases the local install
 //      can't satisfy instead of failing them — a contributor without
 //      `osaurus.browser` should still be able to run the rest of the suite.
@@ -66,9 +66,9 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         /// missing requirements are SKIPPED in the report (not failed)
         /// so an incomplete local setup doesn't mask real regressions.
         public let requirePlugins: [String]?
-        /// Methods to insert into `MethodDatabase` before the case
+        /// Workflows to insert into `WorkflowDatabase` before the case
         /// runs (and remove afterwards). Used by `capability_search`
-        /// cases that probe the methods lane — methods have no
+        /// cases that probe the workflows lane — workflows have no
         /// built-in seed so a fixture has to bring its own. Each
         /// entry's `id` becomes the deterministic primary key
         /// (preferred: `eval-<slug>`) so cleanup works idempotently
@@ -77,7 +77,7 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         /// Insert/cleanup is wrapped around the case body in
         /// `EvalRunner.runCapabilitySearchCase`. Other domains
         /// ignore this field.
-        public let seedMethods: [SeedMethod]?
+        public let seedWorkflows: [SeedWorkflow]?
         /// Skill names to flip `enabled = true` on for the duration
         /// of the case (and restore afterwards). Used by
         /// `capability_search` skill-lane fixtures because every
@@ -117,14 +117,14 @@ public struct EvalCase: Sendable, Codable, Identifiable {
 
         public init(
             requirePlugins: [String]? = nil,
-            seedMethods: [SeedMethod]? = nil,
+            seedWorkflows: [SeedWorkflow]? = nil,
             enableSkills: [String]? = nil,
             enableTools: [String]? = nil,
             ensureToolsDisabled: [String]? = nil,
             workspaceFiles: [WorkspaceFile]? = nil
         ) {
             self.requirePlugins = requirePlugins
-            self.seedMethods = seedMethods
+            self.seedWorkflows = seedWorkflows
             self.enableSkills = enableSkills
             self.enableTools = enableTools
             self.ensureToolsDisabled = ensureToolsDisabled
@@ -145,22 +145,22 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         }
     }
 
-    /// One method to seed into `MethodDatabase` for a case run. Schema
-    /// is intentionally minimal — the recall layer reads
+    /// One workflow to seed into `WorkflowDatabase` for a case run.
+    /// Schema is intentionally minimal — the recall layer reads
     /// `name`/`description`/`triggerText` (via
-    /// `MethodSearchService.buildIndexText`) and needs nothing else
+    /// `WorkflowSearchService.buildIndexText`) and needs nothing else
     /// to score recall.
     ///
     /// `body` and `triggerText` are optional in the JSON shape so
     /// fixture authors don't have to think about them — `body` is
     /// only required by the storage layer's `NOT NULL` constraint
     /// (search ignores it); `triggerText` exists so cases probing
-    /// the "user phrasing differs from method name" shape can pin
+    /// the "user phrasing differs from workflow name" shape can pin
     /// extra index signal. Codable's synthesized decoder doesn't
     /// honour Swift's `= ""` defaults — declaring these `Optional`
     /// is the only way to make them omittable in JSON.
-    public struct SeedMethod: Sendable, Codable {
-        /// Stable id used as the `methods.id` primary key. Prefer
+    public struct SeedWorkflow: Sendable, Codable {
+        /// Stable id used as the `workflows.id` primary key. Prefer
         /// the form `eval-<slug>` so accidental leftovers in a
         /// developer's local DB are obviously test data.
         public let id: String
@@ -498,9 +498,9 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         /// Per-case threshold. The CLI `--threshold` flag wins when set.
         public let thresholdOverride: Float?
         public let expectedTools: AnyOfMatcher?
-        public let expectedMethods: AnyOfMatcher?
+        public let expectedWorkflows: AnyOfMatcher?
         public let expectedSkills: AnyOfMatcher?
-        /// Cap on total accepted-hit count across tools+methods+skills.
+        /// Cap on total accepted-hit count across tools+workflows+skills.
         /// `nil` = no cap. `0` = abstain-style: ANY accepted hit fails
         /// the case.
         public let maxAccepted: Int?
@@ -509,14 +509,14 @@ public struct EvalCase: Sendable, Codable, Identifiable {
             topK: Int? = nil,
             thresholdOverride: Float? = nil,
             expectedTools: AnyOfMatcher? = nil,
-            expectedMethods: AnyOfMatcher? = nil,
+            expectedWorkflows: AnyOfMatcher? = nil,
             expectedSkills: AnyOfMatcher? = nil,
             maxAccepted: Int? = nil
         ) {
             self.topK = topK
             self.thresholdOverride = thresholdOverride
             self.expectedTools = expectedTools
-            self.expectedMethods = expectedMethods
+            self.expectedWorkflows = expectedWorkflows
             self.expectedSkills = expectedSkills
             self.maxAccepted = maxAccepted
         }

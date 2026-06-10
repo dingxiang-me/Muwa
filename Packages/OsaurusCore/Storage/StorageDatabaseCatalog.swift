@@ -38,7 +38,7 @@ public enum StorageDatabaseCatalog {
         var targets: [DatabaseTarget] = [
             .init(label: "chat history", path: OsaurusPaths.chatHistoryDatabaseFile().path),
             .init(label: "memory", path: OsaurusPaths.memoryDatabaseFile().path),
-            .init(label: "methods", path: OsaurusPaths.methodsDatabaseFile().path),
+            .init(label: "workflows", path: OsaurusPaths.workflowsDatabaseFile().path),
             .init(label: "tool index", path: OsaurusPaths.toolIndexDatabaseFile().path),
             // Both Agent DB stores are created encrypted on first open
             // via `EncryptedSQLiteOpener`; they're listed here so

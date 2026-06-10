@@ -7,7 +7,7 @@
 //   * Loading a non-configure tool (e.g. `sandbox_exec`) from the
 //     default agent returns the routing-hint error and does NOT
 //     enqueue the spec into `CapabilityLoadBuffer`.
-//   * Loading any `method/...` or `skill/...` id from the default
+//   * Loading any `workflow/...` or `skill/...` id from the default
 //     agent is refused — those targets are never useful inside the
 //     configuration agent surface.
 //
@@ -41,13 +41,13 @@ struct CapabilitiesLoadDefaultAgentScopeTests {
     }
 
     @Test
-    func defaultAgent_cannotLoadMethods() async throws {
+    func defaultAgent_cannotLoadWorkflows() async throws {
         let tool = CapabilitiesLoadTool()
         let result = try await ChatExecutionContext.$currentAgentId.withValue(Agent.defaultId) {
-            try await tool.execute(argumentsJSON: "{\"ids\": [\"method/anything\"]}")
+            try await tool.execute(argumentsJSON: "{\"ids\": [\"workflow/anything\"]}")
         }
-        // Method loading is hard-disabled for the configuration agent.
-        #expect(result.contains("Method loading is disabled"))
+        // Workflow loading is hard-disabled for the configuration agent.
+        #expect(result.contains("Workflow loading is disabled"))
     }
 
     @Test

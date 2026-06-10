@@ -158,7 +158,7 @@ struct ToolSearchServiceTests {
 
             let results = await CapabilitySearch.search(
                 query: "current headline web search",
-                topK: (methods: 0, tools: 5, skills: 0)
+                topK: (workflows: 0, tools: 5, skills: 0)
             )
             #expect(
                 results.tools.contains { $0.entry.name == fixture.name },
@@ -200,7 +200,7 @@ struct ToolSearchServiceTests {
 
             let capabilityResults = await CapabilitySearch.search(
                 query: "current headline web search",
-                topK: (methods: 0, tools: 5, skills: 0)
+                topK: (workflows: 0, tools: 5, skills: 0)
             )
             #expect(
                 capabilityResults.tools.contains { $0.entry.name == fixture.name },

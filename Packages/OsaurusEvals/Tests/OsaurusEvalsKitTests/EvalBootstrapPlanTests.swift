@@ -30,16 +30,16 @@ struct EvalBootstrapPlanTests {
         let suite = makeSuite(
             cases: [
                 makeCase(
-                    id: "capability_search.method-paraphrase",
+                    id: "capability_search.workflow-paraphrase",
                     domain: "capability_search",
-                    expectedMethods: true
+                    expectedWorkflows: true
                 )
             ]
         )
 
         let plan = EvalBootstrapPlan.make(
             suite: suite,
-            filter: "method-paraphrase",
+            filter: "workflow-paraphrase",
             preference: .automatic
         )
 
@@ -47,7 +47,7 @@ struct EvalBootstrapPlanTests {
             plan
                 == EvalBootstrapPlan(
                     loadInstalledPlugins: false,
-                    searchIndexScope: EvalSearchIndexBootstrapScope(methods: true)
+                    searchIndexScope: EvalSearchIndexBootstrapScope(workflows: true)
                 )
         )
         #expect(plan.usesIsolatedSearchStorage)
@@ -118,9 +118,9 @@ struct EvalBootstrapPlanTests {
             suite: makeSuite(
                 cases: [
                     makeCase(
-                        id: "capability_search.method-paraphrase",
+                        id: "capability_search.workflow-paraphrase",
                         domain: "capability_search",
-                        expectedMethods: true
+                        expectedWorkflows: true
                     )
                 ]
             ),
@@ -133,7 +133,7 @@ struct EvalBootstrapPlanTests {
             disabled
                 == EvalBootstrapPlan(
                     loadInstalledPlugins: false,
-                    searchIndexScope: EvalSearchIndexBootstrapScope(methods: true)
+                    searchIndexScope: EvalSearchIndexBootstrapScope(workflows: true)
                 )
         )
     }
@@ -153,7 +153,7 @@ struct EvalBootstrapPlanTests {
         let root = EvalBootstrap.configureIsolatedSearchStorageIfNeeded(
             for: EvalBootstrapPlan(
                 loadInstalledPlugins: false,
-                searchIndexScope: EvalSearchIndexBootstrapScope(methods: true)
+                searchIndexScope: EvalSearchIndexBootstrapScope(workflows: true)
             )
         )
         isolatedRoot = root
@@ -200,9 +200,9 @@ struct EvalBootstrapPlanTests {
         domain: String,
         requirePlugins: [String]? = nil,
         expectedTools: Bool = false,
-        expectedMethods: Bool = false,
+        expectedWorkflows: Bool = false,
         expectedSkills: Bool = false,
-        seedMethods: [EvalCase.SeedMethod]? = nil,
+        seedWorkflows: [EvalCase.SeedWorkflow]? = nil,
         enableSkills: [String]? = nil
     ) -> EvalCase {
         let anyOf = EvalCase.CapabilitySearchExpectations.AnyOfMatcher(
@@ -210,10 +210,10 @@ struct EvalBootstrapPlanTests {
             minMatches: 0
         )
         let capabilitySearch =
-            expectedTools || expectedMethods || expectedSkills
+            expectedTools || expectedWorkflows || expectedSkills
             ? EvalCase.CapabilitySearchExpectations(
                 expectedTools: expectedTools ? anyOf : nil,
-                expectedMethods: expectedMethods ? anyOf : nil,
+                expectedWorkflows: expectedWorkflows ? anyOf : nil,
                 expectedSkills: expectedSkills ? anyOf : nil
             )
             : nil
@@ -224,7 +224,7 @@ struct EvalBootstrapPlanTests {
             query: "query",
             fixtures: .init(
                 requirePlugins: requirePlugins,
-                seedMethods: seedMethods,
+                seedWorkflows: seedWorkflows,
                 enableSkills: enableSkills
             ),
             expect: .init(capabilitySearch: capabilitySearch)

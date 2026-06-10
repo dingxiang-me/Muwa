@@ -1,8 +1,8 @@
 //
-//  MethodSearchService.swift
+//  WorkflowSearchService.swift
 //  osaurus
 //
-//  Wraps VecturaKit for hybrid search (BM25 + vector) over methods.
+//  Wraps VecturaKit for hybrid search (BM25 + vector) over workflows.
 //  Falls back gracefully when VecturaKit is unavailable.
 //
 
@@ -11,10 +11,10 @@ import Foundation
 import VecturaKit
 import os
 
-/// Diagnostic snapshot for `MethodSearchService.searchWithDiagnostic`.
+/// Diagnostic snapshot for `WorkflowSearchService.searchWithDiagnostic`.
 /// Mirrors `ToolSearchDiagnostic` shape so the env-flag log path in
 /// `CapabilitySearch.search` can format all three uniformly.
-public struct MethodSearchDiagnostic: Sendable {
+public struct WorkflowSearchDiagnostic: Sendable {
     public struct Hit: Sendable {
         public let name: String
         public let score: Float
@@ -24,21 +24,21 @@ public struct MethodSearchDiagnostic: Sendable {
         }
     }
 
-    public let indexedMethodCount: Int
+    public let indexedWorkflowCount: Int
     public let rawHits: [Hit]
     public let acceptedHits: [Hit]
     public let threshold: Float
 
-    public init(indexedMethodCount: Int, rawHits: [Hit], acceptedHits: [Hit], threshold: Float) {
-        self.indexedMethodCount = indexedMethodCount
+    public init(indexedWorkflowCount: Int, rawHits: [Hit], acceptedHits: [Hit], threshold: Float) {
+        self.indexedWorkflowCount = indexedWorkflowCount
         self.rawHits = rawHits
         self.acceptedHits = acceptedHits
         self.threshold = threshold
     }
 }
 
-public actor MethodSearchService {
-    public static let shared = MethodSearchService()
+public actor WorkflowSearchService {
+    public static let shared = WorkflowSearchService()
 
     private static let defaultSearchThreshold: Float = 0.10
 
@@ -52,14 +52,14 @@ public actor MethodSearchService {
     public func initialize() async {
         guard !isInitialized else { return }
 
-        let storageDir = OsaurusPaths.methods().appendingPathComponent("vectura", isDirectory: true)
+        let storageDir = OsaurusPaths.workflows().appendingPathComponent("vectura", isDirectory: true)
 
         for attempt in 1 ... 2 {
             do {
                 OsaurusPaths.ensureExistsSilent(storageDir)
 
                 let config = try VecturaConfig(
-                    name: "osaurus-methods",
+                    name: "osaurus-workflows",
                     directoryURL: storageDir,
                     dimension: EmbeddingService.embeddingDimension,
                     searchOptions: VecturaConfig.SearchOptions(
@@ -75,16 +75,16 @@ public actor MethodSearchService {
                 vectorDB = try await VecturaKit(config: config, embedder: EmbeddingService.sharedEmbedder)
                 isInitialized = true
                 rehydrateReverseIdMap()
-                MethodLogger.search.info("VecturaKit initialized successfully for methods")
+                WorkflowLogger.search.info("VecturaKit initialized successfully for workflows")
                 break
             } catch {
                 if attempt == 1 {
-                    MethodLogger.search.warning(
-                        "VecturaKit init failed for methods, deleting storage to recover: \(error)"
+                    WorkflowLogger.search.warning(
+                        "VecturaKit init failed for workflows, deleting storage to recover: \(error)"
                     )
                     try? FileManager.default.removeItem(at: storageDir)
                 } else {
-                    MethodLogger.search.error("VecturaKit init failed for methods (search unavailable): \(error)")
+                    WorkflowLogger.search.error("VecturaKit init failed for workflows (search unavailable): \(error)")
                     vectorDB = nil
                 }
             }
@@ -94,37 +94,37 @@ public actor MethodSearchService {
     /// See `ToolSearchService.rehydrateReverseIdMap` for the rationale.
     /// Without this, search returns empty until `rebuildIndex()`
     /// completes, leaving `capabilities_discover` unable to surface
-    /// installed methods until the index repopulates.
+    /// installed workflows until the index repopulates.
     private func rehydrateReverseIdMap() {
-        guard let methods = try? MethodDatabase.shared.loadAllMethods() else { return }
-        for method in methods {
-            _ = deterministicUUID(for: method.id)
+        guard let workflows = try? WorkflowDatabase.shared.loadAllWorkflows() else { return }
+        for workflow in workflows {
+            _ = deterministicUUID(for: workflow.id)
         }
-        MethodLogger.search.info("Method reverse-id map rehydrated with \(methods.count) entries")
+        WorkflowLogger.search.info("Workflow reverse-id map rehydrated with \(workflows.count) entries")
     }
 
     // MARK: - Indexing
 
-    public func indexMethod(_ method: Method) async {
+    public func indexWorkflow(_ workflow: Workflow) async {
         guard let db = vectorDB else { return }
         do {
             let toolDescs = Self.loadToolDescriptions()
-            let id = deterministicUUID(for: method.id)
-            let text = buildIndexText(for: method, toolDescriptions: toolDescs)
+            let id = deterministicUUID(for: workflow.id)
+            let text = buildIndexText(for: workflow, toolDescriptions: toolDescs)
             _ = try await db.addDocument(text: text, id: id)
         } catch {
-            MethodLogger.search.error("Failed to index method \(method.id): \(error)")
+            WorkflowLogger.search.error("Failed to index workflow \(workflow.id): \(error)")
         }
     }
 
-    public func removeMethod(id: String) async {
+    public func removeWorkflow(id: String) async {
         guard let db = vectorDB else { return }
         do {
             let uuid = deterministicUUID(for: id)
             try await db.deleteDocuments(ids: [uuid])
             reverseIdMap.removeValue(forKey: uuid.uuidString)
         } catch {
-            MethodLogger.search.error("Failed to remove method \(id) from index: \(error)")
+            WorkflowLogger.search.error("Failed to remove workflow \(id) from index: \(error)")
         }
     }
 
@@ -134,7 +134,7 @@ public actor MethodSearchService {
         query: String,
         topK: Int = 10,
         threshold: Float? = nil
-    ) async -> [MethodSearchResult] {
+    ) async -> [WorkflowSearchResult] {
         guard topK > 0 else { return [] }
         guard let db = vectorDB else { return [] }
         do {
@@ -150,24 +150,27 @@ public actor MethodSearchService {
                 uniquingKeysWith: { first, _ in first }
             )
 
-            let methodIds = results.compactMap { reverseIdMap[$0.id.uuidString] }
+            let workflowIds = results.compactMap { reverseIdMap[$0.id.uuidString] }
 
-            let methods = try MethodDatabase.shared.loadMethodsByIds(methodIds)
-            let scores = try methodIds.compactMap { try MethodDatabase.shared.loadScore(methodId: $0) }
-            let scoreByMethod = Dictionary(scores.map { ($0.methodId, $0) }, uniquingKeysWith: { first, _ in first })
+            let workflows = try WorkflowDatabase.shared.loadWorkflowsByIds(workflowIds)
+            let scores = try workflowIds.compactMap { try WorkflowDatabase.shared.loadScore(workflowId: $0) }
+            let scoreByWorkflow = Dictionary(
+                scores.map { ($0.workflowId, $0) },
+                uniquingKeysWith: { first, _ in first }
+            )
 
             return Array(
-                methods.compactMap { method -> MethodSearchResult? in
-                    let uuid = deterministicUUID(for: method.id)
+                workflows.compactMap { workflow -> WorkflowSearchResult? in
+                    let uuid = deterministicUUID(for: workflow.id)
                     guard let searchScore = scoreMap[uuid.uuidString] else { return nil }
-                    let methodScore = scoreByMethod[method.id]?.score ?? 0.0
-                    return MethodSearchResult(method: method, searchScore: searchScore, score: methodScore)
+                    let workflowScore = scoreByWorkflow[workflow.id]?.score ?? 0.0
+                    return WorkflowSearchResult(workflow: workflow, searchScore: searchScore, score: workflowScore)
                 }
                 .sorted { $0.searchScore > $1.searchScore }
                 .prefix(topK)
             )
         } catch {
-            MethodLogger.search.error("Method search failed: \(error)")
+            WorkflowLogger.search.error("Workflow search failed: \(error)")
             return []
         }
     }
@@ -180,14 +183,14 @@ public actor MethodSearchService {
         query: String,
         topK: Int,
         threshold: Float
-    ) async -> (results: [MethodSearchResult], diagnostic: MethodSearchDiagnostic) {
-        let indexedCount = (try? MethodDatabase.shared.loadAllMethods().count) ?? 0
+    ) async -> (results: [WorkflowSearchResult], diagnostic: WorkflowSearchDiagnostic) {
+        let indexedCount = (try? WorkflowDatabase.shared.loadAllWorkflows().count) ?? 0
         let raw = await search(query: query, topK: topK, threshold: 0.0)
         let accepted = await search(query: query, topK: topK, threshold: threshold)
-        let diagnostic = MethodSearchDiagnostic(
-            indexedMethodCount: indexedCount,
-            rawHits: raw.map { MethodSearchDiagnostic.Hit(name: $0.method.name, score: $0.searchScore) },
-            acceptedHits: accepted.map { MethodSearchDiagnostic.Hit(name: $0.method.name, score: $0.searchScore) },
+        let diagnostic = WorkflowSearchDiagnostic(
+            indexedWorkflowCount: indexedCount,
+            rawHits: raw.map { WorkflowSearchDiagnostic.Hit(name: $0.workflow.name, score: $0.searchScore) },
+            acceptedHits: accepted.map { WorkflowSearchDiagnostic.Hit(name: $0.workflow.name, score: $0.searchScore) },
             threshold: threshold
         )
         return (accepted, diagnostic)
@@ -203,22 +206,22 @@ public actor MethodSearchService {
 
             let toolDescs = Self.loadToolDescriptions()
 
-            let methods = try MethodDatabase.shared.loadAllMethods()
+            let workflows = try WorkflowDatabase.shared.loadAllWorkflows()
             var texts: [String] = []
             var ids: [UUID] = []
-            texts.reserveCapacity(methods.count)
-            ids.reserveCapacity(methods.count)
-            for method in methods {
-                let id = deterministicUUID(for: method.id)
-                texts.append(buildIndexText(for: method, toolDescriptions: toolDescs))
+            texts.reserveCapacity(workflows.count)
+            ids.reserveCapacity(workflows.count)
+            for workflow in workflows {
+                let id = deterministicUUID(for: workflow.id)
+                texts.append(buildIndexText(for: workflow, toolDescriptions: toolDescs))
                 ids.append(id)
             }
             if !texts.isEmpty {
                 _ = try await db.addDocuments(texts: texts, ids: ids)
             }
-            MethodLogger.search.info("Method index rebuilt with \(methods.count) methods")
+            WorkflowLogger.search.info("Workflow index rebuilt with \(workflows.count) workflows")
         } catch {
-            MethodLogger.search.error("Failed to rebuild method index: \(error)")
+            WorkflowLogger.search.error("Failed to rebuild workflow index: \(error)")
         }
     }
 
@@ -226,12 +229,12 @@ public actor MethodSearchService {
 
     private var reverseIdMap: [String: String] = [:]
 
-    private func buildIndexText(for method: Method, toolDescriptions: [String: String] = [:]) -> String {
-        var text = method.description
-        if let trigger = method.triggerText, !trigger.isEmpty {
+    private func buildIndexText(for workflow: Workflow, toolDescriptions: [String: String] = [:]) -> String {
+        var text = workflow.description
+        if let trigger = workflow.triggerText, !trigger.isEmpty {
             text += " " + trigger
         }
-        for toolName in method.toolsUsed {
+        for toolName in workflow.toolsUsed {
             text += " \(toolName)"
             if let desc = toolDescriptions[toolName] {
                 text += " \(desc)"
@@ -249,8 +252,8 @@ public actor MethodSearchService {
         }
     }
 
-    private func deterministicUUID(for methodId: String) -> UUID {
-        let hash = SHA256.hash(data: Data("method:\(methodId)".utf8))
+    private func deterministicUUID(for workflowId: String) -> UUID {
+        let hash = SHA256.hash(data: Data("workflow:\(workflowId)".utf8))
         let bytes = Array(hash)
         let uuid = UUID(
             uuid: (
@@ -260,7 +263,7 @@ public actor MethodSearchService {
                 bytes[12], bytes[13], bytes[14], bytes[15]
             )
         )
-        reverseIdMap[uuid.uuidString] = methodId
+        reverseIdMap[uuid.uuidString] = workflowId
         return uuid
     }
 }

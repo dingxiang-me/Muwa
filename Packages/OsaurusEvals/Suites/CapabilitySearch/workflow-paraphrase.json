@@ -1,11 +1,11 @@
 {
-  "id": "capability_search.method-paraphrase",
+  "id": "capability_search.workflow-paraphrase",
   "domain": "capability_search",
-  "label": "capability search • method • paraphrase / synonym bridge",
+  "label": "capability search • workflow • paraphrase / synonym bridge",
   "query": "make a chart from this data",
-  "notes": "Probes the embed-still-needed class on the methods lane: the user's phrasing ('make a chart') shares no surface tokens with the method name `plot_data` or its description ('Render a graph from tabular numbers'). BM25 cannot bridge the synonym gap — only the embedder can. If this case fails, BM25 isn't the right fix; the description audit (or a richer triggerText set) is.",
+  "notes": "Probes the embed-still-needed class on the workflows lane: the user's phrasing ('make a chart') shares no surface tokens with the workflow name `plot_data` or its description ('Render a graph from tabular numbers'). BM25 cannot bridge the synonym gap — only the embedder can. If this case fails, BM25 isn't the right fix; the description audit (or a richer triggerText set) is.",
   "fixtures": {
-    "seedMethods": [
+    "seedWorkflows": [
       {
         "id": "eval-plot-data",
         "name": "plot_data",
@@ -28,7 +28,7 @@
   },
   "expect": {
     "capabilitySearch": {
-      "expectedMethods": {
+      "expectedWorkflows": {
         "anyOf": ["plot_data"],
         "minMatches": 1
       }

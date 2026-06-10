@@ -26,7 +26,7 @@ public struct SkillSearchResult: Sendable {
 }
 
 /// Diagnostic snapshot for `SkillSearchService.searchWithDiagnostic`. Mirror
-/// of `ToolSearchDiagnostic` / `MethodSearchDiagnostic`; same usage gates
+/// of `ToolSearchDiagnostic` / `WorkflowSearchDiagnostic`; same usage gates
 /// (env-flag trace + offline eval).
 public struct SkillSearchDiagnostic: Sendable {
     public struct Hit: Sendable {

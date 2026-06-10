@@ -166,7 +166,7 @@ Document attachments keep structure where the file format exposes it: CSV/TSV ta
 
 ## More
 
-**Skills & Methods** -- Skills import reusable AI capabilities from GitHub repos or files, compatible with [Agent Skills](https://agentskills.io/). Full Claude plugins (skills, scheduled agents, slash commands, MCP providers, and `CLAUDE.md` context) can be imported from any GitHub repo and managed as a single bundle. Methods are learned workflows that agents save and reuse over time. All are automatically selected via RAG search -- no manual configuration needed. See [Skills Guide](docs/SKILLS.md) and [Claude Plugins](docs/CLAUDE_PLUGINS.md).
+**Skills & Workflows** -- Skills import reusable AI capabilities from GitHub repos or files, compatible with [Agent Skills](https://agentskills.io/). Full Claude plugins (skills, scheduled agents, slash commands, MCP providers, and `CLAUDE.md` context) can be imported from any GitHub repo and managed as a single bundle. Workflows are parameterized, runnable procedures that capable models distill from completed tasks (`workflow_save`) and any model can execute deterministically (`workflow_run`). All are automatically selected via RAG search -- no manual configuration needed. See [Skills Guide](docs/SKILLS.md) and [Claude Plugins](docs/CLAUDE_PLUGINS.md).
 
 **Automation** -- Schedules run recurring tasks in the background. Watchers monitor folders and trigger agents on file changes.
 
@@ -247,7 +247,7 @@ ln -sf "/Applications/Osaurus.app/Contents/MacOS/osaurus" "$(brew --prefix)/bin/
 ├──────────┴──────────┴───────────┴───────────────────┤
 │      Plugin System (v1 / v2 ABI) · Native Plugins   │
 ├──────────┬──────────┬───────────┬───────────────────┤
-│ Identity │ Relay    │ Tools     │ Skills · Methods  │
+│ Identity │ Relay    │ Tools     │ Skills · Workflows│
 ├──────────┴──────────┴───────────┴───────────────────┤
 │  Sandbox VM (Alpine · Apple Containerization)       │
 │  vsock bridge · VirtioFS · per-agent isolation      │

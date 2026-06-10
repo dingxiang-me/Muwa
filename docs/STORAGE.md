@@ -1,6 +1,6 @@
 # Storage
 
-Osaurus encrypts everything sensitive on disk — chats, memory, methods, tool indexes, plugin databases, and large attachments — with a per-device key kept in your macOS Keychain. Nothing leaves your Mac and nothing is readable by another user account, by Spotlight, or by Time Machine snapshots without the same Keychain entry.
+Osaurus encrypts everything sensitive on disk — chats, memory, workflows, tool indexes, plugin databases, and large attachments — with a per-device key kept in your macOS Keychain. Nothing leaves your Mac and nothing is readable by another user account, by Spotlight, or by Time Machine snapshots without the same Keychain entry.
 
 This document covers what's encrypted, how the key is managed, and the user-facing controls in **Settings → Storage**.
 
@@ -46,7 +46,7 @@ If you want to back up your data in plaintext (for example, before reinstalling 
 |---|---|---|
 | Chat history | SQLCipher | `~/.osaurus/chat-history/history.sqlite` |
 | Memory (identity, pinned facts, episodes, transcript, FTS5 mirrors) | SQLCipher | `~/.osaurus/memory/memory.sqlite` |
-| Methods catalog | SQLCipher | `~/.osaurus/methods/methods.sqlite` |
+| Workflows catalog | SQLCipher | `~/.osaurus/workflows/workflows.sqlite` |
 | Tool index | SQLCipher | `~/.osaurus/tool-index/tool_index.sqlite` |
 | Per-plugin databases | SQLCipher | `~/.osaurus/Tools/<plugin-id>/data/data.db` |
 | Per-agent database (opt-in) | SQLCipher | `~/.osaurus/agents/<uuid>/db.sqlite` |
@@ -165,7 +165,7 @@ The ticker is started from [`AppDelegate`](../Packages/OsaurusCore/AppDelegate.s
 | `~/.osaurus/chat-history/blobs/<sha256>.osec` | AES-GCM-encrypted spilled attachments |
 | `~/.osaurus/memory/memory.sqlite` | SQLCipher memory database |
 | `~/.osaurus/memory/vectura/<agentId>/` | Per-agent VecturaKit vector index (plaintext, see Limitations) |
-| `~/.osaurus/methods/methods.sqlite` | SQLCipher methods catalog |
+| `~/.osaurus/workflows/workflows.sqlite` | SQLCipher workflows catalog |
 | `~/.osaurus/tool-index/tool_index.sqlite` | SQLCipher tool index |
 | `~/.osaurus/Tools/<plugin-id>/data/data.db` | Per-plugin SQLCipher database |
 | `~/.osaurus/agents/<uuid>/db.sqlite` | Per-agent SQLCipher database (see [Agent DB & Self-Scheduling](AGENT_DB.md)) |

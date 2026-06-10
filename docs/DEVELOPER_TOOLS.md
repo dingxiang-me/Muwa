@@ -338,7 +338,7 @@ Test wall-time is now bounded by the build-from-scratch cost of the full `Osauru
 - `FluidAudio`: 2 files (`Managers/SpeechService.swift`, `Managers/Model/SpeechModelManager.swift`).
 - `Sparkle`: 1 file (`Services/UpdaterService.swift`).
 - `AAInfographics`: 1 file (`Views/Chat/NativeChartView.swift`).
-- `VecturaKit`: 7 files in `Services/{Memory,Method,Skill,Tool}/*`.
+- `VecturaKit`: 7 files in `Services/{Memory,Workflow,Skill,Tool}/*`.
 - `Containerization`: 1 file (`Services/Sandbox/SandboxManager.swift`).
 - `P256K`, `Highlightr`, `SwiftMath`: 1 file each.
 

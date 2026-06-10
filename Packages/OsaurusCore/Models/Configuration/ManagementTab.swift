@@ -17,6 +17,7 @@ public enum ManagementTab: String, CaseIterable, Identifiable {
     case sandbox
     case tools
     case skills
+    case workflows
     case commands
     case memory
     case schedules
@@ -42,6 +43,7 @@ public enum ManagementTab: String, CaseIterable, Identifiable {
         case .sandbox: "shippingbox.fill"
         case .tools: "wrench.and.screwdriver.fill"
         case .skills: "sparkles"
+        case .workflows: "arrow.triangle.branch"
         case .commands: "command"
         case .memory: "brain.head.profile.fill"
         case .schedules: "calendar.badge.clock"
@@ -67,6 +69,7 @@ public enum ManagementTab: String, CaseIterable, Identifiable {
         case .sandbox: L("Sandbox")
         case .tools: L("Tools")
         case .skills: L("Skills")
+        case .workflows: L("Workflows")
         case .commands: L("Commands")
         case .memory: L("Memory")
         case .schedules: L("Schedules")

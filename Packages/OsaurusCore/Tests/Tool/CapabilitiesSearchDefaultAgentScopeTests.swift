@@ -5,7 +5,7 @@
 //  Default-agent scoping for `capabilities_discover` and the
 //  composer-level schema gate that complements it:
 //
-//   * Search results from the default agent never carry method/skill
+//   * Search results from the default agent never carry workflow/skill
 //     hits — the tools-only fast path skips those lanes entirely.
 //   * `composeChatContext` with `Agent.defaultId` keeps the fixed
 //     baseline schema regardless of query — no non-baseline tool can
@@ -31,12 +31,12 @@ struct CapabilitiesSearchDefaultAgentScopeTests {
         // Either we get hits or we get the no-match envelope — both are
         // valid for source-only tests (the catalog state depends on
         // whether ConfigurationDomainBootstrap has run). What we care
-        // about is that no method/ or skill/ hit ever shows up.
-        #expect(!result.contains("[method]"))
+        // about is that no workflow/ or skill/ hit ever shows up.
+        #expect(!result.contains("[workflow]"))
         #expect(!result.contains("[skill]"))
-        let methodPrefix = "method/"
+        let workflowPrefix = "workflow/"
         let skillPrefix = "skill/"
-        #expect(!result.contains(methodPrefix))
+        #expect(!result.contains(workflowPrefix))
         #expect(!result.contains(skillPrefix))
     }
 }
