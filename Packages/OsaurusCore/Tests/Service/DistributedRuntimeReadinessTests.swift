@@ -138,4 +138,67 @@ struct DistributedRuntimeReadinessTests {
         #expect(decoded.readiness.readinessState == .blocked)
         #expect(decoded.readiness.findings.contains { $0.code == "jaccl_unavailable" })
     }
+
+    @Test("IBV matrix accepts null and empty self slots")
+    func ibvMatrixAcceptsNullAndEmptySelfSlots() throws {
+        let nullSelf = try DistributedIBVDeviceMatrix(jsonData: Data("""
+        [
+          [null, "rdma_en5"],
+          ["rdma_en5", null]
+        ]
+        """.utf8))
+        let emptySelf = DistributedIBVDeviceMatrix(rows: [
+            ["", "mlx0"],
+            ["mlx0", ""],
+        ])
+
+        #expect(nullSelf.isValid(worldSize: 2))
+        #expect(emptySelf.isValid(worldSize: 2))
+        #expect(nullSelf.findings(worldSize: 2).contains { $0.code == "ibv_matrix_valid" })
+        #expect(emptySelf.findings(worldSize: 2).contains { $0.code == "ibv_matrix_valid" })
+    }
+
+    @Test("IBV matrix rejects malformed shape and missing peer devices")
+    func ibvMatrixRejectsMalformedShapeAndMissingPeerDevices() {
+        let wrongWorldSize = DistributedIBVDeviceMatrix(rows: [
+            [nil, "rdma_en5"],
+            ["rdma_en5", nil],
+        ])
+        let notSquare = DistributedIBVDeviceMatrix(rows: [
+            [nil, "rdma_en5"],
+            ["rdma_en5"],
+        ])
+        let selfDevice = DistributedIBVDeviceMatrix(rows: [
+            ["rdma_en5", "rdma_en5"],
+            ["rdma_en5", nil],
+        ])
+        let missingPeer = DistributedIBVDeviceMatrix(rows: [
+            [nil, ""],
+            ["rdma_en5", nil],
+        ])
+
+        #expect(wrongWorldSize.findings(worldSize: 4).contains { $0.code == "ibv_matrix_world_size_mismatch" })
+        #expect(notSquare.findings(worldSize: 2).contains { $0.code == "ibv_matrix_not_square" })
+        #expect(selfDevice.findings(worldSize: 2).contains { $0.code == "ibv_matrix_self_slot_not_empty" })
+        #expect(missingPeer.findings(worldSize: 2).contains { $0.code == "ibv_matrix_peer_device_missing" })
+    }
+
+    @Test("Readiness report includes IBV matrix findings")
+    func readinessReportIncludesIBVMatrixFindings() {
+        let report = DistributedRuntimeReadiness.evaluate(
+            dataPlaneAddresses: ["10.20.0.1:29500", "10.20.0.2:29500"],
+            worldSize: 2,
+            librdmaLoadable: true,
+            jacclAvailable: true,
+            ibvDevicesConfigured: true,
+            ibvDeviceMatrix: .init(rows: [
+                [nil, ""],
+                ["rdma_en5", nil],
+            ])
+        )
+
+        #expect(!report.isRunnable)
+        #expect(report.readinessState == .blocked)
+        #expect(report.findings.contains { $0.code == "ibv_matrix_peer_device_missing" })
+    }
 }

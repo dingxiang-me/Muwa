@@ -54,6 +54,11 @@ require_text "$SOURCE" 'readinessState = "readiness_state"' "source encodes read
 require_text "$SOURCE" 'isRunnable = "is_runnable"' "source encodes runnable state"
 require_text "$SOURCE" 'nodeID = "node_id"' "source encodes node id"
 require_text "$SOURCE" 'dataPlaneCandidates = "data_plane_candidates"' "source encodes data-plane candidates"
+require_text "$SOURCE" 'struct DistributedIBVDeviceMatrix' "source exposes IBV matrix validator"
+require_text "$SOURCE" 'ibv_matrix_world_size_mismatch' "source validates IBV world size"
+require_text "$SOURCE" 'ibv_matrix_not_square' "source validates IBV square shape"
+require_text "$SOURCE" 'ibv_matrix_self_slot_not_empty' "source validates IBV self slot"
+require_text "$SOURCE" 'ibv_matrix_peer_device_missing' "source validates IBV peer slots"
 
 require_text "$TESTS" 'tailscale_data_plane_forbidden' "tests cover Tailscale rejection"
 require_text "$TESTS" 'single_rank_not_tp' "tests cover size-1 fallback rejection"
@@ -64,6 +69,8 @@ require_text "$TESTS" 'Discovery record is stable JSON' "tests cover discovery r
 require_text "$TESTS" 'node_id' "tests cover snake-case node id"
 require_text "$TESTS" 'readiness_state' "tests cover snake-case readiness state"
 require_text "$TESTS" 'is_runnable' "tests cover snake-case runnable flag"
+require_text "$TESTS" 'IBV matrix accepts null and empty self slots' "tests cover IBV valid shapes"
+require_text "$TESTS" 'ibv_matrix_peer_device_missing' "tests cover IBV peer slot failure"
 
 require_text "$DOC" 'No UI or Settings panel changes' "doc keeps UI out of this scaffold"
 require_text "$DOC" 'No vMLX pin bump in this PR' "doc records no vMLX pin bump"
@@ -90,6 +97,7 @@ require_text "$NOTES_README" 'DISCOVERY_JSON_CONTRACT.md' "notes README links JS
 require_text "$NOTES_WIRING" 'Candidate fields must not be treated as proof fields' "wiring notes separate candidates from proof"
 require_text "$NOTES_WIRING" 'DistributedNodeDiscoveryRecord' "wiring notes name source discovery record"
 require_text "$NOTES_WIRING" 'readiness\.readiness_state' "wiring notes document JSON state"
+require_text "$NOTES_WIRING" 'DistributedIBVDeviceMatrix' "wiring notes document IBV validator"
 require_text "$NOTES_WIRING" 'Tailscale/control plane' "wiring notes block Tailscale data-plane"
 require_text "$NOTES_JSON" '"node_id"' "JSON contract documents node id"
 require_text "$NOTES_JSON" '"readiness_state": "blocked"' "JSON contract documents blocked state"

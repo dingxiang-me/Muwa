@@ -34,6 +34,8 @@ probe output.
 - Size-1 distributed fallback is explicitly rejected as tensor-parallel proof.
 - `librdma`, JACCL availability, and `MLX_IBV_DEVICES` configuration are tracked
   as separate gates.
+- `DistributedIBVDeviceMatrix` validates `MLX_IBV_DEVICES` JSON shape before a
+  future launch path can treat IBV as configured.
 - Team-facing implementation notes live in `docs/rdma-tb5/`.
 
 ## Not Included Yet
@@ -52,7 +54,7 @@ probe output.
 
 1. Consume vMLX `DistributedProbe --json` once the corresponding vMLX changes
    are published and pinned.
-2. Add `MLX_IBV_DEVICES` JSON matrix validation and route-table evidence.
+2. Add route-table evidence and real RDMA device enumeration.
 3. Add package-owned proof ingestion for worker liveness, rank agreement,
    decode token/s, token authority, and architecture-specific cache evidence.
 4. Add UI only after the non-UI readiness state is backed by live proof.

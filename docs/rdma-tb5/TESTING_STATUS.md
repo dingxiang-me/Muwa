@@ -40,6 +40,9 @@ Result:
 - Passed stable JSON encoding/decoding for `DistributedNodeDiscoveryRecord`.
 - Passed wire-key assertions for `node_id`, `vmlx_pin`, `readiness_state`,
   `is_runnable`, and endpoint `address_class`.
+- Passed `DistributedIBVDeviceMatrix` validation for `null` and empty-string
+  self slots, world-size mismatch, non-square rows, non-empty self slots, and
+  missing peer device names.
 
 ## vMLX Main Smoke Evidence
 
@@ -185,7 +188,7 @@ Missing before any Qwen distributed-ready claim:
 
 ## Next Tests
 
-1. Add `MLX_IBV_DEVICES` validator and generated matrix diagnostics.
+1. Add generated matrix diagnostics and RDMA device enumeration.
 2. Add child-process strict JACCL init smoke so native backend failures do not
    crash Osaurus.
 3. Run two-rank collective smoke over real Thunderbolt/RDMA.

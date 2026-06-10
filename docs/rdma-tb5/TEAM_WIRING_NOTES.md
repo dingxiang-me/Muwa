@@ -49,6 +49,15 @@ The JSON contract is snake_case for app and web consumers:
 - `readiness.is_runnable`
 - `readiness.endpoints[].address_class`
 
+For `MLX_IBV_DEVICES`, the first source contract is
+`DistributedIBVDeviceMatrix`. It validates the JSON rank matrix shape before
+runtime launch:
+
+- row count must match `world_size`
+- every row must be square
+- diagonal self slots must be `null` or empty string
+- off-diagonal peer slots must contain a device name
+
 ## Endpoint Rules
 
 Allowed as tensor data-plane candidates:
@@ -125,7 +134,7 @@ Include:
 - port result
 - `librdma` status
 - JACCL status
-- IBV matrix summary
+- IBV matrix summary, including world-size and self-slot validation
 - collective smoke result
 - model shard digest summary
 - runtime proof summary when available

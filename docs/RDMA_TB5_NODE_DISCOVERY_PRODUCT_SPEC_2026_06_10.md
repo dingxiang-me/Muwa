@@ -104,8 +104,8 @@ The UI and runtime should run checks in this order and label each level:
    internal address, not via VPN.
 7. **RDMA check**: `librdma` is loadable and RDMA is enabled.
 8. **JACCL check**: JACCL backend is available.
-9. **IBV matrix check**: every rank has the expected peer device entries and
-   empty self slot.
+9. **IBV matrix check**: every rank has the expected peer device entries,
+   square matrix shape, matching world size, and `null` or empty self slot.
 10. **Collective smoke**: ring smoke first where useful, then JACCL multi-rank
     all-sum/all-gather proof.
 11. **Model shard check**: every rank has the expected shard/digest for the
