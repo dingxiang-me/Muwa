@@ -61,15 +61,56 @@ extension EvalRunner {
         }
         defer { try? FileManager.default.removeItem(at: workspace) }
 
+        // Workflow fixtures. Seeds and any workflows the model saves go
+        // through the live `WorkflowDatabase` (the bootstrap plan isolates
+        // storage for workflow-using agent_loop cases, so "live" is a temp
+        // root on automatic runs); everything created here is removed
+        // again below, before scoring returns.
+        let usesWorkflows = testCase.usesWorkflowFixtures
+        if usesWorkflows {
+            // No-op when the bootstrap already opened it; covers forced
+            // plugin-bootstrap runs whose plan skips the index scope.
+            try? WorkflowDatabase.shared.open()
+        }
+        let seededWorkflowIds = await applySeedWorkflows(testCase.fixtures.seedWorkflows)
+        // The per-agent workflows gate strips workflow tools from the
+        // schema for the evaluator's ephemeral random agent id, so cases
+        // that exercise them run under a temp workflows-enabled agent.
+        let evalAgentId: UUID? =
+            testCase.fixtures.enableWorkflows == true
+            ? provisionWorkflowsEnabledEvalAgent()
+            : nil
+        let preRunWorkflowIds: Set<String> =
+            usesWorkflows
+            ? Set(((try? WorkflowDatabase.shared.loadAllWorkflows()) ?? []).map(\.id))
+            : []
+
         let judgeModel = ProcessInfo.processInfo.environment["JUDGE_MODEL"]
         let started = Date()
         let transcript = await AgentLoopEvaluator.run(
             task: testCase.query,
             workspace: workspace,
+            agentId: evalAgentId,
             maxIterations: exp.maxIterations ?? 10,
             contextWindowOverride: exp.contextWindowOverride,
             stopOnToolRejection: exp.stopOnToolRejection ?? false
         )
+
+        // Inventory workflows created during the run (the `workflowSaved`
+        // outcome signal), then tear every fixture down BEFORE any scoring
+        // return so a failing case can't leak `eval-` agents or saved
+        // workflows into the developer's state.
+        let createdWorkflows: [Workflow]
+        if usesWorkflows {
+            let after = (try? WorkflowDatabase.shared.loadAllWorkflows()) ?? []
+            createdWorkflows = after.filter { !preRunWorkflowIds.contains($0.id) }
+        } else {
+            createdWorkflows = []
+        }
+        await cleanupSeededWorkflows(seededWorkflowIds + createdWorkflows.map(\.id))
+        if let evalAgentId {
+            removeWorkflowsEnabledEvalAgent(evalAgentId)
+        }
 
         var verdicts: [CapabilityClaimsJudgement] = []
         if transcript.error == nil, let rubric = exp.rubric, !rubric.isEmpty {
@@ -109,6 +150,10 @@ extension EvalRunner {
         }
         for assertion in exp.commands ?? [] {
             let result = await scoreCommandAssertion(assertion, workspace: workspace)
+            score.record(result.passed, note: result.note)
+        }
+        if let assertion = exp.workflowSaved {
+            let result = scoreWorkflowSavedAssertion(assertion, created: createdWorkflows)
             score.record(result.passed, note: result.note)
         }
 
@@ -308,6 +353,66 @@ extension EvalRunner {
         for (index, notice) in transcript.notices.enumerated() {
             score.notes.append("notice[\(index)]: \(notice.prefix(160))")
         }
+    }
+
+    // MARK: - Workflow fixtures
+
+    /// Provision a temp agent whose only deviation from defaults is the
+    /// workflows feature gate, so `SystemPromptComposer` keeps
+    /// `workflow_save` / `workflow_run` in the composed schema and the
+    /// runtime gate lets them execute. Saved through `AgentStore` +
+    /// `refresh()` (not `AgentManager.add`) on purpose: an eval fixture
+    /// must not count toward agent-created telemetry or mint a crypto
+    /// address/keychain identity it would then have to sweep.
+    private static func provisionWorkflowsEnabledEvalAgent() -> UUID {
+        var settings = AgentSettings.defaultDisabled
+        settings.workflowsEnabled = true
+        let agent = Agent(
+            name: "eval-workflows-\(UUID().uuidString.prefix(8))",
+            description: "Ephemeral OsaurusEvals fixture agent (safe to delete).",
+            settings: settings
+        )
+        AgentStore.save(agent)
+        AgentManager.shared.refresh()
+        return agent.id
+    }
+
+    /// Reverse of `provisionWorkflowsEnabledEvalAgent`.
+    private static func removeWorkflowsEnabledEvalAgent(_ id: UUID) {
+        AgentStore.delete(id: id)
+        AgentManager.shared.refresh()
+    }
+
+    /// Score `expect.agentLoop.workflowSaved` against the workflows the
+    /// run created. Matching is per-workflow: one created workflow must
+    /// satisfy every present sub-field.
+    private static func scoreWorkflowSavedAssertion(
+        _ assertion: EvalCase.AgentLoopExpectations.WorkflowSavedAssertion,
+        created: [Workflow]
+    ) -> (passed: Bool, note: String) {
+        let matches = created.filter { workflow in
+            if let needle = assertion.nameContains,
+                !workflow.name.localizedCaseInsensitiveContains(needle)
+            {
+                return false
+            }
+            if let minSteps = assertion.minSteps, workflow.steps.count < minSteps {
+                return false
+            }
+            return true
+        }
+        let inventory = created.map { "\($0.name)(\($0.steps.count) steps)" }
+            .joined(separator: ",")
+        if matches.isEmpty {
+            return (
+                false,
+                "workflowSaved FAIL: no created workflow matched "
+                    + "(nameContains: \(assertion.nameContains ?? "any"), "
+                    + "minSteps: \(assertion.minSteps.map(String.init) ?? "any")) "
+                    + "— created: [\(inventory)]"
+            )
+        }
+        return (true, "workflowSaved ok: [\(inventory)]")
     }
 
     // MARK: - Outcome scoring

@@ -69,15 +69,27 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         /// Workflows to insert into `WorkflowDatabase` before the case
         /// runs (and remove afterwards). Used by `capability_search`
         /// cases that probe the workflows lane — workflows have no
-        /// built-in seed so a fixture has to bring its own. Each
-        /// entry's `id` becomes the deterministic primary key
-        /// (preferred: `eval-<slug>`) so cleanup works idempotently
-        /// across crashes.
+        /// built-in seed so a fixture has to bring its own — and by
+        /// `agent_loop` cases that exercise `workflow_run` against a
+        /// seeded, runnable workflow. Each entry's `id` becomes the
+        /// deterministic primary key (preferred: `eval-<slug>`) so
+        /// cleanup works idempotently across crashes.
         ///
         /// Insert/cleanup is wrapped around the case body in
-        /// `EvalRunner.runCapabilitySearchCase`. Other domains
-        /// ignore this field.
+        /// `EvalRunner.runCapabilitySearchCase` and
+        /// `EvalRunner.runAgentLoopCase`. Other domains ignore this
+        /// field.
         public let seedWorkflows: [SeedWorkflow]?
+        /// `agent_loop` only: run the loop under an ephemeral
+        /// workflows-enabled agent. The per-agent workflows gate strips
+        /// `workflow_save` / `workflow_run` from the composed schema by
+        /// default (a random eval agent id resolves to
+        /// `workflowsEnabled: false`), so workflow behaviour cases must
+        /// opt in. The runner provisions a temp `eval-` prefixed agent
+        /// with `AgentSettings.workflowsEnabled = true`, threads its id
+        /// through `AgentLoopEvaluator.run(agentId:)`, and deletes it
+        /// after the case. Other domains ignore this field.
+        public let enableWorkflows: Bool?
         /// Skill names to flip `enabled = true` on for the duration
         /// of the case (and restore afterwards). Used by
         /// `capability_search` skill-lane fixtures because every
@@ -118,6 +130,7 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         public init(
             requirePlugins: [String]? = nil,
             seedWorkflows: [SeedWorkflow]? = nil,
+            enableWorkflows: Bool? = nil,
             enableSkills: [String]? = nil,
             enableTools: [String]? = nil,
             ensureToolsDisabled: [String]? = nil,
@@ -125,6 +138,7 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         ) {
             self.requirePlugins = requirePlugins
             self.seedWorkflows = seedWorkflows
+            self.enableWorkflows = enableWorkflows
             self.enableSkills = enableSkills
             self.enableTools = enableTools
             self.ensureToolsDisabled = ensureToolsDisabled
@@ -146,19 +160,20 @@ public struct EvalCase: Sendable, Codable, Identifiable {
     }
 
     /// One workflow to seed into `WorkflowDatabase` for a case run.
-    /// Schema is intentionally minimal — the recall layer reads
-    /// `name`/`description`/`triggerText` (via
-    /// `WorkflowSearchService.buildIndexText`) and needs nothing else
-    /// to score recall.
+    /// The recall layer reads `name`/`description`/`triggerText` (via
+    /// `WorkflowSearchService.buildIndexText`); `agent_loop` cases that
+    /// exercise `workflow_run` additionally need `parameters`/`steps`
+    /// so the seeded workflow is actually runnable (the runner rejects
+    /// step-less workflows).
     ///
-    /// `body` and `triggerText` are optional in the JSON shape so
-    /// fixture authors don't have to think about them — `body` is
-    /// only required by the storage layer's `NOT NULL` constraint
-    /// (search ignores it); `triggerText` exists so cases probing
-    /// the "user phrasing differs from workflow name" shape can pin
-    /// extra index signal. Codable's synthesized decoder doesn't
-    /// honour Swift's `= ""` defaults — declaring these `Optional`
-    /// is the only way to make them omittable in JSON.
+    /// Everything past `description` is optional in the JSON shape so
+    /// fixture authors don't have to think about it — `body` is only
+    /// required by the storage layer's `NOT NULL` constraint (search
+    /// ignores it); `triggerText` exists so cases probing the "user
+    /// phrasing differs from workflow name" shape can pin extra index
+    /// signal. Codable's synthesized decoder doesn't honour Swift's
+    /// `= ""` defaults — declaring these `Optional` is the only way to
+    /// make them omittable in JSON.
     public struct SeedWorkflow: Sendable, Codable {
         /// Stable id used as the `workflows.id` primary key. Prefer
         /// the form `eval-<slug>` so accidental leftovers in a
@@ -168,20 +183,45 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         public let description: String
         public let triggerText: String?
         public let body: String?
+        /// Declared inputs for `workflow_run` (OsaurusCore's
+        /// `WorkflowParameter` is `Codable`, so fixture JSON uses its
+        /// shape directly: `name`/`type`/`description`/`required`/
+        /// `default`). nil → no parameters.
+        public let parameters: [WorkflowParameter]?
+        /// Structured steps for `WorkflowRunner` (OsaurusCore's
+        /// `WorkflowStep` shape: `kind` (`tool`|`guidance`),
+        /// `toolName`, `argsTemplate`, `text`). nil → body-only seed,
+        /// fine for recall cases but rejected by `workflow_run`.
+        public let steps: [WorkflowStep]?
 
         public init(
             id: String,
             name: String,
             description: String,
             triggerText: String? = nil,
-            body: String? = nil
+            body: String? = nil,
+            parameters: [WorkflowParameter]? = nil,
+            steps: [WorkflowStep]? = nil
         ) {
             self.id = id
             self.name = name
             self.description = description
             self.triggerText = triggerText
             self.body = body
+            self.parameters = parameters
+            self.steps = steps
         }
+    }
+
+    /// True when this case touches the workflows subsystem: it seeds
+    /// workflows, runs under a workflows-enabled agent, or asserts a
+    /// workflow was saved. Drives both the agent-loop runner's
+    /// seed/diff/cleanup wrap and the bootstrap plan's workflows
+    /// scope (`WorkflowDatabase` + `WorkflowSearchService`).
+    public var usesWorkflowFixtures: Bool {
+        !(fixtures.seedWorkflows?.isEmpty ?? true)
+            || fixtures.enableWorkflows == true
+            || expect.agentLoop?.workflowSaved != nil
     }
 
     /// What we score against. All sub-fields are optional so a case can
@@ -320,6 +360,15 @@ public struct EvalCase: Sendable, Codable, Identifiable {
         /// call (or before the run ends, when there is no `complete`) —
         /// pins "mark items done as you go", not just "made a list once".
         public let todoUpdatedBeforeComplete: Bool?
+        /// When set, at least one workflow matching the assertion must
+        /// have been CREATED in `WorkflowDatabase` during the run —
+        /// the outcome proof for `workflow_save` cases (a transcript
+        /// `mustCallTools` alone can't tell a save that persisted from
+        /// one that errored). Scored by diffing workflow ids before/
+        /// after the loop; the runner deletes (and unindexes) every
+        /// workflow created during the run regardless of pass/fail so
+        /// save cases can't pollute the developer's live DB.
+        public let workflowSaved: WorkflowSavedAssertion?
 
         public init(
             maxIterations: Int? = nil,
@@ -338,7 +387,8 @@ public struct EvalCase: Sendable, Codable, Identifiable {
             rubric: [String]? = nil,
             contextWindowOverride: Int? = nil,
             stopOnToolRejection: Bool? = nil,
-            todoUpdatedBeforeComplete: Bool? = nil
+            todoUpdatedBeforeComplete: Bool? = nil,
+            workflowSaved: WorkflowSavedAssertion? = nil
         ) {
             self.maxIterations = maxIterations
             self.mustCallTools = mustCallTools
@@ -357,6 +407,25 @@ public struct EvalCase: Sendable, Codable, Identifiable {
             self.contextWindowOverride = contextWindowOverride
             self.stopOnToolRejection = stopOnToolRejection
             self.todoUpdatedBeforeComplete = todoUpdatedBeforeComplete
+            self.workflowSaved = workflowSaved
+        }
+
+        /// Assertion against workflows created during the run. Both
+        /// sub-fields are optional: an empty assertion just requires
+        /// that SOME workflow was saved.
+        public struct WorkflowSavedAssertion: Sendable, Codable {
+            /// Case-insensitive substring the saved workflow's name
+            /// must contain.
+            public let nameContains: String?
+            /// Minimum number of structured steps the saved workflow
+            /// must carry — pins "captured the procedure", not just
+            /// "wrote a row".
+            public let minSteps: Int?
+
+            public init(nameContains: String? = nil, minSteps: Int? = nil) {
+                self.nameContains = nameContains
+                self.minSteps = minSteps
+            }
         }
 
         /// One workspace-file assertion. `path` is relative to the

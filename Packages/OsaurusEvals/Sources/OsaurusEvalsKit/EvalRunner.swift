@@ -1034,7 +1034,7 @@ public enum EvalRunner {
         AgentManager.shared.updateEnabledToolNames(prior, for: agentId)
     }
 
-    // MARK: - Capability search fixture seeding
+    // MARK: - Workflow fixture seeding (capability_search + agent_loop)
 
     /// Insert each `SeedWorkflow` into the live `WorkflowDatabase` and
     /// the `WorkflowSearchService` index. Returns the ids of workflows
@@ -1044,11 +1044,14 @@ public enum EvalRunner {
     /// workflow on disk doesn't lose it because their fixture name
     /// collided.
     ///
+    /// `parameters`/`steps` ride through so `agent_loop` cases can seed
+    /// runnable workflows; recall-only fixtures omit them.
+    ///
     /// Index errors are logged via `notes` but do not fail the case
     /// here; a missing index hit becomes a real recall miss in the
     /// observed `workflowHits` count, which is exactly the signal the
     /// case is designed to surface.
-    private static func applySeedWorkflows(_ seeds: [EvalCase.SeedWorkflow]?) async -> [String] {
+    static func applySeedWorkflows(_ seeds: [EvalCase.SeedWorkflow]?) async -> [String] {
         guard let seeds, !seeds.isEmpty else { return [] }
         var insertedIds: [String] = []
         for seed in seeds {
@@ -1064,7 +1067,9 @@ public enum EvalRunner {
                 description: seed.description,
                 triggerText: seed.triggerText,
                 body: seed.body ?? "",
-                source: .user
+                source: .user,
+                parameters: seed.parameters ?? [],
+                steps: seed.steps ?? []
             )
             do {
                 try WorkflowDatabase.shared.insertWorkflow(workflow)
@@ -1083,7 +1088,7 @@ public enum EvalRunner {
     /// mid-cleanup on a previous run could have already removed some)
     /// so re-running a case after a crash converges back to a clean
     /// state.
-    private static func cleanupSeededWorkflows(_ ids: [String]) async {
+    static func cleanupSeededWorkflows(_ ids: [String]) async {
         for id in ids {
             try? WorkflowDatabase.shared.deleteWorkflow(id: id)
             await WorkflowSearchService.shared.removeWorkflow(id: id)

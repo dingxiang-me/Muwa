@@ -80,6 +80,65 @@ struct EvalBootstrapPlanTests {
         )
     }
 
+    @Test func agentLoopWorkflowCasesClaimWorkflowsScope() {
+        // Each workflow-touching fixture shape independently brings up the
+        // workflows lane: seeded workflows, a workflows-enabled agent, and
+        // a `workflowSaved` outcome assertion.
+        let shapes: [EvalCase] = [
+            makeCase(
+                id: "workflows.run-with-params",
+                domain: "agent_loop",
+                seedWorkflows: [
+                    EvalCase.SeedWorkflow(
+                        id: "eval-write-greeting",
+                        name: "write_greeting",
+                        description: "Writes a greeting file."
+                    )
+                ]
+            ),
+            makeCase(
+                id: "workflows.enable-only",
+                domain: "agent_loop",
+                enableWorkflows: true
+            ),
+            makeCase(
+                id: "workflows.save-after-task",
+                domain: "agent_loop",
+                workflowSaved: EvalCase.AgentLoopExpectations.WorkflowSavedAssertion(minSteps: 1)
+            ),
+        ]
+
+        for shape in shapes {
+            let plan = EvalBootstrapPlan.make(
+                suite: makeSuite(cases: [shape]),
+                filter: nil,
+                preference: .automatic
+            )
+            #expect(
+                plan
+                    == EvalBootstrapPlan(
+                        loadInstalledPlugins: false,
+                        searchIndexScope: EvalSearchIndexBootstrapScope(workflows: true)
+                    ),
+                "case \(shape.id) should claim the workflows scope"
+            )
+            #expect(plan.usesIsolatedSearchStorage)
+        }
+    }
+
+    @Test func agentLoopCasesWithoutWorkflowFixturesSkipIndexBootstrap() {
+        let suite = makeSuite(
+            cases: [
+                makeCase(id: "agent_loop.write-new-file", domain: "agent_loop")
+            ]
+        )
+
+        let plan = EvalBootstrapPlan.make(suite: suite, filter: nil, preference: .automatic)
+
+        #expect(plan == EvalBootstrapPlan(loadInstalledPlugins: false, initializeSearchIndices: false))
+        #expect(!plan.requiresWork)
+    }
+
     @Test func pureDataSuitesSkipStartupBootstrap() {
         let suite = makeSuite(cases: [makeCase(id: "schema.minimum-bound", domain: "schema")])
 
@@ -203,7 +262,9 @@ struct EvalBootstrapPlanTests {
         expectedWorkflows: Bool = false,
         expectedSkills: Bool = false,
         seedWorkflows: [EvalCase.SeedWorkflow]? = nil,
-        enableSkills: [String]? = nil
+        enableWorkflows: Bool? = nil,
+        enableSkills: [String]? = nil,
+        workflowSaved: EvalCase.AgentLoopExpectations.WorkflowSavedAssertion? = nil
     ) -> EvalCase {
         let anyOf = EvalCase.CapabilitySearchExpectations.AnyOfMatcher(
             anyOf: [],
@@ -217,6 +278,10 @@ struct EvalBootstrapPlanTests {
                 expectedSkills: expectedSkills ? anyOf : nil
             )
             : nil
+        let agentLoop =
+            workflowSaved != nil
+            ? EvalCase.AgentLoopExpectations(workflowSaved: workflowSaved)
+            : nil
 
         return EvalCase(
             id: id,
@@ -225,9 +290,10 @@ struct EvalBootstrapPlanTests {
             fixtures: .init(
                 requirePlugins: requirePlugins,
                 seedWorkflows: seedWorkflows,
+                enableWorkflows: enableWorkflows,
                 enableSkills: enableSkills
             ),
-            expect: .init(capabilitySearch: capabilitySearch)
+            expect: .init(capabilitySearch: capabilitySearch, agentLoop: agentLoop)
         )
     }
 }

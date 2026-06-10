@@ -1,0 +1,26 @@
+{
+  "id": "workflows.save-after-task",
+  "domain": "agent_loop",
+  "label": "workflow_save persists a workflow distilled from a completed task",
+  "query": "First, create a file named notes.txt containing exactly the word: alpha. After the file is written, save what you just did as a reusable workflow named save_notes using the workflow_save tool. I confirm you should save it — no need to ask again.",
+  "notes": "Proves chat authoring end to end: the model performs a small task, then distills it into a persisted workflow row with at least one structured step. The save confirmation is pre-granted in the query to match the workflow_save nudge's user-confirm contract. Scored against the database diff (workflowSaved), not just the transcript.",
+  "fixtures": {
+    "enableWorkflows": true
+  },
+  "expect": {
+    "agentLoop": {
+      "maxIterations": 12,
+      "mustCallTools": ["file_write", "workflow_save"],
+      "files": [
+        {
+          "path": "notes.txt",
+          "contains": "alpha"
+        }
+      ],
+      "workflowSaved": {
+        "nameContains": "notes",
+        "minSteps": 1
+      }
+    }
+  }
+}

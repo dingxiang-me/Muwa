@@ -1,0 +1,45 @@
+{
+  "id": "workflows.run-guidance-handoff",
+  "domain": "agent_loop",
+  "label": "workflow_run hands off at a guidance step and the model continues manually",
+  "query": "Run the saved workflow with id eval-prepare-then-finish using the workflow_run tool (it takes no arguments). Follow any instructions the workflow gives you, then reply with one line confirming you are done.",
+  "notes": "Proves the handoff contract: deterministic tool steps run inside workflow_run, execution stops at the guidance step, and the model continues manually from the returned remaining-steps context (a follow-up file_write).",
+  "fixtures": {
+    "enableWorkflows": true,
+    "seedWorkflows": [
+      {
+        "id": "eval-prepare-then-finish",
+        "name": "prepare_then_finish",
+        "description": "Writes a start marker file, then asks the calling model to finish the task manually.",
+        "triggerText": "prepare the workspace then finish manually",
+        "steps": [
+          {
+            "kind": "tool",
+            "toolName": "file_write",
+            "argsTemplate": "{\"path\": \"start.txt\", \"content\": \"started\"}"
+          },
+          {
+            "kind": "guidance",
+            "text": "Now create a file named done.txt containing exactly the word: done. Use the file_write tool."
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "agentLoop": {
+      "maxIterations": 8,
+      "mustCallTools": ["workflow_run", "file_write"],
+      "files": [
+        {
+          "path": "start.txt",
+          "contains": "started"
+        },
+        {
+          "path": "done.txt",
+          "contains": "done"
+        }
+      ]
+    }
+  }
+}

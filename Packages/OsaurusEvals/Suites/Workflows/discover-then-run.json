@@ -1,0 +1,37 @@
+{
+  "id": "workflows.discover-then-run",
+  "domain": "agent_loop",
+  "label": "capabilities_discover surfaces a workflow that the model then runs",
+  "query": "Set up the project marker file for me. There should already be a saved workflow capability for this — discover it and run it rather than doing the task by hand (don't search the folder for it; it's a saved workflow, not a file).",
+  "notes": "Flakiest case in the suite by design: the query never names the workflow id, so the model must discover it via capabilities_discover (workflow lane recall + threshold), extract the workflow/<id> from the results, and call workflow_run. Failures here can be recall or model behaviour — check the forensics trace before blaming either layer.",
+  "fixtures": {
+    "enableWorkflows": true,
+    "seedWorkflows": [
+      {
+        "id": "eval-project-marker",
+        "name": "set_up_project_marker",
+        "description": "Sets up the project marker file by writing marker.txt into the working folder.",
+        "triggerText": "set up the project marker file; create the project marker; initialize the marker file",
+        "steps": [
+          {
+            "kind": "tool",
+            "toolName": "file_write",
+            "argsTemplate": "{\"path\": \"marker.txt\", \"content\": \"project-marker-v1\"}"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "agentLoop": {
+      "maxIterations": 10,
+      "mustCallTools": ["capabilities_discover", "workflow_run"],
+      "files": [
+        {
+          "path": "marker.txt",
+          "contains": "project-marker-v1"
+        }
+      ]
+    }
+  }
+}

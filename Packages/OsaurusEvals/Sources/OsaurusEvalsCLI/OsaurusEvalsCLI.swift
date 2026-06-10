@@ -59,17 +59,31 @@ struct OsaurusEvalsCLI {
             filter: opts.filter,
             preference: opts.pluginBootstrapPreference
         )
+        // Isolated eval storage replaces the on-disk ChatConfiguration with
+        // defaults, which would silently turn `--model auto` into
+        // "foundation" for LLM-driven cases (e.g. the Workflows suite,
+        // whose agent_loop cases isolate storage to protect the real
+        // workflow DB). Resolve the user's configured core model BEFORE
+        // the root override so `auto` keeps meaning "whatever the app is
+        // configured with".
+        var model = opts.model
+        if bootstrapPlan.usesIsolatedSearchStorage, case .keepCurrent = model {
+            let current = ChatConfigurationStore.load()
+            if let name = current.coreModelName, !name.isEmpty {
+                model = .explicit(provider: current.coreModelProvider, name: name)
+            }
+        }
         _ = EvalBootstrap.configureIsolatedSearchStorageIfNeeded(for: bootstrapPlan)
         let startupWatchdog =
             bootstrapPlan.requiresWork
-            ? makeStartupWatchdog(options: opts, suite: suite)
+            ? makeStartupWatchdog(options: opts, model: model, suite: suite)
             : nil
         await EvalBootstrap.run(bootstrapPlan)
         startupWatchdog?.cancel()
 
         let report = await EvalRunner.run(
             suite: suite,
-            model: opts.model,
+            model: model,
             filter: opts.filter,
             thresholdOverride: opts.threshold,
             bootstrapMode: .alreadyLoaded
@@ -142,11 +156,12 @@ struct OsaurusEvalsCLI {
     @MainActor
     private static func makeStartupWatchdog(
         options opts: Options,
+        model: ModelSelection,
         suite: EvalSuite
     ) -> EvalStartupWatchdog? {
         guard let timeoutSeconds = opts.startupTimeoutSeconds else { return nil }
 
-        let modelLabel = ModelOverride.describe(opts.model)
+        let modelLabel = ModelOverride.describe(model)
         let reportData = try? EvalTimeoutReport.makeReport(
             suite: suite,
             modelId: modelLabel,

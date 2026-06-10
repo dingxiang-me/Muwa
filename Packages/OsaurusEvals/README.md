@@ -25,6 +25,7 @@ Packages/OsaurusEvals/
     Schema/             — SchemaValidator.validate pinning
     StreamingHint/      — StreamingToolHint encode/decode round-trips
     ToolEnvelope/       — ToolEnvelope.{success,failure} JSON shape
+    Workflows/          — workflow_run / workflow_save behaviour E2E (LLM)
 ```
 
 A "suite" is just a directory of `*.json` case files. Add a new case by dropping a JSON file in — no Swift edit required.
@@ -119,7 +120,7 @@ Index-only recall measurements over the tools / workflows / skills lanes. No LLM
 
 Field notes:
 
-- `fixtures.seedWorkflows` — workflows to insert into `WorkflowDatabase` before the case runs (and remove after). Each entry is `{ id, name, description, triggerText?, body? }`. Workflows have no built-in seed so a fixture has to bring its own. Prefer `eval-<slug>` ids — the runner skips inserts when the id already exists, so a real user workflow on disk won't get clobbered if your slug collides.
+- `fixtures.seedWorkflows` — workflows to insert into `WorkflowDatabase` before the case runs (and remove after). Each entry is `{ id, name, description, triggerText?, body?, parameters?, steps? }` (`parameters`/`steps` use OsaurusCore's `WorkflowParameter`/`WorkflowStep` JSON shapes and only matter for `agent_loop` cases that execute the seed via `workflow_run`). Workflows have no built-in seed so a fixture has to bring its own. Prefer `eval-<slug>` ids — the runner skips inserts when the id already exists, so a real user workflow on disk won't get clobbered if your slug collides.
 - `fixtures.enableSkills` — array of skill **display names** to flip `enabled = true` on for the duration of the case (and restore after). Built-in skills ship disabled-by-default and the search post-filters disabled skills out, so a recall fixture against e.g. `"Debug Assistant"` silently returns 0 unless we toggle it on first. Restoration is best-effort, not crash-safe — re-running any case that names the same skill converges back.
 - `expect.capabilitySearch.expectedTools` / `expectedWorkflows` / `expectedSkills` — `{ anyOf: [...names], minMatches: N }` matchers. Each matched name must appear in the **accepted** hit set for its lane (i.e. above the lane's threshold).
 - `expect.capabilitySearch.maxAccepted` — caps total accepted hits across all three lanes. `0` is the abstain-style assertion: any accepted hit fails the case.
@@ -211,6 +212,9 @@ Field notes:
 - `expect.agentLoop.stopOnToolRejection` — loop policy: `true` runs the chat surface's policy (first error envelope ends the run with `toolRejected`); default `false` keeps the headless policy (the model gets the error and keeps looping). Lets cases pin BOTH behaviours.
 - `expect.agentLoop.todoUpdatedBeforeComplete` — todo discipline: some `todo` call with at least one checked (`[x]`) box must appear before the first `complete` call (or before the run ends). A single list creation with all boxes unchecked does not pass.
 - `expect.agentLoop.finalTextContains` / `rubric` — cheap substring checks vs. LLM-judge grading of the final answer (same `JUDGE_MODEL` override as `capability_claims`).
+- `fixtures.seedWorkflows` — same shape as `capability_search`, plus `parameters`/`steps` so the seed is runnable by `workflow_run` (the runner rejects step-less workflows). Seeded around the case body and removed after.
+- `fixtures.enableWorkflows` — run the loop under an ephemeral workflows-enabled agent. Required for any case touching `workflow_save` / `workflow_run`: the per-agent workflows gate strips those tools from the composed schema by default, and the evaluator's random eval agent id resolves to `workflowsEnabled: false`. The runner provisions a temp `eval-` prefixed agent with `AgentSettings.workflowsEnabled = true`, threads it through the loop, and deletes it after the case.
+- `expect.agentLoop.workflowSaved` — `{ nameContains?, minSteps? }` outcome assertion: at least one workflow matching both sub-fields must have been **created in `WorkflowDatabase`** during the run (scored by diffing workflow ids before/after the loop). The runner deletes and unindexes every workflow created during the run regardless of pass/fail, so `workflow_save` cases can't pollute the developer's live DB.
 
 Reported `latencyMs` for this domain is **loop-only** wall time (model steps + tool execution), excluding workspace setup and judge calls.
 
@@ -220,6 +224,21 @@ The suite covers seventeen scenarios under `Suites/AgentLoop/`: `edit-file-then-
 make evals EVALS_SUITE=Packages/OsaurusEvals/Suites/AgentLoop MODEL=foundation
 make evals EVALS_SUITE=Packages/OsaurusEvals/Suites/AgentLoop MODEL=mlx-community/Qwen3-4B-MLX-4bit
 make evals EVALS_SUITE=Packages/OsaurusEvals/Suites/AgentLoop MODEL=openai/gpt-4o-mini JUDGE_MODEL=openai/gpt-4o
+```
+
+### `Suites/Workflows/` (agent_loop domain)
+
+End-to-end proof that workflows work under a real model — the behaviour layer the deterministic `WorkflowRunner`/`WorkflowDatabase` unit tests and the index-only `capability_search` workflow-lane cases can't cover. Four cases:
+
+- `run-with-params` — seeded workflow with a declared parameter and a `{{params.*}}` args template; the query names the id and arguments explicitly. Proves parameter validation + template substitution + deterministic tool-step execution via `workflow_run`.
+- `run-guidance-handoff` — seeded workflow with a tool step then a `guidance` step. Proves the handoff contract: `workflow_run` stops at guidance and the model continues manually (a follow-up `file_write`) from the returned remaining-steps context.
+- `save-after-task` — the model performs a small file task, then saves it via `workflow_save` (confirmation pre-granted in the query, matching the nudge's user-confirm contract). Scored with `workflowSaved` against the database diff, not just the transcript.
+- `discover-then-run` — seeded workflow with strong `triggerText`; natural-phrasing query without the id. Proves the full `capabilities_discover` → `workflow_run` loop. Flakiest case by design (recall + model behaviour compound); its `notes` say so.
+
+Automatic (no-plugin) runs of this suite execute against **isolated eval storage** — workflow-touching `agent_loop` cases claim the workflows bootstrap scope, so seeds and model-saved workflows land in a temp root, never the developer's real encrypted database. The runner additionally deletes everything it seeded or the model saved, and the per-case ephemeral workflows-enabled agent, after each case. The per-agent gate itself (tools stripped/rejected when the toggle is off) stays covered by OsaurusCore unit tests — an eval would only measure "the model can't call a tool that isn't in its schema", which proves nothing about the model.
+
+```bash
+make evals EVALS_SUITE=Packages/OsaurusEvals/Suites/Workflows MODEL=mlx-community/Qwen3-4B-MLX-4bit
 ```
 
 ### Other domains

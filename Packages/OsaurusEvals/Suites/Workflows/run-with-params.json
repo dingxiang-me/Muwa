@@ -1,0 +1,46 @@
+{
+  "id": "workflows.run-with-params",
+  "domain": "agent_loop",
+  "label": "workflow_run executes a seeded workflow with explicit parameters",
+  "query": "Run the saved workflow with id eval-write-greeting using the workflow_run tool, passing arguments {\"name\": \"Osaurus\"}. When it finishes, reply with one line confirming what it did.",
+  "notes": "Proves the deterministic execution contract under a real model: parameter validation, {{params.*}} template substitution, and tool-step dispatch through the registry. The query names the id and arguments explicitly so the only behaviour under test is calling workflow_run correctly.",
+  "fixtures": {
+    "enableWorkflows": true,
+    "seedWorkflows": [
+      {
+        "id": "eval-write-greeting",
+        "name": "write_greeting",
+        "description": "Writes a personalized greeting to greeting.txt in the working folder.",
+        "triggerText": "write a greeting file for someone",
+        "parameters": [
+          {
+            "name": "name",
+            "type": "string",
+            "description": "Name to greet",
+            "required": true
+          }
+        ],
+        "steps": [
+          {
+            "kind": "tool",
+            "toolName": "file_write",
+            "argsTemplate": "{\"path\": \"greeting.txt\", \"content\": \"Hello, {{params.name}}!\"}"
+          }
+        ]
+      }
+    ]
+  },
+  "expect": {
+    "agentLoop": {
+      "maxIterations": 6,
+      "mustCallTools": ["workflow_run"],
+      "noToolErrors": true,
+      "files": [
+        {
+          "path": "greeting.txt",
+          "contains": "Hello, Osaurus!"
+        }
+      ]
+    }
+  }
+}

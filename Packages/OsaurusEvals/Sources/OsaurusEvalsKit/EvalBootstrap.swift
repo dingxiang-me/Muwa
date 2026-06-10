@@ -179,6 +179,14 @@ public extension EvalSuite {
     /// Plugin-required cases are ignored here because they skip before
     /// `CapabilitySearchEvaluator.evaluate` when installed plugins were not
     /// loaded, so their expected lanes cannot affect the report.
+    ///
+    /// `agent_loop` cases that touch workflows (seeded workflows, a
+    /// workflows-enabled agent, or a `workflowSaved` assertion) also
+    /// claim the workflows lane: the runner's seed/diff/cleanup wrap
+    /// needs `WorkflowDatabase` open and `WorkflowSearchService`
+    /// initialized, and routing those runs through the isolated eval
+    /// storage keeps fixture writes (and `workflow_save` rows) out of
+    /// the developer's real encrypted database.
     func searchIndexBootstrapScopeWithoutPluginBootstrap(
         filter: String?
     ) -> EvalSearchIndexBootstrapScope {
@@ -187,6 +195,10 @@ public extension EvalSuite {
         var needsSkills = false
 
         for testCase in selectedCases(filter: filter) {
+            if testCase.domain == "agent_loop" {
+                needsWorkflows = needsWorkflows || testCase.usesWorkflowFixtures
+                continue
+            }
             guard testCase.domain == "capability_search" else { continue }
             guard testCase.fixtures.requirePlugins?.isEmpty ?? true else { continue }
 
