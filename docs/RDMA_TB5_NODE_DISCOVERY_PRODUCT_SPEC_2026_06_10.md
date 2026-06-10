@@ -76,6 +76,17 @@ Each running Osaurus node should advertise a local discovery record with:
 The discovery record must separate candidates from proof. A candidate address is
 not usable until the verifier marks it as a passing data-plane route.
 
+The source contract for the first non-UI scaffold is
+`DistributedNodeDiscoveryRecord` with a nested `DistributedRuntimeReadinessReport`.
+The report state maps to the UI state as:
+
+- `blocked`: one or more hard errors.
+- `partial`: no hard errors, but one or more warnings or missing proof gates.
+- `ready`: all current checks are info-only and the selected mode can be
+  considered runnable by policy.
+
+Only `ready` may enable `Start cluster`.
+
 ## Fallback Check Ladder
 
 The UI and runtime should run checks in this order and label each level:
@@ -101,7 +112,9 @@ The UI and runtime should run checks in this order and label each level:
     token/s, and architecture-specific cache evidence.
 
 If a lower check passes and a higher check fails, the UI must show `PARTIAL` and
-the exact blocker. It must not collapse that into a generic ready state.
+the exact blocker. It must not collapse that into a generic ready state. Warning
+states such as private LAN, Wi-Fi, link-local, or localhost addresses are not
+runtime proof.
 
 ## UI Surface
 

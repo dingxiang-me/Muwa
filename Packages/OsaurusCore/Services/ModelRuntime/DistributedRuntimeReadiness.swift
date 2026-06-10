@@ -140,8 +140,71 @@ public struct DistributedRuntimeReadinessReport: Codable, Sendable, Equatable {
     public let ibvDevicesConfigured: Bool?
     public let findings: [DistributedRuntimeFinding]
 
+    public var readinessState: DistributedRuntimeState {
+        if findings.contains(where: { $0.level == .error }) {
+            return .blocked
+        }
+        if findings.contains(where: { $0.level == .warning }) {
+            return .partial
+        }
+        return .ready
+    }
+
     public var isRunnable: Bool {
-        findings.allSatisfy { $0.level != .error }
+        readinessState == .ready
+    }
+}
+
+public enum DistributedRuntimeState: String, Codable, Sendable, Equatable, Hashable {
+    case off
+    case discovering
+    case candidate
+    case partial
+    case blocked
+    case ready
+    case running
+}
+
+public enum DistributedNodeRole: String, Codable, Sendable, Equatable, Hashable {
+    case coordinator
+    case rankWorker
+    case localOnly
+}
+
+public struct DistributedNodeDiscoveryRecord: Codable, Sendable, Equatable {
+    public let nodeID: String
+    public let deviceName: String
+    public let osaurusVersion: String?
+    public let osaurusCommit: String?
+    public let vmlxPin: String?
+    public let distributedCapabilityVersion: Int
+    public let roles: [DistributedNodeRole]
+    public let controlEndpoints: [String]
+    public let dataPlaneCandidates: [DistributedTensorEndpoint]
+    public let readiness: DistributedRuntimeReadinessReport
+
+    public init(
+        nodeID: String,
+        deviceName: String,
+        osaurusVersion: String? = nil,
+        osaurusCommit: String? = nil,
+        vmlxPin: String? = nil,
+        distributedCapabilityVersion: Int = 1,
+        roles: [DistributedNodeRole],
+        controlEndpoints: [String],
+        dataPlaneCandidates: [String],
+        readiness: DistributedRuntimeReadinessReport
+    ) {
+        self.nodeID = nodeID
+        self.deviceName = deviceName
+        self.osaurusVersion = osaurusVersion
+        self.osaurusCommit = osaurusCommit
+        self.vmlxPin = vmlxPin
+        self.distributedCapabilityVersion = distributedCapabilityVersion
+        self.roles = roles
+        self.controlEndpoints = controlEndpoints
+        self.dataPlaneCandidates = dataPlaneCandidates.map(DistributedTensorEndpoint.init)
+        self.readiness = readiness
     }
 }
 

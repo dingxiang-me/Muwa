@@ -32,9 +32,12 @@ xcrun swift test --package-path Packages/OsaurusCore \
 Result:
 
 - Built OsaurusCore.
-- Ran 5 distributed readiness tests.
+- Ran 7 distributed readiness tests.
 - Passed Tailscale rejection, size-1 fallback rejection, Thunderbolt address
   acceptance, and separate `librdma` / JACCL / IBV gates.
+- Passed warning-only readiness behavior: unproven private/Wi-Fi-style
+  addresses are `partial`, not runnable.
+- Passed stable JSON encoding/decoding for `DistributedNodeDiscoveryRecord`.
 
 ## vMLX Main Smoke Evidence
 
@@ -176,6 +179,7 @@ Missing before any Qwen distributed-ready claim:
 - coherent multi-turn Qwen generation
 - token/s and cache evidence
 - architecture-specific cache proof for Qwen hybrid state where applicable
+- Osaurus consumption of the vMLX probe/discovery JSON in live app state
 
 ## Next Tests
 

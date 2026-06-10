@@ -1,5 +1,6 @@
 // Copyright © 2026 osaurus.
 
+import Foundation
 import Testing
 
 @testable import OsaurusCore
@@ -28,6 +29,7 @@ struct DistributedRuntimeReadinessTests {
         )
 
         #expect(!report.isRunnable)
+        #expect(report.readinessState == .blocked)
         #expect(report.endpoints.map(\.addressClass).contains(.tailscaleControl))
         #expect(report.findings.contains { $0.code == "tailscale_data_plane_forbidden" && $0.level == .error })
     }
@@ -43,6 +45,7 @@ struct DistributedRuntimeReadinessTests {
         )
 
         #expect(!report.isRunnable)
+        #expect(report.readinessState == .blocked)
         #expect(report.findings.contains { $0.code == "single_rank_not_tp" })
     }
 
@@ -57,6 +60,7 @@ struct DistributedRuntimeReadinessTests {
         )
 
         #expect(!report.isRunnable)
+        #expect(report.readinessState == .blocked)
         #expect(!report.findings.contains { $0.code == "librdma_unavailable" })
         #expect(report.findings.contains { $0.code == "jaccl_unavailable" })
         #expect(report.findings.contains { $0.code == "ibv_devices_missing" })
@@ -72,8 +76,56 @@ struct DistributedRuntimeReadinessTests {
             ibvDevicesConfigured: true
         )
 
-        #expect(report.isRunnable)
+        #expect(!report.isRunnable)
+        #expect(report.readinessState == .partial)
         #expect(report.endpoints.first?.addressClass == .privateOther)
         #expect(report.findings.contains { $0.code == "unproven_data_plane_address" && $0.level == .warning })
+    }
+
+    @Test("Clean Thunderbolt gates are ready")
+    func cleanThunderboltGatesAreReady() {
+        let report = DistributedRuntimeReadiness.evaluate(
+            dataPlaneAddresses: ["10.20.0.1:29500", "10.20.0.2:29500"],
+            worldSize: 2,
+            librdmaLoadable: true,
+            jacclAvailable: true,
+            ibvDevicesConfigured: true
+        )
+
+        #expect(report.isRunnable)
+        #expect(report.readinessState == .ready)
+        #expect(report.findings.allSatisfy { $0.level == .info })
+    }
+
+    @Test("Discovery record is stable JSON for the future node panel")
+    func discoveryRecordEncodesStableJSON() throws {
+        let report = DistributedRuntimeReadiness.evaluate(
+            dataPlaneAddresses: ["10.20.0.1:29500", "10.20.0.2:29500"],
+            worldSize: 2,
+            librdmaLoadable: true,
+            jacclAvailable: false,
+            ibvDevicesConfigured: false
+        )
+        let record = DistributedNodeDiscoveryRecord(
+            nodeID: "node-a",
+            deviceName: "m5-max-a",
+            osaurusVersion: "0.0-test",
+            osaurusCommit: "abcdef0",
+            vmlxPin: "7e69522f85f5a384d69f1673ab45c98d60d28375",
+            roles: [.coordinator, .rankWorker],
+            controlEndpoints: ["m5-max-a.local:1337"],
+            dataPlaneCandidates: ["10.20.0.1:29500", "10.20.0.2:29500"],
+            readiness: report
+        )
+
+        let data = try JSONEncoder().encode(record)
+        let decoded = try JSONDecoder().decode(DistributedNodeDiscoveryRecord.self, from: data)
+
+        #expect(decoded.nodeID == "node-a")
+        #expect(decoded.vmlxPin == "7e69522f85f5a384d69f1673ab45c98d60d28375")
+        #expect(decoded.roles == [.coordinator, .rankWorker])
+        #expect(decoded.dataPlaneCandidates.map(\.addressClass).allSatisfy { $0 == .thunderboltLoopback })
+        #expect(decoded.readiness.readinessState == .blocked)
+        #expect(decoded.readiness.findings.contains { $0.code == "jaccl_unavailable" })
     }
 }

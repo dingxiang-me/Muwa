@@ -23,6 +23,10 @@ probe output.
 
 - `DistributedRuntimeReadiness` classifies tensor data-plane endpoints and
   records readiness findings.
+- `DistributedRuntimeState` separates `blocked`, `partial`, and `ready`; only
+  `ready` is runnable.
+- `DistributedNodeDiscoveryRecord` provides the first Codable handoff shape for
+  future node discovery and panel wiring.
 - `10.20.0.x` Thunderbolt loopbacks and `10.10.x.x` direct Thunderbolt links are
   accepted as tensor data-plane addresses.
 - `100.x` Tailscale addresses are rejected for tensor data-plane use.
