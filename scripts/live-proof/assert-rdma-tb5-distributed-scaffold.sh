@@ -73,7 +73,7 @@ require_text "$TESTS" 'IBV matrix accepts null and empty self slots' "tests cove
 require_text "$TESTS" 'ibv_matrix_peer_device_missing' "tests cover IBV peer slot failure"
 
 require_text "$DOC" 'No UI or Settings panel changes' "doc keeps UI out of this scaffold"
-require_text "$DOC" 'No vMLX pin bump in this PR' "doc records no vMLX pin bump"
+require_text "$DOC" 'No Osaurus runtime vMLX pin bump in this PR' "doc records no Osaurus runtime vMLX pin bump"
 require_text "$DOC" 'Tailscale remains control-plane/SSH only' "doc records Tailscale boundary"
 require_text "$DOC" 'docs/rdma-tb5/' "doc links dedicated notes folder"
 reject_text "$DOC" 'live-ready' "doc avoids live-ready claim"

@@ -19,13 +19,13 @@ What this PR provides:
 - Separate readiness gates for `librdma`, JACCL, and `MLX_IBV_DEVICES`.
 - Product spec for node discovery, fallback checks, menu/buttons, animations,
   diagnostics copy, and acceptance criteria.
-- Current vMLX smoke-tool SHA: `7e69522f85f5a384d69f1673ab45c98d60d28375`.
+- Current vMLX smoke-tool SHA: `fcb69484105683c5a5032b97420d00e75d3a914e`.
 
 What is not claimed:
 
 - No Qwen model is distributed-ready from this PR.
 - No RDMA collective has passed from Osaurus.
-- No vMLX pin is changed.
+- No Osaurus runtime vMLX pin is changed by this scaffold PR.
 - No UI is added yet.
 - No automatic peer discovery is enabled yet.
 

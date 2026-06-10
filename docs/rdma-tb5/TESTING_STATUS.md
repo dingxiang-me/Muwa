@@ -8,8 +8,9 @@ Current status is `PARTIAL / BLOCKED FOR REAL RDMA TP`.
 
 The Osaurus scaffold is source-tested. The local vMLX probes are close enough
 to smoke the readiness boundaries, but real Qwen tensor-parallel execution is
-blocked because the current local vMLX build reports JACCL unavailable and
-`MLX_IBV_DEVICES` is not configured.
+blocked because the current local vMLX build reports JACCL unavailable for this
+package build. `MLX_IBV_DEVICES` JSON shape is now source/probe-validated, but
+there is not yet a real multi-Mac RDMA device matrix for Qwen TP.
 
 ## Osaurus Checks
 
@@ -32,7 +33,7 @@ xcrun swift test --package-path Packages/OsaurusCore \
 Result:
 
 - Built OsaurusCore.
-- Ran 7 distributed readiness tests.
+- Ran 10 distributed readiness tests.
 - Passed Tailscale rejection, size-1 fallback rejection, Thunderbolt address
   acceptance, and separate `librdma` / JACCL / IBV gates.
 - Passed warning-only readiness behavior: unproven private/Wi-Fi-style
@@ -52,7 +53,7 @@ These checks were run from clean vMLX main checkout
 Current vMLX main smoke-tool SHA:
 
 ```text
-7e69522f85f5a384d69f1673ab45c98d60d28375
+fcb69484105683c5a5032b97420d00e75d3a914e
 ```
 
 Passed:
@@ -65,9 +66,11 @@ swift test --filter MLXDistributedCoreTests --jobs 1
 Result:
 
 - Built the local distributed core tests.
-- Ran 6 tests.
+- Ran 8 selected tests.
 - Passed Thunderbolt address acceptance, Tailscale rejection, private-address
   warning, and loopback-not-proof rules.
+- Passed `IBVDeviceMatrix` validation for `null` and empty self slots, malformed
+  matrix shapes, non-empty self slots, and missing peer devices.
 
 Passed:
 
@@ -75,6 +78,43 @@ Passed:
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift build --product DistributedProbe
 ```
+
+Passed:
+
+```sh
+TMP=$(mktemp /tmp/vmlx-ibv-valid.XXXXXX.json)
+printf '[["","mlx0"],["mlx0",""]]\n' > "$TMP"
+.build/debug/DistributedProbe --json \
+  --modes tp \
+  --world-size 2 \
+  --ibv-devices-json "$TMP" \
+  --data-plane-addresses 10.20.0.1:29500,10.20.0.2:29500 \
+  --models qwen36-smoke
+```
+
+Observed:
+
+- `mlxIBVDevicesSet`: `true`
+- `mlxWorldSize`: `2`
+- `ibv_matrix_valid`
+
+Passed negative control:
+
+```sh
+TMP=$(mktemp /tmp/vmlx-ibv-invalid.XXXXXX.json)
+printf '[[null,""],["mlx0",null]]\n' > "$TMP"
+.build/debug/DistributedProbe --json \
+  --modes tp \
+  --world-size 2 \
+  --ibv-devices-json "$TMP" \
+  --data-plane-addresses 100.93.216.67:29500 \
+  --models qwen36-smoke
+```
+
+Observed:
+
+- `ibv_matrix_peer_device_missing`
+- Tailscale `100.x` remains blocked as tensor data-plane.
 
 Passed:
 
@@ -177,7 +217,7 @@ Current validated Qwen-adjacent gates:
 Missing before any Qwen distributed-ready claim:
 
 - real JACCL backend availability
-- valid `MLX_IBV_DEVICES`
+- real multi-Mac `MLX_IBV_DEVICES`
 - strict rank 0/rank 1 group init with size 2 or higher
 - collective smoke
 - Qwen sharding plan execution

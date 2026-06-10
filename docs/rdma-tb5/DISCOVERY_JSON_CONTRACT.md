@@ -22,7 +22,7 @@ means at least one hard error exists.
   "device_name": "m5-max-a",
   "osaurus_version": "0.0-test",
   "osaurus_commit": "abcdef0",
-  "vmlx_pin": "7e69522f85f5a384d69f1673ab45c98d60d28375",
+  "vmlx_pin": "fcb69484105683c5a5032b97420d00e75d3a914e",
   "distributed_capability_version": 1,
   "roles": ["coordinator", "rankWorker"],
   "control_endpoints": ["m5-max-a.local:1337"],

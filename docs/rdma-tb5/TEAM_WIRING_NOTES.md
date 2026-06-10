@@ -27,8 +27,9 @@ with these fields:
 Candidate fields must not be treated as proof fields.
 
 Current engine-side reference for this contract is vMLX main
-`7e69522f85f5a384d69f1673ab45c98d60d28375`, which exposes the distributed
-probe, peer smoke, inventory, replica smoke, and rank-worker products.
+`fcb69484105683c5a5032b97420d00e75d3a914e`, which exposes the distributed
+probe, peer smoke, inventory, replica smoke, rank-worker products, and the
+engine-side `IBVDeviceMatrix` validator used by `DistributedProbe --json`.
 
 Current Osaurus-side source contract is `DistributedNodeDiscoveryRecord` and
 `DistributedRuntimeReadinessReport`. The UI should treat `ready` as the only
@@ -57,6 +58,14 @@ runtime launch:
 - every row must be square
 - diagonal self slots must be `null` or empty string
 - off-diagonal peer slots must contain a device name
+
+The matching vMLX probe fields are:
+
+- `mlxIBVDevicesSet`
+- `mlxIBVDevicesPath`
+- `mlxWorldSize`
+- `ibvDeviceMatrixFindings[].code`
+- `ibvDeviceMatrixFindings[].message`
 
 ## Endpoint Rules
 

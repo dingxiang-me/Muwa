@@ -43,7 +43,7 @@ probe output.
 - No UI or Settings panel changes.
 - No automatic peer discovery or background cluster joining.
 - No Osaurus runtime switch to distributed execution.
-- No vMLX pin bump in this PR.
+- No Osaurus runtime vMLX pin bump in this PR.
 - No claim that Qwen, MiMo, JANG, MXFP, VL, audio, or video rows have live
   readiness proof.
 - No node-discovery UI yet. See
@@ -52,8 +52,9 @@ probe output.
 
 ## Next Steps
 
-1. Consume vMLX `DistributedProbe --json` once the corresponding vMLX changes
-   are published and pinned.
+1. Consume vMLX `DistributedProbe --json` from vMLX main
+   `fcb69484105683c5a5032b97420d00e75d3a914e` once the runtime lane is ready
+   to pin and ingest distributed probe output.
 2. Add route-table evidence and real RDMA device enumeration.
 3. Add package-owned proof ingestion for worker liveness, rank agreement,
    decode token/s, token authority, and architecture-specific cache evidence.
