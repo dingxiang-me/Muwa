@@ -29,8 +29,11 @@ SOURCE="$ROOT/Packages/OsaurusCore/Services/ModelRuntime/DistributedRuntimeReadi
 TESTS="$ROOT/Packages/OsaurusCore/Tests/Service/DistributedRuntimeReadinessTests.swift"
 DOC="$ROOT/docs/RDMA_TB5_TENSOR_PARALLEL_OSAURUS_SCAFFOLD_2026_06_10.md"
 SPEC="$ROOT/docs/RDMA_TB5_NODE_DISCOVERY_PRODUCT_SPEC_2026_06_10.md"
+NOTES_README="$ROOT/docs/rdma-tb5/README.md"
+NOTES_WIRING="$ROOT/docs/rdma-tb5/TEAM_WIRING_NOTES.md"
+NOTES_TESTING="$ROOT/docs/rdma-tb5/TESTING_STATUS.md"
 
-for file in "$SOURCE" "$TESTS" "$DOC" "$SPEC"; do
+for file in "$SOURCE" "$TESTS" "$DOC" "$SPEC" "$NOTES_README" "$NOTES_WIRING" "$NOTES_TESTING"; do
   [[ -f "$file" ]] || fail_msg "missing ${file#$ROOT/}"
 done
 
@@ -51,6 +54,7 @@ require_text "$TESTS" 'ibv_devices_missing' "tests cover IBV gate"
 require_text "$DOC" 'No UI or Settings panel changes' "doc keeps UI out of this scaffold"
 require_text "$DOC" 'No vMLX pin bump in this PR' "doc records no vMLX pin bump"
 require_text "$DOC" 'Tailscale remains control-plane/SSH only' "doc records Tailscale boundary"
+require_text "$DOC" 'docs/rdma-tb5/' "doc links dedicated notes folder"
 reject_text "$DOC" 'live-ready' "doc avoids live-ready claim"
 
 require_text "$SPEC" 'Enable node discovery' "spec includes node discovery toggle"
@@ -65,6 +69,15 @@ require_text "$SPEC" 'IBV matrix check' "spec includes IBV fallback check"
 require_text "$SPEC" 'Collective smoke' "spec includes collective fallback check"
 require_text "$SPEC" 'Runtime proof' "spec includes runtime proof fallback check"
 require_text "$SPEC" 'A size-1 fallback never appears as distributed-ready' "spec blocks size-1 false ready"
+
+require_text "$NOTES_README" 'PARTIAL' "notes README records partial status"
+require_text "$NOTES_README" 'No Qwen model is distributed-ready' "notes README avoids Qwen ready claim"
+require_text "$NOTES_WIRING" 'Candidate fields must not be treated as proof fields' "wiring notes separate candidates from proof"
+require_text "$NOTES_WIRING" 'Tailscale/control plane' "wiring notes block Tailscale data-plane"
+require_text "$NOTES_TESTING" 'Qwen Status' "testing notes include Qwen status"
+require_text "$NOTES_TESTING" 'BLOCKED' "testing notes record blocked Qwen RDMA TP status"
+require_text "$NOTES_TESTING" 'jacclAvailable.*false' "testing notes record JACCL unavailable"
+require_text "$NOTES_TESTING" 'MLX_IBV_DEVICES' "testing notes record IBV device blocker"
 
 if [[ "$fail" -ne 0 ]]; then
   echo "RDMA/TB5 distributed scaffold guard failed." >&2

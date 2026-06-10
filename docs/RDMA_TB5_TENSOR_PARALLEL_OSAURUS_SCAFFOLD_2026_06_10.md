@@ -30,6 +30,7 @@ probe output.
 - Size-1 distributed fallback is explicitly rejected as tensor-parallel proof.
 - `librdma`, JACCL availability, and `MLX_IBV_DEVICES` configuration are tracked
   as separate gates.
+- Team-facing implementation notes live in `docs/rdma-tb5/`.
 
 ## Not Included Yet
 

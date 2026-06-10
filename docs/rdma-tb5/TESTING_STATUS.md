@@ -1,0 +1,156 @@
+# RDMA/TB5 Testing Status
+
+Updated: 2026-06-10
+
+## Summary
+
+Current status is `PARTIAL / BLOCKED FOR REAL RDMA TP`.
+
+The Osaurus scaffold is source-tested. The local vMLX probes are close enough
+to smoke the readiness boundaries, but real Qwen tensor-parallel execution is
+blocked because the current local vMLX build reports JACCL unavailable and
+`MLX_IBV_DEVICES` is not configured.
+
+## Osaurus Checks
+
+Passed:
+
+```sh
+scripts/live-proof/assert-rdma-tb5-distributed-scaffold.sh
+```
+
+Passed:
+
+```sh
+OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 \
+OSAURUS_TEST_ROOT=/tmp/osaurus-rdma-tb5-test \
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+xcrun swift test --package-path Packages/OsaurusCore \
+  --filter DistributedRuntimeReadinessTests --jobs 1
+```
+
+Result:
+
+- Built OsaurusCore.
+- Ran 5 distributed readiness tests.
+- Passed Tailscale rejection, size-1 fallback rejection, Thunderbolt address
+  acceptance, and separate `librdma` / JACCL / IBV gates.
+
+## vMLX Local Smoke Evidence
+
+These checks were run from `/Users/eric/vmlx-swift` against the current local
+integration checkout.
+
+Passed:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+swift test --filter MLXDistributedCoreTests --jobs 1
+```
+
+Result:
+
+- Built the local distributed core tests.
+- Ran 6 tests.
+- Passed Thunderbolt address acceptance, Tailscale rejection, private-address
+  warning, and loopback-not-proof rules.
+
+Passed:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+swift build --product DistributedProbe
+```
+
+Passed:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+swift build --product TPRankWorker
+```
+
+`TPRankWorker` currently reports an expected configuration error when launched
+without a model:
+
+```text
+ERROR: TP_MODEL_PATH not set
+```
+
+That is a CLI/configuration gate, not a Qwen proof.
+
+## Current Live Readiness Snapshot
+
+Command:
+
+```sh
+.build/debug/DistributedProbe --json \
+  --modes tp \
+  --data-plane-addresses 10.20.0.1:29500,10.20.0.2:29500 \
+  --models qwen36-smoke
+```
+
+Observed:
+
+- `librdmaLoadable`: `true`
+- `jacclAvailable`: `false`
+- `anyDistributedBackendAvailable`: `false`
+- `mlxIBVDevicesSet`: `false`
+- Thunderbolt Bridge candidate exists as `bridge0`.
+- `10.20.0.1` and `10.20.0.2` classify as accepted Thunderbolt loopback
+  tensor data-plane candidates.
+- TP TXT preview is not emitted because JACCL is unavailable and RDMA devices
+  are not configured.
+
+Blocked findings:
+
+- `Requested tp/wired advertisement, but JACCL is unavailable.`
+- `Requested tp/wired advertisement, but RDMA devices are not configured.`
+
+Negative-control command:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+swift run DistributedProbe --json \
+  --modes tp \
+  --data-plane-addresses 10.20.0.1:29500,100.93.216.67:29500 \
+  --models qwen36-smoke
+```
+
+Observed:
+
+- `10.20.0.1` accepted as Thunderbolt data-plane candidate.
+- `100.93.216.67` rejected as Tailscale/control-plane only.
+- Wired TP remains blocked.
+
+## Qwen Status
+
+`BLOCKED` for real RDMA tensor parallel proof.
+
+Current validated Qwen-adjacent gates:
+
+- Qwen smoke can be named in the probe model hash/id field.
+- vMLX `TPRankWorker` builds, pulling in `MLXLLM`, tokenizers,
+  `MLXDistributedTP`, and `MLXDistributedJACCL`.
+- Osaurus/vMLX address policy blocks Tailscale and size-1 false positives.
+
+Missing before any Qwen distributed-ready claim:
+
+- real JACCL backend availability
+- valid `MLX_IBV_DEVICES`
+- strict rank 0/rank 1 group init with size 2 or higher
+- collective smoke
+- Qwen sharding plan execution
+- coherent multi-turn Qwen generation
+- token/s and cache evidence
+- architecture-specific cache proof for Qwen hybrid state where applicable
+
+## Next Tests
+
+1. Expose/build the vMLX two-peer smoke executable as a product or run it from
+   a package target that CI can see.
+2. Add `MLX_IBV_DEVICES` validator and generated matrix diagnostics.
+3. Add child-process strict JACCL init smoke so native backend failures do not
+   crash Osaurus.
+4. Run two-rank collective smoke over real Thunderbolt/RDMA.
+5. Run a tiny synthetic TP linear parity test.
+6. Run real Qwen TP proof only after the lower gates pass.
