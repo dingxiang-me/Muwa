@@ -227,6 +227,57 @@ struct MLXServiceRuntimePolicyTests {
         }
     }
 
+    @Test func n2JANGTQMediaPreflightUsesBundleVisionConfig() throws {
+        let message = ChatMessage(
+            role: "user",
+            content: "describe this",
+            contentParts: [
+                .text("describe this"),
+                .imageUrl(url: "data:image/png;base64,AAAA", detail: nil),
+                .videoUrl(url: "data:video/mp4;base64,AAAA"),
+            ]
+        )
+
+        try MLXService.validateRuntimePolicy(
+            modelName: "nex-n2-pro-jangtq2",
+            modelId: "Nex-N2-Pro-JANGTQ2",
+            messages: [message],
+            parameters: GenerationParameters(temperature: nil, maxTokens: 16),
+            tools: [],
+            runtime: VMLXServerRuntimeSettings()
+        )
+    }
+
+    @Test func mimoJANGTQMediaPreflightStaysBlockedUntilVMLXHasMediaRuntime() {
+        let message = ChatMessage(
+            role: "user",
+            content: "describe this",
+            contentParts: [
+                .text("describe this"),
+                .imageUrl(url: "data:image/png;base64,AAAA", detail: nil),
+                .audioInput(data: "AAAA", format: "wav"),
+            ]
+        )
+
+        do {
+            try MLXService.validateRuntimePolicy(
+                modelName: "mimo-v2.5-jangtq_2",
+                modelId: "JANGQ-AI/MiMo-V2.5-JANGTQ_2",
+                messages: [message],
+                parameters: GenerationParameters(temperature: nil, maxTokens: 16),
+                tools: [],
+                runtime: VMLXServerRuntimeSettings()
+            )
+            Issue.record("MiMo media should remain blocked until vMLX ships MiMo media runtime support.")
+        } catch let error as MLXService.RuntimePolicyError {
+            let description = error.errorDescription ?? ""
+            #expect(description.contains("Image input is not advertised"))
+            #expect(description.contains("Audio input is not advertised"))
+        } catch {
+            Issue.record("Unexpected error type: \(error)")
+        }
+    }
+
     private static func lineCountTool() -> OsaurusCore.Tool {
         OsaurusCore.Tool(
             type: "function",
