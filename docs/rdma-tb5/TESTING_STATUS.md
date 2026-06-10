@@ -36,10 +36,16 @@ Result:
 - Passed Tailscale rejection, size-1 fallback rejection, Thunderbolt address
   acceptance, and separate `librdma` / JACCL / IBV gates.
 
-## vMLX Local Smoke Evidence
+## vMLX Main Smoke Evidence
 
-These checks were run from `/Users/eric/vmlx-swift` against the current local
-integration checkout.
+These checks were run from clean vMLX main checkout
+`/tmp/vmlx-rdma-tb5-main`.
+
+Current vMLX main smoke-tool SHA:
+
+```text
+7e69522f85f5a384d69f1673ab45c98d60d28375
+```
 
 Passed:
 
@@ -68,6 +74,28 @@ Passed:
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 swift build --product TPRankWorker
 ```
+
+Passed:
+
+```sh
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
+swift build --product DistributedPeerSmoke
+
+.build/debug/DistributedPeerSmoke \
+  --self-test \
+  --modes replica,pp \
+  --models qwen36-smoke
+```
+
+Result:
+
+- loopback self-test handshake passed
+- encrypted transport: `true`
+- peer identity pinned: `true`
+- advertised `dist.models`: `qwen36-smoke`
+- advertised `dist.modes`: `pp,replica`
+- `rdmaReady`: `false`
+- `rdmaBlockedReason`: `JACCL backend is unavailable in this package build`
 
 `TPRankWorker` currently reports an expected configuration error when launched
 without a model:
@@ -122,6 +150,11 @@ Observed:
 - `100.93.216.67` rejected as Tailscale/control-plane only.
 - Wired TP remains blocked.
 
+`DistributedModelInventory` also builds from vMLX main. A smoke invocation with
+`--json` was rejected because the tool already emits JSON by default and does
+not support that flag; that invocation is recorded as command misuse, not a
+runtime pass.
+
 ## Qwen Status
 
 `BLOCKED` for real RDMA tensor parallel proof.
@@ -146,11 +179,9 @@ Missing before any Qwen distributed-ready claim:
 
 ## Next Tests
 
-1. Expose/build the vMLX two-peer smoke executable as a product or run it from
-   a package target that CI can see.
-2. Add `MLX_IBV_DEVICES` validator and generated matrix diagnostics.
-3. Add child-process strict JACCL init smoke so native backend failures do not
+1. Add `MLX_IBV_DEVICES` validator and generated matrix diagnostics.
+2. Add child-process strict JACCL init smoke so native backend failures do not
    crash Osaurus.
-4. Run two-rank collective smoke over real Thunderbolt/RDMA.
-5. Run a tiny synthetic TP linear parity test.
-6. Run real Qwen TP proof only after the lower gates pass.
+3. Run two-rank collective smoke over real Thunderbolt/RDMA.
+4. Run a tiny synthetic TP linear parity test.
+5. Run real Qwen TP proof only after the lower gates pass.

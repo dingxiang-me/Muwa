@@ -7,8 +7,9 @@ distributed inference in Osaurus.
 
 ## Current Status
 
-`PARTIAL`: Osaurus now has a readiness vocabulary and product spec for
-RDMA/TB5 discovery, but distributed execution is not enabled.
+`PARTIAL`: Osaurus now has a readiness vocabulary, product spec, and vMLX
+smoke-tool reference for RDMA/TB5 discovery, but distributed execution is not
+enabled.
 
 What this PR provides:
 
@@ -18,6 +19,7 @@ What this PR provides:
 - Separate readiness gates for `librdma`, JACCL, and `MLX_IBV_DEVICES`.
 - Product spec for node discovery, fallback checks, menu/buttons, animations,
   diagnostics copy, and acceptance criteria.
+- Current vMLX smoke-tool SHA: `7e69522f85f5a384d69f1673ab45c98d60d28375`.
 
 What is not claimed:
 

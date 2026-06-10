@@ -26,6 +26,10 @@ with these fields:
 
 Candidate fields must not be treated as proof fields.
 
+Current engine-side reference for this contract is vMLX main
+`7e69522f85f5a384d69f1673ab45c98d60d28375`, which exposes the distributed
+probe, peer smoke, inventory, replica smoke, and rank-worker products.
+
 ## Endpoint Rules
 
 Allowed as tensor data-plane candidates:
@@ -104,6 +108,7 @@ Include:
 - collective smoke result
 - model shard digest summary
 - runtime proof summary when available
+- vMLX distributed smoke-tool SHA when the report was generated
 
 Do not include secrets, local full model paths, tokens, private keys, or full
 hostnames unless a developer diagnostic bundle is explicitly exported.
