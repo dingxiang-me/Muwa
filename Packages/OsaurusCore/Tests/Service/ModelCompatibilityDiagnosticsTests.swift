@@ -156,6 +156,38 @@ struct ModelCompatibilityDiagnosticsTests {
         #expect(report.runtime.reason == .unsupportedLongCat)
     }
 
+    @Test func diffusionGemmaConfig_reportsBlockDiffusionRuntimeBoundary() {
+        let root = makeTempDir()
+        defer { try? FileManager.default.removeItem(at: root) }
+        writeBundle(
+            at: root,
+            config:
+                #"""
+                {
+                  "model_type": "diffusion_gemma",
+                  "architectures": ["DiffusionGemmaForBlockDiffusion"],
+                  "text_config": {"model_type": "diffusion_gemma_text"},
+                  "vision_config": {"model_type": "gemma4_vision"}
+                }
+                """#
+        )
+
+        let report = ModelCompatibilityDiagnostics.report(
+            modelId: "google/diffusiongemma-26B-A4B-it",
+            modelName: "DiffusionGemma 26B A4B",
+            modelTypeHint: nil,
+            bundleURL: root,
+            externalSource: ExternalModelLocator.Source.huggingFaceCache.rawValue
+        )
+
+        #expect(report.localBundle.kind == .available)
+        #expect(report.runtime.kind == .blocked)
+        #expect(report.runtime.reason == .unsupportedDiffusionGemma)
+        #expect(report.runtime.detail.contains("block-diffusion denoising"))
+        #expect(report.benchmark.kind == .notApplicable)
+        #expect(report.featureHooks.isEmpty)
+    }
+
     @Test func catalogEntryWithoutBundle_reportsDownloadRequired() {
         let report = ModelCompatibilityDiagnostics.report(
             modelId: "org/repo",

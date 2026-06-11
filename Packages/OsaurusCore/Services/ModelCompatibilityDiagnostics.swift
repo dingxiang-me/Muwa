@@ -78,6 +78,7 @@ enum ModelCompatibilityDiagnostics {
             case incompleteBundle
             case unsupportedHunyuanDense
             case unsupportedLongCat
+            case unsupportedDiffusionGemma
         }
 
         let kind: Kind
@@ -310,6 +311,23 @@ enum ModelCompatibilityDiagnostics {
                 detail:
                     L(
                         "LongCat local bundles require native vmlx architecture, processor, cache, and media-path support before Osaurus should offer them as runnable."
+                    )
+            )
+        }
+
+        let isDiffusionGemma =
+            modelTypes.contains("diffusion_gemma")
+            || modelTypes.contains("diffusion_gemma_text")
+            || architectures.contains("diffusiongemmaforblockdiffusion")
+            || names.contains(where: { $0.contains("diffusiongemma") })
+        if isDiffusionGemma {
+            return RuntimeStatus(
+                kind: .blocked,
+                reason: .unsupportedDiffusionGemma,
+                title: L("DiffusionGemma engine in progress"),
+                detail:
+                    L(
+                        "DiffusionGemma uses block-diffusion denoising over a canvas, not autoregressive token iteration. Osaurus should not offer it as runnable until vmlx exposes the native block-diffusion generation path and live proof exists."
                     )
             )
         }
