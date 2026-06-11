@@ -219,7 +219,11 @@ final class CapabilitiesDiscoverTool: OsaurusTool, @unchecked Sendable {
             (hits.workflows.map {
                 var extraLines = ["tools_used: \($0.workflow.toolsUsed.joined(separator: ", "))"]
                 if !$0.workflow.steps.isEmpty {
-                    extraLines.append("runnable: use `workflow_run` with `{\"id\": \"\($0.workflow.id)\"}`")
+                    let example = WorkflowContract.runExampleJSON(
+                        workflowId: $0.workflow.id,
+                        parameters: $0.workflow.parameters
+                    )
+                    extraLines.append("runnable: use `workflow_run` with `\(example)`")
                 }
                 return ScoredResult(
                     id: "workflow/\($0.workflow.id)",
@@ -585,8 +589,12 @@ final class CapabilitiesLoadTool: OsaurusTool, @unchecked Sendable {
                 output += "Tools: \(workflow.toolsUsed.joined(separator: ", "))\n"
             }
             if !workflow.steps.isEmpty {
+                let example = WorkflowContract.runExampleJSON(
+                    workflowId: workflow.id,
+                    parameters: workflow.parameters
+                )
                 output +=
-                    "Runnable: `workflow_run` with `{\"id\": \"\(workflow.id)\"}` executes the steps below automatically.\n"
+                    "Runnable: `workflow_run` with `\(example)` executes the steps below automatically.\n"
             }
             output += "\n---\n\n"
             output += workflow.body

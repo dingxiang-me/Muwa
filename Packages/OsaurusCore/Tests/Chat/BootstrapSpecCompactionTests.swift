@@ -136,4 +136,51 @@ struct BootstrapSpecCompactionTests {
         #expect(desc.contains("e.g. tool/foo"), "abbreviation truncated: \(desc)")
         #expect(!desc.contains("Second sentence"))
     }
+
+    // MARK: - #6 workflow_save authoring contract survives the bootstrap
+
+    /// Regression from a live session (2026-06-10): the bootstrap skeleton
+    /// stripped workflow_save's property descriptions and step-item shape,
+    /// so a frontier model invented `{"action": ..., "params": ...}` steps
+    /// and then saved a parameterless guidance-only workflow with hardcoded
+    /// values. The full parameter schema — placeholder rules and structural
+    /// item schemas included — must reach the model on turn 1.
+    @Test func workflowSaveKeepsParameterSchemaThroughBootstrap() throws {
+        let saveTool = WorkflowSaveTool()
+        let tool = Tool(
+            type: "function",
+            function: ToolFunction(
+                name: saveTool.name,
+                description: saveTool.description,
+                parameters: saveTool.parameters
+            )
+        )
+
+        let compact = SystemPromptComposer.compactBootstrapSpec(tool)
+        let root = try #require(object(compact.function.parameters))
+        let properties = try #require(object(root["properties"]))
+
+        // The steps description (placeholder + promote-to-parameters rules)
+        // survives.
+        let steps = try #require(object(properties["steps"]))
+        let stepsDescription: String = {
+            if case .string(let s)? = steps["description"] { return s }
+            return ""
+        }()
+        #expect(stepsDescription.contains("{{params.<name>}}"))
+
+        // The structural step-item schema survives: the model sees the
+        // allowed keys even if some path strips prose.
+        let stepItems = try #require(object(steps["items"]))
+        let stepItemProperties = try #require(object(stepItems["properties"]))
+        #expect(stepItemProperties["tool"] != nil)
+        #expect(stepItemProperties["args_template"] != nil)
+        #expect(stepItemProperties["guidance"] != nil)
+
+        let params = try #require(object(properties["parameters"]))
+        let paramItems = try #require(object(params["items"]))
+        let paramItemProperties = try #require(object(paramItems["properties"]))
+        #expect(paramItemProperties["name"] != nil)
+        #expect(paramItemProperties["type"] != nil)
+    }
 }

@@ -421,10 +421,21 @@ public struct EvalCase: Sendable, Codable, Identifiable {
             /// must carry — pins "captured the procedure", not just
             /// "wrote a row".
             public let minSteps: Int?
+            /// When true, the saved workflow must pass the same static
+            /// contract validation `workflow_run` preflights with
+            /// (`WorkflowContract.validate`): templates parse, placeholders
+            /// resolve, and rendered args satisfy each tool's schema —
+            /// a true save→run round trip, not just a persisted row.
+            public let runnable: Bool?
 
-            public init(nameContains: String? = nil, minSteps: Int? = nil) {
+            public init(
+                nameContains: String? = nil,
+                minSteps: Int? = nil,
+                runnable: Bool? = nil
+            ) {
                 self.nameContains = nameContains
                 self.minSteps = minSteps
+                self.runnable = runnable
             }
         }
 

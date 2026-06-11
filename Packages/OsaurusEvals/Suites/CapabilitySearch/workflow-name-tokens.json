@@ -1,0 +1,25 @@
+{
+  "id": "capability_search.workflow-name-tokens",
+  "domain": "capability_search",
+  "label": "capability search • workflow • name carries the query tokens",
+  "query": "family office one pager report workflow",
+  "notes": "Regression from a live miss (2026-06-10): a model saved `family_office_onepager` whose description said 'one-page summary PDF' and trigger said 'one pager in pdf', then a smaller model queried 'family office one pager report workflow'. With the name absent from the index text the hit scored 0.227 — under the 0.25 floor. The name is now part of buildIndexText (underscores split to spaces); this case pins that behavior.",
+  "fixtures": {
+    "seedWorkflows": [
+      {
+        "id": "eval-family-office-onepager",
+        "name": "family_office_onepager",
+        "description": "Extract key metrics from the Addepar Family Office PDF and generate a one-page summary PDF.",
+        "triggerText": "generate me a one pager in pdf?"
+      }
+    ]
+  },
+  "expect": {
+    "capabilitySearch": {
+      "expectedWorkflows": {
+        "anyOf": ["family_office_onepager"],
+        "minMatches": 1
+      }
+    }
+  }
+}

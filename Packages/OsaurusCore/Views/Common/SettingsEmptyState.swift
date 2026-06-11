@@ -126,14 +126,29 @@ struct SettingsEmptyState: View {
     // MARK: - Example Cards
 
     private var exampleCards: some View {
-        HStack(spacing: 12) {
+        // `fixedSize` + `maxHeight: .infinity` equalizes card heights to
+        // the tallest sibling so uneven copy lengths don't produce a
+        // ragged row.
+        HStack(alignment: .top, spacing: 12) {
             ForEach(Array(examples.enumerated()), id: \.offset) { _, example in
                 VStack(spacing: 10) {
                     Image(systemName: example.icon)
                         .font(.system(size: 20, weight: .medium))
-                        .foregroundColor(theme.accentColor)
-                        .frame(width: 36, height: 36)
-                        .background(Circle().fill(theme.accentColor.opacity(0.1)))
+                        .foregroundStyle(
+                            LinearGradient(
+                                colors: [theme.accentColor, theme.accentColor.opacity(0.7)],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .frame(width: 40, height: 40)
+                        .background(
+                            Circle()
+                                .fill(theme.accentColor.opacity(0.1))
+                                .overlay(
+                                    Circle().stroke(theme.accentColor.opacity(0.15), lineWidth: 1)
+                                )
+                        )
 
                     VStack(spacing: 4) {
                         Text(example.title)
@@ -146,23 +161,25 @@ struct SettingsEmptyState: View {
                             .font(.system(size: 12))
                             .foregroundColor(theme.secondaryText)
                             .multilineTextAlignment(.center)
+                            .lineSpacing(2)
                             .fixedSize(horizontal: false, vertical: true)
                     }
                 }
-                .frame(maxWidth: .infinity)
-                .padding(.horizontal, 12)
-                .padding(.vertical, 16)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 18)
                 .background(
-                    RoundedRectangle(cornerRadius: 10)
+                    RoundedRectangle(cornerRadius: 12)
                         .fill(theme.secondaryBackground.opacity(0.5))
                         .overlay(
-                            RoundedRectangle(cornerRadius: 10)
+                            RoundedRectangle(cornerRadius: 12)
                                 .stroke(theme.cardBorder.opacity(0.5), lineWidth: 1)
                         )
                 )
             }
         }
-        .frame(maxWidth: 540)
+        .fixedSize(horizontal: false, vertical: true)
+        .frame(maxWidth: 560)
     }
 
     // MARK: - Action Buttons
@@ -198,6 +215,7 @@ struct SettingsEmptyState: View {
                     .background(
                         RoundedRectangle(cornerRadius: 8)
                             .fill(theme.accentColor)
+                            .shadow(color: theme.accentColor.opacity(0.35), radius: 8, x: 0, y: 3)
                     )
             }
             .buttonStyle(PlainButtonStyle())

@@ -1198,15 +1198,20 @@ public struct SystemPromptComposer: Sendable {
 
     /// Loop tools whose ARGUMENT constraints must survive the bootstrap:
     /// the ≥30-char `summary` rule (`complete`), the option limits
-    /// (`clarify`), and the path-vs-content rules (`share_artifact`) all
-    /// live in property descriptions the plain skeleton strips — and these
-    /// tools are typically called without a prior `capabilities_load` that
-    /// would restore the full spec. Middle tier: one-line description +
-    /// full parameter schema, so small models see the constraints on turn 1
-    /// without paying for the full prose (which the `.small` budget
-    /// guardrail can't afford).
+    /// (`clarify`), the path-vs-content rules (`share_artifact`), and the
+    /// step-shape / `{{params.*}}` authoring contract (`workflow_save` —
+    /// a live frontier model that only saw the stripped skeleton invented
+    /// `{"action": ...}` steps and saved a parameterless workflow with
+    /// hardcoded values) all live in property descriptions the plain
+    /// skeleton strips — and these tools are typically called without a
+    /// prior `capabilities_load` that would restore the full spec. Middle
+    /// tier: one-line description + full parameter schema, so small models
+    /// see the constraints on turn 1 without paying for the full prose
+    /// (which the `.small` budget guardrail can't afford). `workflow_save`
+    /// only enters the baseline for agents with workflows enabled, so its
+    /// cost is opt-in.
     private static let constraintPreservingBootstrapToolNames: Set<String> = [
-        "complete", "clarify", "share_artifact",
+        "complete", "clarify", "share_artifact", "workflow_save",
     ]
 
     /// Compress first-turn always-loaded specs by keeping the callable name,

@@ -183,7 +183,7 @@ struct WorkflowRunnerHandoffTests {
         }
     }
 
-    @Test func toolStepWithoutNameIsInvalid() async {
+    @Test func toolStepWithoutNameFailsPreflight() async {
         let workflow = Workflow(
             name: "bad-step",
             description: "tool step missing name",
@@ -191,12 +191,21 @@ struct WorkflowRunnerHandoffTests {
             source: .user,
             steps: [WorkflowStep(kind: .tool)]
         )
-        await #expect(throws: WorkflowRunnerError.invalidStep(index: 1, reason: "tool step has no tool name")) {
+        do {
             _ = try await WorkflowRunner.run(
                 workflow: workflow,
                 argumentsJSON: "{}",
                 recordOutcome: false
             )
+            Issue.record("Expected preflightFailed to be thrown")
+        } catch let error as WorkflowRunnerError {
+            guard case .preflightFailed(let message) = error else {
+                Issue.record("Expected preflightFailed, got \(error)")
+                return
+            }
+            #expect(message.contains("tool step has no tool name"))
+        } catch {
+            Issue.record("Unexpected error: \(error)")
         }
     }
 }

@@ -29,16 +29,17 @@ struct CapabilitySearchResults {
 
 enum CapabilitySearch {
     /// Embed-cosine acceptance floor for the **workflows** lane.
-    /// Calibrated against `Suites/CapabilitySearch/workflow-*.json`
-    /// (PR-A baseline, 2026-05-07, recorded against the pre-rename
-    /// method fixtures): lowest expected-hit was `plot_data` at
-    /// 0.281; highest abstain noise was 0.179. 0.25 sits 40% above
-    /// abstain noise and 12% below the tightest recall hit — the
-    /// only band that flips every PR-A workflow case to PASS
-    /// without re-admitting abstain. Was a single global `0.7`
-    /// until PR-A showed that value dropped every workflow/skill
-    /// true positive (top hits land at 0.28-0.59 on
-    /// `potion-base-4M`, not 0.7+).
+    /// Since 2026-06-10 the lane is genuinely vector-only
+    /// (`WorkflowSearchService.makeVecturaConfig`, `hybridWeight: 1.0`),
+    /// so this floor compares directly against `potion-base-4M` cosine.
+    /// Under the earlier hybrid scoring, BM25's negative IDF at tiny N
+    /// clamped to 0 and capped scores at `cosine/2` — a live single-
+    /// workflow install scored 0.223 for a near-verbatim query and
+    /// discovery returned nothing (see WorkflowSearchService for the
+    /// full post-mortem). Vector-only measurements (2026-06-10,
+    /// `WorkflowSearchColdStartTests`): true hits 0.45-0.87, strongest
+    /// abstain noise 0.187 ("thanks, that's perfect"). 0.25 keeps ~35%
+    /// headroom over abstain while accepting every measured recall hit.
     static let minimumRelevanceScoreWorkflows: Float = 0.25
 
     /// Embed-cosine acceptance floor for the **skills** lane.

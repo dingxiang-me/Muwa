@@ -65,6 +65,8 @@ final class WorkflowSaveTool: OsaurusTool, @unchecked Sendable {
         + "Propose this to the user first and only call it after they confirm. Capture the exact tool "
         + "sequence that worked as `steps`; promote anything task-specific (paths, queries, names) to "
         + "`parameters` and reference them as `{{params.<name>}}` inside step `args_template` values. "
+        + "Every tool step's `args_template` must satisfy that tool's required arguments — saves that "
+        + "would fail at run time are rejected with per-step errors so you can correct and retry. "
         + "Use `guidance` steps for parts that need judgment. Saved workflows are discoverable via "
         + "`capabilities_discover` and runnable by any model via `workflow_run`."
 
@@ -84,22 +86,68 @@ final class WorkflowSaveTool: OsaurusTool, @unchecked Sendable {
                 "type": .string("string"),
                 "description": .string("Optional example user phrasings that should surface this workflow in search"),
             ]),
+            // `steps` and `parameters` carry STRUCTURAL item schemas, not just
+            // prose: the first-turn bootstrap ships tool specs as compact
+            // skeletons with every `description` stripped (see
+            // `SystemPromptComposer.compactBootstrapSpec`), and a live model
+            // invented `{"action": ..., "params": ...}` steps when all it saw
+            // was `items: {type: object}`. Shape, required keys, and enums
+            // survive compaction — descriptions don't.
             "parameters": .object([
                 "type": .string("array"),
                 "description": .string(
-                    "Declared inputs. Each item: {\"name\": string, \"type\": \"string\"|\"number\"|\"boolean\", "
-                        + "\"description\": string, \"required\": bool, \"default\": string?}"
+                    "Declared inputs. Reference each as {{params.<name>}} inside step args_template values."
                 ),
-                "items": .object(["type": .string("object")]),
+                "items": .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "name": .object(["type": .string("string")]),
+                        "type": .object([
+                            "type": .string("string"),
+                            "enum": .array([.string("string"), .string("number"), .string("boolean")]),
+                        ]),
+                        "description": .object(["type": .string("string")]),
+                        "required": .object(["type": .string("boolean")]),
+                        "default": .object(["type": .string("string")]),
+                    ]),
+                    "required": .array([.string("name")]),
+                ]),
             ]),
             "steps": .object([
                 "type": .string("array"),
                 "description": .string(
-                    "Ordered steps. Tool step: {\"tool\": string, \"args_template\": object?, \"skill_context\": string?}. "
-                        + "Guidance step: {\"guidance\": string}. In `args_template` string values you may use "
-                        + "{{params.<name>}} and {{steps.<n>.output}} placeholders (steps are 1-based)."
+                    "Ordered steps. Each step is EITHER a tool step ({\"tool\": ..., \"args_template\": {...}}) "
+                        + "OR a guidance step ({\"guidance\": ...}). Promote task-specific values (paths, queries, "
+                        + "names) to `parameters` and reference them as {{params.<name>}} in args_template strings; "
+                        + "{{steps.<n>.output}} carries an earlier step's output (1-based)."
                 ),
-                "items": .object(["type": .string("object")]),
+                "items": .object([
+                    "type": .string("object"),
+                    "properties": .object([
+                        "tool": .object([
+                            "type": .string("string"),
+                            "description": .string("Tool name to execute (tool steps only)"),
+                        ]),
+                        "args_template": .object([
+                            "type": .string("object"),
+                            "description": .string(
+                                "Arguments for the tool; string values may embed {{params.<name>}} "
+                                    + "and {{steps.<n>.output}} placeholders"
+                            ),
+                        ]),
+                        "skill_context": .object([
+                            "type": .string("string"),
+                            "description": .string("Optional skill whose instructions apply to this step"),
+                        ]),
+                        "guidance": .object([
+                            "type": .string("string"),
+                            "description": .string(
+                                "Free-text instruction for the running model (guidance steps only); "
+                                    + "execution hands off here"
+                            ),
+                        ]),
+                    ]),
+                ]),
             ]),
             "source_model": .object([
                 "type": .string("string"),
@@ -156,6 +204,28 @@ final class WorkflowSaveTool: OsaurusTool, @unchecked Sendable {
             )
         }
 
+        // Contract validation: reject saves that would fail at run time,
+        // while the authoring model is still in the loop to self-correct.
+        let toolSchemas = await MainActor.run {
+            WorkflowContract.registrySchemas(for: steps.compactMap(\.toolName))
+        }
+        let issues = WorkflowContract.validate(
+            parameters: parameters,
+            steps: steps,
+            toolSchemas: toolSchemas
+        )
+        if !issues.isEmpty {
+            let detail = issues.map { "- \($0.rendered)" }.joined(separator: "\n")
+            return ToolEnvelope.failure(
+                kind: .invalidArgs,
+                message:
+                    "Workflow not saved — it would fail at run time:\n\(detail)\n"
+                    + "Fix the steps/parameters and call `workflow_save` again.",
+                field: "steps",
+                tool: name
+            )
+        }
+
         let body = Self.renderBody(description: description, parameters: parameters, steps: steps)
         let sourceModel = args["source_model"] as? String
 
@@ -175,8 +245,12 @@ final class WorkflowSaveTool: OsaurusTool, @unchecked Sendable {
             if !parameters.isEmpty {
                 text += " | Parameters: \(parameters.map(\.name).joined(separator: ", "))"
             }
+            let example = WorkflowContract.runExampleJSON(
+                workflowId: workflow.id,
+                parameters: parameters
+            )
             text += "\nAny model can now discover it via `capabilities_discover` and run it with "
-            text += "`workflow_run` using `{\"id\": \"\(workflow.id)\"}`."
+            text += "`workflow_run` using `\(example)`."
             return ToolEnvelope.success(tool: name, text: text)
         } catch {
             return ToolEnvelope.failure(
@@ -229,7 +303,10 @@ final class WorkflowSaveTool: OsaurusTool, @unchecked Sendable {
             }
             guard let tool = item["tool"] as? String, !tool.isEmpty else {
                 throw ParseError(
-                    message: "Step \(index + 1) needs either a `tool` name or a `guidance` text."
+                    message:
+                        "Step \(index + 1) needs either a `tool` name or a `guidance` text. "
+                        + "Tool step shape: {\"tool\": \"file_write\", \"args_template\": {\"path\": \"...\", \"content\": \"...\"}}. "
+                        + "Guidance step shape: {\"guidance\": \"instruction text\"}."
                 )
             }
             var argsTemplate: String?
@@ -320,7 +397,8 @@ final class WorkflowRunTool: OsaurusTool, @unchecked Sendable {
         "Execute a saved workflow by id. Deterministic tool steps run automatically in order; "
         + "execution stops at the first guidance step (or failure) and returns the completed step "
         + "outputs plus remaining instructions for you to continue with judgment. Workflow IDs come "
-        + "from `capabilities_discover` results (`workflow/<id>`). "
+        + "from `capabilities_discover` results (`workflow/<id>`), which also show the exact "
+        + "`arguments` each workflow takes — pass only its declared parameters. "
         + "Example: `{\"id\": \"abc-123\", \"arguments\": {\"path\": \"report.pdf\"}}`."
 
     let parameters: JSONValue? = .object([
@@ -401,6 +479,16 @@ final class WorkflowRunTool: OsaurusTool, @unchecked Sendable {
         do {
             result = try await WorkflowRunner.run(workflow: workflow, argumentsJSON: runArgumentsJSON)
         } catch let error as WorkflowRunnerError {
+            if case .preflightFailed = error {
+                // The workflow itself is broken — retrying with different
+                // arguments cannot help.
+                return ToolEnvelope.failure(
+                    kind: .executionError,
+                    message: error.localizedDescription,
+                    tool: name,
+                    retryable: false
+                )
+            }
             return ToolEnvelope.failure(
                 kind: .invalidArgs,
                 message: error.localizedDescription,

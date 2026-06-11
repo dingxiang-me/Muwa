@@ -17,6 +17,8 @@ public enum WorkflowRunnerError: Error, LocalizedError, Equatable {
     case missingRequiredParameter(String)
     case invalidParameterType(name: String, expected: String)
     case invalidStep(index: Int, reason: String)
+    case unknownArguments(provided: [String], declared: [String])
+    case preflightFailed(message: String)
 
     public var errorDescription: String? {
         switch self {
@@ -26,6 +28,16 @@ public enum WorkflowRunnerError: Error, LocalizedError, Equatable {
             return "Parameter `\(name)` must be a \(expected)."
         case .invalidStep(let index, let reason):
             return "Step \(index) is invalid: \(reason)"
+        case .unknownArguments(let provided, let declared):
+            let providedList = provided.map { "`\($0)`" }.joined(separator: ", ")
+            if declared.isEmpty {
+                return "Unknown argument(s) \(providedList) — this workflow takes no arguments. "
+                    + "Call `workflow_run` with just the `id`."
+            }
+            return "Unknown argument(s) \(providedList). This workflow's declared parameters are: "
+                + declared.joined(separator: ", ") + "."
+        case .preflightFailed(let message):
+            return message
         }
     }
 }
@@ -81,6 +93,7 @@ public enum WorkflowRunner {
         recordOutcome: Bool = true
     ) async throws -> WorkflowRunResult {
         let params = try resolveParameters(workflow: workflow, argumentsJSON: argumentsJSON)
+        try await preflight(workflow: workflow)
 
         var outputs: [WorkflowRunResult.StepOutput] = []
         var stepOutputsByIndex: [Int: String] = [:]
@@ -114,7 +127,9 @@ public enum WorkflowRunner {
                 do {
                     result = try await ToolRegistry.shared.execute(name: toolName, argumentsJSON: args)
                 } catch {
-                    let message = "Step \(index) (`\(toolName)`) threw: \(error.localizedDescription)"
+                    let message =
+                        "Step \(index) (`\(toolName)`) threw: \(error.localizedDescription)"
+                        + contractHint(for: workflow)
                     await report(.failed, workflow: workflow, recordOutcome: recordOutcome, notes: message)
                     return WorkflowRunResult(
                         status: .failed,
@@ -125,7 +140,9 @@ public enum WorkflowRunner {
                     )
                 }
                 if ToolEnvelope.isError(result) {
-                    let message = "Step \(index) (`\(toolName)`) failed: \(result)"
+                    let message =
+                        "Step \(index) (`\(toolName)`) failed: \(result)"
+                        + contractHint(for: workflow)
                     await report(.failed, workflow: workflow, recordOutcome: recordOutcome, notes: message)
                     return WorkflowRunResult(
                         status: .failed,
@@ -151,11 +168,50 @@ public enum WorkflowRunner {
         return result
     }
 
+    // MARK: - Preflight
+
+    /// Statically validate every tool step before executing anything: a
+    /// workflow whose templates can't satisfy its tools' schemas (e.g.
+    /// saved before contract validation existed) fails fast with no side
+    /// effects and a recovery path, instead of dying mid-run on the
+    /// first tool error.
+    static func preflight(workflow: Workflow) async throws {
+        let toolSchemas = await MainActor.run {
+            WorkflowContract.registrySchemas(for: workflow.steps.compactMap(\.toolName))
+        }
+        let issues = WorkflowContract.validate(
+            parameters: workflow.parameters,
+            steps: workflow.steps,
+            toolSchemas: toolSchemas,
+            scope: .executablePrefix
+        )
+        guard !issues.isEmpty else { return }
+        let detail = issues.map { "- \($0.rendered)" }.joined(separator: "\n")
+        throw WorkflowRunnerError.preflightFailed(
+            message:
+                "Workflow '\(workflow.name)' cannot run as saved:\n\(detail)\n"
+                + "No steps were executed. Load it as guided context with `capabilities_load` "
+                + "(`{\"ids\": [\"workflow/\(workflow.id)\"]}`) and perform the steps manually, "
+                + "or ask a capable model to re-save it with valid parameters and args_template values."
+        )
+    }
+
+    /// `Workflow argument contract: ...` line appended to mid-run failure
+    /// text so the model sees what it could have passed.
+    private static func contractHint(for workflow: Workflow) -> String {
+        let example = WorkflowContract.runExampleJSON(
+            workflowId: workflow.id,
+            parameters: workflow.parameters
+        )
+        return "\nWorkflow argument contract: `workflow_run \(example)`."
+    }
+
     // MARK: - Parameter resolution
 
     /// Validate the raw arguments against the workflow's declared
-    /// parameters: required check, type check, default backfill.
-    /// Returns the textual substitution value per parameter name.
+    /// parameters: unknown-key rejection, required check, type check,
+    /// default backfill. Returns the textual substitution value per
+    /// parameter name.
     static func resolveParameters(
         workflow: Workflow,
         argumentsJSON: String
@@ -167,6 +223,18 @@ public enum WorkflowRunner {
             raw = object
         } else {
             raw = [:]
+        }
+
+        // Undeclared keys used to be silently ignored, which left small
+        // models looping: they'd pass `{"path": ...}` to a workflow with
+        // no parameters and never learn the actual contract.
+        let declaredNames = Set(workflow.parameters.map(\.name))
+        let unknown = raw.keys.filter { !declaredNames.contains($0) }.sorted()
+        if !unknown.isEmpty {
+            throw WorkflowRunnerError.unknownArguments(
+                provided: unknown,
+                declared: workflow.parameters.map(\.name)
+            )
         }
 
         var resolved: [String: SubstitutionValue] = [:]

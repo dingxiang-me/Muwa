@@ -153,7 +153,7 @@ extension EvalRunner {
             score.record(result.passed, note: result.note)
         }
         if let assertion = exp.workflowSaved {
-            let result = scoreWorkflowSavedAssertion(assertion, created: createdWorkflows)
+            let result = await scoreWorkflowSavedAssertion(assertion, created: createdWorkflows)
             score.record(result.passed, note: result.note)
         }
 
@@ -389,7 +389,24 @@ extension EvalRunner {
     private static func scoreWorkflowSavedAssertion(
         _ assertion: EvalCase.AgentLoopExpectations.WorkflowSavedAssertion,
         created: [Workflow]
-    ) -> (passed: Bool, note: String) {
+    ) async -> (passed: Bool, note: String) {
+        // Static contract validation per created workflow — the same
+        // check `workflow_run`'s preflight performs, proving the save is
+        // a runnable round trip and not just a persisted row.
+        var contractIssues: [String: [WorkflowContract.Issue]] = [:]
+        if assertion.runnable == true {
+            for workflow in created {
+                let schemas = await MainActor.run {
+                    WorkflowContract.registrySchemas(for: workflow.steps.compactMap(\.toolName))
+                }
+                contractIssues[workflow.id] = WorkflowContract.validate(
+                    parameters: workflow.parameters,
+                    steps: workflow.steps,
+                    toolSchemas: schemas
+                )
+            }
+        }
+
         let matches = created.filter { workflow in
             if let needle = assertion.nameContains,
                 !workflow.name.localizedCaseInsensitiveContains(needle)
@@ -399,16 +416,26 @@ extension EvalRunner {
             if let minSteps = assertion.minSteps, workflow.steps.count < minSteps {
                 return false
             }
+            if assertion.runnable == true, !(contractIssues[workflow.id] ?? []).isEmpty {
+                return false
+            }
             return true
         }
-        let inventory = created.map { "\($0.name)(\($0.steps.count) steps)" }
-            .joined(separator: ",")
+        let inventory = created.map { workflow -> String in
+            var entry = "\(workflow.name)(\(workflow.steps.count) steps"
+            if let issues = contractIssues[workflow.id], !issues.isEmpty {
+                entry += "; not runnable: \(issues.map(\.rendered).joined(separator: " | "))"
+            }
+            return entry + ")"
+        }
+        .joined(separator: ",")
         if matches.isEmpty {
             return (
                 false,
                 "workflowSaved FAIL: no created workflow matched "
                     + "(nameContains: \(assertion.nameContains ?? "any"), "
-                    + "minSteps: \(assertion.minSteps.map(String.init) ?? "any")) "
+                    + "minSteps: \(assertion.minSteps.map(String.init) ?? "any"), "
+                    + "runnable: \(assertion.runnable.map(String.init) ?? "any")) "
                     + "— created: [\(inventory)]"
             )
         }

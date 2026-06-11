@@ -962,6 +962,7 @@ A workflow captures the tool-call sequence that solved a task: declared **parame
 - `Services/Workflow/WorkflowService.swift` — CRUD orchestrator, dependency extraction, scoring
 - `Services/Workflow/WorkflowSearchService.swift` — VecturaKit hybrid search (BM25 + vector)
 - `Services/Workflow/WorkflowRunner.swift` — Deterministic step executor (param validation, templating, guidance handoff)
+- `Services/Workflow/WorkflowContract.swift` — Argument contract: static step validation (save gate + run preflight) and the `workflow_run` invocation example renderer
 - `Tools/WorkflowTools.swift` — `workflow_save` / `workflow_run` chat tools
 - `Views/Workflow/WorkflowsView.swift` — Management tab with score badges and editor sheet
 - `Utils/WorkflowLogger.swift` — Structured logging
@@ -971,7 +972,9 @@ A workflow captures the tool-call sequence that solved a task: declared **parame
 - **Parameterized Steps** — Tool steps carry an `argsTemplate` with `{{params.<name>}}` and `{{steps.<n>.output}}` placeholders the runner substitutes at execution time
 - **Guidance Handoff** — When a step needs judgment, a `guidance` step stops the runner and returns completed-step outputs plus remaining instructions to the calling model
 - **Chat Authoring** — `workflow_save` lets a model distill its task trace into a workflow (user confirms in chat first)
-- **Deterministic Execution** — `workflow_run` validates arguments against the declared parameter schema and executes tool steps sequentially via the tool registry
+- **Save-Time Contract Validation** — `workflow_save` rejects unrunnable workflows with per-step errors while the authoring model can still self-correct: templates must parse as JSON objects, every `{{params.*}}` placeholder must reference a declared parameter (and every required parameter must be referenced), `{{steps.<n>.output}}` must point at an earlier step, and rendered args must satisfy each resolvable tool's schema
+- **Contract Surfacing** — Discover results, `capabilities_load` output, and the save acknowledgment all render a concrete `workflow_run` invocation example built from the declared parameters (name, type, requiredness, default, description), so any model sees exactly what arguments a workflow takes
+- **Deterministic Execution** — `workflow_run` validates arguments against the declared parameter schema (unknown argument keys are rejected with the actual contract), preflights all executable steps against their tool schemas before running anything (a broken workflow fails fast with no side effects and re-save guidance), and executes tool steps sequentially via the tool registry; mid-run failures append the workflow's argument contract to the failure text
 - **Auto-Extraction** — Tool and skill references derive from structured steps (legacy YAML bodies are scraped as a fallback)
 - **Scoring System** — Each workflow tracks success rate and recency; a composite score ranks workflows in search results
 - **RAG Search** — Workflows are indexed by name, description, and trigger text for hybrid BM25 + vector search

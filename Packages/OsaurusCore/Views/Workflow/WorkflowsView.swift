@@ -147,81 +147,39 @@ struct WorkflowsView: View {
 
     // MARK: - Empty State (no workflows at all)
 
-    /// Chat is the authoring path, so there is no "Create" button here —
-    /// just an explanation of how workflows come to exist.
+    /// Chat is the authoring path, so the primary action points at enabling
+    /// Workflows on an agent instead of a "Create" sheet.
     @ViewBuilder
     private var noWorkflowsState: some View {
-        VStack(spacing: 24) {
-            Spacer()
-
-            Image(systemName: "arrow.triangle.branch")
-                .font(.system(size: 40, weight: .light))
-                .foregroundColor(theme.accentColor)
-
-            VStack(spacing: 8) {
-                Text("No Workflows Yet", bundle: .module)
-                    .font(.system(size: 22, weight: .bold, design: .rounded))
-                    .foregroundColor(theme.primaryText)
-
-                Text(
-                    "Workflows are reusable procedures distilled from successful tasks. Enable Workflows in an agent's Features settings, then ask a capable model to save one after it completes a multi-step task.",
-                    bundle: .module
-                )
-                .font(.system(size: 14))
-                .foregroundColor(theme.secondaryText)
-                .multilineTextAlignment(.center)
-                .frame(maxWidth: 460)
-            }
-
-            HStack(spacing: 12) {
-                emptyExampleCard(
+        SettingsEmptyState(
+            icon: "arrow.triangle.branch",
+            title: L("No Workflows Yet"),
+            subtitle: L(
+                "Capable models save them after multi-step tasks — any model can discover and run them."
+            ),
+            examples: [
+                .init(
                     icon: "wand.and.stars",
                     title: L("Distilled in chat"),
-                    description: L("Models propose saving a workflow via workflow_save")
-                )
-                emptyExampleCard(
+                    description: L("A capable model captures the steps that worked")
+                ),
+                .init(
                     icon: "magnifyingglass",
                     title: L("Discoverable"),
-                    description: L("Any model finds them with capabilities_discover")
-                )
-                emptyExampleCard(
+                    description: L("Surfaced automatically when a task matches")
+                ),
+                .init(
                     icon: "play.circle",
                     title: L("Runnable"),
-                    description: L("Parameterized steps run deterministically via workflow_run")
-                )
-            }
-            .frame(maxWidth: 640)
-
-            Spacer()
-        }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .opacity(hasAppeared ? 1 : 0)
-        .animation(.easeOut(duration: 0.25), value: hasAppeared)
-    }
-
-    @ViewBuilder
-    private func emptyExampleCard(icon: String, title: String, description: String) -> some View {
-        VStack(spacing: 8) {
-            Image(systemName: icon)
-                .font(.system(size: 18, weight: .medium))
-                .foregroundColor(theme.accentColor)
-            Text(LocalizedStringKey(title), bundle: .module)
-                .font(.system(size: 12, weight: .semibold))
-                .foregroundColor(theme.primaryText)
-            Text(LocalizedStringKey(description), bundle: .module)
-                .font(.system(size: 11))
-                .foregroundColor(theme.secondaryText)
-                .multilineTextAlignment(.center)
-        }
-        .padding(14)
-        .frame(maxWidth: .infinity, minHeight: 110, alignment: .top)
-        .background(
-            RoundedRectangle(cornerRadius: 10)
-                .fill(theme.cardBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 10)
-                        .stroke(theme.cardBorder, lineWidth: 1)
-                )
+                    description: L("Typed parameters, deterministic execution")
+                ),
+            ],
+            primaryAction: .init(
+                title: L("Enable in Agents"),
+                icon: "person.2",
+                handler: { ManagementStateManager.shared.selectedTab = .agents }
+            ),
+            hasAppeared: hasAppeared
         )
     }
 
@@ -261,7 +219,10 @@ struct WorkflowsView: View {
                 }
             }
         } tabsRow: {
-            HeaderSearchRow(searchText: $searchText, placeholder: "Search workflows")
+            HStack {
+                Spacer()
+                SearchField(text: $searchText, placeholder: "Search workflows", width: 200)
+            }
         }
     }
 
@@ -278,46 +239,6 @@ struct WorkflowsView: View {
                 toastMessage = nil
             }
         }
-    }
-}
-
-// MARK: - Search Row
-
-private struct HeaderSearchRow: View {
-    @Environment(\.theme) private var theme
-
-    @Binding var searchText: String
-    let placeholder: String
-
-    var body: some View {
-        HStack(spacing: 8) {
-            Image(systemName: "magnifyingglass")
-                .font(.system(size: 12))
-                .foregroundColor(theme.tertiaryText)
-            TextField(LocalizedStringKey(placeholder), text: $searchText)
-                .textFieldStyle(.plain)
-                .font(.system(size: 13))
-                .foregroundColor(theme.primaryText)
-            if !searchText.isEmpty {
-                Button(action: { searchText = "" }) {
-                    Image(systemName: "xmark.circle.fill")
-                        .font(.system(size: 12))
-                        .foregroundColor(theme.tertiaryText)
-                }
-                .buttonStyle(PlainButtonStyle())
-            }
-        }
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(
-            RoundedRectangle(cornerRadius: 8)
-                .fill(theme.inputBackground)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 8)
-                        .stroke(theme.inputBorder, lineWidth: 1)
-                )
-        )
-        .frame(maxWidth: 320)
     }
 }
 
