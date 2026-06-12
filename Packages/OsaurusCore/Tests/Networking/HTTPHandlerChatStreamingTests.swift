@@ -1074,6 +1074,44 @@ struct HTTPHandlerChatStreamingTests {
         #expect(!body.contains("built_in_agent_not_exposable"))
     }
 
+    @Test func builtInAgentRun_defaultAlias_overLoopback_bypassesGuard() async throws {
+        struct EchoEngine: ChatEngineProtocol {
+            func streamChat(request: ChatCompletionRequest) async throws -> AsyncThrowingStream<
+                String, Error
+            > {
+                AsyncThrowingStream { continuation in
+                    continuation.yield("OK-BUILTIN-DEFAULT-ALIAS")
+                    continuation.finish()
+                }
+            }
+            func completeChat(request: ChatCompletionRequest) async throws -> ChatCompletionResponse {
+                fatalError("not used")
+            }
+        }
+
+        let server = try await startTestServer(with: EchoEngine(), trustLoopback: true)
+        defer { Task { await server.shutdown() } }
+
+        var request = URLRequest(
+            url: URL(string: "http://\(server.host):\(server.port)/agents/default/run")!
+        )
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.disablePersistenceForTests()
+        request.httpBody = #"""
+            {"model":"fake","stream":true,"messages":[{"role":"user","content":"hi"}]}
+            """#.data(using: .utf8)
+
+        let (data, resp) = try await URLSession.shared.data(for: request)
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+        let body = String(decoding: data, as: UTF8.self)
+        #expect(status == 200)
+        #expect(body.contains("OK-BUILTIN-DEFAULT-ALIAS"))
+        #expect(!body.contains("invalid_agent_id"))
+        #expect(!body.contains("built_in_agent_not_exposable"))
+    }
+
     /// Non-loopback (remote) callers remain blocked from the built-in agent
     /// even with a valid API key. With the Secure Channel hard-require in
     /// place, remote plaintext is stopped even earlier: at the 426 gate,

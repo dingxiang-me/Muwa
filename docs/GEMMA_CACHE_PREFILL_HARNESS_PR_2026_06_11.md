@@ -1836,3 +1836,171 @@ Boundary after this checkpoint:
   release gates are Chat UI visual proof, VL/audio rows, lower-spec
   physical-footprint proof, vMLX main update verification, and full harness
   scoring.
+
+## Default Agent Alias and BatchEngine Status - 2026-06-12
+
+Root issue found after the first matrix pass:
+
+- The QAT agent-loop matrix used the built-in Default agent UUID route:
+  `/agents/00000000-0000-0000-0000-000000000001/run`.
+- The literal route `/agents/default/run` still failed before the local fix
+  with `HTTP_STATUS:400` and body
+  `{"error":"invalid_agent_id","message":"Invalid agent UUID in path"}`.
+- That was a route/parser gap, not a Gemma runtime, cache, or tool-calling
+  failure. The route parser now maps path id `default` to `Agent.defaultId`
+  before the built-in-agent remote guard runs.
+- Security boundary: loopback/plain local requests now reach the built-in
+  Default agent through the alias; remote encrypted requests still normalize to
+  the same built-in UUID and are rejected by the existing remote built-in-agent
+  guard. Remote plaintext requests still fail earlier on Secure Channel policy.
+
+Focused source regression added:
+
+- `Packages/OsaurusCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift`
+  adds `builtInAgentRun_defaultAlias_overLoopback_bypassesGuard`.
+- Local SwiftPM test attempt from `Packages/OsaurusCore` is blocked by the
+  existing local toolchain/repo issue `error: no such module 'Testing'`:
+  `/tmp/osaurus-gemma-proof/swift-test-default-agent-alias-package-de097cb2-plus.log`.
+  Do not report this source test as passed until that toolchain issue is fixed.
+
+Rebuilt app proof after the alias fix:
+
+- Release app build:
+  `/tmp/osaurus-gemma-proof/xcode-build-release-app-default-alias.log`
+  reports `** BUILD SUCCEEDED **`; status file
+  `/tmp/osaurus-gemma-proof/xcode-build-release-app-default-alias.status`
+  records `status=0`.
+- App launch root:
+  `/tmp/osaurus-gemma-proof/osaurus-ui-proof-default-alias-root.txt`.
+- Health:
+  `/tmp/osaurus-gemma-proof/health-default-alias.json`.
+- Runtime config:
+  `/tmp/osaurus-gemma-proof/server-runtime-default-alias.json` keeps
+  `cache.pagedKV.enabled=false`, `cache.blockDisk.enabled=true`,
+  `cache.prefix.enabled=true`, `cache.liveKVCodec="engine_selected"`,
+  `cache.storedKVCodec="auto"`, `concurrency.maxConcurrentSequences=1`,
+  `memorySafety.allowExperimentalMLXPress=false`,
+  `multimodal.enableAudio=true`, `multimodal.enableVideo=true`, and
+  `multimodal.requireMediaSaltForCache=true`.
+
+E2B JANG_4M literal `/agents/default/run` proof:
+
+- Request:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-jang4m-default-alias.request.json`
+- First SSE:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-jang4m-default-alias.sse`
+- First timing:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-jang4m-default-alias.time.txt`
+- Repeat SSE:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-jang4m-default-alias-repeat.sse`
+- Repeat timing:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-jang4m-default-alias-repeat.time.txt`
+- Repeat cache:
+  `/tmp/osaurus-gemma-proof/cache-after-agent-default-e2b-jang4m-default-alias-repeat.json`
+
+Both SSE files return `HTTP_STATUS:200`, emit sanitized `osaurus_agent_tool`
+frames for `complete` with `phase="started"` and `phase="completed"`,
+`is_error=false`, `end_run=true`, and visible final text exactly
+`default alias e2b jang4m tool execution proven.`. The first row took
+`3.81 real`; repeat took `1.78 real`. The repeat cache has `disk_l2_hits=1`,
+`disk_l2_stores=1`, `paged_hits=0`, and `paged_misses=0`. Topology is 15
+layers: 3 full KV layers, 12 rotating KV layers,
+`requires_disk_backed_restore=true`, `effective_kv_mode="turbo(3,3)"`, and
+`turbo_quant_kv_layer_count=0`.
+
+E2B JANG_4M chat prefill/token-rate proof on the same rebuilt app:
+
+- Request:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-cache-ttft-default-alias.request.json`
+- First SSE:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-cache-ttft-default-alias.sse`
+- First timing:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-cache-ttft-default-alias.time.txt`
+- Repeat SSE:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-cache-ttft-default-alias-repeat.sse`
+- Repeat timing:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-cache-ttft-default-alias-repeat.time.txt`
+- Repeat cache:
+  `/tmp/osaurus-gemma-proof/cache-after-chat-e2b-jang4m-cache-ttft-default-alias-repeat.json`
+
+The chat SSE emits `osaurus_prefill` queued/prefill/complete progress from
+`0/27` to `27/27`; the repeat emits `0/27`, `26/27`, `27/27`. Usage reports
+`prompt_tokens=14`, `completion_tokens=21`, `total_tokens=35`, and
+`tokens_per_second=107.598` first pass / `110.253` repeat. Repeat cache reports
+`disk_l2_hits=2`, `disk_l2_stores=6`, `paged_hits=0`, and `paged_misses=0`.
+
+E2B MXFP4 literal `/agents/default/run` proof:
+
+- Request:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-mxfp4-default-alias.request.json`
+- First SSE:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-mxfp4-default-alias.sse`
+- First timing:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-mxfp4-default-alias.time.txt`
+- Repeat SSE:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-mxfp4-default-alias-repeat.sse`
+- Repeat timing:
+  `/tmp/osaurus-gemma-proof/agent-default-e2b-mxfp4-default-alias-repeat.time.txt`
+- Repeat cache:
+  `/tmp/osaurus-gemma-proof/cache-after-agent-default-e2b-mxfp4-default-alias-repeat.json`
+
+Both SSE files return `HTTP_STATUS:200`, emit sanitized `osaurus_agent_tool`
+frames for `complete` with `phase="started"` and `phase="completed"`,
+`is_error=false`, `end_run=true`, and visible final text exactly
+`default alias e2b mxfp4 tool execution proven.`. The first row took
+`3.14 real`; repeat took `1.73 real`. The repeat cache has `disk_l2_hits=1`,
+`disk_l2_stores=1`, `paged_hits=0`, and `paged_misses=0`. Topology is 15
+layers: 3 full KV layers, 12 rotating KV layers,
+`requires_disk_backed_restore=true`, `effective_kv_mode="turbo(3,3)"`, and
+`turbo_quant_kv_layer_count=0`.
+
+E2B MXFP4 chat prefill/token-rate proof on the same rebuilt app:
+
+- Request:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-cache-ttft-default-alias.request.json`
+- First SSE:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-cache-ttft-default-alias.sse`
+- First timing:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-cache-ttft-default-alias.time.txt`
+- Repeat SSE:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-cache-ttft-default-alias-repeat.sse`
+- Repeat timing:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-cache-ttft-default-alias-repeat.time.txt`
+- Repeat cache:
+  `/tmp/osaurus-gemma-proof/cache-after-chat-e2b-mxfp4-cache-ttft-default-alias-repeat.json`
+
+The chat SSE emits `osaurus_prefill` queued/prefill/complete progress from
+`0/28` to `28/28`; the repeat emits `0/28`, `27/28`, `28/28`. Usage reports
+`prompt_tokens=14`, `completion_tokens=21`, `total_tokens=35`, and
+`tokens_per_second=118.2153` first pass / `120.814` repeat. Repeat cache
+reports `disk_l2_hits=2`, `disk_l2_stores=6`, `paged_hits=0`, and
+`paged_misses=0`.
+
+BatchEngine compile status:
+
+- The Osaurus Release app build above compiled the pinned vMLX checkout's
+  `Libraries/MLXLMCommon/BatchEngine/BatchEngine.swift` with no compiler
+  error. The only matching build-log line is the normal `SwiftCompile` command.
+- The separate local checkout `/Users/eric/vmlx-swift` is dirty in
+  `BatchEngine.swift`, `BatchScheduler.swift`, and `BatchTypes.swift`, but a
+  direct current build of that target also succeeds:
+  `/tmp/vmlx-swift-mlxcommon-build-batchengine.latest` points to the log for
+  `swift build --target MLXLMCommon`, which reports
+  `Build of target: 'MLXLMCommon' complete!`.
+- Therefore no current `BatchEngine.swift` compiler error is reproduced from
+  either the PR-pinned app build or the local vMLX `MLXLMCommon` target. If a
+  later command reports BatchEngine errors, keep the exact command, checkout,
+  commit, and full log with this doc before fixing; do not infer it from the
+  filename alone.
+
+Updated boundary:
+
+- Source/unquantized Gemma bundles remain excluded. Do not load them for this
+  checkpoint and do not treat their expert-weight key failures as QAT blockers.
+- The concrete Gemma QAT cache topology still reports rotating KV plus
+  disk-backed restore with `turbo_quant_kv_layer_count=0`; keep saying that
+  exactly until runtime stats prove a nonzero TurboQuant KV layer count.
+- Literal `/agents/default/run` is now proven for E2B JANG_4M and E2B MXFP4.
+  The larger-model matrix is already proven through the built-in Default agent
+  UUID route and should be re-smoked through the alias only if release review
+  requires identical path coverage for every size.

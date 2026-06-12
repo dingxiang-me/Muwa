@@ -4297,9 +4297,16 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             return
         }
 
-        // Extract agent ID: /agents/{id}/run
+        // Extract agent ID: /agents/{id}/run. Accept the local-friendly
+        // "default" alias for clients that do not know the built-in UUID yet;
+        // remote built-in access is still rejected by the guard below.
         let pathComponents = path.split(separator: "/")
-        guard pathComponents.count >= 2, let agentId = UUID(uuidString: String(pathComponents[1])) else {
+        let agentPathIdentifier = pathComponents.count >= 2 ? String(pathComponents[1]) : ""
+        let agentId: UUID? =
+            agentPathIdentifier.lowercased() == "default"
+            ? Agent.defaultId
+            : UUID(uuidString: agentPathIdentifier)
+        guard pathComponents.count >= 2, let agentId else {
             sendResponse(
                 context: context,
                 version: head.version,
