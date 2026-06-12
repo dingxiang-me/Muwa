@@ -665,6 +665,58 @@ struct HTTPHandlerChatStreamingTests {
         #expect(!body.contains("\u{FFFE}"))
     }
 
+    @Test func sse_path_emits_prefill_progress_diagnostic_chunks() async throws {
+        struct PrefillEngine: ChatEngineProtocol {
+            func streamChat(request: ChatCompletionRequest) async throws -> AsyncThrowingStream<
+                String, Error
+            > {
+                AsyncThrowingStream { continuation in
+                    continuation.yield(
+                        StreamingPrefillProgressHint.encode(
+                            PrefillProgressState(
+                                stage: .prefill,
+                                completedUnitCount: 128,
+                                totalUnitCount: 512,
+                                detail: "model.prepare"
+                            )
+                        )
+                    )
+                    continuation.yield("answer")
+                    continuation.finish()
+                }
+            }
+            func completeChat(request: ChatCompletionRequest) async throws -> ChatCompletionResponse {
+                fatalError("not used")
+            }
+        }
+
+        let server = try await startTestServer(with: PrefillEngine())
+        defer { Task { await server.shutdown() } }
+
+        var request = URLRequest(
+            url: URL(string: "http://\(server.host):\(server.port)/chat/completions")!
+        )
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        request.authenticate()
+        request.disablePersistenceForTests()
+        request.httpBody = #"""
+            {"model":"fake","stream":true,"messages":[{"role":"user","content":"hi"}]}
+            """#.data(using: .utf8)
+
+        let (data, resp) = try await URLSession.shared.data(for: request)
+        let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+        let body = String(decoding: data, as: UTF8.self)
+        #expect(status == 200)
+        #expect(body.contains("\"osaurus_prefill\""))
+        #expect(body.contains("\"stage\":\"prefill\""))
+        #expect(body.contains("\"completedUnitCount\":128"))
+        #expect(body.contains("\"totalUnitCount\":512"))
+        #expect(body.contains("\"content\":\"answer\""))
+        #expect(!body.contains("\u{FFFE}"))
+    }
+
     @Test func sse_path_emits_multi_tool_batch_deltas() async throws {
         // Engine that throws ServiceToolInvocations carrying two
         // invocations. The HTTP SSE handler must emit one `tool_calls`

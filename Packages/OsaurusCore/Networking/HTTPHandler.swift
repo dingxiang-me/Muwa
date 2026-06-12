@@ -779,8 +779,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         let logPath = path
 
         runRequestTask(priority: .userInitiated) {
-            let cached = await ModelRuntime.shared.cachedModelSummaries()
-            let diagnostics = await MLXBatchAdapter.snapshotDiagnostics()
+            let cached = await ModelRuntime.shared.cachedModelSummaries(refreshTopology: true)
+            let batchDiagnostics = await MLXBatchAdapter.snapshotDiagnostics()
             let lastEffectiveGenerationSettings =
                 await MLXBatchAdapter.lastEffectiveGenerationSettingsSnapshot()
             var aggregate: [String: Int] = [
@@ -849,6 +849,11 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 row["cache_enabled"] = true
                 row["is_hybrid"] = stats.isHybrid
                 row["is_paged_incompatible"] = stats.isPagedIncompatible
+                row["effective_kv_mode"] = ModelRuntime.cacheKVModeTag(
+                    for: ServerRuntimeSettingsStore.snapshot().cache,
+                    modelName: summary.name,
+                    cacheTopology: summary.cacheTopology
+                )
                 if let topology = summary.cacheTopology {
                     row["cache_topology"] =
                         [
@@ -945,34 +950,6 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 return row
             }
 
-            let batchDiagnostics: Any
-            if let snapshot = diagnostics {
-                var row: [String: Any] = [
-                    "pending_count": snapshot.pendingCount,
-                    "active_count": snapshot.activeCount,
-                    "active_high_watermark": snapshot.activeHighWatermark,
-                    "decode_split_count": snapshot.decodeSplitCount,
-                    "turbo_quant_compressions": snapshot.turboQuantCompressions,
-                    "is_accepting_requests": snapshot.isAcceptingRequests,
-                    "loaded_model_count": snapshot.loadedModelCount,
-                    "native_mtp_model_count": snapshot.nativeMTPModelCount,
-                    "cache_enabled_model_count": snapshot.cacheEnabledModelCount,
-                    "hybrid_model_count": snapshot.hybridModelCount,
-                    "paged_incompatible_model_count": snapshot.pagedIncompatibleModelCount,
-                    "prefix_hits": snapshot.prefixHits,
-                    "prefix_misses": snapshot.prefixMisses,
-                    "disk_l2_hits": snapshot.diskL2Hits,
-                    "disk_l2_misses": snapshot.diskL2Misses,
-                    "disk_l2_stores": snapshot.diskL2Stores,
-                    "ssm_companion_hits": snapshot.ssmCompanionHits,
-                    "ssm_companion_misses": snapshot.ssmCompanionMisses,
-                    "ssm_companion_rederives": snapshot.ssmCompanionReDerives,
-                ]
-                row["native_mtp_depth_summary"] = snapshot.nativeMTPDepthSummary ?? NSNull()
-                batchDiagnostics = row
-            } else {
-                batchDiagnostics = NSNull()
-            }
             let runtimeSettings = ServerRuntimeSettingsStore.snapshot()
             let memoryStatus = MemoryStatus.snapshot()
             let memorySafetyPlan = runtimeSettings.resolvedMemorySafetyPlan(
@@ -980,18 +957,43 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                 host: memoryStatus
             )
 
-            let obj: [String: Any] = [
+            var obj: [String: Any] = [
                 "status": "ok",
                 "timestamp": Date().ISO8601Format(),
                 "models": models,
                 "aggregate": aggregate,
-                "batch_diagnostics": batchDiagnostics,
                 "memory_safety": Self.memorySafetyJSONObject(
                     settings: runtimeSettings,
                     plan: memorySafetyPlan,
                     memoryStatus: memoryStatus
                 ),
             ]
+            if let batchDiagnostics {
+                obj["batch_diagnostics"] = [
+                    "pending_count": batchDiagnostics.pendingCount,
+                    "active_count": batchDiagnostics.activeCount,
+                    "active_high_watermark": batchDiagnostics.activeHighWatermark,
+                    "decode_split_count": batchDiagnostics.decodeSplitCount,
+                    "turbo_quant_compressions": batchDiagnostics.turboQuantCompressions,
+                    "is_accepting_requests": batchDiagnostics.isAcceptingRequests,
+                    "loaded_model_count": batchDiagnostics.loadedModelCount,
+                    "native_mtp_model_count": batchDiagnostics.nativeMTPModelCount,
+                    "native_mtp_depth_summary": batchDiagnostics.nativeMTPDepthSummary ?? NSNull(),
+                    "cache_enabled_model_count": batchDiagnostics.cacheEnabledModelCount,
+                    "hybrid_model_count": batchDiagnostics.hybridModelCount,
+                    "paged_incompatible_model_count": batchDiagnostics.pagedIncompatibleModelCount,
+                    "prefix_hits": batchDiagnostics.prefixHits,
+                    "prefix_misses": batchDiagnostics.prefixMisses,
+                    "disk_l2_hits": batchDiagnostics.diskL2Hits,
+                    "disk_l2_misses": batchDiagnostics.diskL2Misses,
+                    "disk_l2_stores": batchDiagnostics.diskL2Stores,
+                    "ssm_companion_hits": batchDiagnostics.ssmCompanionHits,
+                    "ssm_companion_misses": batchDiagnostics.ssmCompanionMisses,
+                    "ssm_companion_rederives": batchDiagnostics.ssmCompanionReDerives,
+                ] as [String: Any]
+            } else {
+                obj["batch_diagnostics"] = NSNull()
+            }
             let data = try? JSONSerialization.data(withJSONObject: obj, options: .osaurusCanonical)
             let body = data.flatMap { String(decoding: $0, as: UTF8.self) } ?? "{}"
             let headers: [(String, String)] =
@@ -6100,6 +6102,18 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                             hop {
                                 writerBound.value.writeReasoning(
                                     reasoning,
+                                    model: model,
+                                    responseId: responseId,
+                                    created: created,
+                                    context: ctx.value
+                                )
+                            }
+                            continue
+                        }
+                        if let progress = StreamingPrefillProgressHint.decode(delta) {
+                            hop {
+                                writerBound.value.writePrefillProgress(
+                                    progress,
                                     model: model,
                                     responseId: responseId,
                                     created: created,

@@ -434,6 +434,27 @@ final class SSEResponseWriter: ResponseWriter {
         )
         writeSSEChunk(chunk, context: context)
     }
+
+    /// Emit an Osaurus extension progress chunk for local prefill. The chunk
+    /// deliberately uses empty `choices` so OpenAI-compatible text parsers can
+    /// ignore it while Osaurus UI/API clients render progress.
+    func writePrefillProgress(
+        _ progress: PrefillProgressState,
+        model: String,
+        responseId: String,
+        created: Int,
+        context: ChannelHandlerContext
+    ) {
+        var chunk = ChatCompletionChunk(
+            id: responseId,
+            created: created,
+            model: model,
+            choices: [],
+            system_fingerprint: nil
+        )
+        chunk.osaurus_prefill = progress
+        writeSSEChunk(chunk, context: context)
+    }
 }
 
 final class NDJSONResponseWriter: ResponseWriter {

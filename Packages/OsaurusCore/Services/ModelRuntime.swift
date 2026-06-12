@@ -188,7 +188,12 @@ public actor ModelRuntime {
         return modelCache[name] != nil
     }
 
-    func cachedModelSummaries() -> [ModelCacheSummary] {
+    func cachedModelSummaries(refreshTopology: Bool = false) async -> [ModelCacheSummary] {
+        if refreshTopology {
+            for holder in modelCache.values {
+                holder.cacheTopology = await holder.container.cacheTopologySnapshot()
+            }
+        }
         return modelCache.values.map { holder in
             ModelCacheSummary(
                 name: holder.name,
@@ -1490,6 +1495,8 @@ public actor ModelRuntime {
         if cache.pagedKV.enabled {
             guard cache.blockDisk.enabled else { return nil }
             directory = cache.blockDisk.directory
+        } else if cache.blockDisk.enabled {
+            directory = cache.blockDisk.directory
         } else {
             guard cache.legacyDisk.enabled else { return nil }
             directory = cache.legacyDisk.directory
@@ -1568,12 +1575,14 @@ public actor ModelRuntime {
         if ModelFamilyNames.isDSV4Family(modelName)
             || ModelFamilyNames.isZayaFamily(modelName)
             || ModelFamilyNames.isZayaVLFamily(modelName)
-            || ModelFamilyNames.isGemmaFamily(modelName)
             || Self.isKnownHybridModel(name: modelName)
         {
             return false
         }
         if let cacheTopology {
+            if ModelFamilyNames.isGemmaFamily(modelName) {
+                return cacheTopology.kvLayerCount > 0
+            }
             if cacheTopology.mambaLayerCount > 0
                 || cacheTopology.arraysLayerCount > 0
                 || cacheTopology.hybridPoolLayerCount > 0
@@ -1980,6 +1989,8 @@ public actor ModelRuntime {
                 // the historical `respondWithTools` shape (callers that
                 // want reasoning use `streamWithTools`).
                 break
+            case .prefillProgress:
+                break
             case .toolInvocation(let name, let argsJSON):
                 pendingTools.append(
                     ServiceToolInvocation(toolName: name, jsonArguments: argsJSON)
@@ -2105,6 +2116,8 @@ public actor ModelRuntime {
                         if !s.isEmpty { continuation.yield(s) }
                     case .reasoning(let s):
                         if !s.isEmpty { continuation.yield(StreamingReasoningHint.encode(s)) }
+                    case .prefillProgress(let progress):
+                        continuation.yield(StreamingPrefillProgressHint.encode(progress))
                     case .toolInvocation(let name, let argsJSON):
                         continuation.yield(StreamingToolHint.encode(name))
                         continuation.yield(StreamingToolHint.encodeArgs(argsJSON))

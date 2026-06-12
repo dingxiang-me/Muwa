@@ -578,7 +578,7 @@ struct RuntimePolicySourceTests {
         // duplicate-product collisions with the app graph while keeping yyjson
         // as one shared C dependency. Osaurus must not carry SwiftPM
         // moduleAliases for that collision.
-        let expectedRuntimeHardenedRevision = "76047f3b4492d4fae316267a30fba55163b1c5cd"
+        let expectedRuntimeHardenedRevision = "a4aa133689417b924833610db0ff2732151d74cd"
         let manifestRevision = try Self.vmlxPinRevision(in: manifest)
         let workspaceRevision = try Self.vmlxPinRevision(in: workspaceResolved)
         let appRevision = try Self.vmlxPinRevision(in: appResolved)
@@ -866,6 +866,14 @@ struct RuntimePolicySourceTests {
             "ServerRuntimeSettingsStore.migratedFromLegacy must use engine-selected live KV so proven full-KV rows default to TurboQuant"
         )
         #expect(
+            store.contains("pagedKV: VMLXPagedKVCacheSettings(\n                enabled: false"),
+            "ServerRuntimeSettingsStore.migratedFromLegacy must keep paged RAM KV off by default"
+        )
+        #expect(
+            store.contains("shouldRepairPagedCacheDefault"),
+            "ServerRuntimeSettingsStore must repair stale persisted paged-cache default files to off"
+        )
+        #expect(
             !store.contains("normalized.cache.liveKVCodec = .engineSelected"),
             "Legacy cache migration must not overwrite explicit existing live-KV choices"
         )
@@ -910,6 +918,11 @@ struct RuntimePolicySourceTests {
                 && mlxService.contains("Step 3.7 tool parsing/template selection is owned by the pinned")
                 && mlxService.contains("return ModelMediaCapabilities.descriptor(modelId: modelId)"),
             "Step 3.7 runtime policy must stay text-only/tool-capable and must not block preflight on external bundle metadata until Step VLM is wired and proven"
+        )
+        #expect(
+            runtime.contains("if ModelFamilyNames.isGemmaFamily(modelName)")
+                && runtime.contains("return cacheTopology.kvLayerCount > 0"),
+            "Gemma SWA must allow TurboQuant for KV-capable full-attention layers while topology tags preserve rotating SWA layers"
         )
     }
 

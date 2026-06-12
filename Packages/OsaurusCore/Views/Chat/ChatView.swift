@@ -2121,6 +2121,8 @@ final class ChatSession: ObservableObject {
                     // renderer can surface a one-line banner suggesting
                     // the user toggle Disable Thinking for this prompt class.
                     currentTurn.unclosedReasoning = stats.unclosedReasoning
+                } else if let progress = StreamingPrefillProgressHint.decode(delta) {
+                    InferenceProgressManager.shared.prefillDidUpdateAsync(progress)
                 } else if let reasoning = StreamingReasoningHint.decode(delta) {
                     let now = Date()
                     if firstDeltaTime == nil {
