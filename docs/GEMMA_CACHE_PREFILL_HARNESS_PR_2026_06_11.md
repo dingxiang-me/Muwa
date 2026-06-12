@@ -1579,3 +1579,132 @@ Boundary after this checkpoint:
 - This is still not the full ten-model matrix. E2B and 31B QAT rows, plus
   VL/audio rows, Chat UI visual proof, lower-spec physical-footprint proof, and
   full harness scoring remain open.
+
+## 2026-06-11 Agent-Loop E2B QAT Checkpoint
+
+This checkpoint keeps the same QAT-only scope and same keychain-free
+Release-app runtime as the E4B and 26B A4B rows. It does not load BF16/source
+Gemma bundles. It extends the server-side agent-loop proof to the E2B JANG_4M
+and E2B MXFP4 QAT bundles.
+
+E2B JANG_4M agent-loop tool proof:
+
+- request:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-jang4m-f8f02857.request.json`
+- first SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-jang4m-f8f02857.sse`
+- first timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-jang4m-f8f02857.time.txt`
+- repeat SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-jang4m-f8f02857-repeat.sse`
+- repeat timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-jang4m-f8f02857-repeat.time.txt`
+- repeat cache:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-jang4m-f8f02857-repeat.cache.json`
+- repeat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-agent-loop-e2b-jang4m-f8f02857-repeat.txt`
+
+Both SSE files include `osaurus_agent_tool` frames for `complete` with
+`phase="started"` and `phase="completed"`, `is_error=false`, and
+`end_run=true`, then final visible content exactly
+`agent loop e2b jang4m tool execution proven.`. The SSE files do not contain
+internal U+FFFE tool sentinels, raw `tool:` / `args:` / `done:` sentinels,
+`<think>` tags, or tool/reasoning marker leakage.
+
+The repeat cache reports `disk_l2_hits=1`, `disk_l2_misses=9`,
+`disk_l2_stores=1`, `paged_hits=0`, `paged_misses=0`, and
+`companion_misses=1`. The topology is 15 layers: 3 full KV layers and 12
+rotating KV layers, `requires_disk_backed_restore=true`,
+`requires_ssm_companion_state=false`, and `turbo_quant_kv_layer_count=0`.
+The model's `effective_kv_mode` reports `turbo(3,3)` while the concrete
+topology remains rotating KV plus disk-backed restore. The first agent-loop row
+took `3.06 real`; the repeat row took `1.66 real`. The app `ps` row after the
+repeat reports `RSS=2026864 KB`.
+
+E2B MXFP4 agent-loop tool proof:
+
+- request:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-mxfp4-f8f02857.request.json`
+- first SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-mxfp4-f8f02857.sse`
+- first timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-mxfp4-f8f02857.time.txt`
+- repeat SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-mxfp4-f8f02857-repeat.sse`
+- repeat timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-mxfp4-f8f02857-repeat.time.txt`
+- repeat cache:
+  `/tmp/osaurus-gemma-proof/agent-loop-e2b-mxfp4-f8f02857-repeat.cache.json`
+- repeat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-agent-loop-e2b-mxfp4-f8f02857-repeat.txt`
+
+Both SSE files include `osaurus_agent_tool` frames for `complete` with
+`phase="started"` and `phase="completed"`, `is_error=false`, and
+`end_run=true`. The SSE files do not contain internal U+FFFE tool sentinels,
+raw `tool:` / `args:` / `done:` sentinels, `<think>` tags, or tool/reasoning
+marker leakage. The final visible content is
+`agent loop e2b mxfp4 tool execution proven` without the requested trailing
+period, so strict punctuation fidelity for this exact MXFP4 agent prompt is
+partial even though tool execution completed cleanly.
+
+The repeat cache reports `disk_l2_hits=1`, `disk_l2_misses=9`,
+`disk_l2_stores=1`, `paged_hits=0`, `paged_misses=0`, and
+`companion_misses=1`. The topology is 15 layers: 3 full KV layers and 12
+rotating KV layers, `requires_disk_backed_restore=true`,
+`requires_ssm_companion_state=false`, and `turbo_quant_kv_layer_count=0`.
+The model's `effective_kv_mode` reports `turbo(3,3)` while the concrete
+topology remains rotating KV plus disk-backed restore. The first agent-loop row
+took `2.90 real`; the repeat row took `1.62 real`. The app `ps` row after the
+repeat reports `RSS=658592 KB`.
+
+Token/s and prefill progress proof for the same E2B checkpoint:
+
+- E2B JANG_4M request:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-token-rate-f8f02857.request.json`
+- E2B JANG_4M SSE:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-token-rate-f8f02857.sse`
+- E2B JANG_4M cache:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-token-rate-f8f02857.cache.json`
+- E2B JANG_4M timing:
+  `/tmp/osaurus-gemma-proof/chat-e2b-jang4m-token-rate-f8f02857.time.txt`
+- E2B JANG_4M post-chat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-chat-e2b-jang4m-token-rate-f8f02857.txt`
+- E2B MXFP4 request:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-token-rate-f8f02857.request.json`
+- E2B MXFP4 SSE:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-token-rate-f8f02857.sse`
+- E2B MXFP4 cache:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-token-rate-f8f02857.cache.json`
+- E2B MXFP4 timing:
+  `/tmp/osaurus-gemma-proof/chat-e2b-mxfp4-token-rate-f8f02857.time.txt`
+- E2B MXFP4 post-chat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-chat-e2b-mxfp4-token-rate-f8f02857.txt`
+
+The JANG_4M chat SSE emits `osaurus_prefill` queued/prefill/complete progress
+from `0/29` to `29/29`, then visible content
+`e2b jang4m token rate visible.`, and usage with `prompt_tokens=20`,
+`completion_tokens=10`, `total_tokens=30`, and `tokens_per_second=117.0439`.
+The post-chat app `ps` row reports `RSS=2026816 KB`.
+
+The MXFP4 chat SSE emits `osaurus_prefill` queued/prefill/complete progress
+from `0/30` to `30/30`, then visible content
+`e2b mxfp4 token rate visible.`, and usage with `prompt_tokens=20`,
+`completion_tokens=11`, `total_tokens=31`, and `tokens_per_second=124.343`.
+The post-chat app `ps` row reports `RSS=660704 KB`.
+
+Boundary after this checkpoint:
+
+- E2B JANG_4M now has fresh PR-build agent-loop proof with actual `complete`
+  tool execution, exact final text, no sentinel/reasoning/tool leakage, disk L2
+  hit on repeat, paged KV disabled, prefill progress on chat, and token/s from
+  ordinary chat generation.
+- E2B MXFP4 now has the same proof for tool execution, cache, paged-off
+  behavior, prefill, and token/s, but strict punctuation fidelity is partial
+  for the agent-loop final text because the model omitted the requested final
+  period.
+- `/agents/{id}/run` tool-intercept SSE still does not emit a usage chunk.
+  Token/s for the E2B rows is therefore recorded from `/v1/chat/completions`
+  on the same model/runtime checkpoint, not from the tool-intercept agent SSE.
+- This is still not the full ten-model matrix. 31B QAT rows, plus VL/audio
+  rows, Chat UI visual proof, lower-spec physical-footprint proof, and full
+  harness scoring remain open.
