@@ -1453,3 +1453,129 @@ Boundary after this checkpoint:
 - This is still not the full ten-model matrix. E2B, 26B A4B, and 31B QAT rows,
   plus VL/audio rows, Chat UI visual proof, lower-spec physical-footprint proof,
   and full harness scoring remain open.
+
+## 2026-06-11 Agent-Loop 26B A4B QAT Checkpoint
+
+This checkpoint keeps the same QAT-only scope as the 12B and E4B rows. It does
+not load BF16/source Gemma bundles. It extends the fresh Release-app
+agent-loop proof to the 26B A4B JANG_4M and 26B A4B MXFP4 QAT bundles using
+the same app build and keychain-free runtime listed in the E4B checkpoint.
+
+26B A4B JANG_4M agent-loop tool proof:
+
+- request:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-jang4m-f8f02857.request.json`
+- first SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-jang4m-f8f02857.sse`
+- first timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-jang4m-f8f02857.time.txt`
+- repeat SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-jang4m-f8f02857-repeat.sse`
+- repeat timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-jang4m-f8f02857-repeat.time.txt`
+- repeat cache:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-jang4m-f8f02857-repeat.cache.json`
+- repeat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-agent-loop-26b-a4b-jang4m-f8f02857-repeat.txt`
+
+Both SSE files include `osaurus_agent_tool` frames for `complete` with
+`phase="started"` and `phase="completed"`, `is_error=false`, and
+`end_run=true`, then final visible content exactly
+`agent loop 26b a4b jang4m tool execution proven.`. The leak scan found only
+the expected tool trace and final text: no internal U+FFFE tool sentinels, raw
+`tool:` / `args:` / `done:` sentinels, `<think>` tags, or tool/reasoning marker
+leakage.
+
+The repeat cache reports `disk_l2_hits=1`, `disk_l2_misses=7`,
+`disk_l2_stores=1`, `paged_hits=0`, `paged_misses=0`, and
+`companion_misses=1`. The topology is 30 layers: 5 full KV layers and 25
+rotating KV layers, `requires_disk_backed_restore=true`,
+`requires_ssm_companion_state=false`, and `turbo_quant_kv_layer_count=0`.
+The model's `effective_kv_mode` reports `turbo(3,3)` while the concrete
+topology remains rotating KV plus disk-backed restore. The first agent-loop row
+took `6.31 real`; the repeat row took `4.10 real`. The app `ps` row after the
+repeat reports `RSS=13287344 KB`.
+
+26B A4B MXFP4 agent-loop tool proof:
+
+- request:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-mxfp4-f8f02857.request.json`
+- first SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-mxfp4-f8f02857.sse`
+- first timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-mxfp4-f8f02857.time.txt`
+- repeat SSE:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-mxfp4-f8f02857-repeat.sse`
+- repeat timing:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-mxfp4-f8f02857-repeat.time.txt`
+- repeat cache:
+  `/tmp/osaurus-gemma-proof/agent-loop-26b-a4b-mxfp4-f8f02857-repeat.cache.json`
+- repeat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-agent-loop-26b-a4b-mxfp4-f8f02857-repeat.txt`
+
+Both SSE files include `osaurus_agent_tool` frames for `complete` with
+`phase="started"` and `phase="completed"`, `is_error=false`, and
+`end_run=true`, then final visible content exactly
+`agent loop 26b a4b mxfp4 tool execution proven.`. The leak scan found only
+the expected tool trace and final text: no internal U+FFFE tool sentinels, raw
+`tool:` / `args:` / `done:` sentinels, `<think>` tags, or tool/reasoning marker
+leakage.
+
+The repeat cache reports `disk_l2_hits=1`, `disk_l2_misses=7`,
+`disk_l2_stores=1`, `paged_hits=0`, `paged_misses=0`, and
+`companion_misses=1`. The topology is 30 layers: 5 full KV layers and 25
+rotating KV layers, `requires_disk_backed_restore=true`,
+`requires_ssm_companion_state=false`, and `turbo_quant_kv_layer_count=0`.
+The model's `effective_kv_mode` reports `turbo(3,3)` while the concrete
+topology remains rotating KV plus disk-backed restore. The first agent-loop row
+took `4.40 real`; the repeat row took `2.16 real`. The app `ps` row after the
+repeat reports `RSS=744912 KB`.
+
+Token/s and prefill progress proof for the same 26B A4B checkpoint:
+
+- 26B A4B JANG_4M request:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-jang4m-token-rate-f8f02857.request.json`
+- 26B A4B JANG_4M SSE:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-jang4m-token-rate-f8f02857.sse`
+- 26B A4B JANG_4M cache:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-jang4m-token-rate-f8f02857.cache.json`
+- 26B A4B JANG_4M timing:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-jang4m-token-rate-f8f02857.time.txt`
+- 26B A4B JANG_4M post-chat RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-chat-26b-a4b-jang4m-token-rate-f8f02857.txt`
+- 26B A4B MXFP4 request:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-mxfp4-token-rate-f8f02857.request.json`
+- 26B A4B MXFP4 SSE:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-mxfp4-token-rate-f8f02857.sse`
+- 26B A4B MXFP4 cache:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-mxfp4-token-rate-f8f02857.cache.json`
+- 26B A4B MXFP4 timing:
+  `/tmp/osaurus-gemma-proof/chat-26b-a4b-mxfp4-token-rate-f8f02857.time.txt`
+
+The JANG_4M chat SSE emits `osaurus_prefill` queued/prefill/complete progress
+from `0/33` to `33/33`, then visible content
+`26b a4b jang4m token rate visible.`, and usage with `prompt_tokens=21`,
+`completion_tokens=17`, `total_tokens=38`, and `tokens_per_second=87.3053`.
+The post-chat app `ps` row reports `RSS=13300928 KB`.
+
+The MXFP4 chat SSE emits `osaurus_prefill` queued/prefill/complete progress
+from `0/34` to `34/34`, then visible content
+`26b a4b mxfp4 token rate visible.`, and usage with `prompt_tokens=21`,
+`completion_tokens=18`, `total_tokens=39`, and `tokens_per_second=97.2085`.
+
+Boundary after this checkpoint:
+
+- 26B A4B JANG_4M and 26B A4B MXFP4 now have fresh PR-build agent-loop proof
+  with actual `complete` tool execution, no sentinel/reasoning/tool leakage,
+  disk L2 hit on repeat, paged KV disabled, prefill progress on chat, and
+  token/s from ordinary chat generation.
+- `/agents/{id}/run` tool-intercept SSE still does not emit a usage chunk.
+  Token/s for the 26B A4B rows is therefore recorded from
+  `/v1/chat/completions` on the same model/runtime checkpoint, not from the
+  tool-intercept agent SSE.
+- The JANG_4M 26B A4B physical footprint is still heavy on this Mac
+  (`RSS=13287344 KB` after repeat, `RSS=13300928 KB` after token-rate chat).
+  Lower-spec RAM safety is not proven by this row.
+- This is still not the full ten-model matrix. E2B and 31B QAT rows, plus
+  VL/audio rows, Chat UI visual proof, lower-spec physical-footprint proof, and
+  full harness scoring remain open.
