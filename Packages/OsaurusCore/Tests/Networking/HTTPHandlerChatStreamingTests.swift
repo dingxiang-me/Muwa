@@ -932,6 +932,94 @@ struct HTTPHandlerChatStreamingTests {
 
     // MARK: - Built-in agent loopback exposure (App Intents surface)
 
+    /// `/agents/{id}/run` must use the same composer-resolved tool surface it
+    /// renders into the agent prompt. The strict OpenAI `/chat/completions`
+    /// path intentionally stays bare/stateless, but an agent run needs
+    /// per-agent gates: the Default agent gets its fixed configure baseline,
+    /// while custom agents must not see Default-agent-only `osaurus_*` tools.
+    @Test func agentRun_usesComposerResolvedToolSurface() async throws {
+        actor CaptureEngine: ChatEngineProtocol {
+            private(set) var requests: [ChatCompletionRequest] = []
+
+            func streamChat(request: ChatCompletionRequest) async throws -> AsyncThrowingStream<
+                String, Error
+            > {
+                requests.append(request)
+                return AsyncThrowingStream { continuation in
+                    continuation.yield("OK")
+                    continuation.finish()
+                }
+            }
+
+            func completeChat(request: ChatCompletionRequest) async throws -> ChatCompletionResponse {
+                fatalError("not used")
+            }
+        }
+
+        try await SandboxTestLock.runWithStoragePaths {
+            ConfigurationDomainBootstrap.registerBuiltIns()
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "osaurus-http-agent-run-tools-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let previousRoot = OsaurusPaths.overrideRoot
+            OsaurusPaths.overrideRoot = root
+            AgentManager.shared.refresh()
+            defer {
+                OsaurusPaths.overrideRoot = previousRoot
+                AgentManager.shared.refresh()
+                try? FileManager.default.removeItem(at: root)
+            }
+
+            let custom = Agent(
+                name: "HTTPAgentRunTools-\(UUID().uuidString.prefix(6))",
+                systemPrompt: "Test identity",
+                agentAddress: "http-agent-run-tools-\(UUID().uuidString)"
+            )
+            AgentManager.shared.add(custom)
+
+            let engine = CaptureEngine()
+            let server = try await startTestServer(with: engine, trustLoopback: true)
+            defer { Task { await server.shutdown() } }
+
+            func postRun(agentId: UUID, authenticate: Bool) async throws {
+                var request = URLRequest(
+                    url: URL(
+                        string: "http://\(server.host):\(server.port)/agents/\(agentId.uuidString)/run"
+                    )!
+                )
+                request.httpMethod = "POST"
+                request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+                if authenticate { request.authenticate() }
+                request.disablePersistenceForTests()
+                request.httpBody = #"""
+                    {"model":"fake","stream":true,"messages":[{"role":"user","content":"hi"}]}
+                    """#.data(using: .utf8)
+                let (_, resp) = try await URLSession.shared.data(for: request)
+                #expect((resp as? HTTPURLResponse)?.statusCode == 200)
+            }
+
+            try await postRun(agentId: Agent.defaultId, authenticate: false)
+            try await postRun(agentId: custom.id, authenticate: true)
+
+            let requests = await engine.requests
+            #expect(requests.count == 2)
+            let defaultNames = Set(requests[0].tools?.map(\.function.name) ?? [])
+            #expect(defaultNames == ToolRegistry.defaultAgentAllowedToolNames)
+
+            let customNames = Set(requests[1].tools?.map(\.function.name) ?? [])
+            for configure in ToolRegistry.configureToolNames {
+                #expect(
+                    !customNames.contains(configure),
+                    "configure tool \(configure) leaked into custom-agent run schema"
+                )
+            }
+            _ = await AgentManager.shared.delete(id: custom.id)
+        }
+    }
+
     /// Loopback callers (no auth, same machine) may reach the built-in Default
     /// agent via `/agents/{id}/run` so the App Intents "Ask Osaurus" surface
     /// can drive it. The request must pass the built-in guard rather than

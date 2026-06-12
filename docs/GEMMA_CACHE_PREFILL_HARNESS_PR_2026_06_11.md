@@ -125,6 +125,41 @@ Current evidence behind non-TODO cells:
   `/tmp/osaurus-gemma-proof/chat-jang4m-tool-forced-checkpoint-a4aa.json`
   and
   `/tmp/osaurus-gemma-proof/chat-jang4m-tool-result-continuation-checkpoint-a4aa.json`.
+- Agent-route tool-surface fix on current PR branch:
+  - Root issue: `/agents/{id}/run` rendered the agent prompt through
+    `SystemPromptComposer`, but then discarded the composer-resolved tool
+    surface and sent bare `ToolRegistry.alwaysLoadedSpecs`. That let the model
+    prompt and actual tool schema diverge for default-agent configure tools and
+    custom-agent gated tools. Strict OpenAI `/chat/completions` remains bare and
+    stateless by design.
+  - Source regression:
+    `/tmp/osaurus-gemma-proof/xcode-test-http-agent-tool-surface.log` reports
+    `** TEST SUCCEEDED **`; `agentRun_usesComposerResolvedToolSurface` proves
+    the default-agent route receives exactly
+    `ToolRegistry.defaultAgentAllowedToolNames`, while custom agents do not see
+    default-agent-only `osaurus_*` configure tools.
+  - Unsigned patched app build:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-agenttool-surface.log`
+    reports `** BUILD SUCCEEDED **`.
+  - Patched app isolated root:
+    `/tmp/osaurus-gemma-proof/agenttool-surface-root.txt`; health artifact
+    `/tmp/osaurus-gemma-proof/agenttool-surface-health-after-status.json`
+    reports `status=healthy`, `current_model=osaurusai--gemma-4-e2b-it-qat-jang_4m`,
+    `local_model_scan.model_count=27`, persistence not degraded, and RAM
+    feasibility `verdict="ok"`.
+  - Live default-agent JANG_4M configure-read row:
+    `/tmp/osaurus-gemma-proof/agenttool-surface-defaultagent-jang4m-status.sse`
+    returned clean visible text through `/agents/00000000-0000-0000-0000-000000000001/run`
+    with no marker/control-character leakage. It summarized the tool-visible
+    installed-model count as `1`; `/health` separately reported raw local
+    folder scan count `27`, so keep those counters distinct.
+  - Live default-agent JANG_4M `complete` row:
+    `/tmp/osaurus-gemma-proof/agenttool-surface-defaultagent-jang4m-complete.sse`
+    returned `Patched default agent complete tool executed cleanly` with
+    `finish_reason="stop"` and no protocol-marker leakage.
+  - L2 disk prefix cache artifacts were written under the isolated root:
+    `cache/kv_v2` was 37 MB with three `.safetensors` files after the live
+    default-agent rows.
 - Follow-up forced-tool proof on patched app after the Gemma-only agent-loop
   directive fix:
   - Focused source regression:
@@ -199,11 +234,13 @@ Current evidence behind non-TODO cells:
   recorded about 1.96 GB RSS after E2B tool rows. Physical footprint still
   needs Activity Monitor/lower-spec teammate proof.
 - Current-tree Agent route proof after the `a4aa133` repin is still
-  `PARTIAL`: forced `complete` now returns clean terminal text on the
-  patched app, but the route intentionally hides raw tool invocations from
-  SSE and the DB side-effect proof failed argument validation. Do not mark
-  the agent/tool row fully proven until a built-in side-effecting tool
-  succeeds and the side effect is independently queryable.
+  `PARTIAL`, but no longer blocked on schema mismatch: focused source tests
+  now prove the hidden agent route uses the composer-resolved default/custom
+  tool surface, and live default-agent JANG_4M rows for `osaurus_status` and
+  `complete` return clean terminal text. The route intentionally hides raw tool
+  invocations from SSE; DB side-effect proof previously failed argument
+  validation. Do not mark the full UI/agent-loop row complete until a real
+  Chat UI run or independently queryable side-effect row is captured.
 - Speed is still `PARTIAL` for proven E2B rows because token/s is present, but
   TTFT is not yet consistently recorded as a first-class metric across the
   matrix. Add timestamp-based TTFT extraction or explicit runtime TTFT before

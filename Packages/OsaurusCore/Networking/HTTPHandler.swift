@@ -2761,7 +2761,8 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
     /// passes client messages/tools through unchanged.
     private static func enrichWithAgentContext(
         _ request: ChatCompletionRequest,
-        agentId: String?
+        agentId: String?,
+        executionMode: ExecutionMode
     ) async -> ChatCompletionRequest {
         guard let agentId, !agentId.isEmpty,
             let agentUUID = UUID(uuidString: agentId)
@@ -2775,7 +2776,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         let globalToolsDisabled = await MainActor.run { ChatConfigurationStore.load().disableTools }
         let composed = await SystemPromptComposer.composeChatContext(
             agentId: agentUUID,
-            executionMode: .none,
+            executionMode: executionMode,
             query: query,
             messages: enriched.messages,
             toolsDisabled: globalToolsDisabled
@@ -4423,44 +4424,30 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
             // the first (user) turn only.
             Task { @MainActor in FeatureTelemetry.agentRun(source: "http_api") }
 
-            // Enrich with agent context (system prompt + memory)
-            var messages = await Self.enrichWithAgentContext(req, agentId: agentId.uuidString).messages
-
-            // INTENTIONAL DIVERGENCE FROM CHAT: the OpenAI-compatible HTTP
-            // API is stateless (no Osaurus session id), so we cannot reuse
-            // SessionToolStateStore, run a preflight LLM, or freeze a
-            // per-session schema. Bare `alwaysLoadedSpecs(mode:)` keeps the
-            // HTTP schema predictable and avoids per-request preflight cost.
-            // See docs/AGENT_LOOP.md before "fixing" this onto resolveTools.
-            //
-            // Tools resolution:
-            //   1. Always-loaded specs from the agent's execution mode form
-            //      the base set (sandbox, folder, etc.).
-            //   2. Client-supplied `req.tools` are appended (deduped by
-            //      function name, client wins on conflicts) so callers can
-            //      ship custom function definitions without losing the
-            //      agent surface.
-            let baseTools = await MainActor.run {
+            let executionMode = await MainActor.run {
                 let autonomousEnabled = AgentManager.shared.effectiveAutonomousExec(for: agentId)?.enabled == true
-                let mode = ToolRegistry.shared.resolveExecutionMode(
+                return ToolRegistry.shared.resolveExecutionMode(
                     folderContext: nil,
                     autonomousEnabled: autonomousEnabled
                 )
-                return ToolRegistry.shared.alwaysLoadedSpecs(mode: mode)
             }
-            let tools: [Tool] = {
-                guard let clientTools = req.tools, !clientTools.isEmpty else { return baseTools }
-                let clientNames = Set(clientTools.map { $0.function.name })
-                let kept = baseTools.filter { !clientNames.contains($0.function.name) }
-                return kept + clientTools
-            }()
-            // Honor client `tool_choice` when supplied (`none`, `auto`, or
-            // a forced function). Default to `.auto` so existing clients
-            // that set `tools` without `tool_choice` keep working.
-            let resolvedToolChoice: ToolChoiceOption? = {
-                if tools.isEmpty { return nil }
-                return req.tool_choice ?? .auto
-            }()
+
+            // Enrich with agent context (system prompt + memory) and use the
+            // same composer-resolved tool surface for the model request. The
+            // endpoint is still stateless — no SessionToolStateStore,
+            // preflight LLM, or frozen per-session schema — but `/agents/{id}/run`
+            // is an agent surface, so per-agent gates (Default-agent configure
+            // tools, DB, scheduling, speak, render_chart, search_memory) must
+            // match the rendered prompt. Bare `alwaysLoadedSpecs` remains the
+            // contract for strict OpenAI-compatible `/chat/completions`.
+            let enrichedReq = await Self.enrichWithAgentContext(
+                req,
+                agentId: agentId.uuidString,
+                executionMode: executionMode
+            )
+            var messages = enrichedReq.messages
+            let tools = enrichedReq.tools ?? []
+            let resolvedToolChoice = enrichedReq.tool_choice
 
             let configuredMaxToolAttempts = await MainActor.run {
                 ChatConfigurationStore.load().maxToolAttempts ?? 30
