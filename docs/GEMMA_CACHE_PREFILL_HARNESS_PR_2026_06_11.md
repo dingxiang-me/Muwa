@@ -13,8 +13,9 @@ This is the active Osaurus integration checklist for the paired vMLX work.
   `ModelRuntimeEvent.prefillProgress`, `\u{FFFE}prefill:` stream hints, and
   `InferenceProgressManager` so Chat UI shows prefill percentage/stage before
   first token.
-- Gemma 4 QAT and BF16/source rows must run through the harness contract in
-  `docs/HARNESS_COMPATIBILITY.md` before this is called merge-ready.
+- Gemma 4 QAT MXFP4 and JANG_4M rows must run through the harness contract in
+  `docs/HARNESS_COMPATIBILITY.md`, with scores recorded and score blockers
+  fixed, before this is called merge-ready.
 
 ## Local Model Inventory
 
@@ -33,25 +34,6 @@ Downloaded under `~/models`:
 
 Download log directory:
 `/Users/eric/models/.download-logs/gemma4-qat-screen-20260611T222059Z`.
-
-Source/BF16 comparison acquisition:
-
-- OsaurusAI QAT model cards point at Google source counterparts:
-  - `google/gemma-4-E2B-it-qat-q4_0-unquantized` (`hf download --dry-run`:
-    10.2G)
-  - `google/gemma-4-E4B-it-qat-q4_0-unquantized` (`dry-run`: 15.9G)
-  - `google/gemma-4-12B-it-qat-q4_0-unquantized` (`dry-run`: 24.0G)
-  - `google/gemma-4-26B-A4B-it-qat-q4_0-unquantized` (`dry-run`: 51.6G)
-  - `google/gemma-4-31B-it-qat-q4_0-unquantized` (`dry-run`: 62.6G)
-- Total dry-run size is about 164.3G. Downloads were started in detached
-  `screen` session `gemma4-source-downloads` on 2026-06-12 UTC.
-  Status/log directory:
-  `/Users/eric/models/.download-logs/gemma4-source-20260612T005822Z`.
-  Current source download status as of 2026-06-11 18:39 PT:
-  all five source/BF16 comparison bundles are complete according to
-  `source-downloads.status`, and the detached screen session has exited.
-  Current directory sizes are approximately E2B 9.5G, E4B 15G, 12B 22G,
-  26B-A4B 48G, and 31B 58G.
 
 ## Checkpoint Proof Matrix
 
@@ -257,17 +239,17 @@ Current evidence behind non-TODO cells:
 
 Checkpoint execution order:
 
-1. Keep the source changes and tests buildable first; do not widen into the
-   benchmark suite until the app path remains stable.
+1. Keep the QAT app path buildable and live-proven first; do not widen into
+   unrelated model families or non-QAT bundles.
 2. Run the smallest rows first: E2B MXFP4 and E2B JANG_4M full matrix, then
    E4B, then 12B, then 26B-A4B and 31B as local RAM allows.
 3. For each model, collect one artifact bundle prefix:
    `/tmp/osaurus-gemma-proof/matrix-<model>-<date>-{request,sse,response,cache,ps}.<ext>`.
 4. After each model, update the table above before moving to the next model.
-5. Only after the QAT matrix has app-facing proof should the team checkpoint be
-   merged/pushed for lower-spec Mac testing.
-6. Broader benchmark and BF16/source comparison runs happen after that
-   checkpoint, unless a benchmark row is needed to debug a runtime blocker.
+5. Run the QAT harness rows, record scores, and fix score blockers before
+   merge-ready wording.
+6. Only after the QAT matrix has app-facing proof and harness scores should the
+   team checkpoint be merged/pushed for lower-spec Mac testing.
 
 ## Current Verification
 
@@ -316,6 +298,13 @@ Checkpoint execution order:
   This covered `GenerationEventMapperTests`, `InferenceProgressManagerTests`,
   `ServerRuntimeSettingsStoreTests`, `MLXBatchAdapterTests`, and
   `HTTPHandlerChatStreamingTests`.
+- Focused Xcode source regression rerun after removing non-QAT checkpoint
+  scope:
+  `/tmp/osaurus-gemma-proof/xcode-test-focused-cache-prefill-a4aa-rerun.log`
+  reports `** TEST SUCCEEDED **` with 128 tests passing. The xcresult bundle is
+  `/tmp/osaurus-gemma-proof/xcode-test-focused-cache-prefill-a4aa-rerun.xcresult`.
+  This again covered cache default migration, prefill progress, streaming
+  prefill diagnostics, token/s usage chunks, and Gemma tool-surface handling.
 - SwiftPM focused test attempt is locally blocked by this machine's SwiftPM
   test toolchain failing to import module `Testing`; the blocker artifact is
   `/tmp/osaurus-gemma-proof/swift-test-focused-cache-prefill-a4aa.log`.
@@ -615,6 +604,9 @@ Clean-main app build:
 - Unsigned Debug app build passed from the workspace:
   `/tmp/osaurus-gemma-proof/xcode-build-debug-app-main-a4aa-rerun1.log`
   ends with `** BUILD SUCCEEDED **`.
+- Unsigned Debug app rebuild after restoring QAT-only scope also passed:
+  `/tmp/osaurus-gemma-proof/xcode-build-debug-app-main-a4aa-rerun2.log`
+  ends with `** BUILD SUCCEEDED **` and resolves `mlx-swift @ a4aa133`.
 - Local gitignored unblocker for the build:
   `App/osaurus/Secrets.xcconfig` with empty telemetry/Sentry values. This file
   is intentionally not part of the PR.
@@ -632,8 +624,8 @@ Clean-main launch:
   `model_count=27`, and no loaded model before the smoke rows.
 - `/v1/models` artifact:
   `/tmp/osaurus-gemma-proof/clean-main-models.json`.
-  It advertises all requested Gemma QAT MXFP4/JANG_4M bundles plus the
-  downloaded Google source comparison bundles.
+  It advertises the requested Gemma QAT MXFP4/JANG_4M bundles. Extra local
+  folders in the model root are ignored for this checkpoint.
 - Runtime defaults artifact:
   `/tmp/osaurus-keychain-free-gemma-main-a4aa-20260611-190223/config/server-runtime.json`.
   It has `cache.pagedKV.enabled=false`, `cache.blockDisk.enabled=true`,
@@ -688,12 +680,67 @@ Clean-main agent-loop status:
   still needs either a chat UI run or an agent-loop request that actually emits
   and executes a tool call.
 
+Exact rebuilt-app proof after QAT-only scope correction:
+
+- Discarded artifact warning: live `rerun2` API artifacts were not counted
+  because port `1337` was still served by an older Debug app path. The counted
+  live proof below uses process `5718` from:
+  `/tmp/osaurus-gemma-checkpoint-main/build/XcodeDerivedData-gemma-main-app/Build/Products/Debug/osaurus.app/Contents/MacOS/osaurus`.
+- Health artifact:
+  `/tmp/osaurus-gemma-proof/health-main-a4aa-rerun3.json`.
+  It reports `status="healthy"`, model root `/Users/eric/models`, and no
+  loaded model before the rerun3 rows.
+- Process/path proof:
+  `/tmp/osaurus-gemma-proof/pgrep-before-live-main-a4aa-rerun3.txt`.
+- E2B JANG_4M forced OpenAI-compatible tool row passed:
+  `/tmp/osaurus-gemma-proof/chat-tool-jang4m-main-a4aa-rerun3.json`.
+  It returned `finish_reason="tool_calls"`, tool name `complete`, and exact
+  arguments `{"summary":"qat jang4m main a4aa rerun3 tool ok"}`.
+- E2B MXFP4 forced OpenAI-compatible tool row passed:
+  `/tmp/osaurus-gemma-proof/chat-tool-mxfp4-main-a4aa-rerun3.json`.
+  It returned `finish_reason="tool_calls"`, tool name `complete`, and exact
+  arguments `{"summary":"qat mxfp4 main a4aa rerun3 tool ok"}`.
+- E2B JANG_4M tool-result continuation passed:
+  `/tmp/osaurus-gemma-proof/chat-tool-result-jang4m-main-a4aa-rerun3.json`.
+  It returned visible text
+  `The tool returned the summary: "qat jang4m main a4aa rerun3 tool ok".`
+  with `tokens_per_second=18.5051`.
+- E2B MXFP4 tool-result continuation passed:
+  `/tmp/osaurus-gemma-proof/chat-tool-result-mxfp4-main-a4aa-rerun3.json`.
+  It returned visible text
+  `The tool returned the summary "qat mxfp4 main a4aa rerun3 tool ok".`
+  with `tokens_per_second=17.0711`.
+- E2B JANG_4M long-prefix prefill/L2 proof:
+  `/tmp/osaurus-gemma-proof/chat-prefill-jang4m-main-a4aa-rerun3-first.sse`,
+  `/tmp/osaurus-gemma-proof/chat-prefill-jang4m-main-a4aa-rerun3-repeat.sse`,
+  and
+  `/tmp/osaurus-gemma-proof/cache-after-prefill-jang4m-main-a4aa-rerun3.json`.
+  The stream emitted 26 `osaurus_prefill` chunks per run before the visible
+  answer `checkpoint`; cache telemetry reports `effective_kv_mode="turbo(3,3)"`,
+  `paged_cache.enabled=false`, `block_disk_store.hits=1`,
+  `block_disk_store.stores=2`, and `turbo_quant_compressions=2`.
+- E2B MXFP4 long-prefix prefill/L2 proof:
+  `/tmp/osaurus-gemma-proof/chat-prefill-mxfp4-main-a4aa-rerun3-first.sse`,
+  `/tmp/osaurus-gemma-proof/chat-prefill-mxfp4-main-a4aa-rerun3-repeat.sse`,
+  and
+  `/tmp/osaurus-gemma-proof/cache-after-prefill-mxfp4-main-a4aa-rerun3.json`.
+  The stream emitted 26 `osaurus_prefill` chunks per run before the visible
+  answer `checkpoint`; cache telemetry reports `effective_kv_mode="turbo(3,3)"`,
+  `paged_cache.enabled=false`, `block_disk_store.hits=1`,
+  `block_disk_store.stores=2`, and `turbo_quant_compressions=2`.
+- RSS/health after rerun3 E2B live rows:
+  `/tmp/osaurus-gemma-proof/ps-after-e2b-live-main-a4aa-rerun3.txt` records
+  `RSS=711072 KB`, and
+  `/tmp/osaurus-gemma-proof/health-after-e2b-live-main-a4aa-rerun3.json`
+  reports current model `osaurusai--gemma-4-e2b-it-qat-mxfp4` with RAM
+  verdict `ok`.
+
 - Unblock the required harness suites. This branch can build and test the
   cache/runtime changes, but the documented AgentLoop harness lives on newer
   upstream main alongside a larger OsaurusCore agent-loop stack. Do not mark
-  BF16-vs-QAT harness scoring complete until the branch contains that complete
-  harness implementation and the commands below run successfully.
-- Once unblocked, run the required harness suites for each target model:
+  QAT harness scoring complete until the branch contains that complete harness
+  implementation and the commands below run successfully.
+- Once unblocked, run the required harness suites for each QAT target model:
 
 ```sh
 swift run --package-path Packages/OsaurusEvals osaurus-evals run \
@@ -711,8 +758,9 @@ swift run --package-path Packages/OsaurusEvals osaurus-evals run \
   entitlement-signed CLI are available.
 - Run Chat UI and server/API rows for Gemma MXFP4/JANG_4M with cache telemetry
   proving paged RAM off, disk/L2 on, and TurboQuant KV on where valid.
-- Run BF16/source versus QAT harness rows and record scores, token/s, cache
-  topology, memory footprint, and multi-turn visible behavior.
+- Run QAT MXFP4 and JANG_4M harness rows and record scores, token/s, cache
+  topology, memory footprint, and multi-turn visible behavior. Improve model
+  or runtime behavior only where the harness score/logs show a real failure.
 - Token/s is now exposed through OpenAI-compatible SSE usage chunks when
   `stream_options.include_usage=true`. Add normal visible-generation token/s
   rows for every model family before merge-ready wording.
@@ -730,13 +778,7 @@ swift run --package-path Packages/OsaurusEvals osaurus-evals run \
   - Capture token/s, cache topology, prefill progress visibility, and RAM /
     physical-footprint observations during load and generation.
 
-## Open Inventory Gap
+## Inventory Status
 
 - `~/models` currently contains the 10 requested QAT MXFP4/JANG_4M repos.
-- No completed Gemma 4 BF16/source directories were found under `~/models`
-  before starting the Google source downloads. The BF16/source comparison rows
-  still need those downloads to finish before harness execution.
-- Disk headroom at the latest check: `/Users/eric/models` is about `980G` and
-  the data volume has about `302Gi` available. Do not start blind BF16/source
-  full-family downloads until exact source model IDs and expected size are
-  confirmed; choose the smallest source rows first or free space deliberately.
+- Only these ten QAT bundles count for this checkpoint.
