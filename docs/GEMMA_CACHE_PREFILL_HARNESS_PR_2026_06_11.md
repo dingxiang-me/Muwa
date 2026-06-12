@@ -157,6 +157,13 @@ Current evidence behind non-TODO cells:
     `/tmp/osaurus-gemma-proof/agenttool-surface-defaultagent-jang4m-complete.sse`
     returned `Patched default agent complete tool executed cleanly` with
     `finish_reason="stop"` and no protocol-marker leakage.
+  - Live default-agent MXFP4 `complete` row:
+    `/tmp/osaurus-gemma-proof/agenttool-surface-defaultagent-mxfp4-complete.sse`
+    returned `Patched default agent mxfp4 complete tool executed cleanly` with
+    `finish_reason="stop"` and no protocol-marker leakage. Health artifact
+    `/tmp/osaurus-gemma-proof/agenttool-surface-health-after-mxfp4.json`
+    reports `current_model=osaurusai--gemma-4-e2b-it-qat-mxfp4`, persistence
+    not degraded, and RAM feasibility `verdict="ok"`.
   - L2 disk prefix cache artifacts were written under the isolated root:
     `cache/kv_v2` was 37 MB with three `.safetensors` files after the live
     default-agent rows.
