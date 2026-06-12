@@ -1066,7 +1066,29 @@ swift run --package-path Packages/OsaurusEvals osaurus-evals run \
   passed 1/1. The model called `file_write` once, produced no tool errors,
   and created `TODO.md` with the required unchecked items `write tests`,
   `update docs`, and `tag release`.
-- This proves the QAT E2B JANG_4M model can run at least one real
+- Paired E2B MXFP4 rerun after the same eval bootstrap repair:
+
+```sh
+OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 \
+OSAURUS_TEST_ROOT=/tmp/osaurus-evals-gemma-e2b-mxfp4-rerun-1781239642 \
+OSU_MODELS_DIR=/Users/eric/models \
+OSAURUS_DISABLE_MEMORY_VECTOR_SEARCH=1 \
+swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+  --suite Packages/OsaurusEvals/Suites/AgentLoop \
+  --model osaurusai--gemma-4-e2b-it-qat-mxfp4 \
+  --filter write-new-file \
+  --startup-timeout 180 \
+  --out /tmp/osaurus-gemma-proof/evals-agentloop-e2b-mxfp4-write-new-file-915cdab1.json \
+  -v
+```
+
+- MXFP4 result:
+  `/tmp/osaurus-gemma-proof/evals-agentloop-e2b-mxfp4-write-new-file-915cdab1.json`
+  passed 1/1. The model called `file_write` once, produced no tool errors,
+  and created `TODO.md` with the required unchecked items. The eval final text
+  was blank, so count this as a harness tool/outcome pass only; do not use it
+  as visible-chat quality proof.
+- This proves the QAT E2B JANG_4M and MXFP4 models can run at least one real
   `docs/HARNESS_COMPATIBILITY.md` AgentLoop case through the in-process
   OsaurusEvals harness. It does not complete full AgentLoop/AgentLoopFrontier
   scoring for all ten QAT bundles.
