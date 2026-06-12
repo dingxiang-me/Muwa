@@ -4239,6 +4239,32 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
         }
     }
 
+    private static func gemmaQATPostToolFinalToolChoice(
+        model: String,
+        messages: [ChatMessage],
+        requestedToolChoice: ToolChoiceOption?
+    ) -> ToolChoiceOption? {
+        guard messages.last?.role == "tool" else { return requestedToolChoice }
+
+        switch requestedToolChoice {
+        case .some(.required), .some(.function):
+            return requestedToolChoice
+        case .some(.auto), .some(.none), nil:
+            break
+        }
+
+        let modelId = model.lowercased()
+        guard
+            modelId.contains("gemma-4"),
+            modelId.contains("qat"),
+            modelId.contains("jang_4m") || modelId.contains("mxfp4")
+        else {
+            return requestedToolChoice
+        }
+
+        return ToolChoiceOption.none
+    }
+
     /// POST /agents/{id}/run — run the full agent chat loop server-side.
     ///
     /// Accepts a `ChatCompletionRequest` body. Runs inference with the agent's
@@ -4569,6 +4595,11 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     )
                 },
                 modelStep: { msgs, _ in
+                    let iterationToolChoice = Self.gemmaQATPostToolFinalToolChoice(
+                        model: model,
+                        messages: msgs,
+                        requestedToolChoice: resolvedToolChoice
+                    )
                     var iterationReq = ChatCompletionRequest(
                         model: model,
                         messages: msgs,
@@ -4581,7 +4612,7 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         stop: req.stop,
                         n: nil,
                         tools: tools.isEmpty ? nil : tools,
-                        tool_choice: resolvedToolChoice,
+                        tool_choice: iterationToolChoice,
                         session_id: req.session_id,
                         seed: req.seed,
                         response_format: req.response_format,

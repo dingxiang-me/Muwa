@@ -1322,6 +1322,25 @@ struct RuntimePolicySourceTests {
         #expect(agentRun.contains("ChatMessage(role: \"tool\""))
     }
 
+    @Test("Gemma QAT agent final answer disables auto tools after tool results")
+    func gemmaQATAgentFinalAnswerDisablesAutoToolsAfterToolResults() throws {
+        let handler = try Self.source("Networking/HTTPHandler.swift")
+        let helper = try Self.functionBody("private static func gemmaQATPostToolFinalToolChoice(", in: handler)
+        let agentRun = try Self.functionBody("private func handleAgentRunEndpoint(", in: handler)
+
+        #expect(helper.contains("messages.last?.role == \"tool\""))
+        #expect(helper.contains("modelId.contains(\"gemma-4\")"))
+        #expect(helper.contains("modelId.contains(\"qat\")"))
+        #expect(helper.contains("modelId.contains(\"jang_4m\") || modelId.contains(\"mxfp4\")"))
+        #expect(helper.contains("return ToolChoiceOption.none"))
+        #expect(
+            helper.contains("case .some(.required), .some(.function):"),
+            "Required/named tool-choice requests must stay fail-closed instead of being silently downgraded."
+        )
+        #expect(agentRun.contains("gemmaQATPostToolFinalToolChoice("))
+        #expect(agentRun.contains("tool_choice: iterationToolChoice"))
+    }
+
     @Test("OpenAI chat completions endpoint does not inject agent context")
     func openAIChatCompletionsEndpointDoesNotInjectAgentContext() throws {
         let handler = try Self.source("Networking/HTTPHandler.swift")

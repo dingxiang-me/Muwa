@@ -936,6 +936,106 @@ struct HTTPHandlerChatStreamingTests {
         }
     }
 
+    @Test func agentRun_gemmaQATPostToolFinalizationDisablesAutoToolChoice() async throws {
+        actor GemmaQATToolChoiceEngine: ChatEngineProtocol {
+            private var calls = 0
+            private(set) var requests: [ChatCompletionRequest] = []
+
+            func streamChat(request: ChatCompletionRequest) async throws -> AsyncThrowingStream<
+                String, Error
+            > {
+                calls += 1
+                requests.append(request)
+                if calls == 1 {
+                    return AsyncThrowingStream { continuation in
+                        continuation.finish(
+                            throwing: ServiceToolInvocation(
+                                toolName: "osaurus_status",
+                                jsonArguments: "{}"
+                            )
+                        )
+                    }
+                }
+
+                return AsyncThrowingStream { continuation in
+                    continuation.yield("The current model id is osaurusai--gemma-4-12b-it-qat-jang_4m.")
+                    continuation.finish()
+                }
+            }
+
+            func completeChat(request: ChatCompletionRequest) async throws -> ChatCompletionResponse {
+                fatalError("not used")
+            }
+        }
+
+        try await SandboxTestLock.runWithStoragePaths {
+            ConfigurationDomainBootstrap.registerBuiltIns()
+            let root = FileManager.default.temporaryDirectory.appendingPathComponent(
+                "osaurus-http-gemma-qat-post-tool-\(UUID().uuidString)",
+                isDirectory: true
+            )
+            try FileManager.default.createDirectory(at: root, withIntermediateDirectories: true)
+            let previousRoot = OsaurusPaths.overrideRoot
+            OsaurusPaths.overrideRoot = root
+            AgentManager.shared.refresh()
+            defer {
+                OsaurusPaths.overrideRoot = previousRoot
+                AgentManager.shared.refresh()
+                try? FileManager.default.removeItem(at: root)
+            }
+
+            let engine = GemmaQATToolChoiceEngine()
+            let server = try await startTestServer(with: engine, trustLoopback: true)
+            defer { Task { await server.shutdown() } }
+
+            var request = URLRequest(
+                url: URL(string: "http://\(server.host):\(server.port)/agents/default/run")!
+            )
+            request.httpMethod = "POST"
+            request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+            request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.disablePersistenceForTests()
+            let reqBody = ChatCompletionRequest(
+                model: "osaurusai--gemma-4-12b-it-qat-jang_4m",
+                messages: [ChatMessage(role: "user", content: "Use osaurus_status, then answer.")],
+                temperature: 0,
+                max_tokens: 64,
+                stream: true,
+                top_p: 1,
+                frequency_penalty: nil,
+                presence_penalty: nil,
+                stop: nil,
+                n: nil,
+                tools: nil,
+                tool_choice: .auto,
+                session_id: nil
+            )
+            request.httpBody = try JSONEncoder().encode(reqBody)
+
+            let (data, resp) = try await URLSession.shared.data(for: request)
+            let status = (resp as? HTTPURLResponse)?.statusCode ?? -1
+            let body = String(decoding: data, as: UTF8.self)
+            #expect(status == 200)
+            #expect(body.contains("The current model id is osaurusai--gemma-4-12b-it-qat-jang_4m."))
+
+            let requests = await engine.requests
+            #expect(requests.count == 2)
+            if case .some(.auto) = requests[0].tool_choice {
+                // Expected first iteration still allows the model to call tools.
+            } else {
+                Issue.record("Expected first Gemma QAT agent request to use tool_choice auto.")
+            }
+            if case .some(.none) = requests[1].tool_choice {
+                // Expected: Gemma QAT post-tool final text must not run in
+                // auto-tool mode because live JANG/MXFP rows corrupted prose.
+            } else {
+                Issue.record("Expected Gemma QAT post-tool request to use tool_choice none.")
+            }
+            #expect(requests[1].messages.last?.role == "tool")
+            #expect(requests[1].tools?.isEmpty == false)
+        }
+    }
+
     // MARK: - Built-in agent loopback exposure (App Intents surface)
 
     /// `/agents/{id}/run` must use the same composer-resolved tool surface it

@@ -91,7 +91,7 @@ Current model capability metadata from local `config.json`:
 | `osaurusai--gemma-4-e4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
 | `osaurusai--gemma-4-e4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
 | `osaurusai--gemma-4-12b-it-qat-mxfp4` | MXFP4 | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
-| `osaurusai--gemma-4-12b-it-qat-jang_4m` | JANG_4M | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-12b-it-qat-jang_4m` | JANG_4M | `gemma4_unified` | yes | yes | PROVEN | PARTIAL UI / PROVEN API | PROVEN UI+agent | PROVEN UI+agent | PROVEN UI+agent | TODO | PARTIAL UI status tool | TODO | TODO | PARTIAL UI / PROVEN API | PARTIAL |
 | `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
 | `osaurusai--gemma-4-26b-a4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
 | `osaurusai--gemma-4-31b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
@@ -110,7 +110,8 @@ Current evidence behind non-TODO cells:
   OsaurusAI Gemma 4 QAT MXFP4/JANG_4M model ids. PR #1469 is open,
   mergeable, and CI checks `test-core`, `test-cli`, `swiftlint`,
   `shellcheck`, and `update_release_draft` are green as of the 2026-06-12
-  refresh.
+  refresh; `test-core` was still running during the same poll and must be
+  rechecked before merge.
 - Current-head runtime defaults:
   `/tmp/osaurus-gemma-proof/runtime-settings-agentloop-current.json` reports
   `pagedKV.enabled=false`, `blockDisk.enabled=true`,
@@ -212,7 +213,7 @@ Current evidence behind non-TODO cells:
   Combined with the already documented current-head E2B JANG_4M, E4B
   JANG_4M, and E4B MXFP4 rows above, this closes the current-head API/default
   agent-loop tool + prefill/cache matrix for all ten OsaurusAI Gemma 4 QAT
-  MXFP4/JANG_4M models. This is still not harness scoring or UI-click proof.
+  MXFP4/JANG_4M models. This is still not harness scoring.
 - Current-head VL re-proof:
   `/tmp/osaurus-gemma-proof/current-head-matrix-efd741f7-20260611T235458Z/vl-e2b-jang4m-red32-current.request.json`
   uses a deterministic 32x32 red PNG data URL against
@@ -230,11 +231,131 @@ Current evidence behind non-TODO cells:
   `vl-e2b-jang4m-red32-current.leak-scan.txt` is empty. The earlier 1x1 PNG
   attempt in `vl-e2b-jang4m-red-current.*` exercised media/cache but answered
   `Black`, so it is not counted as visual correctness proof.
-- Current-head boundary after the full matrix/VL rerun: UI-click chat proof,
-  lower-spec Activity Monitor physical-footprint proof, successful Gemma4
-  audio, and full `docs/HARNESS_COMPATIBILITY.md` harness scoring remain open
-  gates. Do not count Google/source-looking Gemma bundles or BF16/source loads
-  for this checkpoint unless the scope is explicitly reopened.
+- Current-head Chat UI tool proof on the PR Release app:
+  artifact root `/tmp/osaurus-gemma-proof/ui-pr1469-20260612-001552` was
+  produced from the PR-built app
+  `build/XcodeDerivedData-gemma-ui-agentloop-8a0cf965-release/Build/Products/Release/osaurus.app`
+  launched through LaunchServices with keychain disabled,
+  `OSU_MODELS_DIR=/Users/eric/models`, and `OSU_PORT=1337`.
+  Computer Use verified the visible model selector was switched away from the
+  out-of-scope Google/source-looking folders to
+  `OsaurusAI Gemma 4 12B it qat JANG_4M`.
+  The first UI turn asked the model to use `osaurus_status`; the chat displayed
+  an `Osaurus status` tool card, a final answer, and UI metrics
+  `TTFT 5.47s`, `18.4 tok/s`, `51 tokens`. Final health
+  `health.ui-turn1.final.json` reports current model
+  `osaurusai--gemma-4-12b-it-qat-jang_4m`. Final cache
+  `cache.ui-turn1.final.json` reports `paged_kv_enabled=false`,
+  `block_disk_enabled=true`, `disk_l2_stores=2`,
+  `effective_kv_mode="turbo(3,3)"`, `kv_layer_count=8`,
+  `rotating_kv_layer_count=40`,
+  `requires_disk_backed_restore=true`, and
+  `batch_diagnostics.turbo_quant_compressions=2`.
+  The second UI turn repeated `osaurus_status` after tool-result history; the
+  UI displayed a second `Osaurus status` tool card, final answer, and
+  `TTFT 4.15s`, `18.0 tok/s`, `40 tokens`. Cache before/after artifacts
+  `cache.ui-turn2.before.json` and `cache.ui-turn2.final.json` show
+  `disk_l2_hits` increased `0 -> 1`, `disk_l2_stores` increased `2 -> 4`,
+  `turbo_quant_compressions` increased `2 -> 4`, and paged hits/misses stayed
+  `0`. Screenshot proof is
+  `ui-two-turn-tool-proof.png`. This is a regression row, not a pass: the UI
+  answers have ordinary text corruption (`seleed`, `mdel`, `protctoocol`,
+  `leaketod`, `curren ml IDis`, `28a`). That means the 12B JANG_4M Chat UI
+  tool row is `PARTIAL` even though the tool card rendered and cache telemetry
+  improved. Do not promote any Gemma QAT tool/chat proof while visible text has
+  corrupted words, wrong copied numbers, mojibake, replacement/control
+  characters, protocol marker residue, or spelling/character drift. The next
+  trace must compare raw API events, agent-loop tool-result history,
+  tokenizer/detokenizer output, cache restore state, sampling settings, and UI
+  rendering before claiming this fixed.
+- Current-head root cause and source fix for the UI status-tool corruption:
+  strict `/v1/chat/completions` copy prompts were clean, direct
+  `/agents/default/run` with `tool_choice:"none"` was clean, and manual
+  structured tool-result history was clean until tool schemas were still
+  advertised with `tool_choice:"auto"` on the post-tool final-answer step.
+  The failing trigger was therefore narrowed to Gemma 4 QAT JANG/MXFP
+  post-tool finalization with auto tools still enabled, not SwiftUI rendering
+  and not a generic tokenizer/detokenizer failure. The PR now scopes
+  `/agents/{id}/run` so Gemma 4 QAT JANG_4M/MXFP4 keeps auto tools for the
+  first tool-call iteration, preserves required/named tool choice as
+  fail-closed, but sends `tool_choice:"none"` for the model step immediately
+  after a `role:"tool"` message. Regression proof:
+  `/tmp/osaurus-gemma-proof/weird-text-root-20260612T073342Z/swift-test-agentrun-gemma-qat-toolchoice.log`
+  passed `HTTPHandlerChatStreamingTests.agentRun_gemmaQATPostToolFinalizationDisablesAutoToolChoice`,
+  proving the real HTTP agent loop now sends first-iteration auto and
+  post-tool `none` for
+  `osaurusai--gemma-4-12b-it-qat-jang_4m`. Source guard proof:
+  `/tmp/osaurus-gemma-proof/weird-text-root-20260612T073342Z/swift-test-gemma-toolchoice.log`
+  passed `RuntimePolicySourceTests.gemmaQATAgentFinalAnswerDisablesAutoToolsAfterToolResults`.
+  Build proof:
+  `/tmp/osaurus-gemma-proof/weird-text-root-20260612T073342Z/swift-build-osauruscore-after-toolchoice.log`
+  passed `swift build --target OsaurusCore`.
+- Final patched Release-app proof for the Gemma QAT post-tool fix and source
+  model default-selection fix:
+  `/tmp/osaurus-gemma-proof/weird-text-root-20260612T073342Z/xcodebuild-release-app-livepatched-ui.log`
+  reports `** BUILD SUCCEEDED **` for the keychain-free, unsigned Release app
+  at
+  `build/XcodeDerivedData-gemma-livepatched-ui-20260612010944/Build/Products/Release/osaurus.app`.
+  Computer Use inspected that exact app and the model picker default was
+  `OsaurusAI Gemma 4 12B it qat MXFP4`, not the out-of-scope
+  `google...unquantized` source row. The source fix is intentionally scoped to
+  automatic Chat fallback selection: keep source rows visible in the picker,
+  but rank local OsaurusAI Gemma 4 QAT JANG_4M/MXFP4 rows ahead of
+  source-looking Gemma folders when no explicit model is selected. Regression
+  proof:
+  `/tmp/osaurus-gemma-proof/weird-text-root-20260612T073342Z/swift-test-modelpicker-gemma-default.log`
+  passed
+  `ModelPickerItemChatCapabilityTests.firstChatCapable_prefersOsaurusGemmaQATOverSourceGemma`.
+- Final patched Release-app MXFP4 and JANG_4M tool/cache proof:
+  artifact root `/tmp/osaurus-gemma-proof/final-ui-20260612T0816Z` was
+  produced from the same app binary, launched with
+  `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+  `OSAURUS_KEYCHAIN_FREE_SHOW_UI=1`,
+  `OSU_MODELS_DIR=/Users/eric/models`, and isolated root
+  `/tmp/osaurus-keychain-free-livepatched-ui-20260612T0118`. The first
+  health snapshot reports `local_model_scan.model_count=27` from
+  `/Users/eric/models`.
+  `agent-run-mxfp12-status-fields-repeat.sse` and
+  `agent-run-jang12-status-fields-repeat.sse` both execute
+  `osaurus_status`, return visible final text
+  `Status reports 28 installed model(s), 0 provider(s), and 0 plugin(s).`,
+  and have zero non-ASCII/control-character leak lines in the paired
+  `*.non-ascii-control.txt` artifacts. The first MXFP4 status row returned
+  `1 installed model(s)` because the app's `ModelManager.availableModels`
+  snapshot had not yet caught up to the local scan; the repeat row is the
+  counted proof row.
+- Final patched Release-app cache/RAM proof:
+  `cache-after-mxfp-agent-repeat.json` reports
+  `models[0].name=osaurusai--gemma-4-12b-it-qat-mxfp4`,
+  `effective_kv_mode="turbo(3,3)"`, `paged_cache.enabled=false`,
+  `block_disk_store.enabled=true`, `disk_l2_hits=1`,
+  `disk_l2_stores=4`, `kv_layer_count=8`, `rotating_kv_layer_count=40`,
+  and `requires_disk_backed_restore=true`.
+  `cache-after-jang-agent-repeat.json` reports the same topology for
+  `osaurusai--gemma-4-12b-it-qat-jang_4m` with `disk_l2_hits=2`,
+  `disk_l2_stores=4`, and paged hits/misses still zero. Both rows still
+  report `turbo_quant_kv_layer_count=0`, so do not claim TurboQuant KV layer
+  count proof for rotating Gemma; the honest runtime claim is
+  `effective_kv_mode="turbo(3,3)"` with rotating KV plus disk-backed restore.
+  `cache-files.txt` records seven `.safetensors` L2 files plus
+  `cache_index.db` under the fresh `cache/kv_v2` root, totaling about
+  2.37 GB. `process-footprint-final-app-only.txt` records the final app
+  process at 7,611,520 KB RSS after the JANG row, and `health-final.json`
+  reports current model `osaurusai--gemma-4-12b-it-qat-jang_4m` with RAM
+  feasibility `verdict="ok"`.
+- Final patched Release-app prefill proof:
+  `direct-chat-mxfp12.sse` emits `osaurus_prefill` queued, prefill, and
+  complete chunks from `0/49` through `49/49`, then clean visible text
+  `The selected model id is osaurusai--gemma-4-12b-it-qat-mxfp4.` with zero
+  non-ASCII/control-character leak lines. This proves the direct chat API
+  prefill signal on the final patched app. It does not close the product gap
+  that `/agents/default/run` still lacks equivalent usage/prefill telemetry in
+  its final stream.
+- Current-head boundary after the full matrix/VL/UI rerun: lower-spec Activity
+  Monitor physical-footprint proof, successful Gemma4 audio, and full
+  `docs/HARNESS_COMPATIBILITY.md` harness scoring remain open gates. Do not
+  count Google/source-looking Gemma bundles or BF16/source loads for this
+  checkpoint unless the scope is explicitly reopened.
 - Current app launch, vMLX `a4aa133` pin, keychain-disabled LaunchServices path:
   `/tmp/osaurus-keychain-free-gemma-checkpoint-a4aa-20260611-182816/models.json`.
 - Current runtime settings from the isolated test root:
