@@ -250,6 +250,66 @@ Current evidence behind non-TODO cells:
     `cache_topology.requires_disk_backed_restore=true`. RSS sample
     `/tmp/osaurus-gemma-proof/agents-defaultuuid-12b-jang4m-agenttool-visible-uncommitted-ps-after.txt`
     records about 6.81 GB RSS for the dev app process after the row.
+  - Current-head forced agent-loop proof on commit `5a885570`:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-5a885570-agentproof.log`
+    reports `** BUILD SUCCEEDED **`; app health
+    `/tmp/osaurus-gemma-proof/health-agentproof-5a885570.json` reports
+    `status=healthy`, `local_model_scan.model_count=27`, and
+    `root="/Users/eric/models"`.
+  - 12B JANG_4M actual agent-loop tool execution on commit `5a885570`:
+    request
+    `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-forced-complete-5a885570.request.json`
+    calls `/agents/00000000-0000-0000-0000-000000000001/run` with
+    `tool_choice=complete` and no debug header. Stream artifact
+    `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-forced-complete-5a885570.sse`
+    contains two `osaurus_agent_tool` chunks for `complete`, phases
+    `started` and `completed`, `is_error=false`, `end_run=true`,
+    `finish_reason="stop"`, the expected summary
+    `12b jang4m agent loop tool execution proven on current PR head`, and no
+    U+FFFE, `<|tool`, `<tool_call`, `<tool_response`, or chat-template marker
+    leakage. Repeat artifact
+    `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-forced-complete-repeat-5a885570.sse`
+    passes the same leak/tool checks.
+  - 12B JANG_4M cache/RAM proof on the repeated agent-loop row:
+    `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-forced-complete-repeat-5a885570.cache.json`
+    reports `models[0].name=osaurusai--gemma-4-12b-it-qat-jang_4m`,
+    `effective_kv_mode="turbo(3,3)"`, `paged_kv_enabled=false`,
+    `block_disk_store.enabled=true`, `disk_l2_hits=1`,
+    `block_disk_store.hits=1`, `cache_topology.kv_layer_count=8`,
+    `cache_topology.rotating_kv_layer_count=40`, and
+    `requires_disk_backed_restore=true`. Wall-clock artifact
+    `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-forced-complete-repeat-5a885570.timing.json`
+    plus the parsed run recorded about 5.86 seconds for the repeated agent
+    route. RSS sample
+    `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-forced-complete-repeat-5a885570.ps.txt`
+    records about 6.81 GB RSS.
+  - 12B MXFP4 actual agent-loop tool execution on commit `5a885570`:
+    request
+    `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-5a885570.request.json`
+    calls the same built-in Default agent route with `tool_choice=complete`.
+    Stream artifact
+    `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-5a885570.sse`
+    contains two `osaurus_agent_tool` chunks for `complete`, phases
+    `started` and `completed`, `is_error=false`, `end_run=true`,
+    `finish_reason="stop"`, the expected summary
+    `12b mxfp4 agent loop tool execution proven on current PR head`, and no
+    U+FFFE, `<|tool`, `<tool_call`, `<tool_response`, or chat-template marker
+    leakage. Repeat artifact
+    `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-repeat-5a885570.sse`
+    passes the same leak/tool checks.
+  - 12B MXFP4 cache/RAM proof on the repeated agent-loop row:
+    `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-repeat-5a885570.cache.json`
+    reports `models[0].name=osaurusai--gemma-4-12b-it-qat-mxfp4`,
+    `effective_kv_mode="turbo(3,3)"`, `paged_kv_enabled=false`,
+    `block_disk_store.enabled=true`, `disk_l2_hits=1`,
+    `block_disk_store.hits=1`, `cache_topology.kv_layer_count=8`,
+    `cache_topology.rotating_kv_layer_count=40`, and
+    `requires_disk_backed_restore=true`. Wall-clock artifact
+    `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-repeat-5a885570.timing.json`
+    plus the parsed run recorded about 5.68 seconds for the repeated agent
+    route. RSS sample
+    `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-repeat-5a885570.ps.txt`
+    records about 0.56 GB RSS after switching from 12B JANG_4M to 12B MXFP4.
   - Default-agent JANG_4M end-run tool proof:
     `/tmp/osaurus-gemma-proof/agents-default-jang4m-complete-trace.sse`
     contains trace chunks for tool `complete` with phases `started` and
@@ -852,6 +912,11 @@ Clean-main agent-loop status:
   calling is proven for MXFP4 and JANG_4M above, but final UI/agent-loop proof
   still needs either a chat UI run or an agent-loop request that actually emits
   and executes a tool call.
+- Superseded status update: commit `5a885570` now has forced
+  `/agents/{defaultUUID}/run` agent-loop execution proof for 12B JANG_4M and
+  12B MXFP4 in the current-tree proof section above. The older clean-main E2B
+  row remains useful as the historical failure artifact, not the current
+  checkpoint state.
 
 Exact rebuilt-app proof after QAT-only scope correction:
 
