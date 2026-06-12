@@ -87,15 +87,15 @@ Current model capability metadata from local `config.json`:
 | Model | Format | Config family | Vision | Audio | Inventory | Load/Chat | Prefix/L2 | TQ/SWA | Speed | Tools | Agent | VL | Audio | Prefill UI/API | Memory |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `osaurusai--gemma-4-e2b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | TODO | TODO | PARTIAL | PARTIAL |
-| `osaurusai--gemma-4-e2b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | TODO | TODO | PROVEN API / TODO UI | PARTIAL |
-| `osaurusai--gemma-4-e4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
-| `osaurusai--gemma-4-e4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
-| `osaurusai--gemma-4-12b-it-qat-mxfp4` | MXFP4 | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
-| `osaurusai--gemma-4-12b-it-qat-jang_4m` | JANG_4M | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
-| `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
-| `osaurusai--gemma-4-26b-a4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
-| `osaurusai--gemma-4-31b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
-| `osaurusai--gemma-4-31b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-e2b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | PROVEN API | BLOCKED policy | PROVEN API / TODO UI | PARTIAL |
+| `osaurusai--gemma-4-e4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-e4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-12b-it-qat-mxfp4` | MXFP4 | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-12b-it-qat-jang_4m` | JANG_4M | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-26b-a4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-31b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-31b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PROVEN agent | PROVEN agent | PARTIAL | TODO | PROVEN forced complete | TODO | N/A | TODO | PARTIAL |
 
 Current evidence behind non-TODO cells:
 
@@ -310,6 +310,33 @@ Current evidence behind non-TODO cells:
     route. RSS sample
     `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-forced-complete-repeat-5a885570.ps.txt`
     records about 0.56 GB RSS after switching from 12B JANG_4M to 12B MXFP4.
+  - Current-head rebuilt matrix proof on commit `e9c3daed`:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-e9c3daed-matrix.log`
+    reports `** BUILD SUCCEEDED **`; app health
+    `/tmp/osaurus-gemma-proof/health-matrix-e9c3daed.json` reports
+    `status=healthy`, `local_model_scan.model_count=27`, and
+    `root="/Users/eric/models"`.
+  - Remaining beyond-E2B forced agent-loop matrix:
+    `/tmp/osaurus-gemma-proof/agent-matrix-e9c3daed-summary.txt` has
+    `pass_ok=true` for first and repeat `/agents/{defaultUUID}/run`
+    `tool_choice=complete` rows on E4B JANG_4M, E4B MXFP4, 26B-A4B JANG_4M,
+    26B-A4B MXFP4, 31B JANG_4M, and 31B MXFP4. Every row has two
+    `osaurus_agent_tool` chunks, phases `started` and `completed`, tool name
+    `complete`, `finish_reason="stop"`, the exact expected summary, and no
+    U+FFFE, `<|tool`, `<tool_call`, `<tool_response`, or chat-template marker
+    leakage.
+  - Remaining beyond-E2B cache/RAM matrix:
+    the repeat rows in
+    `/tmp/osaurus-gemma-proof/agent-matrix-e9c3daed-summary.txt` report
+    `effective_kv_mode="turbo(3,3)"`, `paged=false`,
+    `block_hits=1`, `block_stores=1`, `disk_l2_hits=1`, and
+    `restore=true` for each model. Layer topology by row:
+    E4B = `kv_layers=4`, `rotating_layers=20`; 26B-A4B =
+    `kv_layers=5`, `rotating_layers=25`; 31B = `kv_layers=10`,
+    `rotating_layers=50`. RSS samples in the same summary range from about
+    0.58-0.95 GB for MXFP4 rows to about 2.89 GB (E4B JANG_4M),
+    13.69 GB (26B-A4B JANG_4M), and 17.39 GB (31B JANG_4M). These are still
+    RSS samples, not lower-spec Activity Monitor physical-footprint proof.
   - Default-agent JANG_4M end-run tool proof:
     `/tmp/osaurus-gemma-proof/agents-default-jang4m-complete-trace.sse`
     contains trace chunks for tool `complete` with phases `started` and
@@ -439,6 +466,34 @@ Current evidence behind non-TODO cells:
   `requires_disk_backed_restore=true`. Longer decode proof in
   `/tmp/osaurus-gemma-proof/cache-after-long-decode-tq-checkpoint-a4aa.json`
   records `batch_diagnostics.turbo_quant_compressions=3`.
+- E2B JANG_4M real VL image row on commit `e9c3daed`:
+  deterministic input image
+  `/tmp/osaurus-gemma-proof/red-square-32.png` is a 32x32 red PNG carried in
+  `/tmp/osaurus-gemma-proof/vl-e2b-jang4m-red-square-e9c3daed.request.json`
+  as an OpenAI-compatible `image_url` data URL. First and repeat SSE artifacts
+  `/tmp/osaurus-gemma-proof/vl-e2b-jang4m-red-square-first-e9c3daed.sse` and
+  `/tmp/osaurus-gemma-proof/vl-e2b-jang4m-red-square-repeat-e9c3daed.sse`
+  both return the visible answer `Red`, `finish_reason="stop"`, three
+  `osaurus_prefill` chunks, and no U+FFFE/tool/template marker leakage.
+  Repeat cache artifact
+  `/tmp/osaurus-gemma-proof/vl-e2b-jang4m-red-square-repeat-e9c3daed.cache.json`
+  reports `effective_kv_mode="turbo(3,3)"`, `paged_kv_enabled=false`,
+  `block_disk_store.enabled=true`, `disk_l2_hits=1`, `kv_layer_count=3`,
+  `rotating_kv_layer_count=12`, and disk-backed restore required. The repeat
+  row completed in about 1.87 seconds wall clock versus about 4.75 seconds on
+  the first row.
+- E2B JANG_4M real audio row on commit `e9c3daed`:
+  deterministic input audio
+  `/tmp/osaurus-gemma-proof/tone-440hz-1s.wav` is a 1-second 440 Hz WAV carried
+  in `/tmp/osaurus-gemma-proof/audio-e2b-jang4m-tone-e9c3daed.request.json`
+  as OpenAI-compatible `input_audio`. Artifacts
+  `/tmp/osaurus-gemma-proof/audio-e2b-jang4m-tone-first-e9c3daed.sse` and
+  `/tmp/osaurus-gemma-proof/audio-e2b-jang4m-tone-repeat-e9c3daed.sse` do not
+  prove audio generation; both fail closed with the typed SSE error:
+  `Gemma4 audio input is not enabled because the pinned vMLX Gemma4 runtime
+  does not wire audio_tower/embed_audio yet.` Keep Gemma4 audio `BLOCKED
+  policy` until vMLX wires the real audio tower/embed path and the row is
+  rerun successfully.
 - E2B MXFP4 Prefix/L2 and TQ/SWA on the current app:
   `/tmp/osaurus-gemma-proof/cache-after-mxfp4-long-decode-repeat-checkpoint-a4aa.json`
   has `disk_l2_hits=1`, `block_disk_store.hits=1`,
