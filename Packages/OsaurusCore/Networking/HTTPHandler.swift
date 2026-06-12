@@ -4392,12 +4392,10 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         let responseId = Self.shortId(prefix: "chatcmpl-", length: 12)
         let created = Int(Date().timeIntervalSince1970)
-        let emitAgentToolTrace =
-            isLoopbackConnection(context)
-            && (
-                head.headers.first(name: "X-Osaurus-Debug-Agent-Tools") == "1"
-                    || head.headers.first(name: "X-Osaurus-Debug-Agent-Tools")?.lowercased() == "true"
-            )
+        // Local Osaurus agent runs need visible tool progress during prefill/tool
+        // waits. The emitted chunk is sanitized: phase, tool name, call id, error
+        // state, and end-run status only; raw tool arguments/results stay hidden.
+        let emitAgentToolTrace = isLoopbackConnection(context)
 
         hop { writerBound.value.writeHeaders(ctx.value, extraHeaders: cors) }
 

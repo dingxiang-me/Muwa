@@ -205,20 +205,51 @@ Current evidence behind non-TODO cells:
     `/tmp/osaurus-gemma-proof/agenttool-fix-ps-after-agent-runs.txt`
     records about 1.87 GB RSS after live JANG agent/direct rows.
 - Current-tree default-agent tool trace proof from the rebuilt Debug app:
-  - Source regression:
-    `/tmp/osaurus-gemma-proof/xcode-test-agenttrace-type-rerun.log` reports
-    `** TEST SUCCEEDED **` and `Test run with 28 tests in 1 suite passed`.
-    The covered assertions prove `/agents/{id}/run` emits
-    `osaurus_agent_tool` trace chunks only for loopback callers that pass
-    `X-Osaurus-Debug-Agent-Tools: 1`, and ordinary agent streaming does not
-    expose those diagnostic chunks.
+  - Follow-up root issue found 2026-06-11:
+    `/agents/{id}/run` tool execution was proven, but ordinary local streams
+    kept the sanitized `osaurus_agent_tool` progress chunks hidden behind the
+    `X-Osaurus-Debug-Agent-Tools` header. That made the Osaurus UI/API blind
+    during tool execution even though the model and tool loop were working.
+  - Source regression after the visibility fix:
+    `/tmp/osaurus-gemma-proof/xcode-green-agent-tool-visible-default.log`
+    reports `** TEST SUCCEEDED **` for
+    `agent_run_executes_tool_without_streaming_internal_sentinels`. The test
+    sends no `X-Osaurus-Debug-Agent-Tools` header and now requires sanitized
+    `osaurus_agent_tool` chunks with `choices: []`, `started`, `completed`,
+    tool name `complete`, and no U+FFFE sentinel leakage.
   - Rebuilt app proof:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-agent-tool-visible-default.log`
+    reports `** BUILD SUCCEEDED **`. Older artifact
     `/tmp/osaurus-gemma-proof/xcode-build-debug-app-agenttrace.log` reports
     `** BUILD SUCCEEDED **`; the app launched with
     `OSU_MODELS_DIR=/Users/eric/models`, keychain disabled, and health artifact
-    `/tmp/osaurus-gemma-proof/health-agenttrace-live.json` reporting
+    `/tmp/osaurus-gemma-proof/health-agenttool-visible.json` reporting
     `status=healthy`, `local_model_scan.model_count=27`, and persistence not
     degraded.
+  - Product-gap repro before the fix:
+    `/tmp/osaurus-gemma-proof/agents-default-12b-jang4m-c68c3c05-ordinary.sse`
+    had no `osaurus_agent_tool` chunks, while
+    `/tmp/osaurus-gemma-proof/agents-default-12b-jang4m-c68c3c05-debugtrace.sse`
+    contained the same tool's started/completed chunks only because the debug
+    header was present.
+  - Live no-debug-header proof after the fix:
+    `/tmp/osaurus-gemma-proof/agents-defaultuuid-12b-jang4m-agenttool-visible-uncommitted.sse`
+    calls the built-in Default agent UUID route
+    `/agents/00000000-0000-0000-0000-000000000001/run` with no debug header and
+    contains two `osaurus_agent_tool` chunks for tool `complete`, phases
+    `started` and `completed`, `finish_reason="stop"`, and no U+FFFE,
+    `<|tool`, or `<tool_call` leakage.
+  - Live no-debug-header cache/RAM proof after the fix:
+    `/tmp/osaurus-gemma-proof/agents-defaultuuid-12b-jang4m-agenttool-visible-uncommitted-cache-after.json`
+    reports `models[0].name=osaurusai--gemma-4-12b-it-qat-jang_4m`
+    with `is_current=true`,
+    `effective_kv_mode="turbo(3,3)"`, `memory_safety.cache.paged_kv_enabled=false`,
+    `block_disk_store.enabled=true`, `block_disk_store.stores=1`,
+    `disk_l2_stores=1`, `cache_topology.kv_layer_count=8`,
+    `cache_topology.rotating_kv_layer_count=40`, and
+    `cache_topology.requires_disk_backed_restore=true`. RSS sample
+    `/tmp/osaurus-gemma-proof/agents-defaultuuid-12b-jang4m-agenttool-visible-uncommitted-ps-after.txt`
+    records about 6.81 GB RSS for the dev app process after the row.
   - Default-agent JANG_4M end-run tool proof:
     `/tmp/osaurus-gemma-proof/agents-default-jang4m-complete-trace.sse`
     contains trace chunks for tool `complete` with phases `started` and

@@ -884,7 +884,6 @@ struct HTTPHandlerChatStreamingTests {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-            request.setValue("1", forHTTPHeaderField: "X-Osaurus-Debug-Agent-Tools")
             request.authenticate()
             request.disablePersistenceForTests()
             let reqBody = ChatCompletionRequest(
@@ -925,8 +924,11 @@ struct HTTPHandlerChatStreamingTests {
             #expect(body.contains("TOOLLOOP-FINAL"))
             #expect(await engine.sawToolMessage)
             #expect(body.contains("\"osaurus_agent_tool\""))
+            #expect(body.contains("\"choices\":[]"))
+            #expect(body.contains("\"phase\":\"started\""))
             #expect(body.contains("\"phase\":\"completed\""))
             #expect(body.contains("\"name\":\"complete\""))
+            #expect(!body.contains("X-Osaurus-Debug-Agent-Tools"))
             #expect(!body.contains("\u{FFFE}tool:"))
             #expect(!body.contains("\u{FFFE}args:"))
             #expect(!body.contains("\u{FFFE}done:"))
