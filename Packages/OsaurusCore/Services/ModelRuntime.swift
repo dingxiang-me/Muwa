@@ -1958,7 +1958,8 @@ public actor ModelRuntime {
         var pendingTools: [ServiceToolInvocation] = []
         let forcedToolMessages = ModelRuntime.applyForcedToolChoiceDirective(
             messages,
-            toolChoice: toolChoice
+            toolChoice: toolChoice,
+            modelName: modelName
         )
         let augmented = ModelRuntime.applyJSONMode(forcedToolMessages, jsonMode: parameters.jsonMode)
         let events = try await generateEventStream(
@@ -2065,7 +2066,8 @@ public actor ModelRuntime {
     ) async throws -> AsyncThrowingStream<String, Error> {
         let forcedToolMessages = ModelRuntime.applyForcedToolChoiceDirective(
             messages,
-            toolChoice: toolChoice
+            toolChoice: toolChoice,
+            modelName: modelName
         )
         let augmented = ModelRuntime.applyJSONMode(forcedToolMessages, jsonMode: parameters.jsonMode)
         let events = try await generateEventStream(
@@ -2371,15 +2373,57 @@ public actor ModelRuntime {
 
     nonisolated static func applyForcedToolChoiceDirective(
         _ messages: [ChatMessage],
-        toolChoice: ToolChoiceOption?
+        toolChoice: ToolChoiceOption?,
+        modelName: String? = nil
     ) -> [ChatMessage] {
-        // Named `tool_choice` is enforced by `makeTokenizerTools`: the
-        // tokenizer sees only the requested function's schema. Do not add a
-        // generic system directive here. Some model-family templates,
-        // including DSV4 DSML, treat that out-of-template prose as ordinary
-        // instruction text and can respond with an empty visible answer
-        // instead of the selected protocol block.
-        messages
+        guard let toolChoice else { return messages }
+
+        let requiredToolName: String?
+        switch toolChoice {
+        case .function(let target):
+            requiredToolName = target.function.name
+        case .required:
+            requiredToolName = nil
+        case .auto, .none:
+            return messages
+        }
+
+        // Named `tool_choice` is primarily enforced by `makeTokenizerTools`:
+        // the tokenizer sees only the requested function's schema. Keep that
+        // no-op behavior for most families; DSV4 DSML in particular treats
+        // out-of-template prose as ordinary instruction text and regressed
+        // when this was generic.
+        //
+        // Gemma 4's native template already has a required-tool contract in
+        // its fallback path. Live Osaurus agent runs add a much larger system
+        // prompt than strict `/v1/chat/completions`; for Gemma, schema
+        // filtering alone lets forced `complete` degrade into a plain-text
+        // summary. Add the same required-tool wording as a request-local
+        // directive so the bundle-native parser sees a real function-call
+        // turn instead of a textual paraphrase. This is scoped to Gemma and
+        // to explicit `required` / named tool choice only.
+        guard let modelName, ModelFamilyNames.isGemmaFamily(modelName) else {
+            return messages
+        }
+
+        var directive = "The current assistant response MUST be a function call."
+        if let requiredToolName {
+            directive += " Use the `\(requiredToolName)` function."
+        }
+
+        var out = messages
+        if let lastUserIndex = out.lastIndex(where: { $0.role == "user" }) {
+            let existing = out[lastUserIndex].content ?? ""
+            out[lastUserIndex] = ChatMessage(
+                role: out[lastUserIndex].role,
+                content: existing.isEmpty ? directive : existing + "\n\n" + directive,
+                tool_calls: out[lastUserIndex].tool_calls,
+                tool_call_id: out[lastUserIndex].tool_call_id
+            )
+        } else {
+            out.append(ChatMessage(role: "user", content: directive))
+        }
+        return out
     }
 
     /// When `jsonMode` is true, prepend (or augment) a system instruction

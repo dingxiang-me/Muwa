@@ -125,6 +125,49 @@ Current evidence behind non-TODO cells:
   `/tmp/osaurus-gemma-proof/chat-jang4m-tool-forced-checkpoint-a4aa.json`
   and
   `/tmp/osaurus-gemma-proof/chat-jang4m-tool-result-continuation-checkpoint-a4aa.json`.
+- Follow-up forced-tool proof on patched app after the Gemma-only agent-loop
+  directive fix:
+  - Focused source regression:
+    `/tmp/osaurus-gemma-proof/xcode-test-mlx-batch-agenttool-fix.log`
+    reports `** TEST SUCCEEDED **` for `MLXBatchAdapterTests`, including
+    `forcedToolChoiceAddsGemmaRequestLocalDirective` and the non-Gemma no-op
+    guard.
+  - Unsigned Debug app build:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-agenttool-fix.log`
+    reports `** BUILD SUCCEEDED **`.
+  - Runtime defaults from isolated app root
+    `/tmp/osaurus-keychain-free-gemma-agenttool-fix-open-a4aa-20260611-192622/config/server-runtime.json`
+    keep `pagedKV.enabled=false`, `blockDisk.enabled=true`,
+    `legacyDisk.enabled=false`, `prefix.enabled=true`,
+    `liveKVCodec="engine_selected"`, `memorySafety.mode="safe_auto"`, and
+    `memorySafety.allowExperimentalMLXPress=false`.
+  - Direct `/v1/chat/completions` streaming tool proof:
+    `/tmp/osaurus-gemma-proof/v1-stream-e2b-jang4m-forced-complete-agenttool-fix.sse`
+    and
+    `/tmp/osaurus-gemma-proof/v1-stream-e2b-mxfp4-forced-complete-agenttool-fix.sse`
+    both emit `osaurus_prefill` queued/running/complete chunks, exact
+    `complete` tool names, exact JSON `summary` arguments, and
+    `finish_reason="tool_calls"`.
+  - Agent-loop forced `complete` proof:
+    `/tmp/osaurus-gemma-proof/agenttool-custom-e2b-jang4m-forced-complete-agenttool-fix.sse`
+    returns the terminal `complete` summary cleanly through the Osaurus agent
+    SSE surface with no protocol-marker leakage and no loop. The route hides
+    raw tool invocations by design, so this remains `PARTIAL` agent proof
+    until a side-effecting built-in tool row succeeds and is externally
+    queryable.
+  - Agent-loop DB side-effect attempt:
+    `/tmp/osaurus-gemma-proof/agenttool-custom-e2b-jang4m-db-create-auto.sse`
+    reached a DB-tool result path but failed on invalid model-produced column
+    arguments; no table side effect was proven. Keep this as a blocker for
+    exhaustive agent tool proof, not a pass.
+  - Post-run cache/RAM proof:
+    `/tmp/osaurus-gemma-proof/agenttool-fix-cache-after-agent-runs.json`
+    has `disk_l2_hits=1`, `block_disk_store.hits=1`, `paged_hits=0`,
+    `paged_misses=0`, `effective_kv_mode="turbo(3,3)"`,
+    `requires_disk_backed_restore=true`, `mlx_press.enabled=false`, and
+    `memory_safety.verdict`/health equivalent `ok`. RSS sample
+    `/tmp/osaurus-gemma-proof/agenttool-fix-ps-after-agent-runs.txt`
+    records about 1.87 GB RSS after live JANG agent/direct rows.
 - E2B JANG_4M API prefill progress on the current app:
   `/tmp/osaurus-gemma-proof/chat-jang4m-prefill-long-checkpoint-a4aa.sse`
   emitted 19 `osaurus_prefill` chunks from queued/running through
@@ -155,9 +198,12 @@ Current evidence behind non-TODO cells:
   `/tmp/osaurus-gemma-proof/ps-after-tool-continuations-checkpoint-a4aa.txt`
   recorded about 1.96 GB RSS after E2B tool rows. Physical footprint still
   needs Activity Monitor/lower-spec teammate proof.
-- Current-tree Agent route proof has not been rerun after the `a4aa133`
-  repin, so the `Agent` column is `PARTIAL` despite older historical
-  `vmlxfix` artifacts existing.
+- Current-tree Agent route proof after the `a4aa133` repin is still
+  `PARTIAL`: forced `complete` now returns clean terminal text on the
+  patched app, but the route intentionally hides raw tool invocations from
+  SSE and the DB side-effect proof failed argument validation. Do not mark
+  the agent/tool row fully proven until a built-in side-effecting tool
+  succeeds and the side effect is independently queryable.
 - Speed is still `PARTIAL` for proven E2B rows because token/s is present, but
   TTFT is not yet consistently recorded as a first-class metric across the
   matrix. Add timestamp-based TTFT extraction or explicit runtime TTFT before
