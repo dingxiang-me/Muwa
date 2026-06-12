@@ -175,13 +175,66 @@ Current evidence behind non-TODO cells:
   `paged_misses=0`, `effective_kv_mode="turbo(3,3)"`,
   `kv_layer_count=4`, `rotating_kv_layer_count=20`, and
   `requires_disk_backed_restore=true`.
-- Current-head boundary: these rows prove live release-app API/default-agent
-  execution for E2B JANG_4M, E4B JANG_4M, and E4B MXFP4 only. Full matrix
-  re-run on `8a0cf965`, UI-click chat proof, lower-spec Activity Monitor
-  physical-footprint proof, successful Gemma4 audio, and full
-  `docs/HARNESS_COMPATIBILITY.md` harness scoring remain open gates. Do not
-  count Google/source-looking Gemma bundles or BF16/source loads for this
-  checkpoint unless the scope is explicitly reopened.
+- Current-head full QAT matrix extension on PR head `efd741f7` using the
+  same live keychain-free release app:
+  artifact root
+  `/tmp/osaurus-gemma-proof/current-head-matrix-efd741f7-20260611T235458Z`
+  contains first/repeat `/agents/default/run` rows, first/repeat
+  `/v1/chat/completions` prefill rows, cache snapshots, health snapshots, and
+  leak scans for the remaining QAT Gemma rows. Normalized summary artifact
+  `summary.normalized.tsv` reports every listed row with
+  `agent_first_status=200`, `agent_repeat_status=200`,
+  `agent_trace=2`, `chat_first_status=200`, `chat_repeat_status=200`,
+  `paged_hits=0`, `paged_misses=0`, `effective_kv_mode="turbo(3,3)"`,
+  `restore=true`, and `leak_bad=0` after excluding the expected sanitized
+  `is_error=false` trace field:
+  - `osaurusai--gemma-4-e2b-it-qat-mxfp4`: prefill `46/46`,
+    `tokens_per_second=50.7938`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `3 KV / 12 rotating`.
+  - `osaurusai--gemma-4-12b-it-qat-jang_4m`: prefill `46/46`,
+    `tokens_per_second=18.7299`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `8 KV / 40 rotating`.
+  - `osaurusai--gemma-4-12b-it-qat-mxfp4`: prefill `46/46`,
+    `tokens_per_second=19.8534`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `8 KV / 40 rotating`.
+  - `osaurusai--gemma-4-26b-a4b-it-qat-jang_4m`: prefill `50/50`,
+    `tokens_per_second=12.5938`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `5 KV / 25 rotating`.
+  - `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4`: prefill `50/50`,
+    `tokens_per_second=36.2375`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `5 KV / 25 rotating`.
+  - `osaurusai--gemma-4-31b-it-qat-jang_4m`: prefill `46/46`,
+    `tokens_per_second=14.9967`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `10 KV / 50 rotating`.
+  - `osaurusai--gemma-4-31b-it-qat-mxfp4`: prefill `46/46`,
+    `tokens_per_second=11.2934`, `disk_l2_hits=2`, `disk_l2_stores=6`,
+    topology `10 KV / 50 rotating`.
+  Combined with the already documented current-head E2B JANG_4M, E4B
+  JANG_4M, and E4B MXFP4 rows above, this closes the current-head API/default
+  agent-loop tool + prefill/cache matrix for all ten OsaurusAI Gemma 4 QAT
+  MXFP4/JANG_4M models. This is still not harness scoring or UI-click proof.
+- Current-head VL re-proof:
+  `/tmp/osaurus-gemma-proof/current-head-matrix-efd741f7-20260611T235458Z/vl-e2b-jang4m-red32-current.request.json`
+  uses a deterministic 32x32 red PNG data URL against
+  `osaurusai--gemma-4-e2b-it-qat-jang_4m`. First and repeat streams
+  `vl-e2b-jang4m-red32-current.first.sse` and
+  `vl-e2b-jang4m-red32-current.repeat.sse` both return visible answer `Red`,
+  `HTTP_STATUS:200`, `finish_reason="stop"`, `osaurus_prefill` queued,
+  running, and complete chunks at `307/307`, and token/s `28.4698` then
+  `32.9218`. Cache artifact
+  `vl-e2b-jang4m-red32-current.cache.after.final.json` reports
+  `disk_l2_hits=2`, `disk_l2_stores=8`, `paged_hits=0`, `paged_misses=0`,
+  `effective_kv_mode="turbo(3,3)"`, `kv_layer_count=3`,
+  `rotating_kv_layer_count=12`, `requires_disk_backed_restore=true`, and
+  `batch_diagnostics.turbo_quant_compressions=4`. Leak scan
+  `vl-e2b-jang4m-red32-current.leak-scan.txt` is empty. The earlier 1x1 PNG
+  attempt in `vl-e2b-jang4m-red-current.*` exercised media/cache but answered
+  `Black`, so it is not counted as visual correctness proof.
+- Current-head boundary after the full matrix/VL rerun: UI-click chat proof,
+  lower-spec Activity Monitor physical-footprint proof, successful Gemma4
+  audio, and full `docs/HARNESS_COMPATIBILITY.md` harness scoring remain open
+  gates. Do not count Google/source-looking Gemma bundles or BF16/source loads
+  for this checkpoint unless the scope is explicitly reopened.
 - Current app launch, vMLX `a4aa133` pin, keychain-disabled LaunchServices path:
   `/tmp/osaurus-keychain-free-gemma-checkpoint-a4aa-20260611-182816/models.json`.
 - Current runtime settings from the isolated test root:
