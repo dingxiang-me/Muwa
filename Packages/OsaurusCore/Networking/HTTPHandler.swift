@@ -4392,6 +4392,12 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
 
         let responseId = Self.shortId(prefix: "chatcmpl-", length: 12)
         let created = Int(Date().timeIntervalSince1970)
+        let emitAgentToolTrace =
+            isLoopbackConnection(context)
+            && (
+                head.headers.first(name: "X-Osaurus-Debug-Agent-Tools") == "1"
+                    || head.headers.first(name: "X-Osaurus-Debug-Agent-Tools")?.lowercased() == "true"
+            )
 
         hop { writerBound.value.writeHeaders(ctx.value, extraHeaders: cors) }
 
@@ -4699,6 +4705,19 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                         if AgentToolLoop.containsIntercept(calls) {
                             var executions: [AgentLoopToolExecution] = []
                             for call in calls {
+                                if emitAgentToolTrace {
+                                    hop {
+                                        writerBound.value.writeAgentToolTrace(
+                                            phase: "started",
+                                            toolName: call.invocation.toolName,
+                                            callId: call.callId,
+                                            model: model,
+                                            responseId: responseId,
+                                            created: created,
+                                            context: ctx.value
+                                        )
+                                    }
+                                }
                                 let single =
                                     await AgentToolLoop.runBatchInParallel(
                                         [(invocation: call.invocation, callId: call.callId)],
@@ -4706,6 +4725,21 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                                         agentId: agentId
                                     ).first ?? AgentLoopToolExecution(result: "")
                                 let execution = interceptAware(call.invocation, single)
+                                if emitAgentToolTrace {
+                                    hop {
+                                        writerBound.value.writeAgentToolTrace(
+                                            phase: "completed",
+                                            toolName: call.invocation.toolName,
+                                            callId: call.callId,
+                                            isError: execution.isError,
+                                            endRun: execution.endRun,
+                                            model: model,
+                                            responseId: responseId,
+                                            created: created,
+                                            context: ctx.value
+                                        )
+                                    }
+                                }
                                 executions.append(execution)
                                 if execution.endRun { break }
                             }
@@ -4727,6 +4761,21 @@ final class HTTPHandler: ChannelInboundHandler, Sendable {
                     var assistantToolCalls: [ToolCall] = []
                     var toolResultsByCallId: [(String, String)] = []
                     for outcome in outcomes {
+                        if emitAgentToolTrace {
+                            hop {
+                                writerBound.value.writeAgentToolTrace(
+                                    phase: "completed",
+                                    toolName: outcome.invocation.toolName,
+                                    callId: outcome.callId,
+                                    isError: outcome.wasError,
+                                    endRun: false,
+                                    model: model,
+                                    responseId: responseId,
+                                    created: created,
+                                    context: ctx.value
+                                )
+                            }
+                        }
                         assistantToolCalls.append(
                             ToolCall(
                                 id: outcome.callId,

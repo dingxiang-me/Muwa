@@ -16,6 +16,9 @@ This is the active Osaurus integration checklist for the paired vMLX work.
 - Gemma 4 QAT MXFP4 and JANG_4M rows must run through the harness contract in
   `docs/HARNESS_COMPATIBILITY.md`, with scores recorded and score blockers
   fixed, before this is called merge-ready.
+- Do not load, benchmark, or count non-QAT/source-looking Gemma bundles for this
+  checkpoint. The active scope is only the OsaurusAI Gemma 4 QAT MXFP4 and
+  JANG_4M repos listed below.
 
 ## Local Model Inventory
 
@@ -34,6 +37,10 @@ Downloaded under `~/models`:
 
 Download log directory:
 `/Users/eric/models/.download-logs/gemma4-qat-screen-20260611T222059Z`.
+
+Other local Gemma directories can exist under `/Users/eric/models`, including
+Google/source-looking test folders. They are explicitly out of scope here and
+must not be used for load, tool, cache, or harness proof in this checkpoint.
 
 ## Checkpoint Proof Matrix
 
@@ -74,8 +81,8 @@ Current model capability metadata from local `config.json`:
 
 | Model | Format | Config family | Vision | Audio | Inventory | Load/Chat | Prefix/L2 | TQ/SWA | Speed | Tools | Agent | VL | Audio | Prefill UI/API | Memory |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
-| `osaurusai--gemma-4-e2b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PARTIAL | TODO | TODO | PARTIAL | PARTIAL |
-| `osaurusai--gemma-4-e2b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PARTIAL | TODO | TODO | PROVEN API / TODO UI | PARTIAL |
+| `osaurusai--gemma-4-e2b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | TODO | TODO | PARTIAL | PARTIAL |
+| `osaurusai--gemma-4-e2b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | TODO | TODO | PROVEN API / TODO UI | PARTIAL |
 | `osaurusai--gemma-4-e4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 | `osaurusai--gemma-4-e4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
 | `osaurusai--gemma-4-12b-it-qat-mxfp4` | MXFP4 | `gemma4_unified` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
@@ -192,6 +199,52 @@ Current evidence behind non-TODO cells:
     `memory_safety.verdict`/health equivalent `ok`. RSS sample
     `/tmp/osaurus-gemma-proof/agenttool-fix-ps-after-agent-runs.txt`
     records about 1.87 GB RSS after live JANG agent/direct rows.
+- Current-tree default-agent tool trace proof from the rebuilt Debug app:
+  - Source regression:
+    `/tmp/osaurus-gemma-proof/xcode-test-agenttrace-type-rerun.log` reports
+    `** TEST SUCCEEDED **` and `Test run with 28 tests in 1 suite passed`.
+    The covered assertions prove `/agents/{id}/run` emits
+    `osaurus_agent_tool` trace chunks only for loopback callers that pass
+    `X-Osaurus-Debug-Agent-Tools: 1`, and ordinary agent streaming does not
+    expose those diagnostic chunks.
+  - Rebuilt app proof:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-agenttrace.log` reports
+    `** BUILD SUCCEEDED **`; the app launched with
+    `OSU_MODELS_DIR=/Users/eric/models`, keychain disabled, and health artifact
+    `/tmp/osaurus-gemma-proof/health-agenttrace-live.json` reporting
+    `status=healthy`, `local_model_scan.model_count=27`, and persistence not
+    degraded.
+  - Default-agent JANG_4M end-run tool proof:
+    `/tmp/osaurus-gemma-proof/agents-default-jang4m-complete-trace.sse`
+    contains trace chunks for tool `complete` with phases `started` and
+    `completed`, `is_error=false`, `end_run=true`, then the exact visible final
+    text `Default agent JANG4M tool execution traced through Osaurus dev app.`
+  - Default-agent JANG_4M cache/RAM proof:
+    `/tmp/osaurus-gemma-proof/cache-after-agents-default-jang4m-complete-trace.json`
+    reports current model `osaurusai--gemma-4-e2b-it-qat-jang_4m`,
+    `effective_kv_mode="turbo(3,3)"`, `paged_cache.enabled=false`,
+    `block_disk_store.enabled=true`, `disk_l2_stores=1`,
+    `kv_layer_count=3`, `rotating_kv_layer_count=12`,
+    `requires_disk_backed_restore=true`, `memory_safety.allowed=true`, and
+    RSS about 2.03 GB.
+  - Default-agent MXFP4 end-run tool proof:
+    `/tmp/osaurus-gemma-proof/agents-default-mxfp4-complete-trace.sse`
+    contains trace chunks for tool `complete` with phases `started` and
+    `completed`, `is_error=false`, `end_run=true`, then the exact visible final
+    text `Default agent MXFP4 tool execution traced through Osaurus dev app.`
+  - Default-agent MXFP4 cache/RAM proof:
+    `/tmp/osaurus-gemma-proof/cache-after-agents-default-mxfp4-complete-trace.json`
+    reports current model `osaurusai--gemma-4-e2b-it-qat-mxfp4`,
+    `effective_kv_mode="turbo(3,3)"`, `paged_cache.enabled=false`,
+    `block_disk_store.enabled=true`, `kv_layer_count=3`,
+    `rotating_kv_layer_count=12`, `requires_disk_backed_restore=true`,
+    `memory_safety.allowed=true`, and RSS about 0.61 GB.
+  - Exact-copy status-tool rows are not counted as a full pass:
+    `/tmp/osaurus-gemma-proof/agents-default-jang4m-osaurus-status.sse` and
+    `/tmp/osaurus-gemma-proof/agents-default-mxfp4-osaurus-status.sse` reached
+    terminal text but the model visibly mangled copied words/numbers. Keep
+    those rows `PARTIAL` and use them as a regression note for exact-copy
+    quality; they do not invalidate the traced `complete` tool execution pass.
 - E2B JANG_4M API prefill progress on the current app:
   `/tmp/osaurus-gemma-proof/chat-jang4m-prefill-long-checkpoint-a4aa.sse`
   emitted 19 `osaurus_prefill` chunks from queued/running through

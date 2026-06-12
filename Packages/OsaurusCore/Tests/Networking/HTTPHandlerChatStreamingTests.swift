@@ -884,6 +884,7 @@ struct HTTPHandlerChatStreamingTests {
             request.httpMethod = "POST"
             request.setValue("application/json", forHTTPHeaderField: "Content-Type")
             request.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+            request.setValue("1", forHTTPHeaderField: "X-Osaurus-Debug-Agent-Tools")
             request.authenticate()
             request.disablePersistenceForTests()
             let reqBody = ChatCompletionRequest(
@@ -923,6 +924,9 @@ struct HTTPHandlerChatStreamingTests {
             #expect(status == 200)
             #expect(body.contains("TOOLLOOP-FINAL"))
             #expect(await engine.sawToolMessage)
+            #expect(body.contains("\"osaurus_agent_tool\""))
+            #expect(body.contains("\"phase\":\"completed\""))
+            #expect(body.contains("\"name\":\"complete\""))
             #expect(!body.contains("\u{FFFE}tool:"))
             #expect(!body.contains("\u{FFFE}args:"))
             #expect(!body.contains("\u{FFFE}done:"))
@@ -983,7 +987,7 @@ struct HTTPHandlerChatStreamingTests {
             let server = try await startTestServer(with: engine, trustLoopback: true)
             defer { Task { await server.shutdown() } }
 
-            func postRun(agentId: UUID, authenticate: Bool) async throws {
+            func postRun(agentId: UUID, authenticate: Bool) async throws -> String {
                 var request = URLRequest(
                     url: URL(
                         string: "http://\(server.host):\(server.port)/agents/\(agentId.uuidString)/run"
@@ -997,12 +1001,15 @@ struct HTTPHandlerChatStreamingTests {
                 request.httpBody = #"""
                     {"model":"fake","stream":true,"messages":[{"role":"user","content":"hi"}]}
                     """#.data(using: .utf8)
-                let (_, resp) = try await URLSession.shared.data(for: request)
+                let (data, resp) = try await URLSession.shared.data(for: request)
                 #expect((resp as? HTTPURLResponse)?.statusCode == 200)
+                return String(decoding: data, as: UTF8.self)
             }
 
-            try await postRun(agentId: Agent.defaultId, authenticate: false)
-            try await postRun(agentId: custom.id, authenticate: true)
+            let defaultBody = try await postRun(agentId: Agent.defaultId, authenticate: false)
+            let customBody = try await postRun(agentId: custom.id, authenticate: true)
+            #expect(!defaultBody.contains("\"osaurus_agent_tool\""))
+            #expect(!customBody.contains("\"osaurus_agent_tool\""))
 
             let requests = await engine.requests
             #expect(requests.count == 2)
