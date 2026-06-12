@@ -99,6 +99,89 @@ Current model capability metadata from local `config.json`:
 
 Current evidence behind non-TODO cells:
 
+- Current PR head release-app proof on commit
+  `8a0cf96576940858c2f0dcda591d55e18a15ba2c`:
+  `/tmp/osaurus-gemma-proof/xcode-build-release-app-agentloop-8a0cf965.status`
+  records `status=0` and the built app at
+  `build/XcodeDerivedData-gemma-ui-agentloop-8a0cf965-release/Build/Products/Release/osaurus.app`.
+  The app was launched keychain-free with `OSU_MODELS_DIR=/Users/eric/models`
+  and is healthy on `127.0.0.1:1337`; current model inventory artifact
+  `/tmp/osaurus-gemma-proof/models-agentloop-current.json` lists all ten
+  OsaurusAI Gemma 4 QAT MXFP4/JANG_4M model ids. PR #1469 is open,
+  mergeable, and CI checks `test-core`, `test-cli`, `swiftlint`,
+  `shellcheck`, and `update_release_draft` are green as of the 2026-06-12
+  refresh.
+- Current-head runtime defaults:
+  `/tmp/osaurus-gemma-proof/runtime-settings-agentloop-current.json` reports
+  `pagedKV.enabled=false`, `blockDisk.enabled=true`,
+  `legacyDisk.enabled=false`, `prefix.enabled=true`,
+  `liveKVCodec="engine_selected"`, `storedKVCodec="auto"`,
+  `maxConcurrentSequences=1`, `enableAudio=true`, `enableVideo=true`, and
+  `requireMediaSaltForCache=true`. Pre-run cache artifact
+  `/tmp/osaurus-gemma-proof/cache-before-agentloop-current.json` had all cache
+  counters at zero with paged KV disabled.
+- Current-head E2B JANG_4M default-agent tool execution:
+  `/tmp/osaurus-gemma-proof/agent-required-complete-e2b-jang4m-current.sse`
+  and repeat
+  `/tmp/osaurus-gemma-proof/agent-required-complete-e2b-jang4m-current-repeat.sse`
+  call `/agents/default/run` with no client-supplied `tools` array and
+  `tool_choice="required"`. Both streams contain sanitized
+  `osaurus_agent_tool` chunks for `complete`, phases `started` and
+  `completed`, `is_error=false`, `end_run=true`, `HTTP_STATUS:200`, and final
+  visible text `live Osaurus agent loop executed complete tool with Gemma E2B
+  JANG_4M QAT and no parser leak`. Leak scan found no U+FFFE, `<tool`,
+  `<think`, `<|...`, or raw `tool:/args:/done:` marker leakage beyond the
+  expected sanitized trace keys. Wall time improved from `real 4.27` to
+  `real 2.27` on repeat.
+- Current-head E2B JANG_4M cache/prefill/token proof:
+  `/tmp/osaurus-gemma-proof/cache-after-agent-required-complete-e2b-jang4m-current-repeat.json`
+  reports `disk_l2_hits=1`, `disk_l2_stores=1`, `paged_hits=0`,
+  `paged_misses=0`, `effective_kv_mode="turbo(3,3)"`,
+  `kv_layer_count=3`, `rotating_kv_layer_count=12`,
+  `requires_disk_backed_restore=true`, and
+  `turbo_quant_kv_layer_count=0`. Chat artifacts
+  `/tmp/osaurus-gemma-proof/chat-prefill-e2b-jang4m-current.sse` and repeat
+  `/tmp/osaurus-gemma-proof/chat-prefill-e2b-jang4m-current-repeat.sse`
+  emit `osaurus_prefill` queued/running/complete chunks. The repeat row shows
+  prefill progress `35/36` then `36/36`, `tokens_per_second=108.8331`, and
+  `HTTP_STATUS:200` with clean visible text.
+- Current-head E4B JANG_4M default-agent tool execution and cache/prefill:
+  `/tmp/osaurus-gemma-proof/agent-required-complete-e4b-jang4m-current.sse`
+  and repeat
+  `/tmp/osaurus-gemma-proof/agent-required-complete-e4b-jang4m-current-repeat.sse`
+  contain `complete` tool trace chunks with `is_error=false`, `end_run=true`,
+  `finish_reason="stop"`, and no marker leakage. Chat artifacts
+  `/tmp/osaurus-gemma-proof/chat-prefill-e4b-jang4m-current.sse` and repeat
+  `/tmp/osaurus-gemma-proof/chat-prefill-e4b-jang4m-current-repeat.sse`
+  emit queued/running/complete prefill chunks; the repeat row shows `35/36`
+  then `36/36` and `tokens_per_second=36.5466`. Cache artifact
+  `/tmp/osaurus-gemma-proof/cache-after-chat-prefill-e4b-jang4m-current-repeat.json`
+  reports `disk_l2_hits=2`, `disk_l2_stores=6`, `paged_hits=0`,
+  `paged_misses=0`, `effective_kv_mode="turbo(3,3)"`,
+  `kv_layer_count=4`, `rotating_kv_layer_count=20`, and
+  `requires_disk_backed_restore=true`.
+- Current-head E4B MXFP4 default-agent tool execution and cache/prefill:
+  `/tmp/osaurus-gemma-proof/agent-required-complete-e4b-mxfp4-current.sse`
+  and repeat
+  `/tmp/osaurus-gemma-proof/agent-required-complete-e4b-mxfp4-current-repeat.sse`
+  contain `complete` tool trace chunks with `is_error=false`, `end_run=true`,
+  `finish_reason="stop"`, and no marker leakage. Chat artifacts
+  `/tmp/osaurus-gemma-proof/chat-prefill-e4b-mxfp4-current.sse` and repeat
+  `/tmp/osaurus-gemma-proof/chat-prefill-e4b-mxfp4-current-repeat.sse`
+  emit queued/running/complete prefill chunks; the repeat row shows `33/34`
+  then `34/34` and `tokens_per_second=43.0392`. Cache artifact
+  `/tmp/osaurus-gemma-proof/cache-after-chat-prefill-e4b-mxfp4-current-repeat.json`
+  reports `disk_l2_hits=2`, `disk_l2_stores=6`, `paged_hits=0`,
+  `paged_misses=0`, `effective_kv_mode="turbo(3,3)"`,
+  `kv_layer_count=4`, `rotating_kv_layer_count=20`, and
+  `requires_disk_backed_restore=true`.
+- Current-head boundary: these rows prove live release-app API/default-agent
+  execution for E2B JANG_4M, E4B JANG_4M, and E4B MXFP4 only. Full matrix
+  re-run on `8a0cf965`, UI-click chat proof, lower-spec Activity Monitor
+  physical-footprint proof, successful Gemma4 audio, and full
+  `docs/HARNESS_COMPATIBILITY.md` harness scoring remain open gates. Do not
+  count Google/source-looking Gemma bundles or BF16/source loads for this
+  checkpoint unless the scope is explicitly reopened.
 - Current app launch, vMLX `a4aa133` pin, keychain-disabled LaunchServices path:
   `/tmp/osaurus-keychain-free-gemma-checkpoint-a4aa-20260611-182816/models.json`.
 - Current runtime settings from the isolated test root:
