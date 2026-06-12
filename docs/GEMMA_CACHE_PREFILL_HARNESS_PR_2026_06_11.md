@@ -1139,3 +1139,177 @@ swift run --package-path Packages/OsaurusEvals osaurus-evals run \
 
 - `~/models` currently contains the 10 requested QAT MXFP4/JANG_4M repos.
 - Only these ten QAT bundles count for this checkpoint.
+
+## 2026-06-11 Release-App Crash Checkpoint
+
+This checkpoint remains QAT-only. Do not load BF16/source Gemma bundles, and do
+not treat the source expert-key failure
+`Unhandled keys ["down_proj", "gate_up_proj"] ... TextExperts` as part of this
+workstream. That error belongs to the removed source-model lane and should stay
+out of the merge gate for Gemma 4 QAT MXFP4/JANG_4M.
+
+The first keychain-free Release app build at Osaurus `d34f5ffa` and vMLX
+`a4aa133689417b924833610db0ff2732151d74cd` launched successfully with
+`OSU_MODELS_DIR=/Users/eric/models`, advertised all ten requested QAT bundles,
+and reported the desired cache policy before model load:
+
+- `/tmp/osaurus-gemma-proof/health-release-goal-d34f5ffa.json`
+- `/tmp/osaurus-gemma-proof/models-release-goal-d34f5ffa.json`
+- `/tmp/osaurus-gemma-proof/cache-before-release-goal-d34f5ffa.json`
+- runtime config:
+  `/tmp/osaurus-keychain-free-gemma-goal-d34f5ffa-direct-20260611-220034/config/server-runtime.json`
+
+Those artifacts showed `paged_kv_enabled=false`, `block_disk_enabled=true`,
+`legacy_disk_enabled=false`, `prefix_enabled=true`, and
+`live_kv_codec="engine_selected"`.
+
+The first real 12B JANG_4M forced tool-call request then crashed the Release app
+before a complete agent/tool answer:
+
+- request:
+  `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-release-goal-d34f5ffa.request.json`
+- partial SSE:
+  `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-release-goal-d34f5ffa.sse`
+- crash report:
+  `~/Library/Logs/DiagnosticReports/osaurus-2026-06-11-220201.ips`
+
+Root cause from the crash stack: vMLX prefill progress used
+`TaskLocal.withValue` in the optimized generation path and faulted in
+`swift_task_localValuePushImpl` before `TokenIterator` could safely run the
+Gemma QAT request. This is a real Release-app regression in the prefill progress
+wiring, not a source-model loader issue.
+
+vMLX fix under test:
+
+- reachable remote commit:
+  `dc52096743215a153522c9b260c8191f133d7288`
+- branch:
+  `osaurus-ai/vmlx-swift codex/gemma-prefill-tasklocal-crash`
+- change:
+  replace the prefill progress `@TaskLocal` reporter with a scoped
+  thread-dictionary handler in `PrefillProgressReporter.withHandler(...)`, and
+  call that helper from `Evaluate.swift` and `BatchEngine.swift`.
+- source proof:
+  `/tmp/osaurus-gemma-proof/vmlx-release-build-MLXLMCommon-prefill-reporter-fix.log`
+  ends with `Build of target: 'MLXLMCommon' complete!`.
+- blocked source test:
+  the narrow vMLX Swift test was blocked by the unrelated test-target import
+  error `no such module 'Testing'`; do not count that as passed.
+
+Osaurus now pins the reachable vMLX fix revision in:
+
+- `Packages/OsaurusCore/Package.swift`
+- `osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved`
+- `App/osaurus.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved`
+- `Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift`
+
+Current Release app rebuild proof:
+
+- status:
+  `/tmp/osaurus-gemma-proof/xcode-build-release-app-goal-dc520967.status`
+- build log:
+  `/tmp/osaurus-gemma-proof/xcode-build-release-app-goal-dc520967.log`
+- app:
+  `/private/tmp/osaurus-gemma-checkpoint-main/build/XcodeDerivedData-gemma-goal-dc520967-release/Build/Products/Release/osaurus.app`
+- built vMLX checkout:
+  `/tmp/osaurus-gemma-checkpoint-main/build/XcodeDerivedData-gemma-goal-dc520967-release/SourcePackages/checkouts/vmlx-swift`
+  at `dc52096743215a153522c9b260c8191f133d7288`.
+
+The built checkout was inspected after build. `PrefillProgressReporter.swift`
+uses `PrefillProgressReporter.withHandler(...)`, and `Evaluate.swift` /
+`BatchEngine.swift` call that helper. The old prefill
+`PrefillProgressReporter.$current.withValue(...)` TaskLocal path is absent from
+the inspected files.
+
+Focused source-policy proof:
+
+- status:
+  `/tmp/osaurus-gemma-proof/swift-test-runtime-policy-source-dc520967.status`
+- log:
+  `/tmp/osaurus-gemma-proof/swift-test-runtime-policy-source-dc520967.log`
+- command:
+  `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test --package-path Packages/OsaurusCore --filter RuntimePolicySourceTests`
+- result:
+  `Suite "Runtime source policy" passed`; `Test run with 84 tests in 1 suite passed`.
+
+The rebuilt Release app launched keychain-free with isolated state:
+
+- launch log:
+  `/tmp/osaurus-gemma-proof/osaurus-release-goal-dc520967-direct.log`
+- root:
+  `/tmp/osaurus-gemma-proof/osaurus-release-goal-dc520967-root.txt`
+- health:
+  `/tmp/osaurus-gemma-proof/health-release-goal-dc520967.json`
+- models:
+  `/tmp/osaurus-gemma-proof/models-release-goal-dc520967.json`
+- cache before load:
+  `/tmp/osaurus-gemma-proof/cache-before-release-goal-dc520967.json`
+- runtime config:
+  `/tmp/osaurus-keychain-free-gemma-goal-dc520967-direct-20260611-222213/config/server-runtime.json`
+
+Runtime config and `/admin/cache-stats` prove the current default cache policy:
+`pagedKV.enabled=false`, `blockDisk.enabled=true`,
+`legacyDisk.enabled=false`, `prefix.enabled=true`, and
+`liveKVCodec="engine_selected"`.
+
+Release app QAT tool/caching proof:
+
+- 12B JANG_4M first run:
+  `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-release-goal-dc520967.sse`
+  completed the `complete` tool and emitted exactly
+  `release app 12b jang4m default agent tool proven.`. The old Release crash
+  did not reproduce.
+- 12B JANG_4M repeat:
+  `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-release-goal-dc520967-repeat.sse`
+  completed the same tool row. Cache telemetry
+  `/tmp/osaurus-gemma-proof/agent-run-12b-jang4m-release-goal-dc520967-repeat.cache.json`
+  reports `disk_l2_hits=1`, `disk_l2_stores=1`, and
+  `paged_hits=0` / `paged_misses=0`.
+- 12B JANG_4M RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-agent-run-12b-jang4m-release-goal-dc520967-repeat.txt`
+  reports `RSS=7095696 KB` after the repeated row.
+- 12B MXFP4 exact forced-tool row:
+  `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-release-goal-dc520967-exact.sse`
+  completed the `complete` tool and emitted exactly
+  `release app 12b mxfp4 default agent tool proven`.
+- 12B MXFP4 repeat:
+  `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-release-goal-dc520967-exact-repeat.sse`
+  completed the same tool row. Cache telemetry
+  `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-release-goal-dc520967-exact-repeat.cache.json`
+  reports `disk_l2_hits=1`, `disk_l2_stores=2`, and
+  `paged_hits=0` / `paged_misses=0`.
+- 12B MXFP4 RAM:
+  `/tmp/osaurus-gemma-proof/ps-after-agent-run-12b-mxfp4-release-goal-dc520967-exact-repeat.txt`
+  reports `RSS=550080 KB` after the repeated row while the model remains
+  health-current.
+
+Prefill progress proof:
+
+- request:
+  `/tmp/osaurus-gemma-proof/chat-prefill-12b-mxfp4-release-goal-dc520967.request.json`
+- SSE:
+  `/tmp/osaurus-gemma-proof/chat-prefill-12b-mxfp4-release-goal-dc520967.sse`
+- timing:
+  `/tmp/osaurus-gemma-proof/chat-prefill-12b-mxfp4-release-goal-dc520967.timing.json`
+- cache:
+  `/tmp/osaurus-gemma-proof/chat-prefill-12b-mxfp4-release-goal-dc520967.cache.json`
+
+The SSE emitted `osaurus_prefill` before first token with determinate progress:
+`queued 0/3224`, `prefill 0/3224`, chunk updates at `512`, `1024`,
+`1536`, `2048`, `2560`, `3072`, then `complete 3224/3224`. It then generated
+`prefill visible` and emitted usage with `prompt_tokens=4816`,
+`completion_tokens=7`, `total_tokens=4823`, and
+`tokens_per_second=5.8165`.
+
+Current boundary:
+
+- This checkpoint now has Release-app QAT proof for 12B JANG_4M and 12B MXFP4
+  tool-call execution, disk L2 restore/hit telemetry, paged RAM KV disabled,
+  and visible SSE prefill progress.
+- It is still not a full merge gate for all ten QAT bundles. E2B/E4B/26B/31B
+  live app rows, VL rows, full harness scoring, and Chat UI visual confirmation
+  still need to be run before final release wording.
+- The period-bearing MXFP4 forced-tool row
+  `/tmp/osaurus-gemma-proof/agent-run-12b-mxfp4-release-goal-dc520967.sse`
+  completed the tool but emitted the final text without the period, so keep
+  strict punctuation fidelity for that exact prompt marked partial.
