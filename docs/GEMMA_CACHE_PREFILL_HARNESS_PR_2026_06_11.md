@@ -19,6 +19,11 @@ This is the active Osaurus integration checklist for the paired vMLX work.
 - Do not load, benchmark, or count non-QAT/source-looking Gemma bundles for this
   checkpoint. The active scope is only the OsaurusAI Gemma 4 QAT MXFP4 and
   JANG_4M repos listed below.
+- Regression note: errors such as
+  `Unhandled keys ["down_proj", "gate_up_proj"] ... TextExperts` from
+  source/unquantized Gemma expert weights are not part of this checkpoint. They
+  should stay documented as out-of-scope source-bundle failures, not chased as
+  blockers for the QAT MXFP4/JANG_4M rows.
 
 ## Local Model Inventory
 
@@ -83,14 +88,14 @@ Current model capability metadata from local `config.json`:
 | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |
 | `osaurusai--gemma-4-e2b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | TODO | TODO | PARTIAL | PARTIAL |
 | `osaurusai--gemma-4-e2b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN | PROVEN | PROVEN | PARTIAL | PROVEN | PROVEN complete / PARTIAL side-effect | TODO | TODO | PROVEN API / TODO UI | PARTIAL |
-| `osaurusai--gemma-4-e4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| `osaurusai--gemma-4-e4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| `osaurusai--gemma-4-12b-it-qat-mxfp4` | MXFP4 | `gemma4_unified` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| `osaurusai--gemma-4-12b-it-qat-jang_4m` | JANG_4M | `gemma4_unified` | yes | yes | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO | TODO |
-| `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | N/A | TODO | TODO |
-| `osaurusai--gemma-4-26b-a4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | N/A | TODO | TODO |
-| `osaurusai--gemma-4-31b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | N/A | TODO | TODO |
-| `osaurusai--gemma-4-31b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | TODO | TODO | TODO | TODO | TODO | TODO | TODO | N/A | TODO | TODO |
+| `osaurusai--gemma-4-e4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-e4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-12b-it-qat-mxfp4` | MXFP4 | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-12b-it-qat-jang_4m` | JANG_4M | `gemma4_unified` | yes | yes | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | TODO | TODO | PARTIAL |
+| `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-26b-a4b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-31b-it-qat-mxfp4` | MXFP4 | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
+| `osaurusai--gemma-4-31b-it-qat-jang_4m` | JANG_4M | `gemma4` | yes | no | PROVEN | PROVEN agent | PARTIAL | PROVEN agent | PARTIAL | TODO | PROVEN complete trace | TODO | N/A | TODO | PARTIAL |
 
 Current evidence behind non-TODO cells:
 
@@ -245,6 +250,90 @@ Current evidence behind non-TODO cells:
     terminal text but the model visibly mangled copied words/numbers. Keep
     those rows `PARTIAL` and use them as a regression note for exact-copy
     quality; they do not invalidate the traced `complete` tool execution pass.
+  - Expanded QAT default-agent trace matrix:
+    `/tmp/osaurus-gemma-proof/agenttrace-matrix-summary-20260611T205423Z.txt`
+    proves `complete` end-run tool traces for E4B JANG_4M, E4B MXFP4, 12B
+    JANG_4M, 12B MXFP4, and 26B-A4B JANG_4M. Each passing row reports
+    `trace=True`, `final=True`, `finish_stop=True`, matching current model,
+    `effective_kv_mode="turbo(3,3)"`, `paged=false`, `disk=true`, and RSS:
+    E4B JANG_4M 3.16 GB, E4B MXFP4 0.74 GB, 12B JANG_4M 7.45 GB, 12B MXFP4
+    0.75 GB, and 26B-A4B JANG_4M 13.69 GB. These are agent-loop tool trace
+    passes, not full harness/VL/audio passes.
+  - Expanded matrix blocked rows:
+    26B-A4B MXFP4 failed with `curl_failed=18`, then the dev app crashed before
+    31B rows could run; both 31B JANG_4M and 31B MXFP4 have `curl_failed=7`
+    because the server was already down. The zero-byte/partial SSE artifacts
+    are:
+    `/tmp/osaurus-gemma-proof/agents-default-osaurusai-gemma-4-26b-a4b-it-qat-mxfp4-complete-trace.sse`,
+    `/tmp/osaurus-gemma-proof/agents-default-osaurusai-gemma-4-31b-it-qat-jang-4m-complete-trace.sse`,
+    and
+    `/tmp/osaurus-gemma-proof/agents-default-osaurusai-gemma-4-31b-it-qat-mxfp4-complete-trace.sse`.
+  - Crash root-cause evidence:
+    `/Users/eric/Library/Logs/DiagnosticReports/osaurus-2026-06-11-205528.ips`
+    is an `EXC_BAD_ACCESS` / `SIGSEGV` crash on a cooperative queue. The
+    stack is MLX Metal dispatch through
+    `Model2VecStaticEmbeddingPipeline.embedOne`, `VMLXModel2VecEmbedder`,
+    `MetalSafeEmbedder`, `HybridSearchEngine.search`, and
+    `MemorySearchService.searchTranscript`. This points at resident local
+    model inference plus vMLX Model2Vec memory vector search, not Gemma decode
+    or the QAT bundle loader.
+  - Crash prevention guard added after the IPS:
+    `MemorySearchService` now skips VecturaKit/vMLX vector indexing and search
+    while any local MLX model is resident, or when
+    `OSAURUS_DISABLE_MEMORY_VECTOR_SEARCH=1/true`, and uses the existing SQL
+    text fallback instead. This is a fail-closed Osaurus guard for the
+    checkpoint, not the final vMLX Model2Vec root fix. Vector memory search can
+    be restored during resident local inference only after the vMLX embedding
+    crash path is fixed and live-proven.
+  - Guard verification:
+    `/tmp/osaurus-gemma-proof/xcode-test-memory-vector-guard.log` reports
+    `** TEST SUCCEEDED **` for `MemorySearchServiceTests`, and
+    `/tmp/osaurus-gemma-proof/xcode-test-runtime-policy-memory-vector-guard.log`
+    reports `** TEST SUCCEEDED **` with 84 `RuntimePolicySourceTests` passing,
+    including the source-policy assertion that all memory vector operations are
+    guarded before VecturaKit/vMLX embedding work.
+  - Guarded-app build proof:
+    `/tmp/osaurus-gemma-proof/xcode-build-debug-app-memory-vector-guard.log`
+    reports `** BUILD SUCCEEDED **`.
+  - Guarded-app launch proof:
+    `/tmp/osaurus-gemma-proof/osaurus-launch-debug-foreground.log` shows the
+    Debug app launched keychain-free with the local server bound on
+    `127.0.0.1:1337`. Health artifact
+    `/tmp/osaurus-gemma-proof/health-memory-vector-guard-foreground.json`
+    reports `status=healthy`, `local_model_scan.model_count=27`, and
+    `root="/Users/eric/models"`.
+  - Retried 26B-A4B MXFP4 after the memory-vector guard:
+    `/tmp/osaurus-gemma-proof/agents-default-osaurusai-gemma-4-26b-a4b-it-qat-mxfp4-complete-trace-memoryguard.sse`
+    contains `osaurus_agent_tool` `started` and `completed` chunks for
+    `complete`, `is_error=false`, `end_run=true`, exact final text, and
+    `finish_reason="stop"`. Cache artifact
+    `/tmp/osaurus-gemma-proof/cache-after-agents-default-osaurusai-gemma-4-26b-a4b-it-qat-mxfp4-complete-trace-memoryguard.json`
+    reports current model
+    `osaurusai--gemma-4-26b-a4b-it-qat-mxfp4`,
+    `effective_kv_mode="turbo(3,3)"`, `paged_cache.enabled=false`,
+    `block_disk_store.enabled=true`, `kv_layer_count=5`,
+    `rotating_kv_layer_count=25`, and
+    `requires_disk_backed_restore=true`.
+  - Retried 31B JANG_4M after the memory-vector guard:
+    `/tmp/osaurus-gemma-proof/agents-default-osaurusai-gemma-4-31b-it-qat-jang-4m-complete-trace-memoryguard.sse`
+    contains the same passing `complete` trace and final text. Cache artifact
+    `/tmp/osaurus-gemma-proof/cache-after-agents-default-osaurusai-gemma-4-31b-it-qat-jang-4m-complete-trace-memoryguard.json`
+    reports `effective_kv_mode="turbo(3,3)"`, paged cache off, block disk
+    enabled, `kv_layer_count=10`, `rotating_kv_layer_count=50`, and
+    disk-backed restore required. RSS sample
+    `/tmp/osaurus-gemma-proof/ps-after-agents-default-osaurusai-gemma-4-31b-it-qat-jang-4m-complete-trace-memoryguard.txt`
+    records about 18.10 GB RSS after the 31B JANG_4M row.
+  - Retried 31B MXFP4 after the memory-vector guard:
+    `/tmp/osaurus-gemma-proof/agents-default-osaurusai-gemma-4-31b-it-qat-mxfp4-complete-trace-memoryguard.sse`
+    contains the same passing `complete` trace and final text. Cache artifact
+    `/tmp/osaurus-gemma-proof/cache-after-agents-default-osaurusai-gemma-4-31b-it-qat-mxfp4-complete-trace-memoryguard.json`
+    reports `effective_kv_mode="turbo(3,3)"`, paged cache off, block disk
+    enabled, `kv_layer_count=10`, `rotating_kv_layer_count=50`, and
+    disk-backed restore required. Health artifact
+    `/tmp/osaurus-gemma-proof/health-after-31b-mxfp4-memoryguard.json`
+    reports the app still healthy with current model
+    `osaurusai--gemma-4-31b-it-qat-mxfp4`, RAM feasibility `verdict="ok"`,
+    and `mlx_last_error=null`.
 - E2B JANG_4M API prefill progress on the current app:
   `/tmp/osaurus-gemma-proof/chat-jang4m-prefill-long-checkpoint-a4aa.sse`
   emitted 19 `osaurus_prefill` chunks from queued/running through

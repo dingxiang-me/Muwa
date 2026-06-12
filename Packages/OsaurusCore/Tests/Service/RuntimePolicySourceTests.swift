@@ -126,6 +126,31 @@ struct RuntimePolicySourceTests {
         )
     }
 
+    @Test("Memory vector search skips vMLX embeddings while local model is resident")
+    func memoryVectorSearchSkipsResidentMLXModel() throws {
+        let source = try Self.source("Services/Memory/MemorySearchService.swift")
+
+        #expect(source.contains("OSAURUS_DISABLE_MEMORY_VECTOR_SEARCH"))
+        #expect(source.contains("ModelRuntime.shared.cachedModelSummaries()"))
+        #expect(source.contains("residentModels.isEmpty"))
+        #expect(source.contains("using SQL text fallback"))
+
+        for operation in [
+            "indexPinnedFact",
+            "indexEpisode",
+            "indexTranscriptTurn",
+            "searchPinnedFacts",
+            "searchEpisodes",
+            "searchTranscript",
+            "rebuildIndex",
+        ] {
+            #expect(
+                source.contains("vectorWorkAllowed(\"\(operation)\")"),
+                "MemorySearchService must guard \(operation) before VecturaKit/vMLX embedding work"
+            )
+        }
+    }
+
     @Test("AppDelegate binds HTTP server before Parakeet/CoreML startup")
     func appDelegateStartsServerBeforeSpeechAutoload() throws {
         let source = try Self.source("AppDelegate.swift")
