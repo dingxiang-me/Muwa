@@ -39,8 +39,8 @@ jobs:
     # 45 min, not 30. Three-bucket budget:
     #   ~25–30 min — full cold build (mlx-swift `Cmlx` C++ + SQLCipher
     #                 `sqlite3.c` ~250k LoC of C compiled with
-    #                 `-DSQLITE_HAS_CODEC=1` and friends + OsaurusCore +
-    #                 OsaurusCoreTests Swift) when both SPM and DerivedData
+    #                 `-DSQLITE_HAS_CODEC=1` and friends + MuwaCore +
+    #                 MuwaCoreTests Swift) when both SPM and DerivedData
     #                 caches miss. PR #951 (run 24937664669, attempt 2)
     #                 hit the prior 30-min wall mid-Swift-compile after
     #                 27:27 in the xcodebuild step — that's the empirical
@@ -57,7 +57,7 @@ jobs:
     # ceiling indefinitely.
     timeout-minutes: 45
     env:
-      WORKSPACE: osaurus.xcworkspace
+      WORKSPACE: Muwa.xcworkspace
       SPM_CACHE: .spm-cache
       XCRESULT_PATH: build/Tests.xcresult
       # Mirror of xcbeautify stdout/stderr. The `Print failure summary`
@@ -84,7 +84,7 @@ jobs:
         uses: actions/cache@v5
         with:
           path: ${{ env.SPM_CACHE }}
-          key: spm-${{ runner.os }}-${{ env.CACHE_SALT }}-xcode${{ env.XCODE_VERSION }}-${{ hashFiles('osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
+          key: spm-${{ runner.os }}-${{ env.CACHE_SALT }}-xcode${{ env.XCODE_VERSION }}-${{ hashFiles('Muwa.xcworkspace/xcshareddata/swiftpm/Package.resolved') }}
           restore-keys: |
             spm-${{ runner.os }}-${{ env.CACHE_SALT }}-xcode${{ env.XCODE_VERSION }}-
             spm-${{ runner.os }}-${{ env.CACHE_SALT }}-
@@ -99,10 +99,10 @@ jobs:
         with:
           path: ~/Library/Developer/Xcode/DerivedData
           # Include vendored C sources (currently the SQLCipher amalgamation
-          # under Packages/OsaurusCore/SQLCipher/). Without this, an
+          # under Packages/MuwaCore/SQLCipher/). Without this, an
           # SQLCipher bump would land its new sqlite3.{c,h} but CI would
           # silently re-use a stale cached compile of the old code.
-          key: dd-${{ runner.os }}-${{ env.CACHE_SALT }}-xcode${{ env.XCODE_VERSION }}-${{ hashFiles('osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/**/*.swift', 'Packages/**/Package.swift', 'Packages/**/Resources/**', 'Packages/**/*.c', 'Packages/**/*.h') }}
+          key: dd-${{ runner.os }}-${{ env.CACHE_SALT }}-xcode${{ env.XCODE_VERSION }}-${{ hashFiles('Muwa.xcworkspace/xcshareddata/swiftpm/Package.resolved', 'Packages/**/*.swift', 'Packages/**/Package.swift', 'Packages/**/Resources/**', 'Packages/**/*.c', 'Packages/**/*.h') }}
           # Do not use broad restore keys for DerivedData. A restored cache
           # from an older package graph can contain Swift modules whose C
           # module dependencies are no longer visible to Xcode, which shows
@@ -150,11 +150,11 @@ jobs:
         run: >-
           xcodebuild -resolvePackageDependencies
           -workspace "$WORKSPACE"
-          -scheme OsaurusCoreTests
+          -scheme MuwaCoreTests
           -clonedSourcePackagesDirPath "$SPM_CACHE"
           -quiet
 
-      - name: Test OsaurusCore
+      - name: Test MuwaCore
         id: test
         run: |
           set -o pipefail
@@ -192,7 +192,7 @@ jobs:
           # propagates through the longer pipeline.
           xcodebuild test \
             -workspace "$WORKSPACE" \
-            -scheme OsaurusCoreTests \
+            -scheme MuwaCoreTests \
             -disableAutomaticPackageResolution \
             -clonedSourcePackagesDirPath "$SPM_CACHE" \
             -resultBundlePath "$XCRESULT_PATH" \
@@ -243,7 +243,7 @@ jobs:
           #          OR linker failure). PR #881 (run 24573707695) hit this
           #          flavor: both SPM and DerivedData caches missed because
           #          main hadn't ever saved one, so the cold build ran out
-          #          of clock during OsaurusCoreTests Swift compilation.
+          #          of clock during MuwaCoreTests Swift compilation.
           #
           # Mode B — xctest binary built BUT no xcresult bundle
           #          ⇒ test bundle launched but produced zero output before
@@ -288,7 +288,7 @@ jobs:
           # subdirectory off the workspace path, so glob rather than
           # hardcode. We only care about existence, not the actual binary.
           XCTEST_BINARY="$(find "$HOME/Library/Developer/Xcode/DerivedData" \
-            -maxdepth 6 -name 'OsaurusCoreTests.xctest' -type d 2>/dev/null \
+            -maxdepth 6 -name 'MuwaCoreTests.xctest' -type d 2>/dev/null \
             | head -1)"
 
           if [ ! -d "$XCRESULT_PATH" ]; then
@@ -298,7 +298,7 @@ jobs:
               {
                 echo "**Mode A — build phase did not complete (no xctest bundle on disk).**"
                 echo
-                echo "Either a compile/link error fired (scroll the **Test OsaurusCore** log above for the first \`error:\` line), OR the cold build ran past the 45-min job timeout. ${CACHE_NOTE}"
+                echo "Either a compile/link error fired (scroll the **Test MuwaCore** log above for the first \`error:\` line), OR the cold build ran past the 45-min job timeout. ${CACHE_NOTE}"
                 echo
                 echo "If \`cache-hit: false\` AND no \`error:\` lines appear in the raw log, this is the cold-cache-timeout flavor. The fix is to land one successful run on \`main\` so the \`Save DerivedData cache\` step at the bottom of this job populates the cache; subsequent PR runs warm-start from it and finish in ~5 min. Re-running this same job will hit the cache the second time only IF the first attempt finishes successfully."
                 echo
@@ -311,9 +311,9 @@ jobs:
               {
                 echo "**Mode B — xctest bundle built but launched silently (real launch-time hang).**"
                 echo
-                echo "The \`OsaurusCoreTests.xctest\` binary exists in DerivedData (\`$XCTEST_BINARY\`), so the build phase finished. The hang is in dyld load, an ObjC \`+load\` method, a Swift module initializer, or the first test's module init."
+                echo "The \`MuwaCoreTests.xctest\` binary exists in DerivedData (\`$XCTEST_BINARY\`), so the build phase finished. The hang is in dyld load, an ObjC \`+load\` method, a Swift module initializer, or the first test's module init."
                 echo
-                echo "Prime suspects: any file-level \`let\` in OsaurusCore that touches MLX/Metal at first reference (this is the regression class that PR #878 surfaced — see \`_registerFactoriesOnce\` in \`Packages/OsaurusCore/Services/ModelRuntime.swift\` and the matching tests in \`Packages/OsaurusCore/Tests/Service/ModelRuntimeFindDirectoryTests.swift\`)."
+                echo "Prime suspects: any file-level \`let\` in MuwaCore that touches MLX/Metal at first reference (this is the regression class that PR #878 surfaced — see \`_registerFactoriesOnce\` in \`Packages/MuwaCore/Services/ModelRuntime.swift\` and the matching tests in \`Packages/MuwaCore/Tests/Service/ModelRuntimeFindDirectoryTests.swift\`)."
               } >> "$GITHUB_STEP_SUMMARY"
             fi
             exit 0
@@ -454,7 +454,7 @@ jobs:
                   echo
                 fi
               else
-                echo "_(could not derive a dying PID from the raw log; see the \`Test OsaurusCore\` step output for the last test result line on the dying \`xctest (PID)\` instance)_"
+                echo "_(could not derive a dying PID from the raw log; see the \`Test MuwaCore\` step output for the last test result line on the dying \`xctest (PID)\` instance)_"
                 echo
               fi
               echo "**Next step:** download the \`test-core-diagnostic-reports-${{ github.run_attempt }}\` artifact from this run for the symbolicated \`xctest-*.ips\` crash report; the offending frame is on top of the thread that took the signal. To bisect locally, run the suspect suite with \`-parallel-testing-enabled NO\` and a few neighbouring suites under parallelism. Also see the \`test-core-xcbeautify-log-${{ github.run_attempt }}\` artifact for the unfiltered xctest output."
@@ -556,7 +556,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # OsaurusCLI's Package.swift requires `swift-tools-version: 6.2`, which
+      # MuwaCLI's Package.swift requires `swift-tools-version: 6.2`, which
       # ships with the pinned Xcode. The runner's default `swift` may be older
       # (currently 6.1), so point xcrun at the pinned Xcode for these steps.
       # GitHub Actions doesn't let job-level `env:` reference workflow-level
@@ -569,7 +569,7 @@ jobs:
       - name: Run CLI tests
         env:
           DEVELOPER_DIR: /Applications/Xcode_${{ env.XCODE_VERSION }}.app/Contents/Developer
-        run: swift test --package-path Packages/OsaurusCLI --parallel
+        run: swift test --package-path Packages/MuwaCLI --parallel
 
       - name: Annotate timing
         if: always()
