@@ -7,18 +7,18 @@ set -euo pipefail
 # matching binary UUIDs are gone forever and atos can't recover symbols.
 #
 # Sources:
-#   build/osaurus.xcarchive/dSYMs/                — App + embedded frameworks
-#   build/Build/Products/Release/*.dSYM           — osaurus-cli (built outside
+#   build/Muwa.xcarchive/dSYMs/                   — App + embedded frameworks
+#   build/Build/Products/Release/*.dSYM           — muwa-cli (built outside
 #                                                    the archive, so it lands
 #                                                    next to the binary instead
 #                                                    of inside the archive).
 
 : "${VERSION:?VERSION is required}"
 
-ARCHIVE_DSYMS_DIR="build/osaurus.xcarchive/dSYMs"
+ARCHIVE_DSYMS_DIR="build/Muwa.xcarchive/dSYMs"
 CLI_BUILD_DIR="build/Build/Products/Release"
 STAGE_DIR="build_output/dsyms-stage"
-OUT_ZIP="build_output/Osaurus-${VERSION}-dSYMs.zip"
+OUT_ZIP="build_output/Muwa-${VERSION}-dSYMs.zip"
 
 mkdir -p "${STAGE_DIR}"
 

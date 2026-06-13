@@ -2,12 +2,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HANDLER="$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift"
-HELPER="$ROOT/Packages/OsaurusCore/Networking/HTTPLoopHelpers.swift"
-RUNTIME="$ROOT/Packages/OsaurusCore/Services/ModelRuntime.swift"
-RUNTIME_TESTS="$ROOT/Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift"
-CHAT_STOP_TESTS="$ROOT/Packages/OsaurusCore/Tests/Chat/ChatSessionStopTests.swift"
-HTTP_TESTS="$ROOT/Packages/OsaurusCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift"
+HANDLER="$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift"
+HELPER="$ROOT/Packages/MuwaCore/Networking/HTTPLoopHelpers.swift"
+RUNTIME="$ROOT/Packages/MuwaCore/Services/ModelRuntime.swift"
+RUNTIME_TESTS="$ROOT/Packages/MuwaCore/Tests/Service/RuntimePolicySourceTests.swift"
+CHAT_STOP_TESTS="$ROOT/Packages/MuwaCore/Tests/Chat/ChatSessionStopTests.swift"
+HTTP_TESTS="$ROOT/Packages/MuwaCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift"
 
 fail=0
 pass() { echo "PASS $*"; }
@@ -157,7 +157,7 @@ require_text "$HTTP_TESTS" 'requestTaskRegistryCancelsTaskInsertedAfterChannelCa
 
 active="$({ ps -axo pid,ppid,rss,etime,command || true; } \
   | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' \
-  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/osaurus-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*osaurus-staging)' \
+  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/muwa-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*muwa-staging)' \
   | rg -v 'rg -i|assert-http-channel-load-cancellation' || true)"
 if [[ -n "$active" ]]; then
   echo "$active" >&2

@@ -2,7 +2,7 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-ADAPTER="$ROOT/Packages/OsaurusCore/Services/ModelRuntime/MLXBatchAdapter.swift"
+ADAPTER="$ROOT/Packages/MuwaCore/Services/ModelRuntime/MLXBatchAdapter.swift"
 fail=0
 
 pass() { echo "PASS $*"; }
@@ -51,12 +51,12 @@ if [[ -f "$ADAPTER" ]]; then
   require_text "$ADAPTER" 'return false' "implicit sampling does not authorize native MTP greedy rewrite"
 fi
 
-active="$({ ps -axo pid,ppid,rss,etime,command || true; } | rg -v '/Users/eric/.codex/computer-use/.*/SkyComputerUseClient' | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|swift-build --package-path Packages/OsaurusCore|swift-test --package-path Packages/OsaurusCore|/Users/eric/osaurus-staging/Packages/OsaurusCore/.build' | rg -v 'rg -i|assert-no-hidden-local-sampler-defaults' || true)"
+active="$({ ps -axo pid,ppid,rss,etime,command || true; } | rg -v '/Users/eric/.codex/computer-use/.*/SkyComputerUseClient' | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|swift-build --package-path Packages/MuwaCore|swift-test --package-path Packages/MuwaCore|/Users/eric/muwa-staging/Packages/MuwaCore/.build' | rg -v 'rg -i|assert-no-hidden-local-sampler-defaults' || true)"
 if [[ -n "$active" ]]; then
-  fail_msg "active Osaurus build/keychain-sensitive process detected"
+  fail_msg "active Muwa build/keychain-sensitive process detected"
   echo "$active" >&2
 else
-  pass "no active Osaurus build/keychain-sensitive process"
+  pass "no active Muwa build/keychain-sensitive process"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

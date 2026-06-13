@@ -1,0 +1,78 @@
+import Foundation
+import Testing
+
+@testable import MuwaCore
+
+@Suite(.serialized)
+struct SandboxManagerCleanupTests {
+    private let manager = SandboxManager.shared
+
+    @Test
+    func cleanupAfterFailure_removesStaleContainerDirectory() async throws {
+        try await withStableStoragePaths {
+            try await SandboxTestLock.shared.run {
+                let staleDir = await manager.staleContainerDir
+                try FileManager.default.createDirectory(at: staleDir, withIntermediateDirectories: true)
+                #expect(FileManager.default.fileExists(atPath: staleDir.path))
+
+                await manager.cleanupAfterFailure()
+
+                #expect(!FileManager.default.fileExists(atPath: staleDir.path))
+            }
+        }
+    }
+
+    @Test
+    func cleanupAfterFailure_stopsBridgeServer() async throws {
+        try await withStableStoragePaths {
+            try await SandboxTestLock.shared.run {
+                let socketPath = MuwaPaths.container()
+                    .appendingPathComponent("test-bridge.sock").path
+                try MuwaPaths.ensureExists(MuwaPaths.container())
+                try await HostAPIBridgeServer.shared.start(socketPath: socketPath)
+                #expect(await HostAPIBridgeServer.shared.isRunning)
+
+                await manager.cleanupAfterFailure()
+
+                #expect(await !HostAPIBridgeServer.shared.isRunning)
+            }
+        }
+    }
+
+    @Test
+    func cleanupAfterFailure_setsStatusToStopped() async throws {
+        await withStableStoragePaths {
+            await SandboxTestLock.shared.run {
+                await MainActor.run { SandboxManager.State.shared.status = .starting }
+
+                await manager.cleanupAfterFailure()
+
+                let status = await manager.refreshStatus()
+                #expect(status == .stopped || status == .notProvisioned)
+            }
+        }
+    }
+
+    @Test
+    func cleanupAfterFailure_isIdempotent() async throws {
+        await withStableStoragePaths {
+            await SandboxTestLock.shared.run {
+                // Running cleanup twice should not crash or leave bad state,
+                // even when there's nothing to clean up.
+                await manager.cleanupAfterFailure()
+                await manager.cleanupAfterFailure()
+
+                let status = await manager.refreshStatus()
+                #expect(status == .stopped || status == .notProvisioned)
+            }
+        }
+    }
+
+    private func withStableStoragePaths<T: Sendable>(
+        _ body: @MainActor @Sendable () async throws -> T
+    ) async rethrows -> T {
+        try await StoragePathsTestLock.shared.run {
+            try await body()
+        }
+    }
+}

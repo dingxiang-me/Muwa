@@ -1,8 +1,8 @@
 # ABI Versioning
 
-The Osaurus plugin ABI evolves by **append-only** struct extension. Older plugins keep loading against newer hosts; newer plugins detect older hosts via a one-line defensive check before calling new slots. This page is the single source of truth for what changed in each version.
+The Muwa plugin ABI evolves by **append-only** struct extension. Older plugins keep loading against newer hosts; newer plugins detect older hosts via a one-line defensive check before calling new slots. This page is the single source of truth for what changed in each version.
 
-> The canonical C declarations live in [`Packages/OsaurusCore/Tools/PluginABI/osaurus_plugin.h`](../../Packages/OsaurusCore/Tools/PluginABI/osaurus_plugin.h). When in doubt, the header wins.
+> The canonical C declarations live in [`Packages/MuwaCore/Tools/PluginABI/muwa_plugin.h`](../../Packages/MuwaCore/Tools/PluginABI/muwa_plugin.h). When in doubt, the header wins.
 
 ## Forward-compat policy
 
@@ -28,16 +28,16 @@ The `host->version` field on `osr_host_api` advertises the highest documented su
 
 ### v1 (`OSR_ABI_VERSION_1`) — original surface
 
-- Plugin entry: `osaurus_plugin_entry` (no host API injection — v1 plugins cannot call any host callback).
+- Plugin entry: `muwa_plugin_entry` (no host API injection — v1 plugins cannot call any host callback).
 - Plugin API: `init`, `destroy`, `get_manifest`, `invoke`, `free_string`.
 - Use case: pure tools that do their work without storage, network, or inference.
 
 ### v2 (`OSR_ABI_VERSION_2`) — host API injection
 
-- Plugin entry: `osaurus_plugin_entry_v2(const osr_host_api*)` introduced.
+- Plugin entry: `muwa_plugin_entry_v2(const osr_host_api*)` introduced.
 - Plugin API additions: `handle_route`, `on_config_changed`, `on_task_event`.
 - Host API: config (Keychain), per-plugin SQLite, logging, dispatch, inference, HTTP, file I/O, models — the full base set.
-- Migration: re-export the entry as `osaurus_plugin_entry_v2`, capture the `host` pointer at init, opt into `handle_route` / `on_config_changed` / `on_task_event` if needed.
+- Migration: re-export the entry as `muwa_plugin_entry_v2`, capture the `host` pointer at init, opt into `handle_route` / `on_config_changed` / `on_task_event` if needed.
 
 ### v3 (`OSR_ABI_VERSION_3`) — streaming control
 
@@ -83,7 +83,7 @@ Plugins that mirror `osr_host_api` in a non-C language (Swift, Rust, Zig, etc.) 
 
 The classic foot-gun is jumping from a v4 mirror straight to v6 and skipping `log_structured` (v5). The plugin's `host->free_string(ptr)` then resolves to `host->log_structured` (one slot earlier), which discards the pointer. The plugin's *next* host call may also misroute — and the first call that returns a value reads garbage from the wrong slot, eventually crashing inside `libc free()` on a non-malloc pointer (`pointer being freed was not allocated`).
 
-The canonical pin for the layout lives in [`PluginHostAPIStructLayoutTests`](../../Packages/OsaurusCore/Tests/Plugin/PluginHostAPIStructLayoutTests.swift); see [HOST_API.md `Mirror Struct Audit`](HOST_API.md#mirror-struct-audit) for the full field-order table and pinned offsets. Quick reference:
+The canonical pin for the layout lives in [`PluginHostAPIStructLayoutTests`](../../Packages/MuwaCore/Tests/Plugin/PluginHostAPIStructLayoutTests.swift); see [HOST_API.md `Mirror Struct Audit`](HOST_API.md#mirror-struct-audit) for the full field-order table and pinned offsets. Quick reference:
 
 | Slot | Pinned offset (bytes) | Added in |
 |---|---|---|
@@ -95,9 +95,9 @@ The canonical pin for the layout lives in [`PluginHostAPIStructLayoutTests`](../
 
 ### Pre-flight handshake
 
-Starting with the v6 host, every newly-loaded plugin receives a synthetic `(__osaurus_abi_probe__, <UUID>)` pair through `on_config_changed` BEFORE any real per-agent config push, while a per-plugin `.currently_loading` marker is on disk. Plugins that resolve the active agent at the top of `on_config_changed` (`host->get_active_agent_id()` → `host->free_string(ptr)`) trip the misalignment crash here, which leaves the marker on disk and quarantines the plugin on the next launch (instead of re-crashing the host on every restart). The agent detail view surfaces the failure as a "Plugin failed to load" tab with a Retry button.
+Starting with the v6 host, every newly-loaded plugin receives a synthetic `(__muwa_abi_probe__, <UUID>)` pair through `on_config_changed` BEFORE any real per-agent config push, while a per-plugin `.currently_loading` marker is on disk. Plugins that resolve the active agent at the top of `on_config_changed` (`host->get_active_agent_id()` → `host->free_string(ptr)`) trip the misalignment crash here, which leaves the marker on disk and quarantines the plugin on the next launch (instead of re-crashing the host on every restart). The agent detail view surfaces the failure as a "Plugin failed to load" tab with a Retry button.
 
-Plugins that want to opt out of the probe match the documented constant `"__osaurus_abi_probe__"` and early-return — see [HOST_API.md](HOST_API.md#pre-flight-abi-probe). Opting out keeps your `on_config_changed` snappier but gives up the early-detection benefit.
+Plugins that want to opt out of the probe match the documented constant `"__muwa_abi_probe__"` and early-return — see [HOST_API.md](HOST_API.md#pre-flight-abi-probe). Opting out keeps your `on_config_changed` snappier but gives up the early-detection benefit.
 
 ## What's NOT in the ABI (and won't be silently added)
 

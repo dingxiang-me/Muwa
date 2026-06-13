@@ -1,6 +1,6 @@
 # Harness Compatibility
 
-Running record of models validated against the Osaurus agent harness.
+Running record of models validated against the Muwa agent harness.
 Updated as new models are tested — newest entries at the top of each table.
 
 ## How models are tested
@@ -23,7 +23,7 @@ loop (real tools, real workspaces, no mocks):
   background processes, live network fetches, and sandbox-to-user artifact
   delivery. Outputs are pinned through the VirtioFS host mount, so a
   hallucinated "I ran it" cannot pass. Requires a set-up sandbox host; see
-  `Packages/OsaurusEvals/Suites/SandboxFrontier/README.md` for the
+  `Packages/MuwaEvals/Suites/SandboxFrontier/README.md` for the
   entitlement-signing run instructions.
 
 Deterministic expectations (file equality, exit reasons, tool-usage audits)
@@ -58,10 +58,10 @@ not run against the agent suites.
 
 ## Provider wire-format requirements
 
-Quirks discovered live, handled automatically by Osaurus. Useful if you
+Quirks discovered live, handled automatically by Muwa. Useful if you
 connect these providers through a custom endpoint.
 
-| Provider | Requirement | Osaurus handling |
+| Provider | Requirement | Muwa handling |
 |---|---|---|
 | OpenAI (api.openai.com), Azure OpenAI | Rejects `oneOf`/`anyOf`/`allOf`/`enum`/`const`/`not` at the **top level** of function `parameters` (HTTP 400 `invalid_function_parameters`); nested uses are fine. | Top-level offenders stripped on the wire for enforcing providers only; tool arguments are still validated locally against the full schema. |
 | Anthropic | Same restriction on `input_schema` (`oneOf`/`allOf`/`anyOf`). | Same sanitizer. |
@@ -109,7 +109,7 @@ harness bugs; they're scored honestly and tracked across model versions.
   around it by executing the plugin's script via `sandbox_exec` instead
   (gpt-5.5 even discovers and loads the tool via `capabilities_load` but
   still never invokes it). claude-fable-5 and gemini-3.1-pro-preview call
-  the unadvertised tool correctly. (Osaurus intentionally freezes the tool
+  the unadvertised tool correctly. (Muwa intentionally freezes the tool
   schema for the run — deferred-schema policy — and resolves registered
   tools by name at execution time.)
 - **gpt-5.5 — model-side secret-handling policy.** Refuses to call
@@ -136,22 +136,22 @@ export OPENROUTER_API_KEY=. # openrouter/<model>
 export JUDGE_MODEL=xai/grok-4.3   # needs XAI_API_KEY
 
 # 3. Run both suites
-swift run --package-path Packages/OsaurusEvals osaurus-evals run \
-  --suite Packages/OsaurusEvals/Suites/AgentLoopFrontier \
+swift run --package-path Packages/MuwaEvals muwa-evals run \
+  --suite Packages/MuwaEvals/Suites/AgentLoopFrontier \
   --model <prefix>/<model-id> --out build/eval-reports/<model>-frontier.json
-swift run --package-path Packages/OsaurusEvals osaurus-evals run \
-  --suite Packages/OsaurusEvals/Suites/AgentLoop \
+swift run --package-path Packages/MuwaEvals muwa-evals run \
+  --suite Packages/MuwaEvals/Suites/AgentLoop \
   --model <prefix>/<model-id> --out build/eval-reports/<model>-agentloop.json
 ```
 
 Keys ride in ephemeral in-memory providers — never written to disk or
 Keychain. New providers need a preset in
-`Packages/OsaurusEvals/Sources/OsaurusEvalsKit/RemoteProviderBootstrap.swift`.
+`Packages/MuwaEvals/Sources/MuwaEvalsKit/RemoteProviderBootstrap.swift`.
 
 The SandboxFrontier lane additionally needs a set-up sandbox host and an
 entitlement-signed CLI binary (VM boot requires
 `com.apple.security.virtualization`); follow the run instructions in
-`Packages/OsaurusEvals/Suites/SandboxFrontier/README.md`.
+`Packages/MuwaEvals/Suites/SandboxFrontier/README.md`.
 
 When adding a row: record pass/fail counts, the date, and attribute every
 failure (harness error vs. model finding). Harness errors must be fixed and

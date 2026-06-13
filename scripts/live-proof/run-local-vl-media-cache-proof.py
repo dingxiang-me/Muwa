@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a live Osaurus VLM media/cache proof against the app server.
+"""Run a live Muwa VLM media/cache proof against the app server.
 
 This harness uses the OpenAI-compatible chat endpoint with a real data-URL
 image payload. It verifies that the model sees the image, that the repeated
@@ -60,7 +60,7 @@ def save(path: pathlib.Path, value: Any) -> None:
 def process_snapshot() -> str:
     cmd = (
         "ps -axo pid,ppid,stat,etime,rss,command | "
-        "rg -i 'CodeSigningHelper|/Contents/MacOS/osaurus|RunBench|vmlx_engine\\.cli' | "
+        "rg -i 'CodeSigningHelper|/Contents/MacOS/muwa|RunBench|vmlx_engine\\.cli' | "
         "rg -v 'rg -i|codex|zsh -lc' || true"
     )
     return subprocess.run(cmd, shell=True, text=True, capture_output=True).stdout

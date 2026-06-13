@@ -1,9 +1,9 @@
 # JSON determinism contract
 
-This document describes the byte-level determinism contract Osaurus
+This document describes the byte-level determinism contract Muwa
 honours for any JSON payload that crosses a wire boundary, ends up
 embedded in a prompt prefix, or gets hashed for cache lookup. It is the
-companion to `Packages/OsaurusCore/Models/API/JSONDeterminism.swift`.
+companion to `Packages/MuwaCore/Models/API/JSONDeterminism.swift`.
 
 ## Why we need this
 
@@ -15,7 +15,7 @@ forces a full re-prefill of the conversation.
 
 The user-visible failure mode that motivated this work was reported
 against [ds4](https://github.com/antirez/ds4): every tool-using turn
-through Osaurus missed ds4's KV cache. The `--trace` output pinpointed
+through Muwa missed ds4's KV cache. The `--trace` output pinpointed
 the divergence to the `### Available Tool Schemas` block of the
 rendered prompt — keys like `name`, `description`, and `parameters` had
 re-shuffled between the first and second turn, so the prompt's hashed
@@ -37,17 +37,17 @@ digests, or sync-conflict detection.
 
 ## The contract
 
-> Every JSON payload Osaurus emits whose bytes are externally visible
+> Every JSON payload Muwa emits whose bytes are externally visible
 > MUST be encoded with sorted keys and a fixed numeric/whitespace
 > format.
 
 In practice that means:
 
-- Use `JSONEncoder.osaurusCanonical(prettyPrinted:)` instead of
+- Use `JSONEncoder.muwaCanonical(prettyPrinted:)` instead of
   `JSONEncoder()` whenever the bytes are sent over the wire, returned
   to a client, fed back into a prompt, written to a tool result string,
   or hashed for a cache key.
-- Use `JSONSerialization.data(withJSONObject: …, options: .osaurusCanonical)`
+- Use `JSONSerialization.data(withJSONObject: …, options: .muwaCanonical)`
   whenever you build a payload from a Swift `[String: Any]` that
   crosses one of those same boundaries.
 - Treat `JSONValue.object([String: JSONValue])` as a non-deterministic
@@ -57,12 +57,12 @@ In practice that means:
   canonical one.
 
 The single source of truth for the helpers is
-`Packages/OsaurusCore/Models/API/JSONDeterminism.swift`. Grep for
-`osaurusCanonical` to find every call site.
+`Packages/MuwaCore/Models/API/JSONDeterminism.swift`. Grep for
+`muwaCanonical` to find every call site.
 
 ## Where the contract is enforced
 
-Outbound (Osaurus is the client of an external model provider):
+Outbound (Muwa is the client of an external model provider):
 
 - `RemoteProviderService.buildURLRequest` — encoder for every chat /
   responses / messages request body.
@@ -75,7 +75,7 @@ Outbound (Osaurus is the client of an external model provider):
 - `RemoteToolDetection.extractToolCall(fromJSON:)` — args extracted
   from streamed JSON tool-call envelopes.
 
-Inbound / server (Osaurus is the model provider):
+Inbound / server (Muwa is the model provider):
 
 - `GET /mcp/tools`, `POST /mcp/call`, including the `AnyCodable` array
   / dict re-serialisation inside `/mcp/call`.
@@ -87,7 +87,7 @@ Inbound / server (Osaurus is the model provider):
 - `/v1/audio/transcriptions` verbose-JSON dict response.
 - Diagnostics / batch / model-residency dict responses.
 
-Local pipeline (Osaurus's own runtime):
+Local pipeline (Muwa's own runtime):
 
 - `GenerationEventMapper.serializeArguments` — assistant turn replay
   for the on-device prompt.
@@ -114,7 +114,7 @@ External wire / persistence:
 ## Fallback path
 
 `Tool.canonicalize` first round-trips through
-`JSONSerialization.data(…, options: .osaurusCanonical)`. If
+`JSONSerialization.data(…, options: .muwaCanonical)`. If
 `isValidJSONObject` rejects the input or serialisation throws (very
 rare — typically a non-JSON leaf like a `Date` or a non-finite
 `Double`), it falls back to `JSONCanonicalization.normalizeObject`.
@@ -125,9 +125,9 @@ unsorted dict to downstream encoders.
 
 ## Adding new wire / server / tool code
 
-1. Use `JSONEncoder.osaurusCanonical()` (or
+1. Use `JSONEncoder.muwaCanonical()` (or
    `…(prettyPrinted: true)` if the consumer expects pretty bytes).
-2. Use `JSONSerialization.data(withJSONObject: …, options: .osaurusCanonical)`
+2. Use `JSONSerialization.data(withJSONObject: …, options: .muwaCanonical)`
    for `Any`-shaped dicts.
 3. If the new code produces a `JSONValue`, document at the call site
    which downstream encoder will serialise it and confirm that encoder
@@ -151,5 +151,5 @@ unsorted dict to downstream encoders.
   encouraged but optional.
 - Some UI views format JSON with `[.prettyPrinted, .sortedKeys]`
   inline. They satisfy the contract; consider migrating to
-  `JSONEncoder.osaurusCanonical(prettyPrinted: true)` when next
+  `JSONEncoder.muwaCanonical(prettyPrinted: true)` when next
   touched.

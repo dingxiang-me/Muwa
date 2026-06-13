@@ -64,7 +64,7 @@ Match precedence: **exact > path-parameter > wildcard**. The first matching rout
 | `verify` | Same handling as `none` from the host's perspective; the **plugin** verifies the request (e.g. Slack signing key, Stripe webhook signature). |
 | `owner` | Host requires a valid `osk-v1` access key in the `Authorization` header. Use for routes that should only be reachable by you. |
 
-All `/plugins/...` requests must also carry `X-Osaurus-Agent-Id` (or the `osr_agent` query parameter as a fallback for browser top-level navigation; see [Web UIs](#web-uis) below).
+All `/plugins/...` requests must also carry `X-Muwa-Agent-Id` (or the `muwa_agent` query parameter as a fallback for browser top-level navigation; see [Web UIs](#web-uis) below).
 
 ### Implementing `handle_route`
 
@@ -77,12 +77,12 @@ Set `api.handle_route` in your `osr_plugin_api` struct. The host hands you a JSO
   "path": "/items/42?format=full",
   "query": {"format": "full"},
   "path_params": {"id": "42"},
-  "headers": {"x-osaurus-agent-id": "...", "user-agent": "..."},
+  "headers": {"x-muwa-agent-id": "...", "user-agent": "..."},
   "body": "",
   "body_encoding": "utf8",
   "remote_addr": "",
   "plugin_id": "dev.example.MyPlugin",
-  "osaurus": {
+  "muwa": {
     "base_url": "http://127.0.0.1:1338",
     "plugin_url": "http://127.0.0.1:1338/plugins/dev.example.MyPlugin",
     "agent_address": "..."
@@ -113,7 +113,7 @@ HEAD requests for plugin routes go through the same matching/auth pipeline as GE
 
 ### Tunnel exposure
 
-By default, plugin routes are **loopback-only**. A tunneled request (`wss://agent.osaurus.ai/tunnel/connect` → public HTTPS URL) for a route without `tunnel_exposed: true` returns 404, exactly as if the route did not exist. This stops route existence from leaking and prevents accidentally publishing internal endpoints.
+By default, plugin routes are **loopback-only**. A tunneled request (`wss://agent.muwa.ai/tunnel/connect` -> public HTTPS URL) for a route without `tunnel_exposed: true` returns 404, exactly as if the route did not exist. This stops route existence from leaking and prevents accidentally publishing internal endpoints.
 
 To expose a specific route over the tunnel, set `tunnel_exposed: true` on the route spec:
 
@@ -131,7 +131,7 @@ After opting in:
 
 - The route is reachable from both loopback and the tunnel.
 - The host's existing `auth` mode still applies. `auth: "owner"` requires `osk-v1`. `auth: "verify"` means the plugin verifies the request itself (HMAC, signing key, IP allow-list, etc). `auth: "none"` is fully public over the tunnel — only use for routes that have no security implications, like a public health check.
-- The tunnel-aware base URL is injected into your request as `osaurus.base_url` so the URL you generate (e.g. an OAuth redirect URL or a webhook callback URL) automatically uses the public hostname.
+- The tunnel-aware base URL is injected into your request as `muwa.base_url` so the URL you generate (e.g. an OAuth redirect URL or a webhook callback URL) automatically uses the public hostname.
 
 `capabilities.web.tunnel_exposed` works the same way for the static UI: a tunneled GET against the web mount returns 404 unless the manifest opts in.
 
@@ -169,7 +169,7 @@ A web UI is a static directory bundled with your plugin, served from `/plugins/<
 | `entry` | Default file when the path is the mount point itself or doesn't exist (SPA fallback) |
 | `mount` | URL path under `/plugins/<plugin_id>` where the UI is served |
 | `auth` | `none` / `verify` / `owner` |
-| `api_mount` | Optional. Determines `window.__osaurus.apiUrl`. Defaults to `/api`. Set if your plugin mounts API routes under a different prefix. |
+| `api_mount` | Optional. Determines `window.__muwa.apiUrl`. Defaults to `/api`. Set if your plugin mounts API routes under a different prefix. |
 | `tunnel_exposed` | Optional. When `true`, the static UI is reachable over the tunnel. Defaults to `false` (loopback-only). See [Tunnel exposure](#tunnel-exposure). |
 
 ### Manifest validation
@@ -180,37 +180,37 @@ If a `web.mount` overlaps with a `routes[].path`, the plugin **fails to load** w
 
 Move the conflicting route outside the web mount.
 
-### Injected `window.__osaurus`
+### Injected `window.__muwa`
 
 Every HTML response served by the static branch (or the dev proxy) gets a small `<script>` injected before `</head>`:
 
 ```js
-window.__osaurus = {
+window.__muwa = {
   pluginId: "dev.example.MyPlugin",
   baseUrl: "/plugins/dev.example.MyPlugin",
   apiUrl: "/plugins/dev.example.MyPlugin/api",
   agentId: "<UUID>",
-  fetch: function(input, init) { /* attaches X-Osaurus-Agent-Id */ }
+  fetch: function(input, init) { /* attaches X-Muwa-Agent-Id */ }
 };
 ```
 
-Use `window.__osaurus.fetch(...)` instead of the global `fetch` so the agent header is always carried forward. The helper attaches it automatically.
+Use `window.__muwa.fetch(...)` instead of the global `fetch` so the agent header is always carried forward. The helper attaches it automatically.
 
 ### Opening from the app
 
-The Osaurus plugin detail screen has an **Open Web App** button. It opens the URL with `?osr_agent=<agent_uuid>` so the server accepts the top-level navigation. From that point the injected `fetch` helper carries the agent header forward.
+The Muwa plugin detail screen has an **Open Web App** button. It opens the URL with `?muwa_agent=<agent_uuid>` so the server accepts the top-level navigation. From that point the injected `fetch` helper carries the agent header forward.
 
 If you need to deep-link from outside the app, append the same query parameter:
 
 ```
-http://127.0.0.1:1338/plugins/dev.example.MyPlugin/ui?osr_agent=<agent_uuid>
+http://127.0.0.1:1338/plugins/dev.example.MyPlugin/ui?muwa_agent=<agent_uuid>
 ```
 
 ### Dev proxy
 
 During development you often want to run a Vite / Next.js / webpack dev server with HMR rather than rebuilding the plugin every time the UI changes.
 
-Create `~/Library/Application Support/Osaurus/Config/dev-proxy.json`:
+Create `~/Library/Application Support/Muwa/Config/dev-proxy.json`:
 
 ```json
 {
@@ -219,7 +219,7 @@ Create `~/Library/Application Support/Osaurus/Config/dev-proxy.json`:
 }
 ```
 
-When the host serves a request under your plugin's `mount`, it proxies to that URL **with the original method, headers, and body** — POSTs, HMR pings, and any non-GET dev-server traffic flow through. The injected `window.__osaurus` is still added for HTML responses.
+When the host serves a request under your plugin's `mount`, it proxies to that URL **with the original method, headers, and body** — POSTs, HMR pings, and any non-GET dev-server traffic flow through. The injected `window.__muwa` is still added for HTML responses.
 
 Drop the file when you're done; the plugin reverts to its bundled static directory.
 
@@ -243,7 +243,7 @@ The host's static serving:
 | Hung handlers | 30s timeout on `handle_route` |
 | Cross-plugin task tampering | Per-plugin ownership checks in `task_status` / `dispatch_cancel` / `send_draft` / `dispatch_interrupt` |
 | Outbound HTTP SSRF | `host->http_request` blocks loopback / RFC1918 / link-local |
-| File reads | `host->file_read` is hard-scoped to `~/.osaurus/artifacts/` and 50 MB |
+| File reads | `host->file_read` is hard-scoped to `~/.muwa/artifacts/` and 50 MB |
 
 ## What still needs your attention
 

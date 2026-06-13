@@ -1,6 +1,6 @@
 # Messaging Plugin Pattern
 
-Generic recipe for building a conversational Osaurus plugin against any inbound messaging channel — Telegram, Slack, Discord, SMS, email, WhatsApp, or anything else with a webhook-style "user sent a message" event and an outbound API for replying.
+Generic recipe for building a conversational Muwa plugin against any inbound messaging channel — Telegram, Slack, Discord, SMS, email, WhatsApp, or anything else with a webhook-style "user sent a message" event and an outbound API for replying.
 
 This doc is the abstract pattern. [EXAMPLE_TELEGRAM.md](./EXAMPLE_TELEGRAM.md) is the worked example. Read this first to understand the shape, then read the Telegram doc for code-level detail. Use this as a checklist when designing a new messaging plugin.
 
@@ -10,7 +10,7 @@ This doc is the abstract pattern. [EXAMPLE_TELEGRAM.md](./EXAMPLE_TELEGRAM.md) i
 
 ## What we mean by "messaging plugin"
 
-A plugin that turns an inbound chat surface (Telegram bot, Slack workspace, Discord server, phone number) into a continuous Osaurus conversation. The user sees their familiar app; behind the scenes each conversation maps to one Osaurus session and one agent runs per turn with full access to the Osaurus toolkit.
+A plugin that turns an inbound chat surface (Telegram bot, Slack workspace, Discord server, phone number) into a continuous Muwa conversation. The user sees their familiar app; behind the scenes each conversation maps to one Muwa session and one agent runs per turn with full access to the Muwa toolkit.
 
 The shape is the same on every channel:
 
@@ -139,7 +139,7 @@ If you find yourself bridging more events to the channel, you've probably moved 
 sequenceDiagram
   participant User
   participant Channel as Channel API
-  participant Tunnel as Osaurus Tunnel
+  participant Tunnel as Muwa Tunnel
   participant Route as handle_route
   participant Agent as Agent (dispatch)
   participant Tool as reply tool (invoke)
@@ -415,7 +415,7 @@ What changes per channel. This is a checklist, not exhaustive — read each chan
 
 Channel-agnostic tests every messaging plugin should have:
 
-- **Manifest decode** with `osaurus manifest validate`.
+- **Manifest decode** with `muwa manifest validate`.
 - **Auth verification** with valid, invalid, missing, and replayed signatures.
 - **`session_id` derivation** stable across restarts and salt bumps.
 - **Reply token validation**: valid, expired, unknown, blocked-conversation cases each return the right envelope.

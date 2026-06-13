@@ -1,6 +1,6 @@
 # Identity
 
-The Osaurus Identity system gives every participant — human, agent, and device — a cryptographic address. All actions are signed and verifiable, enabling trust without a central authority at runtime.
+The Muwa Identity system gives every participant — human, agent, and device — a cryptographic address. All actions are signed and verifiable, enabling trust without a central authority at runtime.
 
 This document covers the theory behind the design, the address hierarchy, key derivation, request signing, access keys, and the security properties that follow.
 
@@ -28,7 +28,7 @@ This document covers the theory behind the design, the address hierarchy, key de
 
 AI agents that communicate — internally within an application, or externally with other services and agents — need a trust mechanism. Traditional approaches rely on centralized session tokens or API keys that a server issues and validates. This creates a single point of failure and requires the central authority to be online and reachable for every interaction.
 
-Osaurus takes a different approach: **address-based identity**. Every participant derives a cryptographic keypair and is identified by the address of its public key. When an agent signs a message, any verifier can confirm the signature came from that address without contacting a server. Authority flows from a human-controlled root key down to agents, and from there to devices — forming a verifiable chain of trust.
+Muwa takes a different approach: **address-based identity**. Every participant derives a cryptographic keypair and is identified by the address of its public key. When an agent signs a message, any verifier can confirm the signature came from that address without contacting a server. Authority flows from a human-controlled root key down to agents, and from there to devices — forming a verifiable chain of trust.
 
 **Design goals:**
 
@@ -64,11 +64,11 @@ The human's root identity. All authority in the system flows from this address.
 
 The master key is a 32-byte random secret generated via `SecRandomCopyBytes`. It is stored once in the Keychain and never exported during normal operation. The address is derived from the corresponding secp256k1 public key via Keccak-256 hashing.
 
-**Overwrite protection.** `MasterKey.generate(allowReplace:)` defaults to `allowReplace: false` and throws `OsaurusIdentityError.masterAlreadyExists` if a master is already present. `OsaurusIdentity.setup()` short-circuits when an identity exists and returns the existing master without minting a new one. Replacing the master is only allowed via the explicit "Reset Identity" or "Recover from phrase" flows in the Identity view (both of which pass `allowReplace: true`). This guards against the silent-overwrite class of bug where a re-run of onboarding would otherwise strand every persisted agent address and access key.
+**Overwrite protection.** `MasterKey.generate(allowReplace:)` defaults to `allowReplace: false` and throws `MuwaIdentityError.masterAlreadyExists` if a master is already present. `MuwaIdentity.setup()` short-circuits when an identity exists and returns the existing master without minting a new one. Replacing the master is only allowed via the explicit "Reset Identity" or "Recover from phrase" flows in the Identity view (both of which pass `allowReplace: true`). This guards against the silent-overwrite class of bug where a re-run of onboarding would otherwise strand every persisted agent address and access key.
 
 ### Agent Addresses
 
-Each agent in Osaurus gets a deterministic child key derived from the master key. Agents can sign messages on their own behalf, but their authority always traces back to the master address.
+Each agent in Muwa gets a deterministic child key derived from the master key. Agents can sign messages on their own behalf, but their authority always traces back to the master address.
 
 - **Derivation:** HMAC-SHA512 with domain separation
 - **Storage:** Agent keys are never stored — they are re-derived on demand from the master key
@@ -116,13 +116,13 @@ The master key is stored in iCloud Keychain with `kSecAttrAccessibleWhenUnlocked
 ```
 HMAC-SHA512(
     key:  masterKey,                          // 32 bytes
-    data: "osaurus-agent-v1" || bigEndian(index)  // domain + 4-byte index
+    data: "muwa-agent-v1" || bigEndian(index)  // domain + 4-byte index
 )
     → first 32 bytes of HMAC output
     → same address derivation as master key
 ```
 
-The domain prefix `osaurus-agent-v1` prevents cross-protocol key reuse. The big-endian index encoding ensures a canonical byte representation across platforms. Each unique index produces a completely independent keypair.
+The domain prefix `muwa-agent-v1` prevents cross-protocol key reuse. The big-endian index encoding ensures a canonical byte representation across platforms. Each unique index produces a completely independent keypair.
 
 Agent keys are **never persisted**. They are re-derived from the master key whenever a signature is needed, which requires biometric authentication to access the master key. The derived `agentAddress` is persisted on the `Agent` model so it can be displayed without triggering biometric prompts.
 
@@ -157,7 +157,7 @@ Four base64url-encoded segments joined by `.`:
 ```json
 {
   "alg": "es256k+apple-attest",
-  "typ": "osaurus-id",
+  "typ": "muwa-id",
   "ver": 5
 }
 ```
@@ -180,19 +180,19 @@ Four base64url-encoded segments joined by `.`:
 
 1. **Encode payload** as JSON
 2. **Layer 1 — Identity signature:** Domain-separated secp256k1 signing
-   - Envelope: `\x19Osaurus Signed Message:\n<length><payload>`
+   - Envelope: `\x19Muwa Signed Message:\n<length><payload>`
    - Hash: Keccak-256 of the envelope
    - Sign: secp256k1 with recovery (produces 65 bytes: r ‖ s ‖ v)
 3. **Layer 2 — Device assertion:** App Attest assertion over SHA-256 of the payload
 4. **Assemble:** `base64url(header).base64url(payload).hex(accountSig).base64url(deviceAssertion)`
 
-The domain prefix `Osaurus Signed Message` prevents signed payloads from being replayed in other protocols that use the same curve.
+The domain prefix `Muwa Signed Message` prevents signed payloads from being replayed in other protocols that use the same curve.
 
 ---
 
 ## Access Keys (osk-v1)
 
-Access keys are portable, long-lived tokens for external authentication. They allow tools, MCP clients, and remote agents to authenticate against Osaurus without biometric access to the device.
+Access keys are portable, long-lived tokens for external authentication. They allow tools, MCP clients, and remote agents to authenticate against Muwa without biometric access to the device.
 
 ### Format
 
@@ -210,11 +210,11 @@ Three parts separated by `.`:
 
 | Field | Type | Description |
 |-------|------|-------------|
-| `aud` | OsaurusID | Audience address (who this key is for) |
+| `aud` | MuwaID | Audience address (who this key is for) |
 | `cnt` | uint64 | Counter value at creation time |
 | `exp` | int? | Expiration timestamp (null = never expires) |
 | `iat` | int | Issued-at timestamp |
-| `iss` | OsaurusID | Issuer address (who signed this key) |
+| `iss` | MuwaID | Issuer address (who signed this key) |
 | `lbl` | string? | Human-readable label |
 | `nonce` | string | Unique identifier for revocation |
 
@@ -242,7 +242,7 @@ When a request arrives with an `osk-v1` token:
 
 1. **Parse** the three segments (prefix, payload, signature)
 2. **Decode** the base64url payload into `AccessKeyPayload`
-3. **Recover** the signer address via `ecrecover` with `Osaurus Signed Access` domain prefix
+3. **Recover** the signer address via `ecrecover` with `Muwa Signed Access` domain prefix
 4. **Verify issuer** — recovered address must match `payload.iss`
 5. **Check audience** — `payload.aud` must match the master address or the derived address of **any** current agent (the validator is built from `AgentIdentityRegistry`, so keys paired against any agent are accepted at the gate)
 6. **Check whitelist** — `payload.iss` must be in the effective whitelist
@@ -281,7 +281,7 @@ The agent's own address and the master address are always implicitly included.
 
 ### Storage
 
-Whitelist data is persisted in macOS Keychain (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`), keyed by `com.osaurus.whitelist`.
+Whitelist data is persisted in macOS Keychain (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`), keyed by `com.muwa.whitelist`.
 
 ---
 
@@ -305,7 +305,7 @@ isRevoked = revokedKeys.contains(address:nonce)
 
 ### Storage
 
-Revocation data is persisted in macOS Keychain (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`), keyed by `com.osaurus.revocations`.
+Revocation data is persisted in macOS Keychain (`kSecAttrAccessibleWhenUnlockedThisDeviceOnly`), keyed by `com.muwa.revocations`.
 
 ---
 
@@ -323,9 +323,9 @@ A standard BIP39 24-word mnemonic encoding the 32-byte master key. This is the o
 ```
 
 - **Algorithm:** BIP39 §3. 256 bits of entropy plus the high 8 bits of `SHA-256(entropy)` as a checksum (264 bits total = 24 × 11), split into 24 11-bit big-endian indices into the canonical 2048-word English wordlist.
-- **Encoding:** Implemented in [`Identity/MasterKeyMnemonic.swift`](../Packages/OsaurusCore/Identity/MasterKeyMnemonic.swift) with no external SwiftPM dependency. The wordlist ships as a bundle resource at `Resources/Identity/bip39-english.txt`.
-- **Display:** Shown exactly once during onboarding's recovery phase and once in `IdentityView.RecoveryPromptCard` immediately after a fresh `OsaurusIdentity.setup()`. Rendered as a 4×6 grid with "Copy phrase", "Save as .txt", and "Print" actions.
-- **Memory hygiene:** The 32-byte seed is held only on the stack of `OsaurusIdentity.setup()` long enough to compute the mnemonic, then wiped via `Data.zeroOut()` (which calls `memset` over the underlying buffer).
+- **Encoding:** Implemented in [`Identity/MasterKeyMnemonic.swift`](../Packages/MuwaCore/Identity/MasterKeyMnemonic.swift) with no external SwiftPM dependency. The wordlist ships as a bundle resource at `Resources/Identity/bip39-english.txt`.
+- **Display:** Shown exactly once during onboarding's recovery phase and once in `IdentityView.RecoveryPromptCard` immediately after a fresh `MuwaIdentity.setup()`. Rendered as a 4×6 grid with "Copy phrase", "Save as .txt", and "Print" actions.
+- **Memory hygiene:** The 32-byte seed is held only on the stack of `MuwaIdentity.setup()` long enough to compute the mnemonic, then wiped via `Data.zeroOut()` (which calls `memset` over the underlying buffer).
 - **Acknowledgement:** A `masterMnemonicAcknowledged` UserDefaults flag (canonicalised in `IdentityDefaultsKey`) is set when the user confirms "I've saved it". On subsequent launches the Identity view shows a yellow "Master key backup not confirmed" banner whenever the flag is missing.
 
 ### One-time recovery code (server-side claim)
@@ -337,7 +337,7 @@ OSAURUS-XXXX-XXXX-XXXX-XXXX
 Format: `OSAURUS-` prefix followed by 4 groups of 4 uppercase hex characters (8 random bytes = 64 bits of entropy).
 
 - Generated from `SecRandomCopyBytes` and shown to the user exactly once during initial setup.
-- Single-use; consumed when claimed against the Osaurus directory.
+- Single-use; consumed when claimed against the Muwa directory.
 - **Cannot rebuild the local master** — it is only an authenticator for the future server-side recovery flow.
 - Discarded from application memory after display; never stored on device in plaintext.
 
@@ -347,9 +347,9 @@ When the persisted derivatives no longer match the current master (see [Identity
 
 | Action | What it does | When to use |
 |--------|--------------|-------------|
-| **Recover from phrase** | Opens `RecoverFromMnemonicSheet`, validates the entered 24 words against the BIP39 wordlist + checksum, derives a candidate `OsaurusID`, and confirms it reproduces the persisted agent addresses before calling `MasterKey.install(seed:allowReplace: true)`. Drift goes away because every existing derivative now matches. | The user has the original mnemonic from onboarding and wants their old identity back. |
+| **Recover from phrase** | Opens `RecoverFromMnemonicSheet`, validates the entered 24 words against the BIP39 wordlist + checksum, derives a candidate `MuwaID`, and confirms it reproduces the persisted agent addresses before calling `MasterKey.install(seed:allowReplace: true)`. Drift goes away because every existing derivative now matches. | The user has the original mnemonic from onboarding and wants their old identity back. |
 | **Repair forward** | Re-derives every mismatched agent at a fresh unused index off the *current* master and revokes every stale osk-v1 access key in one synchronous pass. The HTTP server is restarted so the new validator picks up the change. | The original mnemonic is gone. Existing pairings will need to be re-issued. |
-| **Reset identity** | `OsaurusIdentity.wipe()` deletes the master, clears every non-built-in agent's address/index, calls `APIKeyManager.deleteAll()`, clears the `masterMnemonicAcknowledged` flag, then triggers `OnboardingService.resetOnboarding()`. The revocation store is intentionally kept (cheap and harmless). | Nuclear option. Start completely fresh. |
+| **Reset identity** | `MuwaIdentity.wipe()` deletes the master, clears every non-built-in agent's address/index, calls `APIKeyManager.deleteAll()`, clears the `masterMnemonicAcknowledged` flag, then triggers `OnboardingService.resetOnboarding()`. The revocation store is intentionally kept (cheap and harmless). | Nuclear option. Start completely fresh. |
 
 The **Recover** path will refuse to overwrite the current master if the entered phrase derives a different identity than the one the persisted agents were minted under, unless the user explicitly clicks "Restore Anyway". This catches the case where the user pastes a valid but unrelated BIP39 phrase.
 
@@ -357,7 +357,7 @@ The **Recover** path will refuse to overwrite the current master if the entered 
 
 ## Identity Health and Drift
 
-[`Identity/IdentityHealthCheck.swift`](../Packages/OsaurusCore/Identity/IdentityHealthCheck.swift) is a pure synchronous helper that, given an already-unlocked master key, returns an `IdentityDrift` value:
+[`Identity/IdentityHealthCheck.swift`](../Packages/MuwaCore/Identity/IdentityHealthCheck.swift) is a pure synchronous helper that, given an already-unlocked master key, returns an `IdentityDrift` value:
 
 ```swift
 public struct IdentityDrift: Sendable {
@@ -382,7 +382,7 @@ When `drift.hasDrift` is true, `IdentityView` renders an `IdentityDriftBanner` a
 
 ## Per-Agent Key Management
 
-The `AgentAddressesSection` of the Identity view renders each non-built-in agent as an expandable row backed by [`Views/Identity/AgentKeyManagement.swift`](../Packages/OsaurusCore/Views/Identity/AgentKeyManagement.swift).
+The `AgentAddressesSection` of the Identity view renders each non-built-in agent as an expandable row backed by [`Views/Identity/AgentKeyManagement.swift`](../Packages/MuwaCore/Views/Identity/AgentKeyManagement.swift).
 
 The collapsed row is a compact summary: address, copy button, "Stale" pill if the agent appears in `IdentityDrift.mismatchedAgents`, and a chevron. Expanded, the row exposes:
 
@@ -391,7 +391,7 @@ The collapsed row is a compact summary: address, copy button, "Stale" pill if th
 - **Per-agent osk-v1 access keys.** A scoped list of every key whose `aud` matches the agent's address (via `APIKeyManager.listKeys(forAudience:)`). Each key shows its label, status pill (Active / Expired / Revoked), expiration, and a per-key Revoke button.
 - **Generate access key (scoped to this agent).** Opens the shared `AccessKeyGeneratorSheet` with `agentIndex` pre-filled, so `APIKeyManager.generate(label:expiration:agentIndex:)` mints an agent-scoped key. The sheet displays a "Scoped to {agent name} ({address})" caption to make the scope unambiguous. The freshly generated key is shown in a one-shot copy banner ("Copy this key now. It won't be shown again.") and is never persisted to disk.
 
-The same `AccessKeyGeneratorSheet` powers the global `AccessKeysSection` in `ServerView` (master-scoped). It was extracted from `ServerView.swift` into [`Views/Settings/AccessKeyGeneratorSheet.swift`](../Packages/OsaurusCore/Views/Settings/AccessKeyGeneratorSheet.swift) so both call sites share one widget.
+The same `AccessKeyGeneratorSheet` powers the global `AccessKeysSection` in `ServerView` (master-scoped). It was extracted from `ServerView.swift` into [`Views/Settings/AccessKeyGeneratorSheet.swift`](../Packages/MuwaCore/Views/Settings/AccessKeyGeneratorSheet.swift) so both call sites share one widget.
 
 ---
 
@@ -401,7 +401,7 @@ The identity system supports two communication modes:
 
 ### Internal Communication
 
-Agents within the same Osaurus instance authenticate using the full two-layer token system:
+Agents within the same Muwa instance authenticate using the full two-layer token system:
 
 - **Layer 1:** secp256k1 identity signature (master or agent key)
 - **Layer 2:** App Attest device assertion
@@ -424,7 +424,7 @@ Access keys bridge the gap between the hardware-bound internal identity and the 
 The LAN pairing flow is a challenge-response protocol between an in-app connector and a Bonjour-discovered agent. It is unauthenticated (no pre-existing key) but signature-verified in both directions and end-to-end sealed.
 
 1. **Challenge.** Connector calls `GET /pair/challenge`; the host issues a single-use nonce (~2 minute TTL, tracked in `PairingChallengeStore`). Connector-chosen nonces are not accepted, so a captured `/pair` request cannot be replayed.
-2. **Request.** Connector generates an ephemeral X25519 keypair and signs `nonce` + ephemeral public key (`encPub`) with its `connectorAddress` private key (domain prefix `Osaurus Signed Pairing`), then `POST`s to `/pair`.
+2. **Request.** Connector generates an ephemeral X25519 keypair and signs `nonce` + ephemeral public key (`encPub`) with its `connectorAddress` private key (domain prefix `Muwa Signed Pairing`), then `POST`s to `/pair`.
 3. **Verification and approval.** The host verifies the signature, atomically consumes the nonce, resolves the target agent, and shows an approval dialog naming both the connector and the agent. Prompts are serialized (a concurrent request gets `429 busy`), auto-deny after a 2-minute timeout, and only accept Return when the prompt window is key — keystrokes in other apps cannot approve a pairing. `/pair` and `/pair/challenge` are rate-limited per source IP, with a cooldown after a denial.
 4. **Sealed key delivery.** On approval, the host mints an **agent-scoped** `osk-v1` key for the approved agent (`agentIndex = agent.agentIndex`) with a **90-day expiration** by default ("Remember this device permanently" opts into a non-expiring key). The key is HPKE-sealed (X25519 + HKDF-SHA256 + ChaCha20-Poly1305, via `PairingKeyEnvelope`) to the connector's ephemeral `encPub`, with the agent address and nonce bound into the HPKE `info` — a passive observer on the LAN never sees the plaintext key, and an envelope cannot be transplanted to a different exchange.
 5. **Server identity verification.** The response carries a server signature (agent key) over the challenge and key fingerprint. The connector recovers the signer address and requires it to match the `address` it discovered in the agent's Bonjour TXT record, defeating spoofed advertisements.
@@ -434,7 +434,7 @@ Pairings approved before the agent-scoping fix are master-scoped, never-expiring
 
 ### Relay Tunnel Trust Model
 
-Agents can be exposed through the Osaurus Relay (`agent.osaurus.ai`), which proxies public HTTPS traffic over a WebSocket tunnel into the local server at `127.0.0.1`.
+Agents can be exposed through the Muwa Relay (`agent.muwa.ai`), which proxies public HTTPS traffic over a WebSocket tunnel into the local server at `127.0.0.1`.
 
 - **No loopback trust for relayed traffic.** `RelayTunnelManager` stamps every proxied request with an internal marker header (set *after* copying the external caller's headers, so a remote caller cannot suppress or forge a trusted state). The HTTP handler treats marked requests as non-loopback: they always pass through the full auth gate, CORS origin rules, and the built-in-agent remote block, even when `Expose to network` is off.
 - **Relay pairing (`/pair-invite`)** consumes a signed, single-use `AgentInvite` and supports the same HPKE sealed-key delivery as LAN pairing: the connector supplies an ephemeral `encPub`, and the minted key is returned only inside a sealed envelope. The relay operator (a TLS-terminating MITM by construction) never observes plaintext credentials in transit.
@@ -442,12 +442,12 @@ Agents can be exposed through the Osaurus Relay (`agent.osaurus.ai`), which prox
 
 ### Secure Channel (Agent-to-Agent E2E Encryption)
 
-All Osaurus-to-Osaurus agent traffic — LAN peers discovered over Bonjour and remote peers behind the relay — runs inside the **Osaurus Secure Channel v1**, a forward-secret, mutually authenticated encrypted layer above HTTP. (Full feature document: [`SECURE_CHANNEL.md`](SECURE_CHANNEL.md).)
+All Muwa-to-Muwa agent traffic — LAN peers discovered over Bonjour and remote peers behind the relay — runs inside the **Muwa Secure Channel v1**, a forward-secret, mutually authenticated encrypted layer above HTTP. (Full feature document: [`SECURE_CHANNEL.md`](SECURE_CHANNEL.md).)
 
 **Handshake (`POST /secure/session`).** A SIGMA-style signed-ephemeral exchange:
 
 1. The client sends an ephemeral X25519 public key, a freshness nonce, and the agent address it expects to reach (pinned at pairing/discovery time).
-2. The server replies with its own ephemeral X25519 key, a session id, an expiry (1 hour), and a secp256k1 **agent-key signature over the full handshake transcript** (domain prefix `Osaurus Secure Channel`).
+2. The server replies with its own ephemeral X25519 key, a session id, an expiry (1 hour), and a secp256k1 **agent-key signature over the full handshake transcript** (domain prefix `Muwa Secure Channel`).
 3. The client recovers the signer address from the signature and requires it to match the pinned agent address — a MITM cannot fake this without the agent's private key.
 4. Both sides derive directional ChaCha20-Poly1305 keys via HKDF-SHA256 over the X25519 shared secret, salted with the transcript hash.
 
@@ -462,13 +462,13 @@ Because both X25519 keys are ephemeral, the channel has **forward secrecy**: com
 - Streams must end with the authenticated `fin` frame; silent truncation by a relay or middlebox is detected client-side.
 - Sequence numbers double as AEAD nonces and are bound into the AAD with the session id and direction, so frames cannot be transplanted between sessions, directions, or calls.
 
-**Hard-require (no downgrade).** Non-loopback requests to `/agents/{id}/run` and `/agents/{id}/dispatch` — including relay-origin traffic — that did not arrive through the channel are rejected with `426 Upgrade Required` (`secure_channel_required`). Loopback callers (CLI, App Intents) stay plaintext. `/models` and agent metadata routes keep accepting plaintext for third-party SDK clients, though Osaurus peers fetch them through the channel too. Peers advertise support via `osc=1` in their Bonjour TXT record and a `secureChannel` flag in pair/invite responses; an old peer that cannot handshake produces a clear "upgrade Osaurus" error instead of a cryptic failure.
+**Hard-require (no downgrade).** Non-loopback requests to `/agents/{id}/run` and `/agents/{id}/dispatch` — including relay-origin traffic — that did not arrive through the channel are rejected with `426 Upgrade Required` (`secure_channel_required`). Loopback callers (CLI, App Intents) stay plaintext. `/models` and agent metadata routes keep accepting plaintext for third-party SDK clients, though Muwa peers fetch them through the channel too. Peers advertise support via `osc=1` in their Bonjour TXT record and a `secureChannel` flag in pair/invite responses; an old peer that cannot handshake produces a clear "upgrade Muwa" error instead of a cryptic failure.
 
 With the channel in place, the relay is a **blind pipe**: it forwards only handshake messages and ciphertext, and the relay operator (a TLS-terminating MITM by construction) can no longer observe Bearer tokens, prompts, or responses.
 
 ### Pre-auth request limits
 
-Both Osaurus HTTP servers reject oversized request bodies before the auth gate runs, so an unauthenticated client cannot exhaust host memory:
+Both Muwa HTTP servers reject oversized request bodies before the auth gate runs, so an unauthenticated client cannot exhaust host memory:
 
 | Endpoint | Limit | Configurable via |
 |----------|-------|------------------|
@@ -480,7 +480,7 @@ Both servers enforce the cap with a `Content-Length` pre-check at request head a
 
 ### Future: Cross-Instance Communication
 
-The address-based design naturally extends to agent-to-agent communication across different Osaurus instances. Since every agent has a globally unique address and can sign messages, agents can verify each other's identity without a shared authority — only knowledge of the other agent's address is needed.
+The address-based design naturally extends to agent-to-agent communication across different Muwa instances. Since every agent has a globally unique address and can sign messages, agents can verify each other's identity without a shared authority — only knowledge of the other agent's address is needed.
 
 ---
 
@@ -489,13 +489,13 @@ The address-based design naturally extends to agent-to-agent communication acros
 | Property | Mechanism |
 |----------|-----------|
 | Master key never leaves Keychain | Stored with `kSecAttrAccessibleWhenUnlocked`, read requires `LAContext` biometric auth |
-| Master key cannot be silently overwritten | `MasterKey.generate(allowReplace:)` defaults to `false` and throws `masterAlreadyExists` if a master is present; `OsaurusIdentity.setup()` short-circuits when one already exists |
+| Master key cannot be silently overwritten | `MasterKey.generate(allowReplace:)` defaults to `false` and throws `masterAlreadyExists` if a master is present; `MuwaIdentity.setup()` short-circuits when one already exists |
 | Master key has a local restore path | BIP39 24-word mnemonic shown once at setup; entered via `RecoverFromMnemonicSheet` to call `MasterKey.install(seed:allowReplace: true)` |
 | Agent keys never stored | Re-derived on demand via HMAC-SHA512 from master key |
 | Agent indices are never reused | `AgentManager.nextUnusedAgentIndex()` always picks a fresh slot so old derived addresses cannot be regenerated by the rotate path |
 | Device keys hardware-bound | Secure Enclave P-256 via App Attest (`DCAppAttestService`) |
 | Anti-replay | Per-device monotonic counter (`cnt`) persisted in `UserDefaults`; server rejects seen values |
-| Domain separation | `Osaurus Signed Message`, `Osaurus Signed Access`, `Osaurus Signed Pairing`, and `Osaurus Secure Channel` prefixes prevent cross-protocol signature reuse |
+| Domain separation | `Muwa Signed Message`, `Muwa Signed Access`, `Muwa Signed Pairing`, and `Muwa Secure Channel` prefixes prevent cross-protocol signature reuse |
 | Recovery code single-use | Generated from `SecRandomCopyBytes`, shown once, never stored on device |
 | Canonical encoding | Access key payloads use sorted-key JSON for deterministic signature verification |
 | Memory safety | Master key bytes and seed bytes are zeroed after use via `Data.zeroOut()` extension (calls `memset` over the underlying buffer) |
@@ -520,7 +520,7 @@ The address-based design naturally extends to agent-to-agent communication acros
 
 ## File Reference
 
-### Identity core (`Packages/OsaurusCore/Identity/`)
+### Identity core (`Packages/MuwaCore/Identity/`)
 
 | File | Responsibility |
 |------|---------------|
@@ -529,8 +529,8 @@ The address-based design naturally extends to agent-to-agent communication acros
 | `IdentityHealthCheck.swift` | Pure helper that classifies persisted derivatives as healthy / mismatched against the current master |
 | `AgentKey.swift` | Deterministic child key derivation (HMAC-SHA512) and signing for per-agent identities |
 | `DeviceKey.swift` | App Attest key generation, attestation, assertion, and software fallback |
-| `OsaurusIdentity.swift` | Public entry point — orchestrates `setup()`, `wipe()`, and two-layer request signing |
-| `IdentityModels.swift` | Data types: `OsaurusID`, `TokenHeader`, `TokenPayload`, `AccessKeyPayload`, `AccessKeyInfo`, `AgentInfo`, `RevocationSnapshot`, `IdentityInfo` (now carries `mnemonic`), and the `IdentityDefaultsKey` namespace for UserDefaults flags |
+| `MuwaIdentity.swift` | Public entry point — orchestrates `setup()`, `wipe()`, and two-layer request signing |
+| `IdentityModels.swift` | Data types: `MuwaID`, `TokenHeader`, `TokenPayload`, `AccessKeyPayload`, `AccessKeyInfo`, `AgentInfo`, `RevocationSnapshot`, `IdentityInfo` (now carries `mnemonic`), and the `IdentityDefaultsKey` namespace for UserDefaults flags |
 | `APIKeyManager.swift` | Generate, persist, and revoke `osk-v1` access keys (metadata in Keychain). Includes `listKeys(forAudience:)` for per-agent scoping |
 | `APIKeyValidator.swift` | Immutable, lock-free access key validation via ecrecover + whitelist + revocation; accepts master- and any agent-scoped audience |
 | `AgentIdentityRegistry.swift` | Thread-safe snapshot of all agents' derived addresses/indices, maintained by `AgentManager`, read by the validator builder and the route-level scope check |
@@ -544,9 +544,9 @@ The address-based design naturally extends to agent-to-agent communication acros
 | `CounterStore.swift` | Per-device monotonic counter in `UserDefaults` |
 | `RecoveryManager.swift` | One-time recovery code generation at identity creation |
 | `CryptoHelpers.swift` | Keccak-256, domain-separated signing, ecrecover, address derivation, encoding utilities, and `Data.zeroOut()` |
-| `OsaurusIdentityError.swift` | Error types for the identity system, including `masterAlreadyExists` and the four `mnemonic*` validation cases |
+| `MuwaIdentityError.swift` | Error types for the identity system, including `masterAlreadyExists` and the four `mnemonic*` validation cases |
 
-### Identity UI (`Packages/OsaurusCore/Views/Identity/`)
+### Identity UI (`Packages/MuwaCore/Views/Identity/`)
 
 | File | Responsibility |
 |------|---------------|

@@ -1,6 +1,6 @@
 # Runtime validation standard
 
-This is the standard checklist for Osaurus + vmlx runtime changes that touch
+This is the standard checklist for Muwa + vmlx runtime changes that touch
 model loading, generation, cache residency, reasoning, Jinja templates, media
 inputs, tool calls, or sampling defaults.
 
@@ -10,13 +10,13 @@ real-model run.
 
 ## Ground rules
 
-- Record the exact Osaurus SHA, vmlx-swift-lm SHA, mlx-swift SHA, swift-jinja
+- Record the exact Muwa SHA, vmlx-swift-lm SHA, mlx-swift SHA, swift-jinja
   SHA, model bundle path, model revision, and Package.resolved entries.
 - Do not claim speed, cache, or coherence from source reading alone. Source
   tests are contract guards. Runtime claims need logs or benchmark artifacts.
 - Keep cache claims topology-specific. "Cache works" is not a valid result.
   Say which cache tier was used and which model cache family was exercised.
-- Test both the direct engine path and the Osaurus app/API path when the change
+- Test both the direct engine path and the Muwa app/API path when the change
   affects user-visible behavior.
 - Preserve bundle generation_config defaults unless a model-specific reason is
   proven from a failing run.
@@ -95,15 +95,15 @@ Fail if any of these are true:
   such as `/Users/...`.
 - The workspace and app resolved files disagree on vmlx-swift-lm, mlx-swift,
   swift-jinja, or swift-transformers.
-- A required org fork resolves to an upstream URL when Osaurus expects the
-  osaurus-ai fork.
-- vmlx, mlx-swift, or Jinja code needed by Osaurus is uncommitted while
-  Osaurus pins an older SHA.
+- A required org fork resolves to an upstream URL when Muwa expects the
+  muwa-ai fork.
+- vmlx, mlx-swift, or Jinja code needed by Muwa is uncommitted while
+  Muwa pins an older SHA.
 
 Suggested job:
 
 ```sh
-swift package resolve --package-path Packages/OsaurusCore
+swift package resolve --package-path Packages/MuwaCore
 swift package resolve
 mkdir -p build/runtime-pin-check
 runtime_pins() {
@@ -114,26 +114,26 @@ runtime_pins() {
       or .identity=="swift-transformers")
     | [.identity, .location, .state.revision] | @tsv' "$1"
 }
-runtime_pins Packages/OsaurusCore/Package.resolved > build/runtime-pin-check/core.tsv
-runtime_pins App/osaurus.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved > build/runtime-pin-check/app.tsv
-runtime_pins osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved > build/runtime-pin-check/workspace.tsv
+runtime_pins Packages/MuwaCore/Package.resolved > build/runtime-pin-check/core.tsv
+runtime_pins App/Muwa.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved > build/runtime-pin-check/app.tsv
+runtime_pins Muwa.xcworkspace/xcshareddata/swiftpm/Package.resolved > build/runtime-pin-check/workspace.tsv
 diff -u build/runtime-pin-check/core.tsv build/runtime-pin-check/app.tsv
 diff -u build/runtime-pin-check/core.tsv build/runtime-pin-check/workspace.tsv
 rg -n '/Users/|huggingface/swift-jinja|huggingface/swift-transformers' \
-  Packages/OsaurusCore/Package.swift \
-  Packages/OsaurusCore/Package.resolved \
-  App/osaurus.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved \
-  osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved && exit 1 || true
+  Packages/MuwaCore/Package.swift \
+  Packages/MuwaCore/Package.resolved \
+  App/Muwa.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/Package.resolved \
+  Muwa.xcworkspace/xcshareddata/swiftpm/Package.resolved && exit 1 || true
 ```
 
-### Osaurus no-load contract tests
+### Muwa no-load contract tests
 
 These are fast CI checks for wiring and policy. They do not prove model quality.
 
 Run at least:
 
 ```sh
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter 'ModelRuntimeMappingTests|MultimodalContentPartTests|MaterializeMediaDataUrlMCDCTests|ModelMediaCapabilitiesMCDCTests|VLMDetectionTests|MultiTurnFamilyMatrixTests|LocalReasoningCapabilityTests|LocalGenerationDefaultsTests|GenerationEventMapperTests|MLXBatchAdapterTests|RuntimePolicySourceTests|ThinkTagScrubberTests'
 ```
 
@@ -147,13 +147,13 @@ Coverage expected from these tests:
   Qwen-family stamps resolve through vmlx.
 - Media capability detection rejects bare text models that only look similar to
   VLM or omni names.
-- Generation defaults from bundle/config and Osaurus overrides are merged
+- Generation defaults from bundle/config and Muwa overrides are merged
   without silently dropping top_k, top_p, temperature, min_p, stop strings, or
   KV settings.
 
 ### vmlx contract tests
 
-Run on the vmlx repo before repinning Osaurus:
+Run on the vmlx repo before repinning Muwa:
 
 ```sh
 swift build --target MLXLMCommon
@@ -202,8 +202,8 @@ follow-up after assistant reasoning/tool state. Record `runs.jsonl`.
 Use these as explicit release blockers when they touch the current branch:
 
 - Stale resolver URLs: the app project, workspace, and package resolver records
-  must not disagree on `osaurus-ai/Jinja`, `osaurus-ai/swift-transformers`,
-  `osaurus-ai/vmlx-swift-lm`, or `osaurus-ai/mlx-swift`.
+  must not disagree on `muwa-ai/Jinja`, `muwa-ai/swift-transformers`,
+  `muwa-ai/vmlx-swift-lm`, or `muwa-ai/mlx-swift`.
 - Parakeet live streaming: independently encoded chunks are not safe to
   concatenate. Use retained PCM snapshots or fresh `.preEncoded` embeddings until
   a stateful/incremental Parakeet path has its own proof.
@@ -279,7 +279,7 @@ T5: switch model, then switch back, no cross-model cache poisoning.
 
 Every reasoning-family change must test:
 
-- Template context sent by Osaurus (`enable_thinking`, `reasoning_effort`, or
+- Template context sent by Muwa (`enable_thinking`, `reasoning_effort`, or
   family-specific field) in `MLXBatchAdapter.prepareInput`.
 - vmlx parser stamp source: JANG stamp, model_type heuristic, or none.
 - ON/OFF/ON toggle across three turns in the same chat.
@@ -316,7 +316,7 @@ Add these scripts as follow-up work:
 
 - `scripts/runtime-matrix/run_osaurus_matrix.sh`: runs the live app/API matrix
   and writes `runs.jsonl`.
-- `scripts/runtime-matrix/collect_logs.sh`: extracts structured Osaurus and
+- `scripts/runtime-matrix/collect_logs.sh`: extracts structured Muwa and
   vmlx logs for one run window.
 - `scripts/runtime-matrix/compare_runs.py`: compares two validation folders and
   flags speed, stop-reason, parser, or cache regressions.

@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Generate the bundled Claude marketplace importability catalog.
 
-Osaurus only imports four Claude-plugin component types: skills, agents,
+Muwa only imports four Claude-plugin component types: skills, agents,
 commands, and MCP servers. Plugins that ship only hooks / output-styles /
-monitors / lspServers / themes / bin have nothing Osaurus can install. The
+monitors / lspServers / themes / bin have nothing Muwa can install. The
 official marketplace lists 200+ plugins and classifying them at runtime would
 require ~160 GitHub requests per session (rate-limit blowup), so we precompute
 the classification once here and commit the result as a bundle resource.
@@ -17,7 +17,7 @@ Usage:
     python3 scripts/claude-marketplace/generate-importability-catalog.py
 
 Writes:
-    Packages/OsaurusCore/Resources/ClaudePlugins/claude-marketplace-importability.json
+    Packages/MuwaCore/Resources/ClaudePlugins/claude-marketplace-importability.json
 """
 
 from __future__ import annotations
@@ -39,7 +39,7 @@ MARKETPLACE_URL = (
 REPO_ROOT = Path(__file__).resolve().parents[2]
 OUTPUT_PATH = (
     REPO_ROOT
-    / "Packages/OsaurusCore/Resources/ClaudePlugins/claude-marketplace-importability.json"
+    / "Packages/MuwaCore/Resources/ClaudePlugins/claude-marketplace-importability.json"
 )
 
 
@@ -126,9 +126,9 @@ def resolve_source(plugin: dict) -> tuple[str, str, str] | None:
 
 # Cache of repo -> {path: git-tree-type} (or None when the tree couldn't be
 # fetched). git-tree types: "tree" (dir), "blob" (file or symlink), "commit"
-# (submodule). The GitHub contents API that Osaurus uses reports symlinks as
+# (submodule). The GitHub contents API that Muwa uses reports symlinks as
 # "symlink" and submodules as "submodule" — neither is "dir" — so only "tree"
-# entries count as directories here, matching Osaurus's behavior.
+# entries count as directories here, matching Muwa's behavior.
 _tree_cache: dict[tuple[str, str], dict[str, str] | None] = {}
 
 
@@ -170,7 +170,7 @@ def classify_components(base: str, entries: dict[str, str]) -> dict:
     """Replicate buildManifest's component discovery exactly and return the
     importable component summary used by the detail view.
 
-    Osaurus discovers, under the plugin's base path:
+    Muwa discovers, under the plugin's base path:
       - skills: ANY real directory directly under `skills/` (SKILL.md is not
         required; symlinks/submodules are NOT directories so they don't count),
       - agents: `agents/<file>.md` files,

@@ -43,8 +43,8 @@ CATALOG_BASENAMES = ("Localizable.xcstrings", "InfoPlist.xcstrings")
 # resolved relative to the repo root (this file lives in scripts/i18n/).
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_PATHS = (
-    "Packages/OsaurusCore/Resources/Localizable.xcstrings",
-    "App/osaurus/InfoPlist.xcstrings",
+    "Packages/MuwaCore/Resources/Localizable.xcstrings",
+    "App/Muwa/InfoPlist.xcstrings",
 )
 
 # A language is shown only when a contributor's coverage meets this share of the

@@ -1,4 +1,4 @@
-# Contributing to Osaurus
+# Contributing to Muwa
 
 Thanks for your interest in contributing! We welcome bug reports, feature ideas, documentation improvements, and code contributions.
 
@@ -22,8 +22,8 @@ Requirements:
 
 Build and run:
 
-1. Open `osaurus.xcworkspace` in Xcode 16.4+
-2. Select the `osaurus` target and press Run
+1. Open `Muwa.xcworkspace` in Xcode 16.4+
+2. Select the `Muwa` target and press Run
 3. In the app UI, choose a port (default `1337`), then Start
 4. Download a model from the Model Manager to generate text locally
 
@@ -33,7 +33,7 @@ Project layout and API overview are in `README.md`. For a complete feature inven
 
 ### Layer definitions
 
-The core library (`Packages/OsaurusCore/`) follows a layered architecture. Each layer has a specific role and set of rules.
+The core library (`Packages/MuwaCore/`) follows a layered architecture. Each layer has a specific role and set of rules.
 
 **Models** — Pure data. No logic, no side effects, no singletons.
 
@@ -102,8 +102,8 @@ The core library (`Packages/OsaurusCore/`) follows a layered architecture. Each 
 ### Tool calling (developer notes)
 
 - OpenAI‑compatible DTOs live in `Models/API/OpenAIAPI.swift` (`Tool`, `ToolFunction`, `ToolCall`, `DeltaToolCall`, etc.).
-- Prompt templating is handled internally by `vmlx-swift`. Osaurus does not assemble prompts manually.
-- Tool-call detection lives entirely in `vmlx-swift`'s `BatchEngine.generate`, which emits authoritative `Generation.toolCall(ToolCall)` events. Osaurus's `GenerationEventMapper` simply translates each one into a `ModelRuntimeEvent.toolInvocation`.
+- Prompt templating is handled internally by `vmlx-swift`. Muwa does not assemble prompts manually.
+- Tool-call detection lives entirely in `vmlx-swift`'s `BatchEngine.generate`, which emits authoritative `Generation.toolCall(ToolCall)` events. Muwa's `GenerationEventMapper` simply translates each one into a `ModelRuntimeEvent.toolInvocation`.
 - Streaming tool calls reach the wire as OpenAI-style deltas inside `Networking/HTTPHandler.swift` (and the equivalent Anthropic / Open Responses writers in `Models/Chat/ResponseWriters.swift`).
 
 ## Development workflow
@@ -122,30 +122,30 @@ The core library (`Packages/OsaurusCore/`) follows a layered architecture. Each 
 
 ### Dependencies
 
-The workspace lockfile at `osaurus.xcworkspace/xcshareddata/swiftpm/Package.resolved`
+The workspace lockfile at `Muwa.xcworkspace/xcshareddata/swiftpm/Package.resolved`
 is the single source of truth for pinned dependency versions. Xcode updates
 this file automatically when you add, remove, or update a package. Commit
 the changed `Package.resolved` alongside your other changes.
 
-OsaurusCore uses a single consolidated `vmlx-swift` pin for local inference:
+MuwaCore uses a single consolidated `vmlx-swift` pin for local inference:
 MLX, MLXLMCommon, MLXLLM, MLXVLM, Tokenizers, Jinja, chat templates, reasoning
 parsers, cache layers, media plumbing, and runtime MTP policy all come from
 that package. Do not add separate root dependencies on `mlx-swift`,
 `vmlx-swift-lm`, `swift-transformers`, or `Jinja` for inference work.
 
-SwiftPM mirrors still live in both `osaurus.xcworkspace/xcshareddata/swiftpm/configuration/`
-and `App/osaurus.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/`.
+SwiftPM mirrors still live in both `Muwa.xcworkspace/xcshareddata/swiftpm/configuration/`
+and `App/Muwa.xcodeproj/project.xcworkspace/xcshareddata/swiftpm/configuration/`.
 They only protect transitive non-inference packages that still reference the
 Hugging Face package identities. The vendored tokenizer/template/runtime helper
 modules are prefixed inside `vmlx-swift` itself (`VMLXTokenizers`, `VMLXJinja`,
 `VMLXEventSource`, `VMLXHuggingFace`, `VMLXHub`, `VMLXGeneration`,
-`VMLXModels`), so Osaurus must not add package-level `moduleAliases` for the
+`VMLXModels`), so Muwa must not add package-level `moduleAliases` for the
 inference graph. `yyjson` remains the single shared C package dependency because
 linking both a vendored copy and the transitive upstream copy exports duplicate
 `yyjson_*` symbols. Keep the two mirror files in sync until upstream transitive
 packages no longer refer to the Hugging Face package identities.
 
-`swift-sdk` also pulls `EventSource` transitively. OsaurusCore declares the same
+`swift-sdk` also pulls `EventSource` transitively. MuwaCore declares the same
 package at the root with the `AsyncHTTPClient` trait enabled so EventSource's
 conditional AsyncHTTPClient transport compiles with declared NIO and shim
 dependencies when the consolidated MLX/Numerics graph is present. This is a
@@ -162,7 +162,7 @@ gitignored and not used by CI.
 
 ### Testing
 
-- Add or update tests in `Packages/OsaurusCore/Tests/` where reasonable
+- Add or update tests in `Packages/MuwaCore/Tests/` where reasonable
 - Ensure the project builds and tests pass in Xcode before submitting
 
 ### Commit and PR guidelines
@@ -202,7 +202,7 @@ Good documentation is just as important as good code. Here's how to contribute t
 2. **Update the README** — If the feature should be highlighted:
    - Add to the "Highlights" table
    - Add to "Key Features" section
-   - Update "What is Osaurus?" if it's a major feature
+   - Update "What is Muwa?" if it's a major feature
 
 3. **Create dedicated documentation** — For significant features:
    - Create a new doc in `/docs/` (e.g., `FEATURE_NAME.md`)
@@ -252,7 +252,7 @@ Use the "Feature request" issue template and describe:
 
 ## Localization
 
-Osaurus ships English (source), German, and Simplified Chinese, and we're actively seeking help with **Spanish, Korean, Japanese, and Traditional Chinese** (already enabled in Xcode and ready to translate). All UI strings live in the OsaurusCore string catalog; see **[LOCALIZATION.md](LOCALIZATION.md)** for how to add strings, add languages, and run validation. To pick up a language and get credited on the contributor leaderboard, see **[TRANSLATORS.md](TRANSLATORS.md)**.
+Muwa ships English (source), German, and Simplified Chinese, and we're actively seeking help with **Spanish, Korean, Japanese, and Traditional Chinese** (already enabled in Xcode and ready to translate). All UI strings live in the MuwaCore string catalog; see **[LOCALIZATION.md](LOCALIZATION.md)** for how to add strings, add languages, and run validation. To pick up a language and get credited on the contributor leaderboard, see **[TRANSLATORS.md](TRANSLATORS.md)**.
 
 ## Security
 
@@ -266,7 +266,7 @@ This project follows the Contributor Covenant. By participating, you agree to up
 
 ## Join the community
 
-- **[Discord](https://discord.gg/osaurus)** — Chat with contributors and maintainers
-- **[Good First Issues](https://github.com/osaurus-ai/osaurus/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — Great starting points
+- **[Discord](https://discord.gg/muwa)** — Chat with contributors and maintainers
+- **[Good First Issues](https://github.com/muwa-ai/muwa/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — Great starting points
 
-Thank you for helping make Osaurus better!
+Thank you for helping make Muwa better!

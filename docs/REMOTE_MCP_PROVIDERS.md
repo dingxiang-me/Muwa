@@ -1,13 +1,13 @@
 # Remote MCP Providers
 
-Remote MCP Providers connect Osaurus to external MCP (Model Context Protocol) servers and aggregate their tools into your local Osaurus instance. The model can then call those remote tools the same way it calls local plugins.
+Remote MCP Providers connect Muwa to external MCP (Model Context Protocol) servers and aggregate their tools into your local Muwa instance. The model can then call those remote tools the same way it calls local plugins.
 
 This is different from [Remote Providers](REMOTE_PROVIDERS.md) (which provide _inference_ endpoints). Remote MCP Providers provide **tools**.
 
-Remote MCP Providers are client connections to MCP tool servers. Osaurus can
+Remote MCP Providers are client connections to MCP tool servers. Muwa can
 connect to HTTP/SSE MCP endpoints and can also launch configured stdio MCP
 subprocesses. Command-based stdio is supported in the opposite direction too:
-external MCP clients can launch Osaurus with `osaurus mcp` to use Osaurus as
+external MCP clients can launch Muwa with `muwa-cli mcp` to use Muwa as
 their MCP server.
 
 ---
@@ -16,11 +16,11 @@ their MCP server.
 
 | Direction | Transport | Status | How to configure |
 | --- | --- | --- | --- |
-| External MCP client -> Osaurus | Stdio command | Supported | Configure the client with `command: "osaurus"` and `args: ["mcp"]`. |
-| External MCP client -> Osaurus | HTTP endpoints | Supported | Use `GET /mcp/tools` and `POST /mcp/call` on the local Osaurus server. |
-| Osaurus -> remote MCP provider | HTTP endpoint | Supported | Add a provider URL in **Custom Server** or choose a catalog template. |
-| Osaurus -> remote MCP provider | HTTP streaming / SSE | Supported when the server supports it | Enable **Streaming Enabled** in Advanced. |
-| Osaurus -> third-party local MCP provider | Stdio command | Supported | Choose **Stdio** in Custom Server and configure command, args, env, execution host, and working directory. |
+| External MCP client -> Muwa | Stdio command | Supported | Configure the client with `command: "muwa-cli"` and `args: ["mcp"]`. |
+| External MCP client -> Muwa | HTTP endpoints | Supported | Use `GET /mcp/tools` and `POST /mcp/call` on the local Muwa server. |
+| Muwa -> remote MCP provider | HTTP endpoint | Supported | Add a provider URL in **Custom Server** or choose a catalog template. |
+| Muwa -> remote MCP provider | HTTP streaming / SSE | Supported when the server supports it | Enable **Streaming Enabled** in Advanced. |
+| Muwa -> third-party local MCP provider | Stdio command | Supported | Choose **Stdio** in Custom Server and configure command, args, env, execution host, and working directory. |
 
 If a vendor publishes a stdio config such as `{"command": "npx", "args": [...]}`,
 enter that command in the Stdio editor. The **Test** button launches the
@@ -51,11 +51,11 @@ Used by Linear, Notion, Vercel, Supabase, Cloudflare, Hugging Face, Sentry, Stri
 
 - One big **Sign In with [Provider]** button.
 - Tap it → your default browser opens to the vendor's OAuth consent screen.
-- After you approve, the browser redirects back to a loopback URL Osaurus is listening on (`http://127.0.0.1:<ephemeral>/callback`).
+- After you approve, the browser redirects back to a loopback URL Muwa is listening on (`http://127.0.0.1:<ephemeral>/callback`).
 - A green **Connected** badge appears.
 - Click **Add Provider**. Done.
 
-No client ID, secret, or redirect URI to configure — Osaurus uses [RFC 7591 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591) to register itself with the vendor on the fly.
+No client ID, secret, or redirect URI to configure — Muwa uses [RFC 7591 Dynamic Client Registration](https://datatracker.ietf.org/doc/html/rfc7591) to register itself with the vendor on the fly.
 
 #### OAuth 2.1 (manual Client ID + Client Secret)
 
@@ -105,7 +105,7 @@ subprocess and therefore do not send traffic through URLSession's proxy path.
 
 ## Provider Catalog
 
-The catalog is hardcoded in [`MCPProviderTemplate.swift`](../Packages/OsaurusCore/Models/Configuration/MCPProviderTemplate.swift). Templates are pure UI prefills — saving from one produces an `MCPProvider` record identical to one you would build by hand, so removing or editing a template later never affects already-saved providers.
+The catalog is hardcoded in [`MCPProviderTemplate.swift`](../Packages/MuwaCore/Models/Configuration/MCPProviderTemplate.swift). Templates are pure UI prefills — saving from one produces an `MCPProvider` record identical to one you would build by hand, so removing or editing a template later never affects already-saved providers.
 
 | Provider             | Category            | Auth     | Endpoint                                                                                            |
 | -------------------- | ------------------- | -------- | --------------------------------------------------------------------------------------------------- |
@@ -196,7 +196,7 @@ Add arbitrary HTTP headers. Mark a header as a **secret** to store its value in 
 
 | Setting               | Description                               | Default |
 | --------------------- | ----------------------------------------- | ------- |
-| **Auto-connect**      | Connect automatically when Osaurus starts | true    |
+| **Auto-connect**      | Connect automatically when Muwa starts | true    |
 | **Streaming Enabled** | Use the streaming/SSE HTTP transport when the server supports it | false   |
 | **Discovery Timeout** | Timeout for tool discovery (seconds)      | 20      |
 | **Tool Call Timeout** | Timeout for tool execution (seconds)      | 45      |
@@ -208,7 +208,7 @@ Add arbitrary HTTP headers. Mark a header as a **secret** to store its value in 
 ```mermaid
 sequenceDiagram
     participant U as User
-    participant O as Osaurus
+    participant O as Muwa
     participant B as Browser
     participant S as MCP Server
     participant A as Auth Server
@@ -230,12 +230,12 @@ sequenceDiagram
     O-->>U: "Connected to Linear"
 ```
 
-The implementation lives in [`Packages/OsaurusCore/Services/MCP/OAuth/`](../Packages/OsaurusCore/Services/MCP/OAuth/) and uses the shared loopback server in [`Packages/OsaurusCore/Services/Auth/OAuthLoopbackServer.swift`](../Packages/OsaurusCore/Services/Auth/OAuthLoopbackServer.swift).
+The implementation lives in [`Packages/MuwaCore/Services/MCP/OAuth/`](../Packages/MuwaCore/Services/MCP/OAuth/) and uses the shared loopback server in [`Packages/MuwaCore/Services/Auth/OAuthLoopbackServer.swift`](../Packages/MuwaCore/Services/Auth/OAuthLoopbackServer.swift).
 
 ### Token Refresh & 401 Recovery
 
 - Access tokens are refreshed proactively before they expire.
-- If a request returns `401 Unauthorized`, Osaurus probes the response's `WWW-Authenticate: Bearer` challenge, refreshes once, and retries. If that also fails, the provider's row surfaces a "Sign in again" prompt.
+- If a request returns `401 Unauthorized`, Muwa probes the response's `WWW-Authenticate: Bearer` challenge, refreshes once, and retries. If that also fails, the provider's row surfaces a "Sign in again" prompt.
 - All tokens (access + refresh) live in Keychain; `mcp.json` only stores client IDs and metadata.
 
 ---
@@ -246,7 +246,7 @@ The implementation lives in [`Packages/OsaurusCore/Services/MCP/OAuth/`](../Pack
 
 When you connect to an MCP provider:
 
-1. Osaurus establishes an HTTP/SSE connection to the MCP server (with bearer / OAuth headers as appropriate).
+1. Muwa establishes an HTTP/SSE connection to the MCP server (with bearer / OAuth headers as appropriate).
 2. Sends a `tools/list` request to discover available tools.
 3. Registers each tool with a namespaced name.
 4. Tools become available for model inference.
@@ -269,7 +269,7 @@ linear_search_issues
 
 When a model calls a remote MCP tool:
 
-1. Osaurus receives the tool call request.
+1. Muwa receives the tool call request.
 2. Routes it to the correct MCP provider.
 3. Sends the request to the remote MCP server.
 4. Returns the result to the model.
@@ -280,7 +280,7 @@ When a model calls a remote MCP tool:
 
 ### In Chat
 
-Remote MCP tools work like any other tool. When a model decides to use a tool, Osaurus handles the routing automatically.
+Remote MCP tools work like any other tool. When a model decides to use a tool, Muwa handles the routing automatically.
 
 ### Via MCP API
 
@@ -342,9 +342,9 @@ button — saving and connecting is the test.
 ### "My provider config has `command` and `args`"
 
 That is a stdio MCP provider config. Choose **Custom Server**, switch the
-transport to **Stdio**, and enter the command/args there. `command: "osaurus"`
+transport to **Stdio**, and enter the command/args there. `command: "muwa-cli"`
 with `args: ["mcp"]` is still the opposite direction: external MCP clients use
-that to launch Osaurus as their MCP server.
+that to launch Muwa as their MCP server.
 
 ### "Authentication failed" / `401 Unauthorized`
 
@@ -398,7 +398,7 @@ Every authorization request includes a cryptographically random `state` paramete
 Non-secret configuration is stored at:
 
 ```
-~/.osaurus/providers/mcp.json
+~/.muwa/providers/mcp.json
 ```
 
 Each provider record carries its `name`, `url`, `enabled`, headers (non-secret
@@ -416,7 +416,7 @@ Existing pre-OAuth `mcp.json` files keep working unchanged; missing fields defau
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                        Osaurus                                   │
+│                        Muwa                                      │
 │  ┌─────────────────────────────────────────────────────────┐    │
 │  │                   ToolRegistry                           │    │
 │  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐   │    │

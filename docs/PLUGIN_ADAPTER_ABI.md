@@ -1,6 +1,6 @@
 # Plugin Adapter ABI
 
-Osaurus plugin format adapters are an in-process Swift v1 surface for file
+Muwa plugin format adapters are an in-process Swift v1 surface for file
 formats that should live in plugin packs instead of core. The ABI is small by
 design: an adapter declares a stable format identifier, optional leading-byte
 detection patterns, a contained document open step, and a record streaming step.

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run strict live multi-turn tool/cache proof against a local Osaurus app.
+"""Run strict live multi-turn tool/cache proof against a local Muwa app.
 
 This harness exercises the OpenAI-compatible chat endpoint used by real
 clients. It verifies a required tool call, a no-tool follow-up after a tool
@@ -57,7 +57,7 @@ def save(path: pathlib.Path, value: Any) -> None:
 def process_snapshot() -> str:
     cmd = (
         "ps -axo pid,ppid,stat,etime,rss,command | "
-        "rg -i 'CodeSigningHelper|/Contents/MacOS/osaurus|RunBench|vmlx_engine\\.cli' | "
+        "rg -i 'CodeSigningHelper|/Contents/MacOS/muwa|RunBench|vmlx_engine\\.cli' | "
         "rg -v 'rg -i|codex|zsh -lc' || true"
     )
     return subprocess.run(cmd, shell=True, text=True, capture_output=True).stdout

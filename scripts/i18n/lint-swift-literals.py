@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Flag Swift literal patterns that bypass the OsaurusCore catalog."""
+"""Flag Swift literal patterns that bypass the MuwaCore catalog."""
 
 from __future__ import annotations
 
@@ -10,7 +10,7 @@ from pathlib import Path
 
 
 ROOT = Path(__file__).resolve().parents[2]
-SCAN_DIR = ROOT / "Packages" / "OsaurusCore"
+SCAN_DIR = ROOT / "Packages" / "MuwaCore"
 ALLOWLIST_FILE = ROOT / "scripts" / "i18n" / "lint-allowlist.txt"
 
 PATTERNS: list[tuple[str, re.Pattern[str]]] = [

@@ -1,0 +1,975 @@
+//
+//  Skill.swift
+//  Muwa
+//
+//  Defines a Skill - markdown instructions that guide AI behavior.
+//  Skills are stored as directories with SKILL.md files following the Agent Skills spec.
+//  See: https://agentskills.io/specification
+//
+
+import Foundation
+
+/// Represents a file within a skill's references or assets directory
+public struct SkillFile: Codable, Identifiable, Sendable, Equatable {
+    public var id: String { name }
+    public let name: String
+    public let relativePath: String
+    public let size: Int64
+
+    public init(name: String, relativePath: String, size: Int64 = 0) {
+        self.name = name
+        self.relativePath = relativePath
+        self.size = size
+    }
+}
+
+/// A skill containing instructions/guidance for the AI
+/// Follows the Agent Skills specification: https://agentskills.io/specification
+public struct Skill: Codable, Identifiable, Sendable, Equatable {
+    public let id: UUID
+    public var name: String
+    public var description: String
+    public var version: String
+    public var author: String?
+    public var category: String?
+    public var keywords: [String]
+    public var enabled: Bool
+    public var instructions: String
+    public let isBuiltIn: Bool
+    public let createdAt: Date
+    public var updatedAt: Date
+
+    // MARK: - Plugin Association
+
+    /// The plugin ID if this skill was installed as part of a plugin
+    public var pluginId: String?
+
+    /// Whether this skill was installed from a plugin
+    public var isFromPlugin: Bool { pluginId != nil }
+
+    // MARK: - Directory Structure
+
+    /// Files in the references/ directory (loaded into context)
+    public var references: [SkillFile]
+    /// Files in the assets/ directory (supporting files)
+    public var assets: [SkillFile]
+    /// The directory name (Agent Skills format: lowercase-with-hyphens)
+    public var directoryName: String?
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        description: String = "",
+        version: String = "1.0.0",
+        author: String? = nil,
+        category: String? = nil,
+        keywords: [String] = [],
+        enabled: Bool = true,
+        instructions: String = "",
+        isBuiltIn: Bool = false,
+        createdAt: Date = Date(),
+        updatedAt: Date = Date(),
+        references: [SkillFile] = [],
+        assets: [SkillFile] = [],
+        directoryName: String? = nil,
+        pluginId: String? = nil
+    ) {
+        self.id = id
+        self.name = name
+        self.description = description
+        self.version = version
+        self.author = author
+        self.category = category
+        self.keywords = keywords
+        self.enabled = enabled
+        self.instructions = instructions
+        self.isBuiltIn = isBuiltIn
+        self.createdAt = createdAt
+        self.updatedAt = updatedAt
+        self.references = references
+        self.assets = assets
+        self.directoryName = directoryName
+        self.pluginId = pluginId
+    }
+
+    /// Total count of associated files
+    public var totalFileCount: Int {
+        references.count + assets.count
+    }
+
+    /// Whether this skill has any associated files
+    public var hasAssociatedFiles: Bool {
+        totalFileCount > 0
+    }
+
+    // MARK: - Built-in Skills
+
+    /// All built-in skills
+    public static var builtInSkills: [Skill] {
+        [
+            // Research & Analysis
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000001")!,
+                name: L("Research Analyst"),
+                description: L("In-depth research with fact-checking and balanced analysis"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("research"),
+                keywords: ["research", "fact-check", "sources", "analysis", "citations", "evidence"],
+                enabled: false,
+                instructions: """
+                    When conducting research and analysis:
+
+                    ## Information Gathering
+                    - Identify multiple reliable sources
+                    - Cross-reference facts across sources
+                    - Note the date and credibility of sources
+                    - Distinguish between facts, opinions, and speculation
+                    - Look for primary sources when possible
+
+                    ## Analysis Approach
+                    - Present multiple perspectives on controversial topics
+                    - Identify potential biases in sources
+                    - Use data and evidence to support conclusions
+                    - Acknowledge limitations and uncertainties
+                    - Separate correlation from causation
+
+                    ## Output Format
+                    - Start with a clear executive summary
+                    - Use comparison tables for complex data
+                    - Include citations and references
+                    - Highlight key findings and insights
+                    - Provide actionable recommendations
+
+                    ## Quality Checks
+                    - Verify statistics and numerical claims
+                    - Check for logical fallacies
+                    - Ensure balanced coverage of viewpoints
+                    - Update outdated information when possible
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+
+            // Creative
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000002")!,
+                name: L("Creative Brainstormer"),
+                description: L("Generate ideas, overcome creative blocks, and explore possibilities"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("creative"),
+                keywords: ["brainstorm", "ideation", "creative", "ideas", "innovation", "imagination"],
+                enabled: false,
+                instructions: """
+                    When helping with creative thinking and ideation:
+
+                    ## Idea Generation
+                    - Start with quantity over quality (divergent thinking)
+                    - Build on ideas with "Yes, and..." mentality
+                    - Combine unrelated concepts for novel ideas
+                    - Challenge assumptions and constraints
+                    - Explore opposite or extreme versions
+
+                    ## Brainstorming Techniques
+                    - Mind mapping: branch out from central concept
+                    - SCAMPER: Substitute, Combine, Adapt, Modify, Put to other uses, Eliminate, Reverse
+                    - Random word association
+                    - "What if" scenarios
+                    - Role-play different perspectives
+
+                    ## Overcoming Creative Blocks
+                    - Take a step back and reframe the problem
+                    - Look at analogous solutions in other fields
+                    - Break the problem into smaller parts
+                    - Set constraints to spark creativity
+                    - Use prompts and creative exercises
+
+                    ## Refining Ideas
+                    - Evaluate ideas against original goals
+                    - Identify the most promising concepts
+                    - Combine the best elements from multiple ideas
+                    - Consider feasibility and implementation
+                    - Iterate and improve selected ideas
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+
+            // Learning & Education
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000003")!,
+                name: L("Study Tutor"),
+                description: L("Patient explanations, practice problems, and learning strategies"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("learning"),
+                keywords: ["tutor", "teach", "learn", "study", "explain", "practice", "education"],
+                enabled: false,
+                instructions: """
+                    When helping someone learn:
+
+                    ## Teaching Approach
+                    - Assess current understanding before explaining
+                    - Use the Socratic method - guide with questions
+                    - Break complex topics into digestible parts
+                    - Connect new concepts to familiar ones
+                    - Adapt explanations to the learner's level
+
+                    ## Explanation Techniques
+                    - Start with the "why" before the "how"
+                    - Use concrete examples and analogies
+                    - Provide visual descriptions when helpful
+                    - Summarize key points regularly
+                    - Check understanding before moving on
+
+                    ## Practice & Reinforcement
+                    - Offer practice problems of increasing difficulty
+                    - Provide hints before full solutions
+                    - Explain common mistakes and misconceptions
+                    - Use spaced repetition for retention
+                    - Celebrate progress and effort
+
+                    ## Learning Strategies
+                    - Suggest active recall techniques
+                    - Recommend study schedules and breaks
+                    - Teach note-taking methods
+                    - Encourage teaching concepts to others
+                    - Help create study plans and goals
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+
+            // Productivity
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000004")!,
+                name: L("Productivity Coach"),
+                description: L("Task management, prioritization, and goal achievement"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("productivity"),
+                keywords: ["productivity", "tasks", "prioritize", "goals", "time-management", "planning"],
+                enabled: false,
+                instructions: """
+                    When helping with productivity and task management:
+
+                    ## Task Breakdown
+                    - Break large projects into actionable tasks
+                    - Define clear, specific next actions
+                    - Estimate time requirements realistically
+                    - Identify dependencies between tasks
+                    - Set milestones for progress tracking
+
+                    ## Prioritization
+                    - Use Eisenhower Matrix (urgent/important)
+                    - Apply the 80/20 rule (Pareto principle)
+                    - Consider deadlines and dependencies
+                    - Balance quick wins with important work
+                    - Re-prioritize when circumstances change
+
+                    ## Time Management
+                    - Suggest time-blocking techniques
+                    - Recommend focused work sessions (Pomodoro, etc.)
+                    - Help identify and minimize distractions
+                    - Plan buffer time for unexpected tasks
+                    - Encourage regular breaks for sustainability
+
+                    ## Goal Setting
+                    - Make goals SMART (Specific, Measurable, Achievable, Relevant, Time-bound)
+                    - Break annual goals into quarterly/monthly targets
+                    - Track progress with metrics when possible
+                    - Celebrate achievements along the way
+                    - Adjust goals based on learning and feedback
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+
+            // Content Summarizer
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000005")!,
+                name: L("Content Summarizer"),
+                description: L("Extract key points and create structured summaries"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("productivity"),
+                keywords: ["summarize", "summary", "tldr", "key-points", "digest", "condense"],
+                enabled: false,
+                instructions: """
+                    When summarizing content:
+
+                    ## Summary Types
+                    - TL;DR: 1-2 sentence essence
+                    - Executive Summary: Key points for decision makers
+                    - Detailed Summary: Comprehensive overview
+                    - Bullet Points: Scannable key takeaways
+
+                    ## Extraction Techniques
+                    - Identify the main thesis or argument
+                    - Extract key facts, figures, and data
+                    - Note important names, dates, and events
+                    - Capture action items and recommendations
+                    - Preserve essential context
+
+                    ## Structure
+                    - Lead with the most important information
+                    - Group related points together
+                    - Use hierarchical organization
+                    - Include section headers for long summaries
+                    - End with conclusions or next steps
+
+                    ## Quality Guidelines
+                    - Maintain accuracy - do not add interpretation
+                    - Keep the original tone and intent
+                    - Adjust length to the requested format
+                    - Highlight what's new or surprising
+                    - Note any gaps or missing information
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+
+            // Debug Assistant (keeping one coding skill)
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000006")!,
+                name: L("Debug Assistant"),
+                description: L("Systematic debugging and problem-solving approach"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("development"),
+                keywords: ["debug", "bug", "error", "crash", "fix", "troubleshoot", "diagnose"],
+                enabled: false,
+                instructions: """
+                    When helping debug issues:
+
+                    ## Initial Assessment
+                    - What is the expected behavior?
+                    - What is the actual behavior?
+                    - When did it start happening?
+                    - What changed recently?
+                    - Is it reproducible?
+
+                    ## Systematic Approach
+                    1. Reproduce the issue consistently
+                    2. Isolate the problem area
+                    3. Form hypotheses about the cause
+                    4. Test each hypothesis methodically
+                    5. Document findings as you go
+
+                    ## Common Debugging Techniques
+                    - Add logging at key points
+                    - Use debugger breakpoints
+                    - Check input/output at boundaries
+                    - Compare working vs non-working cases
+                    - Binary search through changes
+
+                    ## Questions to Ask
+                    - Are all dependencies correct versions?
+                    - Is the environment configured properly?
+                    - Are there any error messages in logs?
+                    - Does it work in a different environment?
+                    - Have you tried clearing caches?
+
+                    ## Resolution
+                    - Fix the root cause, not just symptoms
+                    - Add tests to prevent regression
+                    - Document the fix for future reference
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+
+            // Data Visualization
+            Skill(
+                id: UUID(uuidString: "00000001-0000-0000-0000-000000000007")!,
+                name: L("Data Visualizer"),
+                description: L("Render charts and graphs from data inline or from file attachments"),
+                version: "1.0.0",
+                author: "Muwa",
+                category: L("productivity"),
+                keywords: ["chart", "graph", "plot", "visualize", "bar", "line", "pie", "data", "table", "csv"],
+                enabled: false,
+                instructions: """
+                    When the user's message contains data suitable for visualization:
+
+                    ## Choosing the right path
+
+                    **If the data is in a file attachment:** call the `render_chart` tool.
+                    Pass the full raw file content in the `data` field and use `xColumn` /
+                    `series` to specify which columns to plot. The tool handles all parsing
+                    and downsampling — you never need to format individual data points. Example:
+                    ```
+                    render_chart(
+                      data: "<full raw CSV/TSV/JSON content>",
+                      format: "csv",
+                      chartType: "line",
+                      xColumn: "Month",
+                      series: ["Revenue", "Expenses"],
+                      title: "Monthly Financials"
+                    )
+                    ```
+
+                    **If the data is small and inline** (pasted table, computed values, fewer
+                    than ~50 data points): emit a ```chart fenced block with the full spec:
+                    ```chart
+                    {
+                      "chartType": "line",
+                      "title": "...",
+                      "categories": [...],
+                      "series": [{ "name": "...", "data": [...] }]
+                    }
+                    ```
+
+                    ## Chart type selection
+                    - **column / bar**: comparisons between categories
+                    - **line / spline**: trends over time or ordered sequences
+                    - **area / areaspline**: trends where cumulative volume matters
+                    - **pie**: proportions (use only with ≤8 slices)
+                    - **scatter**: correlations between two numeric variables
+                    - **bubble**: correlations with a third size dimension
+                    - **gauge**: single KPI value with a target range
+                    - **waterfall**: cumulative effect of sequential values
+
+                    ## Quality guidelines
+                    - Always set a meaningful `title`
+                    - Set `tooltipSuffix` when data has units (USD, %, ms, kg, etc.)
+                    - Use `stacking: "percent"` for part-to-whole comparisons across categories
+                    - Keep series count ≤ 8 for readability
+                    - For time series, put dates/times as `categories` on the x-axis
+                    """,
+                isBuiltIn: true,
+                createdAt: Date.distantPast,
+                updatedAt: Date.distantPast
+            ),
+        ]
+    }
+}
+
+// MARK: - YAML Frontmatter Parsing
+
+extension Skill {
+    /// Parse a skill from markdown content with YAML frontmatter
+    public static func parse(from markdown: String) throws -> Skill {
+        let (frontmatter, body) = try extractFrontmatter(from: markdown)
+
+        guard let name = frontmatter["name"] as? String, !name.isEmpty else {
+            throw SkillParseError.missingRequiredField("name")
+        }
+
+        let id: UUID
+        if let idString = frontmatter["id"] as? String, let parsedId = UUID(uuidString: idString) {
+            id = parsedId
+        } else {
+            id = UUID()
+        }
+
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        let createdAt: Date
+        if let dateString = frontmatter["createdAt"] as? String,
+            let parsed = dateFormatter.date(from: dateString)
+        {
+            createdAt = parsed
+        } else {
+            createdAt = Date()
+        }
+
+        let updatedAt: Date
+        if let dateString = frontmatter["updatedAt"] as? String,
+            let parsed = dateFormatter.date(from: dateString)
+        {
+            updatedAt = parsed
+        } else {
+            updatedAt = Date()
+        }
+
+        let keywords: [String]
+        if let raw = frontmatter["keywords"] as? String, !raw.isEmpty {
+            keywords = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+        } else {
+            keywords = []
+        }
+
+        return Skill(
+            id: id,
+            name: name,
+            description: frontmatter["description"] as? String ?? "",
+            version: frontmatter["version"] as? String ?? "1.0.0",
+            author: frontmatter["author"] as? String,
+            category: frontmatter["category"] as? String,
+            keywords: keywords,
+            enabled: frontmatter["enabled"] as? Bool ?? true,
+            instructions: body.trimmingCharacters(in: .whitespacesAndNewlines),
+            isBuiltIn: false,
+            createdAt: createdAt,
+            updatedAt: updatedAt,
+            pluginId: frontmatter["pluginId"] as? String
+        )
+    }
+
+    /// Convert skill to markdown with YAML frontmatter
+    public func toMarkdown() -> String {
+        let dateFormatter = ISO8601DateFormatter()
+        dateFormatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
+
+        var yaml = "---\n"
+        yaml += "id: \"\(id.uuidString)\"\n"
+        yaml += "name: \"\(escapeYamlString(name))\"\n"
+        yaml += "description: \"\(escapeYamlString(description))\"\n"
+        yaml += "version: \"\(version)\"\n"
+        if let author = author {
+            yaml += "author: \"\(escapeYamlString(author))\"\n"
+        }
+        if let category = category {
+            yaml += "category: \"\(escapeYamlString(category))\"\n"
+        }
+        if !keywords.isEmpty {
+            yaml += "keywords: \"\(keywords.joined(separator: ", "))\"\n"
+        }
+        yaml += "enabled: \(enabled)\n"
+        if let pluginId = pluginId {
+            yaml += "pluginId: \"\(escapeYamlString(pluginId))\"\n"
+        }
+        yaml += "createdAt: \"\(dateFormatter.string(from: createdAt))\"\n"
+        yaml += "updatedAt: \"\(dateFormatter.string(from: updatedAt))\"\n"
+        yaml += "---\n\n"
+        yaml += instructions
+
+        return yaml
+    }
+
+    /// Extract YAML frontmatter and body from markdown
+    private static func extractFrontmatter(from markdown: String) throws -> ([String: Any], String) {
+        guard let split = Self.splitFrontmatter(markdown) else {
+            // Distinguish "no frontmatter at all" from "opened but never closed"
+            let trimmed = markdown.trimmingCharacters(in: .whitespacesAndNewlines)
+            if !trimmed.hasPrefix("---") {
+                throw SkillParseError.noFrontmatter
+            }
+            throw SkillParseError.malformedFrontmatter
+        }
+        let frontmatter = parseYaml(split.frontmatterLines)
+        return (frontmatter, split.body)
+    }
+
+    /// Splits a markdown document into its YAML frontmatter lines and body.
+    /// Returns nil when no closing `---` is found. Returns an empty
+    /// frontmatter when the document does not start with `---`.
+    ///
+    /// Exposed to other parsers in the module (e.g. the Claude plugin
+    /// installer) so frontmatter parsing stays consistent across SKILL.md,
+    /// agent and command markdown.
+    static func splitFrontmatter(_ markdown: String) -> (frontmatterLines: [String], body: String)? {
+        let normalized = markdown.replacingOccurrences(of: "\r\n", with: "\n")
+        let trimmed = normalized.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix("---") else {
+            return ([], normalized)
+        }
+        let lines = trimmed.components(separatedBy: "\n")
+        var endIndex: Int?
+        for (index, line) in lines.enumerated() where index > 0 {
+            if line.trimmingCharacters(in: .whitespaces) == "---" {
+                endIndex = index
+                break
+            }
+        }
+        guard let end = endIndex else { return nil }
+        let frontmatterLines = Array(lines[1 ..< end])
+        let body = lines[(end + 1)...].joined(separator: "\n")
+        return (frontmatterLines, body)
+    }
+
+    /// Run `parseYaml` against an arbitrary YAML block. Public-in-module so
+    /// other parsers can reuse the same folded/literal scalar handling.
+    static func parseYamlBlock(_ lines: [String]) -> [String: Any] {
+        parseYaml(lines)
+    }
+
+    /// Simple YAML parser for frontmatter. Handles:
+    /// - flat `key: value` pairs
+    /// - nested objects (indented children)
+    /// - folded (`>`) and literal (`|`) block scalars
+    private static func parseYaml(_ lines: [String]) -> [String: Any] {
+        var result: [String: Any] = [:]
+        var currentNestedKey: String?
+        var nestedObject: [String: Any] = [:]
+
+        var i = 0
+        while i < lines.count {
+            let rawLine = lines[i]
+            let stripped = rawLine.trimmingCharacters(in: .whitespaces)
+            if stripped.isEmpty || stripped.hasPrefix("#") {
+                i += 1
+                continue
+            }
+
+            let leadingSpaces = rawLine.prefix(while: { $0 == " " }).count
+
+            guard let colonIndex = stripped.firstIndex(of: ":") else {
+                i += 1
+                continue
+            }
+
+            let key = String(stripped[..<colonIndex]).trimmingCharacters(in: .whitespaces)
+            let value = String(stripped[stripped.index(after: colonIndex)...]).trimmingCharacters(in: .whitespaces)
+
+            // Block scalar introducer (`>` or `|`) — consume continuation lines
+            // that are indented strictly more than the parent key.
+            if value == ">" || value == "|" {
+                let folded = (value == ">")
+                let baseIndent = leadingSpaces
+                var collected: [String] = []
+                i += 1
+                while i < lines.count {
+                    let next = lines[i]
+                    let nextTrim = next.trimmingCharacters(in: .whitespaces)
+                    if nextTrim.isEmpty {
+                        // Preserve paragraph breaks for `|`; for `>` empty
+                        // lines also separate paragraphs (insert empty marker).
+                        collected.append("")
+                        i += 1
+                        continue
+                    }
+                    let nextIndent = next.prefix(while: { $0 == " " }).count
+                    if nextIndent <= baseIndent {
+                        break
+                    }
+                    collected.append(nextTrim)
+                    i += 1
+                }
+                let joined: String
+                if folded {
+                    // Folded: paragraphs separated by single newlines; lines
+                    // inside a paragraph joined by spaces.
+                    var paragraphs: [String] = []
+                    var current: [String] = []
+                    for piece in collected {
+                        if piece.isEmpty {
+                            if !current.isEmpty {
+                                paragraphs.append(current.joined(separator: " "))
+                                current = []
+                            }
+                        } else {
+                            current.append(piece)
+                        }
+                    }
+                    if !current.isEmpty {
+                        paragraphs.append(current.joined(separator: " "))
+                    }
+                    joined = paragraphs.joined(separator: "\n")
+                } else {
+                    // Literal: preserve newlines verbatim, trim trailing blanks.
+                    var trimmedTail = collected
+                    while let last = trimmedTail.last, last.isEmpty {
+                        trimmedTail.removeLast()
+                    }
+                    joined = trimmedTail.joined(separator: "\n")
+                }
+
+                if leadingSpaces >= 2 && currentNestedKey != nil {
+                    nestedObject[key] = joined
+                } else {
+                    if let nestedKey = currentNestedKey, !nestedObject.isEmpty {
+                        result[nestedKey] = nestedObject
+                        nestedObject = [:]
+                    }
+                    currentNestedKey = nil
+                    result[key] = joined
+                }
+                continue
+            }
+
+            // Check if this is a nested key (indented)
+            if leadingSpaces >= 2 && currentNestedKey != nil {
+                let parsedValue = parseYamlValue(value)
+                nestedObject[key] = parsedValue
+            } else {
+                if let nestedKey = currentNestedKey, !nestedObject.isEmpty {
+                    result[nestedKey] = nestedObject
+                    nestedObject = [:]
+                }
+
+                if value.isEmpty {
+                    currentNestedKey = key
+                } else {
+                    currentNestedKey = nil
+                    result[key] = parseYamlValue(value)
+                }
+            }
+            i += 1
+        }
+
+        if let nestedKey = currentNestedKey, !nestedObject.isEmpty {
+            result[nestedKey] = nestedObject
+        }
+
+        return result
+    }
+
+    /// Parse a single YAML value
+    private static func parseYamlValue(_ value: String) -> Any {
+        var v = value
+
+        // Remove quotes if present
+        if (v.hasPrefix("\"") && v.hasSuffix("\"")) || (v.hasPrefix("'") && v.hasSuffix("'")) {
+            v = String(v.dropFirst().dropLast())
+            // Unescape quotes
+            v = v.replacingOccurrences(of: "\\\"", with: "\"")
+            v = v.replacingOccurrences(of: "\\'", with: "'")
+        }
+
+        // Parse booleans
+        if v.lowercased() == "true" {
+            return true
+        } else if v.lowercased() == "false" {
+            return false
+        }
+
+        return v
+    }
+
+    /// Escape special characters for YAML string
+    private func escapeYamlString(_ string: String) -> String {
+        return
+            string
+            .replacingOccurrences(of: "\\", with: "\\\\")
+            .replacingOccurrences(of: "\"", with: "\\\"")
+    }
+}
+
+// MARK: - Errors
+
+public enum SkillParseError: Error, LocalizedError {
+    case noFrontmatter
+    case malformedFrontmatter
+    case missingRequiredField(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .noFrontmatter:
+            return "Skill file must start with YAML frontmatter (---)"
+        case .malformedFrontmatter:
+            return "Could not parse YAML frontmatter"
+        case .missingRequiredField(let field):
+            return "Missing required field: \(field)"
+        }
+    }
+}
+
+// MARK: - Export/Import Support
+
+extension Skill {
+    /// Export format for sharing skills
+    public struct ExportData: Codable {
+        public let version: Int
+        public let skill: Skill
+
+        public init(skill: Skill) {
+            self.version = 1
+            // Create a copy without built-in flag for export
+            self.skill = Skill(
+                id: UUID(),  // Generate new ID on export
+                name: skill.name,
+                description: skill.description,
+                version: skill.version,
+                author: skill.author,
+                category: skill.category,
+                keywords: skill.keywords,
+                enabled: skill.enabled,
+                instructions: skill.instructions,
+                isBuiltIn: false,
+                createdAt: Date(),
+                updatedAt: Date()
+            )
+        }
+    }
+
+    /// Export this skill to JSON data
+    public func exportToJSON() throws -> Data {
+        let exportData = ExportData(skill: self)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.dateEncodingStrategy = .iso8601
+        return try encoder.encode(exportData)
+    }
+
+    /// Import a skill from JSON data
+    public static func importFromJSON(_ data: Data) throws -> Skill {
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        let exportData = try decoder.decode(ExportData.self, from: data)
+        return exportData.skill
+    }
+}
+
+// MARK: - Agent Skills Format Compatibility
+// Compatible with https://agentskills.io/specification
+
+extension Skill {
+    /// Convert name to Agent Skills format (lowercase, hyphens)
+    public var xplaceholder_agentSkillsNamex: String {
+        let sanitized = name.lowercased()
+            .replacingOccurrences(of: " ", with: "-")
+            .replacingOccurrences(of: "_", with: "-")
+            .components(separatedBy: CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-")).inverted)
+            .joined()
+            .replacingOccurrences(of: "--", with: "-")
+            .trimmingCharacters(in: CharacterSet(charactersIn: "-"))
+        return sanitized.isEmpty ? "skill-\(id.uuidString.prefix(8).lowercased())" : sanitized
+    }
+
+    /// Export to Agent Skills SKILL.md format
+    /// Compatible with: https://agentskills.io/specification
+    public func toAgentSkillsFormat() -> String {
+        toAgentSkillsFormatInternal(includeId: false)
+    }
+
+    /// Export to Agent Skills format with internal ID for local storage
+    public func toAgentSkillsFormatWithId() -> String {
+        toAgentSkillsFormatInternal(includeId: true)
+    }
+
+    private func toAgentSkillsFormatInternal(includeId: Bool) -> String {
+        var yaml = "---\n"
+        yaml += "name: \(xplaceholder_agentSkillsNamex)\n"
+
+        // Description is required, truncate to 1024 chars per spec
+        let truncatedDesc = String(description.prefix(1024))
+        yaml += "description: \(escapeAgentSkillsYaml(truncatedDesc))\n"
+
+        // Metadata section
+        yaml += "metadata:\n"
+        if includeId {
+            yaml += "  muwa-id: \"\(id.uuidString)\"\n"
+            yaml += "  muwa-enabled: \(enabled)\n"
+        }
+        if let pluginId = pluginId {
+            yaml += "  muwa-plugin-id: \"\(pluginId)\"\n"
+        }
+        if let author = author {
+            yaml += "  author: \(escapeAgentSkillsYaml(author))\n"
+        }
+        yaml += "  version: \"\(version)\"\n"
+        if let category = category {
+            yaml += "  category: \(escapeAgentSkillsYaml(category))\n"
+        }
+        if !keywords.isEmpty {
+            yaml += "  keywords: \"\(keywords.joined(separator: ", "))\"\n"
+        }
+
+        yaml += "---\n\n"
+        yaml += instructions
+
+        return yaml
+    }
+
+    /// Parse from Agent Skills SKILL.md format
+    /// Compatible with: https://agentskills.io/specification
+    public static func parseAgentSkillsFormat(from markdown: String) throws -> Skill {
+        let (frontmatter, body) = try extractFrontmatter(from: markdown)
+
+        // Agent Skills format requires 'name' field
+        guard let name = frontmatter["name"] as? String, !name.isEmpty else {
+            throw SkillParseError.missingRequiredField("name")
+        }
+
+        // Description is required in Agent Skills format
+        let description = frontmatter["description"] as? String ?? ""
+
+        // Extract metadata if present
+        var author: String?
+        var version = "1.0.0"
+        var category: String?
+        var keywords: [String] = []
+        var muwaId: UUID?
+        var enabled = true
+        var pluginId: String?
+
+        if let metadata = frontmatter["metadata"] as? [String: Any] {
+            author = metadata["author"] as? String
+            version = metadata["version"] as? String ?? "1.0.0"
+            category = metadata["category"] as? String
+            if let raw = metadata["keywords"] as? String, !raw.isEmpty {
+                keywords = raw.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }
+            }
+
+            // Muwa-specific metadata
+            if let idString = metadata["muwa-id"] as? String {
+                muwaId = UUID(uuidString: idString)
+            }
+            if let enabledValue = metadata["muwa-enabled"] as? Bool {
+                enabled = enabledValue
+            }
+            pluginId = metadata["muwa-plugin-id"] as? String
+        }
+
+        // Convert Agent Skills name (lowercase-hyphen) to display name (Title Case)
+        let displayName =
+            name
+            .split(separator: "-")
+            .map { $0.prefix(1).uppercased() + $0.dropFirst() }
+            .joined(separator: " ")
+
+        return Skill(
+            id: muwaId ?? UUID(),
+            name: displayName,
+            description: description,
+            version: version,
+            author: author,
+            category: category,
+            keywords: keywords,
+            enabled: enabled,
+            instructions: body.trimmingCharacters(in: .whitespacesAndNewlines),
+            isBuiltIn: false,
+            createdAt: Date(),
+            updatedAt: Date(),
+            pluginId: pluginId
+        )
+    }
+
+    /// Check if markdown content is in Agent Skills format
+    public static func isAgentSkillsFormat(_ markdown: String) -> Bool {
+        guard let (frontmatter, _) = try? extractFrontmatter(from: markdown) else {
+            return false
+        }
+        // Agent Skills format has 'name' but no 'id' field
+        let hasName = frontmatter["name"] != nil
+        let hasId = frontmatter["id"] != nil
+        return hasName && !hasId
+    }
+
+    /// Parse from either Muwa or Agent Skills format (auto-detect)
+    public static func parseAnyFormat(from markdown: String) throws -> Skill {
+        if isAgentSkillsFormat(markdown) {
+            return try parseAgentSkillsFormat(from: markdown)
+        } else {
+            return try parse(from: markdown)
+        }
+    }
+
+    /// Escape string for Agent Skills YAML format
+    private func escapeAgentSkillsYaml(_ string: String) -> String {
+        // If string contains special chars, wrap in quotes
+        let needsQuotes =
+            string.contains(":") || string.contains("#") || string.contains("\"") || string.contains("'")
+            || string.contains("\n") || string.hasPrefix(" ") || string.hasSuffix(" ")
+
+        if needsQuotes {
+            let escaped =
+                string
+                .replacingOccurrences(of: "\\", with: "\\\\")
+                .replacingOccurrences(of: "\"", with: "\\\"")
+                .replacingOccurrences(of: "\n", with: "\\n")
+            return "\"\(escaped)\""
+        }
+        return string
+    }
+}

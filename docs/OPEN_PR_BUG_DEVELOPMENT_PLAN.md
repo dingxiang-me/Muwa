@@ -1,6 +1,6 @@
 # Open PR and Bug Development Plan
 
-Snapshot update: 2026-05-16 07:33 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-16 07:33 UTC, repo `muwa-ai/muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -14,9 +14,9 @@ older dated section below; keep the older sections only as history.
   - Release Drafter `25950238917`: `success`.
   - pages `25950238605`: `success`.
 - Exact-main local release gate passed for `bb2e7f7c` in
-  `/private/tmp/osaurus-coord/worktrees/main-bb2e7f7c`; evidence:
-  `/private/tmp/osaurus-coord/evidence/builds/main-bb2e7f7c.log`
-  (`swift build --package-path Packages/OsaurusCore -c release`, 397.59s,
+  `/private/tmp/muwa-coord/worktrees/main-bb2e7f7c`; evidence:
+  `/private/tmp/muwa-coord/evidence/builds/main-bb2e7f7c.log`
+  (`swift build --package-path Packages/MuwaCore -c release`, 397.59s,
   existing warnings only).
 - Open PRs evaluated: 29.
 - Open issues evaluated: 32.
@@ -66,23 +66,23 @@ Reasons:
 
 ## Execution Results - 2026-05-16 07:33 UTC
 
-- Lane D (#1050) executed in `Packages/OsaurusEvals/**`: eval startup now has a
+- Lane D (#1050) executed in `Packages/MuwaEvals/**`: eval startup now has a
   timeout guard and emits an errored JSON report instead of hanging. Validation:
-  `swift build --package-path Packages/OsaurusEvals`,
-  `swift test --package-path Packages/OsaurusEvals`, timeout smoke tests with
-  and without `CI=true`, and `git diff --check -- Packages/OsaurusEvals`.
+  `swift build --package-path Packages/MuwaEvals`,
+  `swift test --package-path Packages/MuwaEvals`, timeout smoke tests with
+  and without `CI=true`, and `git diff --check -- Packages/MuwaEvals`.
 - Lane C (#615/#828/#1059) executed in provider scope: OpenAI-compatible model
   discovery falls back to configured manual model IDs when `/models` is
   unavailable or schema-incompatible, while auth/server errors still fail.
-  Validation: `swift test --package-path Packages/OsaurusCore --filter
+  Validation: `swift test --package-path Packages/MuwaCore --filter
   RemoteProviderModelDiscoveryTests`, `swift test --package-path
-  Packages/OsaurusCore --filter Provider`, and scoped `git diff --check`.
+  Packages/MuwaCore --filter Provider`, and scoped `git diff --check`.
 - Lane B (#823/#789/#995) executed in tool/context scope:
   `capabilities_search` can expose indexed/enabled tools from BM25 when the
   embedding side is unavailable, and diagnostics now report requested versus
   effective fused cutoffs. Validation: focused tool, preflight, capability, and
   tool database tests plus scoped `git diff --check`.
-- Lane E (#416/#1058) executed as docs-only: `osaurus mcp` is documented as the
+- Lane E (#416/#1058) executed as docs-only: `muwa mcp` is documented as the
   supported stdio bridge, and Remote MCP Providers are clarified as URL-based
   HTTP/SSE only. Validation: `git diff --check` over the touched docs.
 
@@ -125,9 +125,9 @@ issues, and must acquire a mutation lock before writing to GitHub.
 
 | Lane | Issues/PRs | Status | Write scope | Validation | Next action |
 | --- | --- | --- | --- | --- | --- |
-| B. Tool exposure matrix | #823, #789, #995; observe #1110 | Dispatch after local gate | `Packages/OsaurusCore/Services/Tool/**`, `Packages/OsaurusCore/Services/Context/**`, focused chat/tool diagnostics tests | Tool search/index tests, capability-search evals, focused chat tests | Pin why granted tools/search tools are not exposed, then add diagnostics or recall fixes without touching provider networking. |
-| C. Provider compatibility | #615, #828, #1059 | Dispatch after local gate; #1059 draft is `DIRTY` | `Packages/OsaurusCore/Services/Provider/**`, provider tests only | Remote provider tests, model discovery tests | Add fallback behavior for OpenAI-compatible providers without `/models`, direct model IDs, and MiniMax-compatible endpoints. |
-| D. Eval CLI hang | #1050 | Dispatch first; isolated | `Packages/OsaurusEvals/**` only | `swift test --package-path Packages/OsaurusEvals`; CLI smoke with and without `CI=true` | Make eval CLI noninteractive/timeout-safe on current main and document the behavior in help text if needed. |
+| B. Tool exposure matrix | #823, #789, #995; observe #1110 | Dispatch after local gate | `Packages/MuwaCore/Services/Tool/**`, `Packages/MuwaCore/Services/Context/**`, focused chat/tool diagnostics tests | Tool search/index tests, capability-search evals, focused chat tests | Pin why granted tools/search tools are not exposed, then add diagnostics or recall fixes without touching provider networking. |
+| C. Provider compatibility | #615, #828, #1059 | Dispatch after local gate; #1059 draft is `DIRTY` | `Packages/MuwaCore/Services/Provider/**`, provider tests only | Remote provider tests, model discovery tests | Add fallback behavior for OpenAI-compatible providers without `/models`, direct model IDs, and MiniMax-compatible endpoints. |
+| D. Eval CLI hang | #1050 | Dispatch first; isolated | `Packages/MuwaEvals/**` only | `swift test --package-path Packages/MuwaEvals`; CLI smoke with and without `CI=true` | Make eval CLI noninteractive/timeout-safe on current main and document the behavior in help text if needed. |
 | E. MCP stdio docs | #416, #1058 | Dispatch first; docs-only | `README.md`, `docs/REMOTE_MCP_PROVIDERS.md`, `docs/FEATURES.md`, `docs/DEVELOPER_TOOLS.md` | `git diff --check` | Align docs with command-based MCP provider support and clarify remote transport limits. |
 | F. Global proxy | #1091, #232 | Design next | Shared URLSession/proxy policy, settings UI, model download/provider/plugin call sites | Proxy config unit tests plus model/provider smoke tests | Draft architecture first because it crosses provider, model download, plugin, and remote docs scopes. |
 | T-M. Multimodal plugin I/O spec | Plugin/council roadmap; adjacent to #793, #332, #417, #1002 | Spec lane; docs-only | `docs/MULTIMODAL_PLUGIN_ENGINE_SPEC.md`, `docs/OPEN_PR_BUG_DEVELOPMENT_PLAN.md` | `git diff --check -- docs/MULTIMODAL_PLUGIN_ENGINE_SPEC.md docs/OPEN_PR_BUG_DEVELOPMENT_PLAN.md` | Use the new acceptance criteria, threat model, and T-M1-T-M7 slices to scope future implementation PRs; do not add ABI surface without a proven host gap. |
@@ -278,7 +278,7 @@ Acceptance gates for the foundation PR:
 | #828 | bug | Minimax 2.7 Not Connecting |
 | #823 | bug | I cant use tools, and I've granted all permissions |
 | #793 | enhancement | Community Plugin Browser |
-| #789 | bug | Osaurus Search tool never seem to be found by any model |
+| #789 | bug | Muwa Search tool never seem to be found by any model |
 | #689 | bug | Transcription mode is very unreliable |
 | #662 | bug | Invalid request format |
 | #654 | enhancement | Default Agent Configuration and Agent Team Functions |
@@ -298,7 +298,7 @@ Acceptance gates for the foundation PR:
 | #232 | enhancement, good first issue | HTTP/Socks5 proxy support for downloading models and accessing online providers |
 | #22 | enhancement | Benchmarks for current models, more sizes |
 
-Snapshot update: 2026-05-15 08:02 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-15 08:02 UTC, repo `muwa-ai/muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -312,8 +312,8 @@ older dated section below; keep the older sections only as history.
   - Release Drafter `25904487513`: `success`.
   - pages `25904486956`: `success`.
 - The exact-main local release gate passed in
-  `/private/tmp/osaurus-coord/worktrees/main-973b8fa7` with log output at
-  `/private/tmp/osaurus-coord/evidence/builds/main-973b8fa7.log`.
+  `/private/tmp/muwa-coord/worktrees/main-973b8fa7` with log output at
+  `/private/tmp/muwa-coord/evidence/builds/main-973b8fa7.log`.
   No new `origin/main` SHA appeared during this refresh, so the prior successful
   exact-SHA local gate remains the active dispatch evidence for invariant I3.
 - Open PRs evaluated: 29.
@@ -362,7 +362,7 @@ Reasons:
    boundaries: Lane F (#1091/#232) first, then Lane B (#823/#789/#995), then
    Lane C (#615/#828/#1059).
 
-Snapshot update: 2026-05-15 04:05 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-15 04:05 UTC, repo `muwa-ai/muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -378,14 +378,14 @@ older dated section below; keep the older sections only as history.
   `RaajeevChandran` at `2026-05-15T04:08:18Z` with state reason `COMPLETED`
   (not merged).
 - The active detached theme worktree is
-  `/tmp/osaurus-coord/worktrees/theme-editor-save-image-1093-1094` on commit
+  `/tmp/muwa-coord/worktrees/theme-editor-save-image-1093-1094` on commit
   `e6fb329d`. This run added one more guard there:
   - `ThemeManager.saveTheme(_:)` now posts `.globalThemeChanged` when saving a
     non-active custom theme, so open chat windows pinned to that theme refresh.
   - `ChatWindowStateAgentSyncTests` now includes a regression test that saves a
     non-active custom theme and asserts the open window updates.
 - Focused validation passed on that detached branch:
-  `swift test --package-path Packages/OsaurusCore --filter ChatWindowStateAgentSyncTests`
+  `swift test --package-path Packages/MuwaCore --filter ChatWindowStateAgentSyncTests`
   completed cleanly with 11 tests passing after a cold SwiftPM build.
 
 ## Nudge Decision - 2026-05-15 04:05 UTC
@@ -409,7 +409,7 @@ Reasons:
    history only; do not rebase or push it unless the newer lane proves
    insufficient.
 
-Snapshot update: 2026-05-15 00:50 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-15 00:50 UTC, repo `muwa-ai/muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -424,8 +424,8 @@ older dated section below; keep the older sections only as history.
   - Release Drafter `25884917217`: `success`.
   - pages `25884916149`: `success`.
 - Current-main local release build passed on the same SHA in
-  `/private/tmp/osaurus-coord/worktrees/main-f525a946` using
-  `swift build --package-path Packages/OsaurusCore -c release`.
+  `/private/tmp/muwa-coord/worktrees/main-f525a946` using
+  `swift build --package-path Packages/MuwaCore -c release`.
   Duration was 411.41s with existing warnings only.
 - Open PRs evaluated: 28.
 - Open issues evaluated: 37.
@@ -466,7 +466,7 @@ GitHub/origin mutation lock before push or PR creation.
 
 | Lane | Issues/PRs | Status | Write scope | Validation | Next action |
 | --- | --- | --- | --- | --- | --- |
-| A. Theme editor correctness | #1089, #1093, #1094; follow-on #1090 | Ready now | `Packages/OsaurusCore/Views/Theme/*`, `Models/Theme/*`, focused theme tests | Theme manager/unit tests, focused UI state tests, release build | Create narrow branch fixing live application of saved theme changes, image picker placement, and save-without-apply behavior. |
+| A. Theme editor correctness | #1089, #1093, #1094; follow-on #1090 | Ready now | `Packages/MuwaCore/Views/Theme/*`, `Models/Theme/*`, focused theme tests | Theme manager/unit tests, focused UI state tests, release build | Create narrow branch fixing live application of saved theme changes, image picker placement, and save-without-apply behavior. |
 | B. Tool exposure matrix | #823, #789, #995 | Worker A was in progress from older main; not integration-ready | `Tools/*`, `Services/Tool/*`, `Services/Chat/*`, diagnostics only | Tool registry/search/prompt/provider request tests | Restart or finish from current main; do not integrate the stale partial worker patch until rebased and validated. |
 | C. Provider compatibility | #615, #828, #1059 | Worker B lane exists but stale base | `Services/Provider/*`, `Managers/RemoteProviderManager.swift`, provider settings tests | Remote request/model discovery tests, release build | Extract a current-main branch for OpenAI-compatible providers without `/models`, direct model IDs, and MiniMax fallback. |
 | D. CapabilitySearch eval hang | #1050 | Worker C lane exists but stale base | Eval CLI/tests only | Eval CLI test with and without `CI=true` | Add noninteractive default/timeout behavior and document the CI workaround as a fallback. |
@@ -576,10 +576,10 @@ Every unsupervised tick should:
 1. Fetch and snapshot live `origin/main`, open PRs, open issues, and latest main
    CI/release/pages runs.
 2. If `origin/main` changed, require latest main CI success and rerun local
-   `swift build --package-path Packages/OsaurusCore -c release` on that exact
+   `swift build --package-path Packages/MuwaCore -c release` on that exact
    SHA before dispatching branch work.
 3. Never merge, close, delete branches, mutate main, create duplicate PRs, or
-   push without a lock under `/tmp/osaurus-coord/locks`.
+   push without a lock under `/tmp/muwa-coord/locks`.
 4. Dispatch only one branch per lane and keep write scopes disjoint.
 5. Prefer Lane A first, then Lane B/C in parallel if separate workers are
    available, then Lane D/E fallback branches.
@@ -589,7 +589,7 @@ Every unsupervised tick should:
 
 ---
 
-Snapshot update: 2026-05-14 19:05 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-14 19:05 UTC, repo `muwa-ai/muwa`.
 
 This update supersedes the 16:30 UTC section below. Live GitHub state is
 authoritative; the older sections remain as history for why the queue moved.
@@ -604,8 +604,8 @@ authoritative; the older sections remain as history for why the queue moved.
   - Release Drafter `25878282182`: `success`.
   - pages `25878280411`: `success`.
 - Current-main local release build passed on the same SHA in detached worktree
-  `/private/tmp/osaurus-coord/worktrees/main-163aaa5e` using
-  `swift build --package-path Packages/OsaurusCore -c release`.
+  `/private/tmp/muwa-coord/worktrees/main-163aaa5e` using
+  `swift build --package-path Packages/MuwaCore -c release`.
 - Open PRs evaluated: 29.
 - Draft PRs: 24. Non-draft PRs: 5.
 - Merge state distribution: 5 `MERGEABLE`, 24 `CONFLICTING`.
@@ -730,7 +730,7 @@ Each heartbeat should now:
 
 ---
 
-Snapshot update: 2026-05-14 16:30 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-14 16:30 UTC, repo `muwa-ai/muwa`.
 
 This update supersedes the 2026-05-13 queue state below while preserving it as
 history. Live GitHub state is authoritative; older notes are useful only for
@@ -746,7 +746,7 @@ why the queue moved.
 - Latest `origin/main`: `501d40350a252e5ae40cf51c1cc83aa3d6ba12b2`.
 - Latest main GitHub run: CI `25853923524`, completed `success`.
 - Current-main local release build evidence is green on the same SHA:
-  `/tmp/osaurus-coord/verifier-evidence/main-release-build-501d4035.log`.
+  `/tmp/muwa-coord/verifier-evidence/main-release-build-501d4035.log`.
 - Open issues evaluated: 32 total, including 11 `bug`, 20 `enhancement`, and
   2 `good first issue` labels. #1050 is an unlabeled reliability bug candidate.
 
@@ -757,7 +757,7 @@ Posted one maintainer nudge, and only one:
 - #1086: posted `@tpae` review/merge nudge because the PR is non-draft,
   `CLEAN`, fixes fresh bug #1085, and local plus remote gates passed on the
   exact same head SHA `df183c2b785960050e729d0e991fc2952599a147`.
-  Comment: https://github.com/osaurus-ai/osaurus/pull/1086#issuecomment-4452597924
+  Comment: https://github.com/muwa-ai/muwa/pull/1086#issuecomment-4452597924
 
 Do not post another #1048 nudge now. #1048 was already nudged on
 2026-05-10 and is currently `DIRTY` with broad non-mechanical conflicts.
@@ -776,7 +776,7 @@ proof against current main is available.
    lock.
 2. Refresh main after #1086 merges.
    Once #1086 lands, confirm `origin/main` advanced, wait for latest main CI,
-   rerun `swift build --package-path Packages/OsaurusCore -c release`, and
+   rerun `swift build --package-path Packages/MuwaCore -c release`, and
    refresh #1085/#995/#823/#789/#647/#903/#662/#689 verifier notes.
 3. Use bug work as the next productive path if PR review stalls.
    Top local reproduction/fix candidates are #647, #823/#789/#995, #615/#828,
@@ -788,7 +788,7 @@ proof against current main is available.
    changes the blocker.
 5. Keep document stack sequencing blocked behind #974.
    After #974 is manually resolved and merged, resume with #941, publish
-   `/tmp/osaurus-coord/state/format-plugin-base-sha`, then #929/#939/#940,
+   `/tmp/muwa-coord/state/format-plugin-base-sha`, then #929/#939/#940,
    followed by #936, #937, #942, #983, #1022/#1023, and #1024.
 
 ## Open PR Plan - 2026-05-14 16:30 UTC
@@ -874,11 +874,11 @@ Each heartbeat should now:
 
 ---
 
-Snapshot update: 2026-05-13 19:36 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-13 19:36 UTC, repo `muwa-ai/muwa`.
 
 This update supersedes the 13:24 UTC queue state below. It is based on all 31
 currently open PRs, current PR bodies/comments/reviews, check rollups, and the
-latest heartbeat evidence from `/tmp/osaurus-coord`.
+latest heartbeat evidence from `/tmp/muwa-coord`.
 
 ## Current State - 2026-05-13 19:36 UTC
 
@@ -891,7 +891,7 @@ latest heartbeat evidence from `/tmp/osaurus-coord`.
 - Latest `origin/main`: `f73e09b2d09e44d1d23dc00330afdd028a4cf04a`.
 - Latest main GitHub run: green.
 - Local release build of current main still fails at
-  `Packages/OsaurusCore/Services/Sandbox/SandboxManager.swift:1009` because
+  `Packages/MuwaCore/Services/Sandbox/SandboxManager.swift:1009` because
   `process.kill(signal)` receives `Int32` while the current Containerization API
   expects `Signal`.
 
@@ -900,7 +900,7 @@ latest heartbeat evidence from `/tmp/osaurus-coord`.
 The only live `@tpae` nudge required right now is #1064, because it is approved,
 directly addresses the current local-main build blocker, and remains `BEHIND`
 with red `test-core`. A focused comment was posted:
-`https://github.com/osaurus-ai/osaurus/pull/1064#issuecomment-4444593151`.
+`https://github.com/muwa-ai/muwa/pull/1064#issuecomment-4444593151`.
 
 Do not post a fresh #1048 nudge yet. #1048 is still the A0 parent, but asking
 for it to merge before the Signal API fix lands would keep downstream work
@@ -984,7 +984,7 @@ the shared main release build is red. Each tick should now:
 7. Never merge, close, delete branches, mark ready, or mutate PR bodies without
    exact local and remote gates.
 
-Snapshot update: 2026-05-13 13:24 UTC, repo `osaurus-ai/osaurus`.
+Snapshot update: 2026-05-13 13:24 UTC, repo `muwa-ai/muwa`.
 
 This update supersedes the queue state below while preserving the older
 2026-05-07 snapshot for historical context.
@@ -1003,8 +1003,8 @@ This update supersedes the queue state below while preserving the older
 - Did not duplicate comments on #992 or #873 because those already had
   follow-up notes.
 - Current local blocker: `origin/main` still fails local
-  `swift build --package-path Packages/OsaurusCore -c release` at
-  `Packages/OsaurusCore/Services/Sandbox/SandboxManager.swift:1009`, where
+  `swift build --package-path Packages/MuwaCore -c release` at
+  `Packages/MuwaCore/Services/Sandbox/SandboxManager.swift:1009`, where
   `process.kill(signal)` receives `Int32` but the Containerization API expects
   `Signal`.
 - Highest-value unblocking PR is #1064 or an equivalent mainline fix for that
@@ -1027,7 +1027,7 @@ This update supersedes the queue state below while preserving the older
    Rebase each PR on a build-clean main and mark ready only when the exact head
    SHA has clean local and remote gates.
 5. Wait until later today before posting maintainer nudges.
-   Draft nudges are staged under `/tmp/osaurus-coord/maintainer-queue/maintainer-nudges/`.
+   Draft nudges are staged under `/tmp/muwa-coord/maintainer-queue/maintainer-nudges/`.
    If there is no movement, nudge `@tpae` on #1064/#1048 and the requirement
    that all Codex PRs build cleanly before readiness.
 
@@ -1068,7 +1068,7 @@ This update supersedes the queue state below while preserving the older
 
 ---
 
-Snapshot: 2026-05-07 01:45 UTC, repo `osaurus-ai/osaurus`.
+Snapshot: 2026-05-07 01:45 UTC, repo `muwa-ai/muwa`.
 
 This is a triage and execution plan for Claude to expand and revise. It is based on GitHub open PRs, open issues labeled `bug`, PR check status, issue comments, and the local checkout state. The local checkout was on `main`, behind `origin/main` by 17 commits when this was written.
 
@@ -1136,7 +1136,7 @@ Plan:
 1. #985, `Fix open bug regressions and core build readiness`
    - Links/fixes: #662 and several related provider/runtime regressions.
    - Current blocker: `DIRTY` merge state despite green checks.
-   - Rebase onto current `origin/main`, resolve conflicts, rerun `swift build --package-path Packages/OsaurusCore`, `swift test --package-path Packages/OsaurusCore`, and PR checks.
+   - Rebase onto current `origin/main`, resolve conflicts, rerun `swift build --package-path Packages/MuwaCore`, `swift test --package-path Packages/MuwaCore`, and PR checks.
    - After merge, verify and close #662.
 2. #992, `Preserve system prompts for Gemma templates`
    - Links/fixes: #903.
@@ -1347,7 +1347,7 @@ For each PR Claude touches:
 3. Rebase onto `origin/main` unless the PR is intentionally stacked on another open PR.
 4. Resolve conflicts by preserving the narrower PR scope and dropping duplicated stale commits already merged through newer PRs.
 5. Run the smallest relevant local tests first, then the package-level checks used by the PR body.
-6. Push and recheck `gh pr checks <number> -R osaurus-ai/osaurus`.
+6. Push and recheck `gh pr checks <number> -R muwa-ai/muwa`.
 7. Update the PR body with current validation and dependency notes.
 8. Comment on linked issues with the PR number, expected release/build, and exact verification prompt or API request.
 9. Close only after the fix is merged, released if necessary, and the issue is not still reporting a separate failure mode.

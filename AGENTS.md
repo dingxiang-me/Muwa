@@ -8,25 +8,25 @@ machine context, and useful commands.
 Running tests and builds is encouraged — they're how we keep quality high. The
 canonical lanes live in `Makefile`:
 
-- `make test` — `swift test --package-path Packages/OsaurusCore` (fast unit
+- `make test` — `swift test --package-path Packages/MuwaCore` (fast unit
   loop).
 - `make ci-test` — mirrors the CI `test-core` xcodebuild job (`xcbeautify`
   output, xcresult bundle at `build/Tests.xcresult`).
 - `make cli` / `make app` — build the CLI and the embedded app via
-  `xcodebuild` against `osaurus.xcworkspace`.
-- `make evals` / `make evals-all` — run OsaurusEvals suites under
-  `Packages/OsaurusEvals/Suites/*`.
+  `xcodebuild` against `Muwa.xcworkspace`.
+- `make evals` / `make evals-all` — run MuwaEvals suites under
+  `Packages/MuwaEvals/Suites/*`.
 - Live-app smoke: `scripts/live-proof/launch-keychain-free-osaurus.sh`.
 
 ### Keychain tip (optional)
 
-Some tests touch Osaurus Keychain wrappers. If a test doesn't need real
+Some tests touch Muwa Keychain wrappers. If a test doesn't need real
 Keychain access, prefer running it in keychain-disabled mode to avoid
 unrelated "wants to use your confidential information" prompts:
 
 ```bash
-OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 \
-OSAURUS_TEST_ROOT=/tmp/osaurus-test \
+MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1 \
+MUWA_TEST_ROOT=/tmp/osaurus-test \
 make test
 ```
 
@@ -50,7 +50,7 @@ and deletes rather than calling `SecItemCopyMatching` / `SecItemAdd` /
 - Chat/API defaults must come from the active model bundle's
   `generation_config.json` or equivalent runtime config unless a user
   explicitly overrides them. Native-trained defaults such as top-k matter for
-  quality and speed; do not replace them with synthetic Osaurus defaults.
+  quality and speed; do not replace them with synthetic Muwa defaults.
 - Reasoning, tool, and chat-template behavior must be auto-detected from the
   bundle/tokenizer/template/runtime config. Do not fake thinking envelopes,
   strip visible output to hide parser bugs, or coerce one model family into
@@ -83,7 +83,7 @@ and deletes rather than calling `SecItemCopyMatching` / `SecItemAdd` /
 - Big-model load cancellation must be live-proven before promotion: if the user
   stops generation, closes chat, or exits during first load, startup must
   cancel and cleanup must prevent zombie loads and OOM growth.
-- Qwen/JANG/JANGTQ RAM regressions require end-to-end Osaurus proof with
+- Qwen/JANG/JANGTQ RAM regressions require end-to-end Muwa proof with
   physical footprint, stop status, cache telemetry, token/s, and visible
   multi-turn output before being called fixed.
 - Memory limits must apply only through documented user/runtime settings and
@@ -93,7 +93,7 @@ and deletes rather than calling `SecItemCopyMatching` / `SecItemAdd` /
   API/app error that tells the user what setting or resource limit applied.
 - Server settings are part of runtime proof, not a source-only contract. For
   every claimed model/runtime row, verify the relevant server setting wiring
-  through live Osaurus panel/API state: generation defaults and overrides,
+  through live Muwa panel/API state: generation defaults and overrides,
   reasoning mode, tool mode, memory enablement, prefix cache, paged KV, L2 disk
   cache, TurboQuant KV when applicable, media/cache settings, concurrency, and
   memory-safety settings. Toggle the setting, speak to the model, and confirm
@@ -110,7 +110,7 @@ and deletes rather than calling `SecItemCopyMatching` / `SecItemAdd` /
   live chat, `/admin/cache-stats`, and typed incompatibility rather than silent
   ignore for unsupported combinations.
 - Do not spawn recursive local "agent" workers, Python subagents, or delegated
-  helper agents for Gemma/Osaurus release work unless the user explicitly asks.
+  helper agents for Gemma/Muwa release work unless the user explicitly asks.
   Do not use Python or shell wrappers as an orchestration layer to farm work out
   to Codex, Claude, local LLMs, or other helper agents. Work directly in the
   current session, keep status artifacts current, and use normal shell, test,

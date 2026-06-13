@@ -15,7 +15,7 @@ The mental model is a redaction gate sitting between the chat surface and any re
 3. Once verified the surface flips to four sub-tabs (**Overview** / **Rules** / **Providers** / **Model**). Flip **Enable Privacy Filter** on in Overview
 4. Send a chat message that contains PII — a review sheet appears showing each detected entity, the surrounding context, and a side-by-side scrubbed preview with hover-to-reveal originals. Approve → message scrubs and sends → reply streams back with placeholders unscrubbed inline
 
-The toggle is sticky: it persists synchronously to `~/.osaurus/config/privacy-filter.json` so Cmd-Q immediately after toggling can't lose the state.
+The toggle is sticky: it persists synchronously to `~/.muwa/config/privacy-filter.json` so Cmd-Q immediately after toggling can't lose the state.
 
 ---
 
@@ -89,7 +89,7 @@ Three detectors run in sequence and union their results. The merge is by `(categ
 
 ### 1. Built-in regex (`RegexEntityDetector`)
 
-Deterministic patterns toggled per-category in **Privacy → Rules → Detection Patterns**. Each toggle controls BOTH the detection pass and the post-scrub leak check — turning a category off here means Osaurus won't flag it AND won't block a send that leaks it. The settings copy is explicit about that trade-off so users don't think the leak check is independent.
+Deterministic patterns toggled per-category in **Privacy → Rules → Detection Patterns**. Each toggle controls BOTH the detection pass and the post-scrub leak check — turning a category off here means Muwa won't flag it AND won't block a send that leaks it. The settings copy is explicit about that trade-off so users don't think the leak check is independent.
 
 | Category         | Pattern                                              |
 | ---------------- | ---------------------------------------------------- |
@@ -118,9 +118,9 @@ User-defined regex from **Privacy → Rules → Custom Rules**. Patterns are val
 
 ### 4. On-device classifier
 
-The detection model is [`openai/privacy-filter`](https://huggingface.co/openai/privacy-filter) — OpenAI's bidirectional 1.5B-parameter / ~50M-active sparse-MoE token classifier, Apache-2.0 licensed. Sparse-MoE matters here: only ~50M of those 1.5B parameters fire per token, which is why a 2.8 GB BF16 model is practical to run locally per outbound request. Osaurus ships the MLX conversion at [`mlx-community/openai-privacy-filter-bf16`](https://huggingface.co/mlx-community/openai-privacy-filter-bf16).
+The detection model is [`openai/privacy-filter`](https://huggingface.co/openai/privacy-filter) — OpenAI's bidirectional 1.5B-parameter / ~50M-active sparse-MoE token classifier, Apache-2.0 licensed. Sparse-MoE matters here: only ~50M of those 1.5B parameters fire per token, which is why a 2.8 GB BF16 model is practical to run locally per outbound request. Muwa ships the MLX conversion at [`mlx-community/openai-privacy-filter-bf16`](https://huggingface.co/mlx-community/openai-privacy-filter-bf16).
 
-The vendored `PrivacyFilterKit` decodes the model's BIOES-tagged token output with Viterbi calibration (`viterbi_calibration.json`) so adjacent tokens collapse into one span — `"John"` `"Doe"` becomes one `person` entity instead of two. The model's eight native categories (`person`, `email`, `phone`, `url`, `address`, `date`, `accountNumber`, `secret`) map 1:1 onto Osaurus's `EntityCategory` via `EntityCategory.init(_:)`.
+The vendored `PrivacyFilterKit` decodes the model's BIOES-tagged token output with Viterbi calibration (`viterbi_calibration.json`) so adjacent tokens collapse into one span — `"John"` `"Doe"` becomes one `person` entity instead of two. The model's eight native categories (`person`, `email`, `phone`, `url`, `address`, `date`, `accountNumber`, `secret`) map 1:1 onto Muwa's `EntityCategory` via `EntityCategory.init(_:)`.
 
 Categories the classifier emits that aren't backed by a regex layer (`address`, `person`, `date`, `secret`) are model-only.
 
@@ -245,7 +245,7 @@ The pre-install hero matches `SettingsEmptyState` visual weight (Schedules, Watc
 | `customRules`            | `[]`    | User-defined `PrivacyRule` array (name, category, pattern, enabled).                              |
 | `providerOverrides`      | `{}`    | Per-provider enable map keyed by `RemoteProvider.id.uuidString`. Missing keys → true.             |
 
-Stored at `~/.osaurus/config/privacy-filter.json`. The `Codable` decoder is hand-rolled (not synthesized) so new fields land with safe defaults instead of failing the whole decode when an older on-disk config file is missing them — turning on the master toggle in a future Osaurus that grows a new setting will never reset the user's other choices.
+Stored at `~/.muwa/config/privacy-filter.json`. The `Codable` decoder is hand-rolled (not synthesized) so new fields land with safe defaults instead of failing the whole decode when an older on-disk config file is missing them — turning on the master toggle in a future Muwa that grows a new setting will never reset the user's other choices.
 
 ---
 
@@ -253,11 +253,11 @@ Stored at `~/.osaurus/config/privacy-filter.json`. The `Codable` decoder is hand
 
 | Path                                                                        | Contents                                                                            |
 | --------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| `~/.osaurus/config/privacy-filter.json`                                     | User configuration (plaintext, atomic write)                                        |
-| `~/.osaurus/aux-models/openai-privacy-filter-bf16-v1/`                      | Model bundle (`config.json`, `model.safetensors`, `tokenizer.json`, calibration)    |
-| `~/.osaurus/aux-models/openai-privacy-filter-bf16-v1/osaurus-manifest.json` | Locally generated SHA-256 manifest used by **Re-verify**                            |
+| `~/.muwa/config/privacy-filter.json`                                     | User configuration (plaintext, atomic write)                                        |
+| `~/.muwa/aux-models/openai-privacy-filter-bf16-v1/`                      | Model bundle (`config.json`, `model.safetensors`, `tokenizer.json`, calibration)    |
+| `~/.muwa/aux-models/openai-privacy-filter-bf16-v1/muwa-manifest.json` | Locally generated SHA-256 manifest used by **Re-verify**                            |
 
-The manifest is synthesized from Hugging Face's `/api/models/.../tree/main` payload at download time (LFS files expose `lfs.oid` which is a real SHA-256). The upstream repo doesn't ship one, so this is Osaurus's own integrity record. Re-verify re-hashes every required file and reports mismatches without re-downloading.
+The manifest is synthesized from Hugging Face's `/api/models/.../tree/main` payload at download time (LFS files expose `lfs.oid` which is a real SHA-256). The upstream repo doesn't ship one, so this is Muwa's own integrity record. Re-verify re-hashes every required file and reports mismatches without re-downloading.
 
 `SessionRedactionStore` is in-memory only — placeholder maps don't persist across app restarts, and each chat session has its own entry keyed by `sessionId`. **Forget Redactions in Every Conversation** in the Overview tab clears the live actor state; the next outbound send mints fresh placeholders.
 
@@ -296,11 +296,11 @@ Overrides are keyed by `RemoteProvider.id` (UUID) so renaming or re-creating a p
 
 ## Troubleshooting
 
-**Toggle resets to off after restart.** Fixed in the synchronous-save change. If it recurs, check that `~/.osaurus/config/privacy-filter.json` is writable (`-rw-r--r--`) and that `PrivacyFilterStore.setOverrideDirectory` isn't stuck on a leftover test path (only relevant if you're running Osaurus from a development build right after `swift test`).
+**Toggle resets to off after restart.** Fixed in the synchronous-save change. If it recurs, check that `~/.muwa/config/privacy-filter.json` is writable (`-rw-r--r--`) and that `PrivacyFilterStore.setOverrideDirectory` isn't stuck on a leftover test path (only relevant if you're running Muwa from a development build right after `swift test`).
 
 **Review sheet appears but the send goes unscrubbed.** The sheet's Send button used to be wired through the `.approved` array but didn't always re-run the scrub when the user toggled individual entities off and then back on. Confirm by checking **Insights → Server Request** for placeholders. If you see raw PII in the wire body, file an issue with the request log — the `WireTransportProbe` capture is the smoking-gun evidence.
 
-**"Privacy Filter is enabled but the on-device model isn't available."** The bundle isn't installed or failed to verify. Open **Privacy → Model** and click **Re-verify**. If the verifier reports mismatches, the easiest path is to delete `~/.osaurus/aux-models/openai-privacy-filter-bf16-v1/` and re-install from the **Privacy** tab.
+**"Privacy Filter is enabled but the on-device model isn't available."** The bundle isn't installed or failed to verify. Open **Privacy → Model** and click **Re-verify**. If the verifier reports mismatches, the easiest path is to delete `~/.muwa/aux-models/openai-privacy-filter-bf16-v1/` and re-install from the **Privacy** tab.
 
 **Per-category leak block is too aggressive.** The post-scrub invariant re-scans for the same categories as detection, so if you've enabled `awsKey` as a preset and your prompt legitimately contains a string that matches the AWS-key heuristic but ISN'T a key, the send blocks. Disable the preset or refine its pattern via a custom rule with a tighter regex.
 
@@ -344,7 +344,7 @@ Overrides are keyed by `RemoteProvider.id` (UUID) so renaming or re-creating a p
 
 ## Related Docs
 
-- [Memory](MEMORY.md) — what Osaurus *keeps* about your conversations (orthogonal to what gets scrubbed on send)
+- [Memory](MEMORY.md) — what Muwa *keeps* about your conversations (orthogonal to what gets scrubbed on send)
 - [Remote Providers](REMOTE_PROVIDERS.md) — provider configuration; per-provider overrides in Privacy live alongside provider records
 - [Developer Tools](DEVELOPER_TOOLS.md) — Insights surface used to verify wire-level redaction
 - [Localization](LOCALIZATION.md) — adding new languages for the Privacy settings and review sheet

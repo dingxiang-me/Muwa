@@ -1,0 +1,25 @@
+{
+  "id": "capability_claims.skill-first",
+  "domain": "capability_claims",
+  "label": "capability claims • load governing skill before tool group",
+  "query": "Go to example.com and tell me the page's main heading.",
+  "notes": "The 'Muwa Browser' skill governs the browser tool group. The manifest lists the skill alongside the tools and the 'Skills that govern tool groups' rule tells the model to load the skill first. Deterministic ordering check: a capabilities_load carrying skill/Muwa Browser must precede any browser_* tool call. Requires muwa.browser installed.",
+  "fixtures": {
+    "requirePlugins": ["muwa.browser"],
+    "enableSkills": ["Muwa Browser"],
+    "enableTools": ["browser_navigate", "browser_do", "browser_read"]
+  },
+  "expect": {
+    "capabilityClaims": {
+      "rubric": [
+        "Attempts the browser task rather than denying it has browser tools."
+      ],
+      "mustCallTools": ["capabilities_load"],
+      "loadSkillFirst": {
+        "skill": "Muwa Browser",
+        "beforeTools": ["browser_navigate", "browser_do", "browser_read"]
+      },
+      "maxIterations": 8
+    }
+  }
+}

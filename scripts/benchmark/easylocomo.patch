@@ -162,7 +162,7 @@ index 24feb39..347eae9 100644
  
 +def _extra_headers():
 +    if config.agent_id:
-+        return {"X-Osaurus-Agent-Id": config.agent_id}
++        return {"X-Muwa-Agent-Id": config.agent_id}
 +    return None
 +
  def get_openai_client():

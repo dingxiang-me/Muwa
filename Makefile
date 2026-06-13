@@ -1,12 +1,12 @@
 SHELL := /bin/bash
 
 # Default configuration
-# The scheme for the CLI package is typically "osaurus-cli" (the package name)
-SCHEME_CLI := osaurus-cli
-SCHEME_APP := osaurus
+# The scheme for the CLI package is typically "muwa-cli" (the package name)
+SCHEME_CLI := muwa-cli
+SCHEME_APP := Muwa
 CONFIG := Release
-PROJECT := App/osaurus.xcodeproj
-WORKSPACE := osaurus.xcworkspace
+PROJECT := App/Muwa.xcodeproj
+WORKSPACE := Muwa.xcworkspace
 DERIVED := build/DerivedData
 XCODEBUILD_FLAGS ?=
 
@@ -16,7 +16,7 @@ help:
 	@echo "Targets:"
 	@echo "  cli            Build CLI ($(SCHEME_CLI)) into $(DERIVED)"
 	@echo "  app            Build app ($(SCHEME_APP)) and embed CLI"
-	@echo "  install-cli    Install/update /usr/local/bin/osaurus symlink"
+	@echo "  install-cli    Install/update /usr/local/bin/muwa symlink"
 	@echo "  serve          Build CLI and start server (use PORT=XXXX, EXPOSE=1)"
 	@echo "  status         Check if server is running"
 	@echo "  bench-setup         Clone EasyLocomo + apply patches + install deps"
@@ -24,13 +24,13 @@ help:
 	@echo "  bench-ingest-chunks Fast chunk-only backfill (no LLM, ~minutes)"
 	@echo "  bench-run           Run LOCOMO benchmark only (skip ingestion)"
 	@echo "  bench               Full ingest + run LOCOMO benchmark"
-	@echo "  evals               Run one OsaurusEvals suite (MODEL=, FILTER=, EVALS_SUITE=)"
+	@echo "  evals               Run one MuwaEvals suite (MODEL=, FILTER=, EVALS_SUITE=)"
 	@echo "  evals-verbose       Same as 'evals' plus per-case raw LLM response (debugging prompt iter)"
 	@echo "  evals-report        Same as 'evals' but also writes JSON to EVALS_OUT (build/evals.json)"
-	@echo "  evals-all           Run every suite under Packages/OsaurusEvals/Suites/* (MODEL=, FILTER=)"
+	@echo "  evals-all           Run every suite under Packages/MuwaEvals/Suites/* (MODEL=, FILTER=)"
 	@echo "  evals-all-verbose   Same as 'evals-all' plus per-case raw LLM response"
 	@echo "  evals-all-report    Same as 'evals-all' but writes per-suite JSON to EVALS_OUT_DIR (build/evals/)"
-	@echo "  test           Run OsaurusCore package tests via 'swift test'"
+	@echo "  test           Run MuwaCore package tests via 'swift test'"
 	@echo "  ci-test        Reproduce the CI test-core job locally (xcodebuild + xcbeautify)"
 	@echo "  clean          Remove DerivedData build output"
 
@@ -42,31 +42,31 @@ app: cli
 	@echo "Building app ($(SCHEME_APP))…"
 	xcodebuild -workspace $(WORKSPACE) -scheme $(SCHEME_APP) -configuration $(CONFIG) -derivedDataPath $(DERIVED) build -quiet $(XCODEBUILD_FLAGS)
 	@echo "Embedding CLI into App Bundle (Helpers)…"
-	# Copy osaurus-cli to osaurus.app/Contents/Helpers/osaurus
-	mkdir -p "$(DERIVED)/Build/Products/$(CONFIG)/osaurus.app/Contents/Helpers"
-	cp "$(DERIVED)/Build/Products/$(CONFIG)/osaurus-cli" "$(DERIVED)/Build/Products/$(CONFIG)/osaurus.app/Contents/Helpers/osaurus"
-	chmod +x "$(DERIVED)/Build/Products/$(CONFIG)/osaurus.app/Contents/Helpers/osaurus"
+	# Copy muwa-cli to Muwa.app/Contents/Helpers/muwa
+	mkdir -p "$(DERIVED)/Build/Products/$(CONFIG)/Muwa.app/Contents/Helpers"
+	cp "$(DERIVED)/Build/Products/$(CONFIG)/muwa-cli" "$(DERIVED)/Build/Products/$(CONFIG)/Muwa.app/Contents/Helpers/muwa"
+	chmod +x "$(DERIVED)/Build/Products/$(CONFIG)/Muwa.app/Contents/Helpers/muwa"
 
 install-cli: cli
 	@echo "Installing CLI symlink…"
 	./scripts/release/install_cli_symlink.sh --dev
 
 serve: install-cli
-	@echo "Starting Osaurus server…"
+	@echo "Starting Muwa server…"
 	@if [[ -n "$(PORT)" ]]; then \
 		ARGS="$$ARGS --port $(PORT)"; \
 	fi; \
 	if [[ "$(EXPOSE)" == "1" ]]; then \
 		ARGS="$$ARGS --expose"; \
 	fi; \
-	osaurus serve $$ARGS
+	muwa serve $$ARGS
 
 status:
-	osaurus status
+	muwa status
 
 test:
-	@echo "Running OsaurusCore tests…"
-	swift test --package-path Packages/OsaurusCore
+	@echo "Running MuwaCore tests…"
+	swift test --package-path Packages/MuwaCore
 
 # Mirrors the CI `test-core` job: same xcodebuild flags, same xcbeautify
 # pipe, same xcresult bundle. Run this locally to repro a failed CI run.
@@ -80,8 +80,8 @@ ci-test:
 	@mkdir -p build
 	@rm -rf build/Tests.xcresult
 	@set -o pipefail; xcodebuild test \
-		-workspace osaurus.xcworkspace \
-		-scheme OsaurusCoreTests \
+		-workspace Muwa.xcworkspace \
+		-scheme MuwaCoreTests \
 		-resultBundlePath build/Tests.xcresult \
 		-quiet \
 		-skipPackagePluginValidation \
@@ -113,14 +113,14 @@ bench-setup:
 	else \
 		echo "EasyLocomo already cloned."; \
 	fi
-	@echo "Applying Osaurus patches…"
+	@echo "Applying Muwa patches…"
 	cd $(EASYLOCOMO_DIR) && git checkout -- . && git apply ../../scripts/benchmark/easylocomo.patch
 	@echo "Installing Python dependencies…"
 	cd $(EASYLOCOMO_DIR) && python -m venv .venv && .venv/bin/pip install -q -r requirements.txt
 	@echo "Done. Run 'make bench-ingest' then 'make bench-run'."
 
 bench-ingest:
-	@echo "Ingesting LOCOMO conversations into Osaurus memory…"
+	@echo "Ingesting LOCOMO conversations into Muwa memory…"
 	$(BENCH_PYTHON) scripts/benchmark/ingest_locomo.py --base-url $(BENCH_BASE_URL)
 
 bench-ingest-chunks:
@@ -137,15 +137,15 @@ bench-run:
 
 bench: bench-ingest bench-run
 
-## ── OsaurusEvals (off-CI behaviour evals) ────────────────────────
+## ── MuwaEvals (off-CI behaviour evals) ────────────────────────
 # Override on the command line, e.g.
 #   make evals MODEL=foundation
 #   make evals MODEL=openai/gpt-4o-mini FILTER=browser
 #   make evals-report EVALS_OUT=reports/today.json
 # Default model is `auto` (whatever ChatConfigurationStore is set to);
-# see Packages/OsaurusEvals/README.md for the full --model grammar.
+# see Packages/MuwaEvals/README.md for the full --model grammar.
 
-EVALS_ROOT := Packages/OsaurusEvals/Suites
+EVALS_ROOT := Packages/MuwaEvals/Suites
 EVALS_SUITE ?= $(EVALS_ROOT)/CapabilitySearch
 EVALS_OUT ?= build/evals.json
 EVALS_OUT_DIR ?= build/evals
@@ -155,15 +155,15 @@ EVALS_OUT_DIR ?= build/evals
 EVALS_ALL_SUITES := $(sort $(dir $(wildcard $(EVALS_ROOT)/*/)))
 
 evals:
-	@echo "Running OsaurusEvals against $(EVALS_SUITE)…"
-	swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+	@echo "Running MuwaEvals against $(EVALS_SUITE)…"
+	swift run --package-path Packages/MuwaEvals muwa-evals run \
 		--suite $(EVALS_SUITE) \
 		$(if $(MODEL),--model $(MODEL),) \
 		$(if $(FILTER),--filter $(FILTER),)
 
 evals-verbose:
-	@echo "Running OsaurusEvals (verbose) against $(EVALS_SUITE)…"
-	swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+	@echo "Running MuwaEvals (verbose) against $(EVALS_SUITE)…"
+	swift run --package-path Packages/MuwaEvals muwa-evals run \
 		--suite $(EVALS_SUITE) \
 		--verbose \
 		$(if $(MODEL),--model $(MODEL),) \
@@ -171,7 +171,7 @@ evals-verbose:
 
 evals-report:
 	@mkdir -p $(dir $(EVALS_OUT))
-	swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+	swift run --package-path Packages/MuwaEvals muwa-evals run \
 		--suite $(EVALS_SUITE) \
 		$(if $(MODEL),--model $(MODEL),) \
 		$(if $(FILTER),--filter $(FILTER),) \
@@ -187,7 +187,7 @@ evals-all:
 	@rc=0; for suite in $(EVALS_ALL_SUITES); do \
 		echo ""; \
 		echo "── $$suite ──"; \
-		swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+		swift run --package-path Packages/MuwaEvals muwa-evals run \
 			--suite $$suite \
 			$(if $(MODEL),--model $(MODEL),) \
 			$(if $(FILTER),--filter $(FILTER),) \
@@ -200,7 +200,7 @@ evals-all-verbose:
 	@rc=0; for suite in $(EVALS_ALL_SUITES); do \
 		echo ""; \
 		echo "── $$suite ──"; \
-		swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+		swift run --package-path Packages/MuwaEvals muwa-evals run \
 			--suite $$suite \
 			--verbose \
 			$(if $(MODEL),--model $(MODEL),) \
@@ -218,7 +218,7 @@ evals-all-report:
 		out="$(EVALS_OUT_DIR)/$$name.json"; \
 		echo ""; \
 		echo "── $$suite → $$out ──"; \
-		swift run --package-path Packages/OsaurusEvals osaurus-evals run \
+		swift run --package-path Packages/MuwaEvals muwa-evals run \
 			--suite $$suite \
 			$(if $(MODEL),--model $(MODEL),) \
 			$(if $(FILTER),--filter $(FILTER),) \

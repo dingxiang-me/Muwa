@@ -2,7 +2,7 @@
 
 Date: 2026-05-06
 
-This PR wires the Osaurus UI/catalog side of Ling-2.6 Flash to the vmlx
+This PR wires the Muwa UI/catalog side of Ling-2.6 Flash to the vmlx
 BailingHybrid runtime path.
 
 ## Dependency Pins
@@ -23,7 +23,7 @@ BailingHybrid runtime path.
     `controlPlaneYieldInterval=8` keeps long B=1 decodes from starving
     cancel/shutdown/config-update, and `updateMaxBatchSize(_:)` is a
     runtime API so hosts hot-resize without an explicit model evict.
-    Osaurus's `MLXBatchAdapter.Registry.engine(...)` adopts the new API
+    Muwa's `MLXBatchAdapter.Registry.engine(...)` adopts the new API
     and evict-rebuilds on `.engineShutdown`.
   - Ports `BailingLinearAttention.recurrentGLA` to a fused Metal kernel
     (`bailing_recurrent_gla` via singleton kernel manager). Closes the
@@ -39,12 +39,12 @@ BailingHybrid runtime path.
   - `enableSSMReDerive` default remains `true`; osaurus now preserves that
     automatic hybrid-cache default so SSM/linear-attention companion state can
     rederive/store after generation and participate in prefix/L2 restores.
-- `swift-jinja`: unchanged at the existing Osaurus fork pin. No new parser
+- `swift-jinja`: unchanged at the existing Muwa fork pin. No new parser
   behavior is needed for Ling in this PR.
 - `mlx-swift` / `mlx`: unchanged. No MLX kernel or ABI change is required by
   this osaurus integration.
 
-## Osaurus Wiring
+## Muwa Wiring
 
 - Adds curated catalog entries for:
   - `OsaurusAI/Ling-2.6-flash-MXFP4`
@@ -63,11 +63,11 @@ BailingHybrid runtime path.
 
 ## Review Notes
 
-- No osaurus-side prompt mutation is used. The only Ling-specific runtime
+- No muwa-side prompt mutation is used. The only Ling-specific runtime
   policy in osaurus is the explicit `enable_thinking=false` context passed to
   vmlx before tokenizer rendering.
 - No JANGTQ3 path is introduced; the vmlx pin rejects it.
-- Ling has no osaurus-side opt-in path for reasoning. This is intentional:
+- Ling has no muwa-side opt-in path for reasoning. This is intentional:
   the Flash SKU is used as a direct-answer chat model, and reasoning-only
   output can leave voice/chat sessions looking stuck behind the Stop control.
 - The MiniMax JANGTQ_K decoder fix is included in the same vmlx pin; osaurus

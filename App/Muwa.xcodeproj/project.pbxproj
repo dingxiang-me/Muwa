@@ -1,0 +1,704 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 77;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		05576F752F72E7D800EF3CD3 /* MuwaCore in Frameworks */ = {isa = PBXBuildFile; productRef = 05576F742F72E7D800EF3CD3 /* MuwaCore */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		F0BB3C352E51FBCD00895593 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F0BB3C1E2E51FBCC00895593 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0BB3C252E51FBCC00895593;
+			remoteInfo = Muwa;
+		};
+		F0BB3C3F2E51FBCD00895593 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = F0BB3C1E2E51FBCC00895593 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = F0BB3C252E51FBCC00895593;
+			remoteInfo = Muwa;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXCopyFilesBuildPhase section */
+		F0EEC1202E60000100895593 /* Embed CLI */ = {
+			isa = PBXCopyFilesBuildPhase;
+			buildActionMask = 2147483647;
+			dstPath = Contents/Helpers;
+			dstSubfolderSpec = 6;
+			files = (
+			);
+			name = "Embed CLI";
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXCopyFilesBuildPhase section */
+
+/* Begin PBXFileReference section */
+		F0BB3C262E51FBCC00895593 /* Muwa.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Muwa.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0BB3C342E51FBCD00895593 /* MuwaTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MuwaTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		F0BB3C3E2E51FBCD00895593 /* MuwaUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = MuwaUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		F025D88A2E86B24100A507DE /* Exceptions for "Muwa" folder in "Muwa" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+				Secrets.xcconfig,
+			);
+			target = F0BB3C252E51FBCC00895593 /* Muwa */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
+/* Begin PBXFileSystemSynchronizedRootGroup section */
+		F0BB3C282E51FBCC00895593 /* Muwa */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				F025D88A2E86B24100A507DE /* Exceptions for "Muwa" folder in "Muwa" target */,
+			);
+			path = Muwa;
+			sourceTree = "<group>";
+		};
+		F0BB3C412E51FBCD00895593 /* MuwaUITests */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = MuwaUITests;
+			sourceTree = "<group>";
+		};
+/* End PBXFileSystemSynchronizedRootGroup section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		F0BB3C232E51FBCC00895593 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				05576F752F72E7D800EF3CD3 /* MuwaCore in Frameworks */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BB3C312E51FBCD00895593 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BB3C3B2E51FBCD00895593 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		F0BB3C1D2E51FBCC00895593 = {
+			isa = PBXGroup;
+			children = (
+				F0BB3C282E51FBCC00895593 /* Muwa */,
+				F0BB3C412E51FBCD00895593 /* MuwaUITests */,
+				F0C60E852E54A26A0028ED4F /* Frameworks */,
+				F0BB3C272E51FBCC00895593 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		F0BB3C272E51FBCC00895593 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				F0BB3C262E51FBCC00895593 /* Muwa.app */,
+				F0BB3C342E51FBCD00895593 /* MuwaTests.xctest */,
+				F0BB3C3E2E51FBCD00895593 /* MuwaUITests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+		F0C60E852E54A26A0028ED4F /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+			);
+			name = Frameworks;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		F0BB3C252E51FBCC00895593 /* Muwa */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0BB3C482E51FBCD00895593 /* Build configuration list for PBXNativeTarget "Muwa" */;
+			buildPhases = (
+				F0BB3C222E51FBCC00895593 /* Sources */,
+				F0BB3C232E51FBCC00895593 /* Frameworks */,
+				F0BB3C242E51FBCC00895593 /* Resources */,
+				F0EEC1202E60000100895593 /* Embed CLI */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			fileSystemSynchronizedGroups = (
+				F0BB3C282E51FBCC00895593 /* Muwa */,
+			);
+			name = Muwa;
+			packageProductDependencies = (
+				05576F742F72E7D800EF3CD3 /* MuwaCore */,
+			);
+			productName = Muwa;
+			productReference = F0BB3C262E51FBCC00895593 /* Muwa.app */;
+			productType = "com.apple.product-type.application";
+		};
+		F0BB3C332E51FBCD00895593 /* MuwaTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0BB3C4B2E51FBCD00895593 /* Build configuration list for PBXNativeTarget "MuwaTests" */;
+			buildPhases = (
+				F0BB3C302E51FBCD00895593 /* Sources */,
+				F0BB3C312E51FBCD00895593 /* Frameworks */,
+				F0BB3C322E51FBCD00895593 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F0BB3C362E51FBCD00895593 /* PBXTargetDependency */,
+			);
+			name = MuwaTests;
+			packageProductDependencies = (
+			);
+			productName = MuwaTests;
+			productReference = F0BB3C342E51FBCD00895593 /* MuwaTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+		F0BB3C3D2E51FBCD00895593 /* MuwaUITests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = F0BB3C4E2E51FBCD00895593 /* Build configuration list for PBXNativeTarget "MuwaUITests" */;
+			buildPhases = (
+				F0BB3C3A2E51FBCD00895593 /* Sources */,
+				F0BB3C3B2E51FBCD00895593 /* Frameworks */,
+				F0BB3C3C2E51FBCD00895593 /* Resources */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				F0BB3C402E51FBCD00895593 /* PBXTargetDependency */,
+			);
+			fileSystemSynchronizedGroups = (
+				F0BB3C412E51FBCD00895593 /* MuwaUITests */,
+			);
+			name = MuwaUITests;
+			packageProductDependencies = (
+			);
+			productName = MuwaUITests;
+			productReference = F0BB3C3E2E51FBCD00895593 /* MuwaUITests.xctest */;
+			productType = "com.apple.product-type.bundle.ui-testing";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		F0BB3C1E2E51FBCC00895593 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1640;
+				LastUpgradeCheck = 2630;
+				TargetAttributes = {
+					F0BB3C252E51FBCC00895593 = {
+						CreatedOnToolsVersion = 16.4;
+					};
+					F0BB3C332E51FBCD00895593 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = F0BB3C252E51FBCC00895593;
+					};
+					F0BB3C3D2E51FBCD00895593 = {
+						CreatedOnToolsVersion = 16.4;
+						TestTargetID = F0BB3C252E51FBCC00895593;
+					};
+				};
+			};
+			buildConfigurationList = F0BB3C212E51FBCC00895593 /* Build configuration list for PBXProject "Muwa" */;
+			developmentRegion = en;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				en,
+				de,
+				"zh-Hans",
+				es,
+				ko,
+				ja,
+				"zh-Hant",
+				Base,
+			);
+			mainGroup = F0BB3C1D2E51FBCC00895593;
+			minimizedProjectReferenceProxies = 1;
+			packageReferences = (
+				F0F4E2992ED1209200BEFA4D /* XCLocalSwiftPackageReference "../Packages/MuwaRepository" */,
+				F0AA7F342ED20D2E00672B07 /* XCLocalSwiftPackageReference "../Packages/MuwaCLI" */,
+				F0AA7F3B2ED20DA700672B07 /* XCLocalSwiftPackageReference "../Packages/MuwaCore" */,
+			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = F0BB3C272E51FBCC00895593 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				F0BB3C252E51FBCC00895593 /* Muwa */,
+				F0BB3C332E51FBCD00895593 /* MuwaTests */,
+				F0BB3C3D2E51FBCD00895593 /* MuwaUITests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		F0BB3C242E51FBCC00895593 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BB3C322E51FBCD00895593 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BB3C3C2E51FBCD00895593 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		F0BB3C222E51FBCC00895593 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BB3C302E51FBCD00895593 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		F0BB3C3A2E51FBCD00895593 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		F0BB3C362E51FBCD00895593 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0BB3C252E51FBCC00895593 /* Muwa */;
+			targetProxy = F0BB3C352E51FBCD00895593 /* PBXContainerItemProxy */;
+		};
+		F0BB3C402E51FBCD00895593 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = F0BB3C252E51FBCC00895593 /* Muwa */;
+			targetProxy = F0BB3C3F2E51FBCD00895593 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		F0BB3C462E51FBCD00895593 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = dwarf;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_DYNAMIC_NO_PIC = NO;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_OPTIMIZATION_LEVEL = 0;
+				GCC_PREPROCESSOR_DEFINITIONS = (
+					"DEBUG=1",
+					"$(inherited)",
+				);
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = INCLUDE_SOURCE;
+				MTL_FAST_MATH = YES;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+			};
+			name = Debug;
+		};
+		F0BB3C472E51FBCD00895593 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				ASSETCATALOG_COMPILER_GENERATE_SWIFT_ASSET_SYMBOL_EXTENSIONS = YES;
+				CLANG_ANALYZER_NONNULL = YES;
+				CLANG_ANALYZER_NUMBER_OBJECT_CONVERSION = YES_AGGRESSIVE;
+				CLANG_CXX_LANGUAGE_STANDARD = "gnu++20";
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CLANG_ENABLE_OBJC_WEAK = YES;
+				CLANG_WARN_BLOCK_CAPTURE_AUTORELEASING = YES;
+				CLANG_WARN_BOOL_CONVERSION = YES;
+				CLANG_WARN_COMMA = YES;
+				CLANG_WARN_CONSTANT_CONVERSION = YES;
+				CLANG_WARN_DEPRECATED_OBJC_IMPLEMENTATIONS = YES;
+				CLANG_WARN_DIRECT_OBJC_ISA_USAGE = YES_ERROR;
+				CLANG_WARN_DOCUMENTATION_COMMENTS = YES;
+				CLANG_WARN_EMPTY_BODY = YES;
+				CLANG_WARN_ENUM_CONVERSION = YES;
+				CLANG_WARN_INFINITE_RECURSION = YES;
+				CLANG_WARN_INT_CONVERSION = YES;
+				CLANG_WARN_NON_LITERAL_NULL_CONVERSION = YES;
+				CLANG_WARN_OBJC_IMPLICIT_RETAIN_SELF = YES;
+				CLANG_WARN_OBJC_LITERAL_CONVERSION = YES;
+				CLANG_WARN_OBJC_ROOT_CLASS = YES_ERROR;
+				CLANG_WARN_QUOTED_INCLUDE_IN_FRAMEWORK_HEADER = YES;
+				CLANG_WARN_RANGE_LOOP_ANALYSIS = YES;
+				CLANG_WARN_STRICT_PROTOTYPES = YES;
+				CLANG_WARN_SUSPICIOUS_MOVE = YES;
+				CLANG_WARN_UNGUARDED_AVAILABILITY = YES_AGGRESSIVE;
+				CLANG_WARN_UNREACHABLE_CODE = YES;
+				CLANG_WARN__DUPLICATE_METHOD_MATCH = YES;
+				COPY_PHASE_STRIP = NO;
+				DEAD_CODE_STRIPPING = YES;
+				DEBUG_INFORMATION_FORMAT = "dwarf-with-dsym";
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_STRICT_OBJC_MSGSEND = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				GCC_C_LANGUAGE_STANDARD = gnu17;
+				GCC_NO_COMMON_BLOCKS = YES;
+				GCC_WARN_64_TO_32_BIT_CONVERSION = YES;
+				GCC_WARN_ABOUT_RETURN_TYPE = YES_ERROR;
+				GCC_WARN_UNDECLARED_SELECTOR = YES;
+				GCC_WARN_UNINITIALIZED_AUTOS = YES_AGGRESSIVE;
+				GCC_WARN_UNUSED_FUNCTION = YES;
+				GCC_WARN_UNUSED_VARIABLE = YES;
+				LOCALIZATION_PREFERS_STRING_CATALOGS = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MTL_ENABLE_DEBUG_INFO = NO;
+				MTL_FAST_MATH = YES;
+				SDKROOT = macosx;
+				STRING_CATALOG_GENERATE_SYMBOLS = YES;
+				SWIFT_COMPILATION_MODE = wholemodule;
+			};
+			name = Release;
+		};
+		F0BB3C492E51FBCD00895593 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReferenceAnchor = F0BB3C282E51FBCC00895593 /* Muwa */;
+			baseConfigurationReferenceRelativePath = Secrets.xcconfig;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = YES;
+				CODE_SIGN_ENTITLEMENTS = Muwa/muwa.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = YES;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = YES;
+				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Muwa/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Muwa;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Muwa plugins may use automation to control other applications on your behalf.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Muwa plugins may access your calendar to read and create events.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Muwa plugins may access your calendar to read and create events.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Muwa uses the microphone for on-device voice transcription with FluidAudio.";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Muwa plugins may access your reminders to read and create tasks.";
+				INFOPLIST_KEY_SUEnableAutomaticChecks = YES;
+				INFOPLIST_KEY_SUFeedURL = "$(SU_FEED_URL)";
+				INFOPLIST_KEY_SUPublicEDKey = "$(SPARKLE_PUBLIC_ED_KEY)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinoki.muwa;
+				PRODUCT_NAME = Muwa;
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
+				SPARKLE_PUBLIC_ED_KEY = "NQKrakIb5Ubs7VsOIilz5nbfl8drP0YWbDrCYDtYDko=";
+				SU_FEED_URL = "https://dingxiang-me.github.io/Muwa/appcast.xml";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.2;
+			};
+			name = Debug;
+		};
+		F0BB3C4A2E51FBCD00895593 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				AUTOMATION_APPLE_EVENTS = YES;
+				CODE_SIGN_ENTITLEMENTS = Muwa/muwa.entitlements;
+				"CODE_SIGN_IDENTITY[sdk=macosx*]" = "Apple Development";
+				CODE_SIGN_STYLE = Automatic;
+				COMBINE_HIDPI_IMAGES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				ENABLE_APP_SANDBOX = NO;
+				ENABLE_HARDENED_RUNTIME = YES;
+				ENABLE_OUTGOING_NETWORK_CONNECTIONS = YES;
+				ENABLE_PREVIEWS = YES;
+				ENABLE_RESOURCE_ACCESS_AUDIO_INPUT = YES;
+				ENABLE_RESOURCE_ACCESS_CALENDARS = YES;
+				ENABLE_RESOURCE_ACCESS_CAMERA = NO;
+				ENABLE_RESOURCE_ACCESS_CONTACTS = YES;
+				ENABLE_RESOURCE_ACCESS_LOCATION = YES;
+				ENABLE_RESOURCE_ACCESS_PHOTO_LIBRARY = NO;
+				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = Muwa/Info.plist;
+				INFOPLIST_KEY_CFBundleDisplayName = Muwa;
+				INFOPLIST_KEY_ITSAppUsesNonExemptEncryption = NO;
+				INFOPLIST_KEY_LSApplicationCategoryType = "public.app-category.utilities";
+				INFOPLIST_KEY_LSUIElement = YES;
+				INFOPLIST_KEY_NSAppleEventsUsageDescription = "Muwa plugins may use automation to control other applications on your behalf.";
+				INFOPLIST_KEY_NSCalendarsFullAccessUsageDescription = "Muwa plugins may access your calendar to read and create events.";
+				INFOPLIST_KEY_NSCalendarsUsageDescription = "Muwa plugins may access your calendar to read and create events.";
+				INFOPLIST_KEY_NSHumanReadableCopyright = "";
+				INFOPLIST_KEY_NSMicrophoneUsageDescription = "Muwa uses the microphone for on-device voice transcription with FluidAudio.";
+				INFOPLIST_KEY_NSRemindersUsageDescription = "Muwa plugins may access your reminders to read and create tasks.";
+				INFOPLIST_KEY_SUEnableAutomaticChecks = YES;
+				INFOPLIST_KEY_SUFeedURL = "$(SU_FEED_URL)";
+				INFOPLIST_KEY_SUPublicEDKey = "$(SPARKLE_PUBLIC_ED_KEY)";
+				LD_RUNPATH_SEARCH_PATHS = (
+					"$(inherited)",
+					"@executable_path/../Frameworks",
+				);
+				MACOSX_DEPLOYMENT_TARGET = 15.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinoki.muwa;
+				PRODUCT_NAME = Muwa;
+				REGISTER_APP_GROUPS = YES;
+				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
+				RUNTIME_EXCEPTION_ALLOW_JIT = NO;
+				RUNTIME_EXCEPTION_ALLOW_UNSIGNED_EXECUTABLE_MEMORY = NO;
+				RUNTIME_EXCEPTION_DEBUGGING_TOOL = NO;
+				RUNTIME_EXCEPTION_DISABLE_EXECUTABLE_PAGE_PROTECTION = NO;
+				RUNTIME_EXCEPTION_DISABLE_LIBRARY_VALIDATION = YES;
+				SPARKLE_PUBLIC_ED_KEY = "NQKrakIb5Ubs7VsOIilz5nbfl8drP0YWbDrCYDtYDko=";
+				SU_FEED_URL = "https://dingxiang-me.github.io/Muwa/appcast.xml";
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.2;
+			};
+			name = Release;
+		};
+		F0BB3C4C2E51FBCD00895593 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinoki.muwaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Muwa.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Muwa";
+			};
+			name = Debug;
+		};
+		F0BB3C4D2E51FBCD00895593 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MACOSX_DEPLOYMENT_TARGET = 15.5;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinoki.muwaTests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.2;
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/Muwa.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/Muwa";
+			};
+			name = Release;
+		};
+		F0BB3C4F2E51FBCD00895593 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinoki.muwaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.2;
+				TEST_TARGET_NAME = Muwa;
+			};
+			name = Debug;
+		};
+		F0BB3C502E51FBCD00895593 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				CODE_SIGN_STYLE = Automatic;
+				CURRENT_PROJECT_VERSION = 1;
+				DEAD_CODE_STRIPPING = YES;
+				DEVELOPMENT_TEAM = 4W8QF9VR2F;
+				GENERATE_INFOPLIST_FILE = YES;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_BUNDLE_IDENTIFIER = com.dinoki.muwaUITests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SWIFT_EMIT_LOC_STRINGS = NO;
+				SWIFT_STRICT_CONCURRENCY = complete;
+				SWIFT_VERSION = 6.2;
+				TEST_TARGET_NAME = Muwa;
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		F0BB3C212E51FBCC00895593 /* Build configuration list for PBXProject "Muwa" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0BB3C462E51FBCD00895593 /* Debug */,
+				F0BB3C472E51FBCD00895593 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F0BB3C482E51FBCD00895593 /* Build configuration list for PBXNativeTarget "Muwa" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0BB3C492E51FBCD00895593 /* Debug */,
+				F0BB3C4A2E51FBCD00895593 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F0BB3C4B2E51FBCD00895593 /* Build configuration list for PBXNativeTarget "MuwaTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0BB3C4C2E51FBCD00895593 /* Debug */,
+				F0BB3C4D2E51FBCD00895593 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		F0BB3C4E2E51FBCD00895593 /* Build configuration list for PBXNativeTarget "MuwaUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				F0BB3C4F2E51FBCD00895593 /* Debug */,
+				F0BB3C502E51FBCD00895593 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
+/* Begin XCLocalSwiftPackageReference section */
+		F0AA7F342ED20D2E00672B07 /* XCLocalSwiftPackageReference "../Packages/MuwaCLI" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/MuwaCLI;
+		};
+		F0AA7F3B2ED20DA700672B07 /* XCLocalSwiftPackageReference "../Packages/MuwaCore" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/MuwaCore;
+		};
+		F0F4E2992ED1209200BEFA4D /* XCLocalSwiftPackageReference "../Packages/MuwaRepository" */ = {
+			isa = XCLocalSwiftPackageReference;
+			relativePath = ../Packages/MuwaRepository;
+		};
+/* End XCLocalSwiftPackageReference section */
+
+/* Begin XCSwiftPackageProductDependency section */
+		05576F742F72E7D800EF3CD3 /* MuwaCore */ = {
+			isa = XCSwiftPackageProductDependency;
+			productName = MuwaCore;
+		};
+/* End XCSwiftPackageProductDependency section */
+	};
+	rootObject = F0BB3C1E2E51FBCC00895593 /* Project object */;
+}

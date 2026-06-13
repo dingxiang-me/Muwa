@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Classify live runtime proof summaries against Osaurus proof rules.
+"""Classify live runtime proof summaries against Muwa proof rules.
 
 The family runtime matrix already records model responses, token rates, cache
 telemetry, and failed checks. This script converts those artifacts into the

@@ -1,12 +1,12 @@
 # Native Swift image generation integration
 
-This documents the Osaurus-side boundary for native Swift MFlux/Flux-family
+This documents the Muwa-side boundary for native Swift MFlux/Flux-family
 image generation through vMLX. It is a wiring contract and release gate, not a
-claim that Osaurus can serve native Swift image models today.
+claim that Muwa can serve native Swift image models today.
 
 ## Current status
 
-Osaurus currently routes local MLX text/VLM generation through
+Muwa currently routes local MLX text/VLM generation through
 `vmlx-swift-lm`:
 
 ```text
@@ -16,7 +16,7 @@ ChatEngine
             -> BatchEngine.generate(...)
 ```
 
-There is no Osaurus local `/v1/images/generations` or `/v1/images/edits`
+There is no Muwa local `/v1/images/generations` or `/v1/images/edits`
 runtime path wired to native Swift `vMLXFlux` yet. Remote provider image
 generation, VLM image input, and artifact rendering are separate surfaces and
 do not prove local native image generation.
@@ -42,13 +42,13 @@ The `loaded` rows above only prove the native constructor accepted the local
 directory and opened safetensors metadata/arrays. They do not prove real
 prompt-conditioned weights are applied or resident.
 
-## Required Osaurus wiring after vMLXFlux passes
+## Required Muwa wiring after vMLXFlux passes
 
-Do not expose native Swift image generation in Osaurus until the vMLX matrix
+Do not expose native Swift image generation in Muwa until the vMLX matrix
 has at least one `production_candidate` or stronger row with prompt-sensitive
 images.
 
-When that gate exists, the Osaurus integration should add a dedicated image
+When that gate exists, the Muwa integration should add a dedicated image
 runtime lane instead of forcing images through `MLXBatchAdapter`:
 
 ```text
@@ -74,7 +74,7 @@ The runtime lane must own:
 
 ## Production gate
 
-Before Osaurus exposes a native image model as local production-capable, the
+Before Muwa exposes a native image model as local production-capable, the
 same exact bundle must pass all of these:
 
 1. `vmlxflux-probe --matrix` on `/Users/eric/vmlx-swift` reports no blockers
@@ -83,12 +83,12 @@ same exact bundle must pass all of these:
    base prompt, same-scene modification, and style/material change.
 3. The output artifacts are valid PNG/JPEG files at requested dimensions and
    are manually inspected or scored by a VLM/CLIP-style quality check.
-4. The Osaurus API path can cold-load, generate, cancel, unload, reload, and
+4. The Muwa API path can cold-load, generate, cancel, unload, reload, and
    generate again without stale state or duplicate engines.
 5. Generation-only models reject `/v1/images/edits` with a clear 400, while
    edit-capable models accept source image and mask payloads.
 6. The app and HTTP API agree on model capabilities, error wording, and output
    artifact paths.
 
-Until then, Osaurus documentation must describe native Swift image generation
+Until then, Muwa documentation must describe native Swift image generation
 as blocked upstream in vMLX, not as a supported local inference feature.

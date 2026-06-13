@@ -21,48 +21,48 @@ require_text() {
   fi
 }
 
-require_text "$ROOT/Packages/OsaurusCore/Services/Keychain/KeychainQueryHelpers.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Keychain/KeychainQueryHelpers.swift" \
   "static var disablesKeychainForProcess" \
   "shared disabled-process flag"
 
-require_text "$ROOT/Packages/OsaurusCore/Services/Keychain/AgentSecretsKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Keychain/AgentSecretsKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return nil }" \
   "agent secret reads bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Services/Keychain/AgentSecretsKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Keychain/AgentSecretsKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return false }" \
   "agent secret writes bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Services/Keychain/AgentSecretsKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Keychain/AgentSecretsKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return true }" \
   "agent secret deletes bypass Keychain"
 
-require_text "$ROOT/Packages/OsaurusCore/Services/Keychain/ToolSecretsKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Keychain/ToolSecretsKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return nil }" \
   "tool secret reads bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Services/Keychain/ToolSecretsKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Keychain/ToolSecretsKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return [] }" \
   "tool secret enumeration bypasses Keychain"
 
-require_text "$ROOT/Packages/OsaurusCore/Services/Provider/RemoteProviderKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Provider/RemoteProviderKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return nil }" \
   "remote provider reads bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Services/Provider/RemoteProviderKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/Provider/RemoteProviderKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return false }" \
   "remote provider writes bypass Keychain"
 
-require_text "$ROOT/Packages/OsaurusCore/Services/MCP/MCPProviderKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/MCP/MCPProviderKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return nil }" \
   "MCP provider reads bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Services/MCP/MCPProviderKeychain.swift" \
+require_text "$ROOT/Packages/MuwaCore/Services/MCP/MCPProviderKeychain.swift" \
   "if KeychainQueryHelpers.disablesKeychainForProcess { return false }" \
   "MCP provider writes bypass Keychain"
 
-require_text "$ROOT/Packages/OsaurusCore/Identity/StorageKeyManager.swift" \
+require_text "$ROOT/Packages/MuwaCore/Identity/StorageKeyManager.swift" \
   "if Self.disablesKeychainForProcess { return nil }" \
   "storage key reads bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Identity/StorageKeyManager.swift" \
+require_text "$ROOT/Packages/MuwaCore/Identity/StorageKeyManager.swift" \
   "if Self.disablesKeychainForProcess { return }" \
   "storage key writes bypass Keychain"
-require_text "$ROOT/Packages/OsaurusCore/Identity/StorageKeyManager.swift" \
+require_text "$ROOT/Packages/MuwaCore/Identity/StorageKeyManager.swift" \
   "generateInMemoryKey()" \
   "storage key uses in-memory disabled-mode key"
 

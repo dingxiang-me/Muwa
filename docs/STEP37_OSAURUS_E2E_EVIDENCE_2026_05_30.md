@@ -1,8 +1,8 @@
-# Step 3.7 Osaurus E2E Evidence - 2026-05-30
+# Step 3.7 Muwa E2E Evidence - 2026-05-30
 
 Current vMLX pin: `25f8111552005fdc6ef12cd2c8298a782d4e2052`
 
-This note records the final no-sign Osaurus proof for the Step 3.7 lane. It does
+This note records the final no-sign Muwa proof for the Step 3.7 lane. It does
 not claim LFM, MXFP4/MXFP8, or VL rows unless explicitly listed below.
 
 ## 2026-06-01 Final Step Parser/Cache Refresh
@@ -20,21 +20,21 @@ Launch/proof boundary:
   --timestamp=none`; no identity, certificate, notary, `security` command, or
   password/keychain prompt was used.
 - Launched through LaunchServices with `launchctl` env:
-  `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
-  `OSAURUS_TEST_ROOT=/tmp/osaurus-post1314-step-final-root/state-open`, and
-  `OSU_MODELS_DIR=/tmp/osaurus-post1314-step-final-root/models`.
+  `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+  `MUWA_TEST_ROOT=/tmp/muwa-post1314-step-final-root/state-open`, and
+  `OSU_MODELS_DIR=/tmp/muwa-post1314-step-final-root/models`.
 - `/v1/models` served `step-3.7-flash-jang_2l` and
   `step-3.7-flash-jang_k`.
 
 Final strict Step JANG_2L artifact:
-`/tmp/osaurus-post1314-25f8111-step-jang2l-final-20260601-191743/step-3.7-flash-jang_2l_summary.json`.
+`/tmp/muwa-post1314-25f8111-step-jang2l-final-20260601-191743/step-3.7-flash-jang_2l_summary.json`.
 
 Final strict Step JANG_K artifact with warm disk-L2 restore:
-`/tmp/osaurus-post1314-25f8111-step-jangk-restart-l2-20260601-192211/step-3.7-flash-jang_k_summary.json`.
+`/tmp/muwa-post1314-25f8111-step-jangk-restart-l2-20260601-192211/step-3.7-flash-jang_k_summary.json`.
 
 Both final rows reported `passed=true`, `failed_checks=[]`. They prove strict
 required/none/required multi-turn `line_count` behavior through the real
-Osaurus app path: exact turn 1 args `red\ngreen\nblue`, exact turn 3 args
+Muwa app path: exact turn 1 args `red\ngreen\nblue`, exact turn 3 args
 `one\ntwo`, visible no-tool follow-up, no protocol leak, no incoherent loop, no
 length-stop fake pass, healthy `/health` after the row, and token/s recorded
 for the visible generation turn. Topology is 45 layers with 12 KV layers and 33
@@ -51,7 +51,7 @@ repetition-penalty, close-token, synthetic reasoning, or prompt-coercion fix.
 ## Build and launch
 
 - Build path:
-  `/tmp/osaurus-step37-pr/build/DerivedData-step37-nosign-discoveryfix/Build/Products/Release/osaurus.app`
+  `/tmp/muwa-step37-pr/build/DerivedData-step37-nosign-discoveryfix/Build/Products/Release/osaurus.app`
 - Build command used the keychain-free wrapper:
   `scripts/live-proof/build-keychain-free-osaurus.sh`
 - Signing settings observed:
@@ -60,9 +60,9 @@ repetition-penalty, close-token, synthetic reasoning, or prompt-coercion fix.
 - The post-build bundle seal was local ad-hoc only:
   `/usr/bin/codesign --sign - --timestamp=none`.
 - Runtime launch used:
-  `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
-  fresh `OSAURUS_TEST_ROOT`, and
-  `OSU_MODELS_DIR=/tmp/osaurus-step37-modelroot-jang-and-tqk`.
+  `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+  fresh `MUWA_TEST_ROOT`, and
+  `OSU_MODELS_DIR=/tmp/muwa-step37-modelroot-jang-and-tqk`.
 - Served model ids:
   `step-3.7-flash-jang_2l` and `step-3.7-flash-jangtq_k`.
 
@@ -72,7 +72,7 @@ was used in this proof lane.
 ## Live TurboQuant and L2 proof
 
 Artifact:
-`/tmp/osaurus-step37-tqdiag-430481c-live-20260530-203554/summary.json`
+`/tmp/muwa-step37-tqdiag-430481c-live-20260530-203554/summary.json`
 
 - Cold row: HTTP 200, `finish=stop`, no protocol leak, no length stop.
 - Cold row deltas: `turbo_quant_compressions +1`, `disk_l2_misses +2`,
@@ -82,13 +82,13 @@ Artifact:
   `disk_l2_stores +1`.
 - Visible generation token/s was recorded in the artifact.
 
-This proves the Osaurus app sees live TurboQuant compression diagnostics from
+This proves the Muwa app sees live TurboQuant compression diagnostics from
 the pinned vMLX runtime and reuses the disk L2 block store on a repeated prefix.
 
 ## Live multi-turn tool proof
 
 Artifact:
-`/tmp/osaurus-step37-final-430481c-step-jang2l-tool-20260530-204607/step-3.7-flash-jang_2l_summary.json`
+`/tmp/muwa-step37-final-430481c-step-jang2l-tool-20260530-204607/step-3.7-flash-jang_2l_summary.json`
 
 - Overall verdict: `passed=true`, `failed_checks=[]`.
 - Turn 1 required tool call:
@@ -109,17 +109,17 @@ Artifact:
   `turbo_quant_compressions=4`, `disk_l2_hits=1`,
   `disk_l2_stores=7`.
 
-This proves Step 3.7 JANG_2L through the real Osaurus app path for strict
+This proves Step 3.7 JANG_2L through the real Muwa app path for strict
 required/none/required multi-turn tool behavior, no loop/leak/length-stop fake
 pass, disk-backed restore topology, and live TurboQuant/L2 diagnostics.
 
 ## Live Step JANGTQ_K tool/cache proof
 
 Cold artifact:
-`/tmp/osaurus-step37-discoveryfix-430481c-step-jangtqk-tool-20260530-221008/step-3.7-flash-jangtq_k_summary.json`
+`/tmp/muwa-step37-discoveryfix-430481c-step-jangtqk-tool-20260530-221008/step-3.7-flash-jangtq_k_summary.json`
 
 Warm artifact:
-`/tmp/osaurus-step37-discoveryfix-430481c-step-jangtqk-warm-20260530-221128/step-3.7-flash-jangtq_k_summary.json`
+`/tmp/muwa-step37-discoveryfix-430481c-step-jangtqk-warm-20260530-221128/step-3.7-flash-jangtq_k_summary.json`
 
 - Overall verdict: both rows reported `passed=true`, `failed_checks=[]`.
 - Turn 1 required tool call:
@@ -145,13 +145,13 @@ Warm artifact:
   2 completion tokens in 0.436365625 seconds, about 4.58 tok/s. Required
   tool-call turns emitted zero completion tokens by design.
 
-This proves Step 3.7 JANGTQ_K through the real Osaurus app path for strict
+This proves Step 3.7 JANGTQ_K through the real Muwa app path for strict
 required/none/required multi-turn tool behavior, no loop/leak/length-stop fake
 pass, disk-backed restore topology, rotating KV detection, and warm L2 reuse.
 
 ## Source and readiness guards
 
-The following passed after repinning Osaurus to vMLX
+The following passed after repinning Muwa to vMLX
 `60b888659e1196995fa57f7af91d982e5948a680`:
 
 - `git diff --check`
@@ -159,9 +159,9 @@ The following passed after repinning Osaurus to vMLX
 - `MLXBatchAdapterTests/cacheKVModeTagTracksEffectiveCoordinatorPolicy`
 - `scripts/live-proof/assert-server-settings-runtime-wiring.sh`
 - `scripts/live-proof/assert-keychain-free-proof-path.sh`
-- `scripts/live-proof/assert-osaurus-vmlx-pr-readiness.sh`
-- `scripts/live-proof/assert-osaurus-no-forced-behavior-pr.sh`
-- `scripts/live-proof/assert-osaurus-pr-hygiene.sh`
+- `scripts/live-proof/assert-muwa-vmlx-pr-readiness.sh`
+- `scripts/live-proof/assert-muwa-no-forced-behavior-pr.sh`
+- `scripts/live-proof/assert-muwa-pr-hygiene.sh`
 - `scripts/live-proof/assert-tool-choice-required-routing.sh`
 
 The guards cover vMLX pin surfaces, runtime settings save/invalidation,
@@ -173,19 +173,19 @@ and PR hygiene.
 ## 2026-05-31 Current-Head Retest
 
 The current retest used the rebuilt no-sign app:
-`/tmp/osaurus-1310-60b888-nosign-dd/Build/Products/Release/osaurus.app`.
+`/tmp/muwa-1310-60b888-nosign-dd/Build/Products/Release/osaurus.app`.
 
 The launch used `scripts/live-proof/open-keychain-free-osaurus.sh` with
-`OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, isolated
-`OSAURUS_TEST_ROOT=/tmp/osaurus-1310-60b888-live-root-20260531-031451`, and
-`OSU_MODELS_DIR=/tmp/osaurus-step37-localmeta-modelroot`.
+`MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, isolated
+`MUWA_TEST_ROOT=/tmp/muwa-1310-60b888-live-root-20260531-031451`, and
+`OSU_MODELS_DIR=/tmp/muwa-step37-localmeta-modelroot`.
 
 LFM2.5 JANG_2L:
 
 - Cold strict artifact:
-  `/tmp/osaurus-1310-60b888-final-lfm-jang2l-20260531-031510/lfm2.5-8b-a1b-jang_2l_summary.json`.
+  `/tmp/muwa-1310-60b888-final-lfm-jang2l-20260531-031510/lfm2.5-8b-a1b-jang_2l_summary.json`.
 - Warm strict cache-hit artifact:
-  `/tmp/osaurus-1310-60b888-final-lfm-jang2l-warm1024-20260531-031546/lfm2.5-8b-a1b-jang_2l_summary.json`.
+  `/tmp/muwa-1310-60b888-final-lfm-jang2l-warm1024-20260531-031546/lfm2.5-8b-a1b-jang_2l_summary.json`.
 - Warm verdict: `passed=true`, `failed_checks=[]`.
 - Turn 1 and turn 3 produced exact `line_count` tool calls with
   `red\ngreen\nblue` and `one\ntwo` respectively.
@@ -201,7 +201,7 @@ LFM2.5 JANG_2L:
 Step 3.7 JANG_2L:
 
 - Strict artifact:
-  `/tmp/osaurus-1310-60b888-final-step-jang2l-20260531-031601/step-3.7-flash-jang_2l_summary.json`.
+  `/tmp/muwa-1310-60b888-final-step-jang2l-20260531-031601/step-3.7-flash-jang_2l_summary.json`.
 - Verdict: `passed=true`, `failed_checks=[]`.
 - Turn 1 and turn 3 produced exact `line_count` tool calls with
   `red\ngreen\nblue` and `one\ntwo` respectively.
@@ -220,7 +220,7 @@ Step 3.7 JANG_2L:
   row.
 - 2026-05-31 retest boundary: a fresh no-sign, LaunchServices-launched,
   keychain-disabled app at
-  `/private/tmp/osaurus-step37-full-pr/build/DerivedData-step37-hostfix-nosign-17c8b5ec/Build/Products/Release/osaurus.app`
+  `/private/tmp/muwa-step37-full-pr/build/DerivedData-step37-hostfix-nosign-17c8b5ec/Build/Products/Release/osaurus.app`
   confirmed one-turn `tool_choice: required` behavior for
   `step-3.7-flash-jang_2l` and `step-3.7-flash-jangtq_k`. Both streamed exact
   `line_count` tool calls with args `{"text":"red\ngreen\nblue"}` and

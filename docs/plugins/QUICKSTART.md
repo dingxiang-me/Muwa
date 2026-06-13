@@ -1,12 +1,12 @@
 # Plugin Quickstart
 
-Get a working plugin running in **under 5 minutes**. By the end you'll have a plugin loaded into Osaurus that can be invoked from chat and reloaded as you iterate.
+Get a working plugin running in **under 5 minutes**. By the end you'll have a plugin loaded into Muwa that can be invoked from chat and reloaded as you iterate.
 
 ## Prerequisites
 
 - macOS 15 (Sequoia) or later
-- Osaurus installed and running
-- The `osaurus` CLI on your `PATH`. From the Osaurus app menu, choose **Settings → Developer → Install CLI**.
+- Muwa installed and running
+- The `muwa-cli` CLI on your `PATH`. From the Muwa app menu, choose **Settings → Developer → Install CLI**.
 - Either:
   - **Swift** toolchain (Xcode 16 or `swift --version` >= 6.0), or
   - **Rust** toolchain (`cargo` and `rustc` >= 1.75)
@@ -14,7 +14,7 @@ Get a working plugin running in **under 5 minutes**. By the end you'll have a pl
 Check the basics:
 
 ```bash
-osaurus --version
+muwa --version
 swift --version   # or: cargo --version
 ```
 
@@ -22,14 +22,14 @@ swift --version   # or: cargo --version
 
 ```bash
 mkdir my-plugin && cd my-plugin
-osaurus tools create my-plugin               # Swift (default)
+muwa-cli tools create my-plugin               # Swift (default)
 # or:
-osaurus tools create my-plugin --language rust
+muwa-cli tools create my-plugin --language rust
 ```
 
 You now have a project with:
 
-- `osaurus-plugin.json` — the dev manifest used by the CLI
+- `muwa-plugin.json` — the dev manifest used by the CLI
 - `Sources/MyPlugin/Plugin.swift` (or `src/lib.rs`) — your plugin entry point
 - A `web/` placeholder for a web UI
 - A `.github/workflows/release.yml` for CI publishing
@@ -37,21 +37,21 @@ You now have a project with:
 ## Step 2: Build and run with hot reload
 
 ```bash
-osaurus tools dev
+muwa-cli tools dev
 ```
 
 This command:
 
 1. Builds the dylib in DEBUG mode
-2. Symlinks it into the Osaurus tools directory (`~/Library/Application Support/Osaurus/Tools/`)
-3. Sends a reload signal so Osaurus picks up the new binary
+2. Symlinks it into the Muwa tools directory (`~/Library/Application Support/Muwa/Tools/`)
+3. Sends a reload signal so Muwa picks up the new binary
 4. Watches your sources for changes and rebuilds + reloads on every save
 
 Leave this running while you develop.
 
 ## Step 3: Try the plugin
 
-Open Osaurus and start a new chat. Ask:
+Open Muwa and start a new chat. Ask:
 
 > Use the hello_world tool with name "Plugin Author"
 
@@ -75,10 +75,10 @@ Open `Sources/MyPlugin/Plugin.swift` and modify the response message in `HelloTo
 **"Plugin not found in chat"**
 
 ```bash
-osaurus tools list
+muwa-cli tools list
 ```
 
-Make sure your plugin appears. If not, check `osaurus tools dev` output for build errors.
+Make sure your plugin appears. If not, check `muwa-cli tools dev` output for build errors.
 
 **"hello_world is not a recognized tool"**
 
@@ -86,11 +86,11 @@ The model needs to be told the tool exists. Either explicitly mention the tool i
 
 **"Plugin failed to load"**
 
-Open Insights and search for `[Osaurus]` log lines. Common causes: missing `init` function, invalid manifest JSON, crash during `init`. See [DEBUGGING.md](DEBUGGING.md) for a full decision tree.
+Open Insights and search for `[Muwa]` log lines. Common causes: missing `init` function, invalid manifest JSON, crash during `init`. See [DEBUGGING.md](DEBUGGING.md) for a full decision tree.
 
 **Web UI shows 401**
 
-Use the **Open Web App** button inside the Osaurus plugin detail page rather than copying the URL into Safari directly. The button automatically attaches the current agent context. If you need to embed your own URL, append `?osr_agent=<agent_uuid>`.
+Use the **Open Web App** button inside the Muwa plugin detail page rather than copying the URL into Safari directly. The button automatically attaches the current agent context. If you need to embed your own URL, append `?muwa_agent=<agent_uuid>`.
 
 ## Going further
 

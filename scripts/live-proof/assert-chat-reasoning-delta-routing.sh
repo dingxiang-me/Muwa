@@ -2,12 +2,12 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CHAT_ENGINE="$ROOT/Packages/OsaurusCore/Services/Chat/ChatEngine.swift"
-CHAT_TESTS="$ROOT/Packages/OsaurusCore/Tests/Chat/ChatEngineTests.swift"
-HTTP_HANDLER="$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift"
-HTTP_STREAM_TESTS="$ROOT/Packages/OsaurusCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift"
-OPENAI_API="$ROOT/Packages/OsaurusCore/Models/API/OpenAIAPI.swift"
-OPEN_RESPONSES_API="$ROOT/Packages/OsaurusCore/Models/API/OpenResponsesAPI.swift"
+CHAT_ENGINE="$ROOT/Packages/MuwaCore/Services/Chat/ChatEngine.swift"
+CHAT_TESTS="$ROOT/Packages/MuwaCore/Tests/Chat/ChatEngineTests.swift"
+HTTP_HANDLER="$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift"
+HTTP_STREAM_TESTS="$ROOT/Packages/MuwaCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift"
+OPENAI_API="$ROOT/Packages/MuwaCore/Models/API/OpenAIAPI.swift"
+OPEN_RESPONSES_API="$ROOT/Packages/MuwaCore/Models/API/OpenResponsesAPI.swift"
 
 fail=0
 pass() { echo "PASS $*"; }
@@ -123,7 +123,7 @@ require_order "$HTTP_HANDLER" 'StreamingReasoningHint\.decode\(delta\)' \
 
 active="$({ ps -axo pid,ppid,rss,etime,command || true; } \
   | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' \
-  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/osaurus-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*osaurus-staging)' \
+  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/muwa-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*muwa-staging)' \
   | rg -v 'rg -i|assert-chat-reasoning-delta-routing' || true)"
 if [[ -n "$active" ]]; then
   echo "$active" >&2

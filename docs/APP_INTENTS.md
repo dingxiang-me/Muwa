@@ -1,27 +1,27 @@
 # App Intents (Shortcuts, Spotlight, Siri)
 
-This guide explains how Osaurus exposes itself to the system through Apple's
+This guide explains how Muwa exposes itself to the system through Apple's
 App Intents framework, so it can be driven from Shortcuts, Spotlight, and Siri.
 
-- **Audience**: Osaurus developers and power users.
-- **Scope**: This is the **provider** direction only (the OS asks Osaurus to do
-  something). Osaurus calling *other* apps' intents is out of scope.
+- **Audience**: Muwa developers and power users.
+- **Scope**: This is the **provider** direction only (the OS asks Muwa to do
+  something). Muwa calling *other* apps' intents is out of scope.
 
 ---
 
 ## What you get
 
-Two app shortcuts are available the moment Osaurus is installed — no setup:
+Two app shortcuts are available the moment Muwa is installed — no setup:
 
 | Shortcut | Intent | Behavior |
 |----------|--------|----------|
-| **Ask Osaurus** | `AskOsaurusIntent` | Sends a prompt to the **currently active** agent (`AgentManager.activeAgentId`) and returns/speaks the reply. Awaits the result. |
-| **Run Osaurus Agent** | `RunAgentIntent` | Starts one of your custom agents in the background (fire-and-confirm). Progress and results surface in Osaurus's own Work Mode and toasts. |
+| **Ask Muwa** | `AskMuwaIntent` | Sends a prompt to the **currently active** agent (`AgentManager.activeAgentId`) and returns/speaks the reply. Awaits the result. |
+| **Run Muwa Agent** | `RunAgentIntent` | Starts one of your custom agents in the background (fire-and-confirm). Progress and results surface in Muwa's own Work Mode and toasts. |
 
 Example phrases (each must contain the app name):
 
-- "Ask Osaurus" → then dictate/type the prompt
-- "Run <agent> in Osaurus"
+- "Ask Muwa" -> then dictate/type the prompt
+- "Run <agent> in Muwa"
 
 ---
 
@@ -35,9 +35,9 @@ App Intents-specific bridge to maintain.
 
 ```mermaid
 flowchart TD
-    siri["Shortcuts / Spotlight / Siri"] --> intent["AskOsaurusIntent / RunAgentIntent (main app target)"]
+    siri["Shortcuts / Spotlight / Siri"] --> intent["AskMuwaIntent / RunAgentIntent (main app target)"]
     intent --> ensure["ensure server up in-process (ServerController.ensureRunning)"]
-    ensure --> client["OsaurusLocalClient over 127.0.0.1:port"]
+    ensure --> client["MuwaLocalClient over 127.0.0.1:port"]
     client -->|"Ask: await reply"| run["POST /agents/{activeId}/run (SSE to [DONE])"]
     client -->|"Run: fire-and-confirm"| dispatch["POST /agents/{id}/dispatch (202)"]
     query["AgentQuery.suggestedEntities"] -->|"reads disk"| store["AgentStore.loadAll, filter custom"]
@@ -49,30 +49,30 @@ flowchart TD
 
 ### Where the code lives
 
-Everything is in the **main app target** (`App/osaurus/AppIntents/`), not a
+Everything is in the **main app target** (`App/Muwa/AppIntents/`), not a
 separate App Intents extension:
 
 | File | Role |
 |------|------|
-| `App/osaurus/AppIntents/AgentEntity.swift` | `AgentEntity` + `AgentQuery` (the agent picker) |
-| `App/osaurus/AppIntents/OsaurusIntents.swift` | `AskOsaurusIntent`, `RunAgentIntent` |
-| `App/osaurus/AppIntents/OsaurusShortcuts.swift` | `OsaurusShortcuts` (the `AppShortcutsProvider`) |
-| `Packages/OsaurusCore/AppIntents/OsaurusLocalClient.swift` | The shared HTTP client + server-up logic |
+| `App/Muwa/AppIntents/AgentEntity.swift` | `AgentEntity` + `AgentQuery` (the agent picker) |
+| `App/Muwa/AppIntents/MuwaIntents.swift` | `AskMuwaIntent`, `RunAgentIntent` |
+| `App/Muwa/AppIntents/MuwaShortcuts.swift` | `MuwaShortcuts` (the `AppShortcutsProvider`) |
+| `Packages/MuwaCore/AppIntents/MuwaLocalClient.swift` | The shared HTTP client + server-up logic |
 
-The client lives in `OsaurusCore` (reusable, testable); the App Intents types
+The client lives in `MuwaCore` (reusable, testable); the App Intents types
 live in the app target because `AppShortcutsProvider` discovery and the
 App Intents metadata extractor operate on the app bundle.
 
 The app is **unsandboxed** (`ENABLE_APP_SANDBOX = NO`), so the intent code
-reads `~/.osaurus/` directly and starts the server in-process. There is no app
+reads `~/.muwa/` directly and starts the server in-process. There is no app
 group and no shared snapshot file — the live source of truth is read directly.
 
 ### Execution endpoints
 
 | Intent | Endpoint | Why |
 |--------|----------|-----|
-| Ask Osaurus | `POST /agents/{activeId}/run` | The full agent loop (persona, memory, skills, tools) on the currently active agent. Streams SSE; the client reads to the `[DONE]` frame and concatenates `choices[].delta.content`. Short asks finish well within the intent time budget. |
-| Run Osaurus Agent | `POST /agents/{id}/dispatch` | A **detached** background run that survives the client disconnecting. Returns `202` immediately with a `poll_url`; the run continues in the app. |
+| Ask Muwa | `POST /agents/{activeId}/run` | The full agent loop (persona, memory, skills, tools) on the currently active agent. Streams SSE; the client reads to the `[DONE]` frame and concatenates `choices[].delta.content`. Short asks finish well within the intent time budget. |
+| Run Muwa Agent | `POST /agents/{id}/dispatch` | A **detached** background run that survives the client disconnecting. Returns `202` immediately with a `poll_url`; the run continues in the app. |
 
 `POST /agents/{id}/run` is a streaming, **connection-bound** loop (capped at 30
 tool iterations). If the client disconnects, the run is cancelled. That is fine
@@ -83,8 +83,8 @@ for a short "ask" but wrong for a long, tool-heavy run — which is exactly why
 
 `AgentQuery` reads `AgentStore.loadAll()` on the main actor and filters to
 **custom** agents (mirroring `GET /agents`, which also omits built-ins). The
-built-in "Osaurus" agent is intentionally excluded from the picker — "Ask
-Osaurus" targets the active agent instead. `AgentQuery` also conforms to
+built-in "Muwa" agent is intentionally excluded from the picker — "Ask
+Muwa" targets the active agent instead. `AgentQuery` also conforms to
 `EntityStringQuery` so Siri and Spotlight can match agents by name.
 
 Because picker population reads from disk, it works even when the server isn't
@@ -92,10 +92,10 @@ running.
 
 ### Server-up path
 
-Before any request, `OsaurusLocalClient.ensureServerReachable()`:
+Before any request, `MuwaLocalClient.ensureServerReachable()`:
 
 1. Resolves the base URL — live config (`ServerController.sharedConfiguration`),
-   then `~/.osaurus/config/server.json`, then the default port `1337`.
+   then `~/.muwa/config/server.json`, then the default port `1337`.
 2. `GET /health`. If healthy, proceed.
 3. Otherwise calls `ServerController.ensureRunning()` (starts the embedded
    server in-process on the live controller) and retries with short backoff
@@ -106,17 +106,17 @@ menu-bar app to handle them, and the server is brought up headlessly.
 
 ### The built-in agent over loopback
 
-"Ask Osaurus" follows the active agent, which **defaults to the built-in
-"Osaurus" agent** until the user selects a different one. By default the
+"Ask Muwa" follows the active agent, which **defaults to the built-in
+"Muwa" agent** until the user selects a different one. By default the
 built-in agent is **blocked on all HTTP surfaces** (`BuiltInAgentGuard` →
 `403 built_in_agent_not_exposable`) so its persona, memory, and tools are
-reachable only from the in-app Chat. So that "Ask Osaurus" works when the
+reachable only from the in-app Chat. So that "Ask Muwa" works when the
 built-in is the active agent, the guard is **relaxed for loopback callers only**
 on `/agents/{id}/run` and `/agents/{id}/dispatch` (see `HTTPHandler.swift`).
 Remote callers remain blocked.
 
 > Security note: this exposes the built-in agent to any process on `localhost`
-> without authentication, consistent with Osaurus's existing no-auth-loopback
+> without authentication, consistent with Muwa's existing no-auth-loopback
 > model. The plugin-host path that also consults the guard was **not** changed.
 
 ---
@@ -125,9 +125,9 @@ Remote callers remain blocked.
 
 ```bash
 make app
-# -> build/DerivedData/Build/Products/Release/osaurus.app
-cp -R build/DerivedData/Build/Products/Release/osaurus.app /Applications/
-open /Applications/osaurus.app
+# -> build/DerivedData/Build/Products/Release/Muwa.app
+cp -R build/DerivedData/Build/Products/Release/Muwa.app /Applications/
+open /Applications/Muwa.app
 ```
 
 App Intents metadata is embedded at build time (the
@@ -136,16 +136,16 @@ registers the bundle (launching it once is enough). If they look stale, it is
 almost always Launch Services caching an old copy:
 
 ```bash
-/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/osaurus.app
+/System/Library/Frameworks/CoreServices.framework/Frameworks/LaunchServices.framework/Support/lsregister -f /Applications/Muwa.app
 ```
 
-For end users there is nothing extra to do: installing Osaurus normally makes
+For end users there is nothing extra to do: installing Muwa normally makes
 the shortcuts available with zero configuration.
 
 **Prerequisites for a meaningful run**
 
-- A working model configured (so the built-in agent can answer "Ask Osaurus").
-- At least one custom agent created in-app (so "Run Osaurus Agent" has
+- A working model configured (so the built-in agent can answer "Ask Muwa").
+- At least one custom agent created in-app (so "Run Muwa Agent" has
   something to list).
 
 ---
@@ -176,8 +176,8 @@ curl http://127.0.0.1:1337/tasks/<id>   # poll status/output
 ### Layer 2 — Unit tests (guard relaxation)
 
 ```bash
-OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 OSAURUS_TEST_ROOT=/tmp/osaurus-test \
-  swift test --package-path Packages/OsaurusCore --filter builtInAgentRun
+MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1 MUWA_TEST_ROOT=/tmp/muwa-test \
+  swift test --package-path Packages/MuwaCore --filter builtInAgentRun
 ```
 
 Covers `builtInAgentRun_overLoopback_bypassesGuard` (loopback → streams, no
@@ -185,10 +185,10 @@ Covers `builtInAgentRun_overLoopback_bypassesGuard` (loopback → streams, no
 
 ### Layer 3 — App Intents UX
 
-- **Shortcuts app**: add "Ask Osaurus" / "Run Osaurus Agent", fill the
+- **Shortcuts app**: add "Ask Muwa" / "Run Muwa Agent", fill the
   parameters, run. The agent dropdown exercises `AgentQuery.suggestedEntities`.
-- **Spotlight**: ⌘-Space, type "Ask Osaurus".
-- **Siri**: "Ask Osaurus", or "Run <agent> in Osaurus".
+- **Spotlight**: Command-Space, type "Ask Muwa".
+- **Siri**: "Ask Muwa", or "Run <agent> in Muwa".
 
 Edge cases:
 
@@ -196,7 +196,7 @@ Edge cases:
   `ensureServerReachable()` brings the server up (first run is slightly slower).
 - Stop the server in settings, then run a shortcut — it should auto-start
   rather than error; if it truly cannot reach the server you get the readable
-  "Osaurus isn't reachable…" message.
+  "Muwa isn't reachable…" message.
 
 ---
 
@@ -204,7 +204,7 @@ Edge cases:
 
 - **No `String` in shortcut phrases.** App Shortcut phrases may only
   interpolate `AppEntity` / `AppEnum` parameters, never a plain `String`. That
-  is why "Ask Osaurus" has no `\(\.$prompt)` phrase — the prompt is supplied
+  is why "Ask Muwa" has no `\(\.$prompt)` phrase -- the prompt is supplied
   through the intent parameter. The `agent` entity *can* appear in a phrase.
 - **Empty input on Run.** `/dispatch` requires a non-empty prompt; if the user
   provides no input, the client falls back to a minimal `"Begin."` kickoff.

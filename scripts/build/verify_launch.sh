@@ -8,9 +8,9 @@ set -euo pipefail
 # sentinel and exits nonzero, so this script fails the build before notarize/
 # publish instead of shipping a brick.
 
-APP="${1:-build_output/Osaurus.app}"
-APP_BIN="$APP/Contents/MacOS/osaurus"
-CLI_BIN="$APP/Contents/Helpers/osaurus"
+APP="${1:-build_output/Muwa.app}"
+APP_BIN="$APP/Contents/MacOS/muwa"
+CLI_BIN="$APP/Contents/Helpers/muwa"
 WATCHDOG_SECONDS=10
 
 if [[ ! -x "$APP_BIN" ]]; then
@@ -18,14 +18,14 @@ if [[ ! -x "$APP_BIN" ]]; then
   exit 1
 fi
 
-OUT="$(mktemp -t osaurus-spawn-out)"
+OUT="$(mktemp -t muwa-spawn-out)"
 trap 'rm -f "$OUT"' EXIT
 
 echo "Spawn-checking app binary: $APP_BIN"
-# OSAURUS_SPAWN_CHECK makes the binary print OSAURUS_SPAWN_OK and exit(0) before
-# any heavy init; OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS keeps it off the login
+# MUWA_SPAWN_CHECK makes the binary print MUWA_SPAWN_OK and exit(0) before
+# any heavy init; MUWA_DISABLE_KEYCHAIN_FOR_TESTS keeps it off the login
 # Keychain so the check never raises a confidential-information prompt.
-OSAURUS_SPAWN_CHECK=1 OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1 "$APP_BIN" >"$OUT" 2>&1 &
+MUWA_SPAWN_CHECK=1 MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1 "$APP_BIN" >"$OUT" 2>&1 &
 SPAWN_PID=$!
 
 # macOS has no `timeout`; arm a background killer so a hung spawn still fails.
@@ -45,8 +45,8 @@ if [[ "$STATUS" -ne 0 ]]; then
   exit 1
 fi
 
-if ! grep -q "OSAURUS_SPAWN_OK" "$OUT"; then
-  echo "❌ app spawn check did not print the OSAURUS_SPAWN_OK sentinel" >&2
+if ! grep -q "MUWA_SPAWN_OK" "$OUT"; then
+  echo "❌ app spawn check did not print the MUWA_SPAWN_OK sentinel" >&2
   cat "$OUT" >&2 || true
   exit 1
 fi

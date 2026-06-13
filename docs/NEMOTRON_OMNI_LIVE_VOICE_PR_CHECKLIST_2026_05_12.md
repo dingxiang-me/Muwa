@@ -2,7 +2,7 @@
 
 ## Scope
 
-This checklist tracks the Osaurus side of live voice input for Nemotron Omni
+This checklist tracks the Muwa side of live voice input for Nemotron Omni
 models. This branch pins `vmlx-swift-lm` to `6561a72`, which can consume
 `UserInput.Audio`, preserves pre-encoded Parakeet/audio embeddings, exposes a
 reusable retained live PCM buffer with a streaming cursor for VAD/call-mode
@@ -52,7 +52,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `UserInput.Audio` sources to `.preEncoded` audio embeddings before
   `processor.prepare(input:)`. Existing `.preEncoded` audio is preserved, which
   is the handoff point for a future live Parakeet/sound-projection component.
-- `Packages/OsaurusCore/Package.swift` pins `vmlx-swift-lm` to `6561a72` so
+- `Packages/MuwaCore/Package.swift` pins `vmlx-swift-lm` to `6561a72` so
   the app consumes the Swift live-voice handoff, live PCM streaming cursor,
   tracked `OmniAudioLatencyBench` and `OmniAudioChunkStabilityBench`
   harnesses, and media-placeholder-aware cache restore guard, plus current
@@ -60,9 +60,9 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   indexer plus ratio-4 overlap-compressor state fixes.
 - Parakeet/RADIO source, function, and documentation verification is an
   explicit release guard: the source repo must contain the encoder functions
-  and bench/docs, the live remote must contain the pinned commit, Osaurus must
+  and bench/docs, the live remote must contain the pinned commit, Muwa must
   resolve the same revision, and this check must be repeated after any final
-  Osaurus commit/push before calling the PR ready.
+  Muwa commit/push before calling the PR ready.
 - Live voice timing is now visible in the normal debug path:
   - `FloatingInputCard` logs `snapshot_ms`, `wav_encode_ms`, `wav_bytes`,
     `sample_rate`, and `duration_ms` when a voice turn is captured.
@@ -82,7 +82,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
 
 ## Verified Evidence
 
-- `swift build --target OsaurusCore` passed after the live voice snapshot
+- `swift build --target MuwaCore` passed after the live voice snapshot
   changes, after the `vmlx-swift-lm` pin bump to `638024b`, and after the
   TTFT/live-voice timing instrumentation. It also passed after the API-level
   `/chat/completions` trace recorder was added. Re-run after the `fb8fb39`
@@ -112,9 +112,9 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `remapParakeetWeights`, `NemotronHRADIOVisionModel`,
   `remapRadioWeights`, `OmniAudioChunkStabilityBench`,
   `PARAKEET-RADIO-INTEGRATION.md`, and
-  `docs/benchmarks/omni-audio-chunk-stability-2026-05-13.md`; Osaurus pins the
-  same revision in `Packages/OsaurusCore/Package.swift` and the tracked
-  resolved files; the Osaurus-resolved checkout also contains the same encoder
+  `docs/benchmarks/omni-audio-chunk-stability-2026-05-13.md`; Muwa pins the
+  same revision in `Packages/MuwaCore/Package.swift` and the tracked
+  resolved files; the Muwa-resolved checkout also contains the same encoder
   functions, docs, and DSV4 causal top-k/overlap-compressor helpers.
 - Focused UI/API attachment regression tests passed:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
@@ -125,13 +125,13 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `Chat.Message.audios` / `.videos`.
 - Focused API WAV side-channel regression test passed:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
-  --package-path Packages/OsaurusCore --filter
+  --package-path Packages/MuwaCore --filter
   MultimodalContentPartTests/mapping_audioWavDecodesToSamples`.
   This covers OpenAI-compatible `input_audio` WAV payloads mapping directly to
   `UserInput.Audio.samples` instead of a temp-file `UserInput.Audio.url`.
 - API WAV side-channel regression set passed:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
-  --package-path Packages/OsaurusCore --filter
+  --package-path Packages/MuwaCore --filter
   'MultimodalContentPartTests|MaterializeMediaDataUrlMCDCTests|MLXBatchAdapterTests/preencodeAudioSources_replacesRawAudioAndCountsInputs'`.
   This passed with `25` tests in `3` suites, preserving video/audio temp-file
   fallback coverage while adding the valid-WAV direct PCM path. The two
@@ -139,7 +139,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `MLXArray`/`default.metallib` fixture limitation.
 - Xcode debug app build passed after the API WAV side-channel change:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild
-  -workspace osaurus.xcworkspace -scheme osaurus -configuration Debug
+  -workspace Muwa.xcworkspace -scheme Muwa -configuration Debug
   -destination 'platform=macOS,arch=arm64' ... build`. The build resolved
   `vmlx-swift-lm @ f728718`.
 - Rebuilt debug app `/chat/completions` smoke passed for an
@@ -173,7 +173,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
 - After rebase onto `osaurus/main`, the post-rebase focused package
   suite passed with `48` tests in `6` suites:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
-  --package-path Packages/OsaurusCore --filter
+  --package-path Packages/MuwaCore --filter
   'RemoteChatRequestEncodingTests|RuntimePolicySourceTests/vmlxPinIncludesRuntimeHardening|MultimodalContentPartTests/mapping_audioWavDecodesToSamples|MaterializeMediaDataUrlMCDCTests|MLXBatchAdapterTests/preencodeAudioSources_replacesRawAudioAndCountsInputs|LiveVoiceResidentPreencodeIntegrationTests'`.
   The gated real-model test skipped in this default run, as intended.
 - After the resident live-preencode scheduler landed, the same broader focused
@@ -189,7 +189,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   OSAURUS_OMNI_MODEL=<local-omni-id> OSAURUS_OMNI_AUDIO=<audio-file>
   OSAURUS_MLX_METALLIB=<default.metallib>
   DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer swift test
-  --package-path Packages/OsaurusCore --filter
+  --package-path Packages/MuwaCore --filter
   LiveVoiceResidentPreencodeIntegrationTests`. The test warms a resident
   Nemotron Omni model, runs `preencodeLiveVoiceAudioIfResident(...)` on a real
   audio file, checks `status=stored`, checks exact source sample count/rate
@@ -206,7 +206,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   `composer_submit=preencoded`; earlier run before the composer-submit
   assertion recorded max RSS about `13.1 GB`.
 - `OmniAudioLatencyBench` on `Nemotron-Omni-Nano-JANGTQ-CRACK` measured the
-  Osaurus BatchEngine path at `1514.1 ms` raw PCM first semantic delta on
+  Muwa BatchEngine path at `1514.1 ms` raw PCM first semantic delta on
   turn 1, `1498.6 ms` raw PCM on turn 2, `208.9 ms` pre-encoded Parakeet on
   turn 1, and `201.8 ms` pre-encoded Parakeet on turn 2. The bench recorded
   `63` media-placeholder tokens, known media token IDs `[18, 27]`, media
@@ -220,7 +220,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   be concatenated from independently encoded live chunks.
 - Xcode app build passed from the workspace:
   `DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild
-  -workspace osaurus.xcworkspace -scheme osaurus -configuration Debug
+  -workspace Muwa.xcworkspace -scheme Muwa -configuration Debug
   -destination 'platform=macOS,arch=arm64'
   -derivedDataPath build/XcodeDerivedData-livevoice
   CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGN_IDENTITY= build`.
@@ -290,7 +290,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
     at `5304.7 ms`, total `5513.7 ms`.
   - repeated audio streaming request: first semantic SSE delta at `1601.1 ms`,
     total `1815.3 ms`.
-  - Osaurus logs showed model cache hits for the audio requests; audio
+  - Muwa logs showed model cache hits for the audio requests; audio
     `prepareInput` was `38 ms` on the first audio request and `16 ms` on the
     repeated request, while the vMLX `engine.generate(...)` await dominated the
     first semantic delta.
@@ -306,7 +306,7 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
 
 ## PR Gates
 
-- Build: `swift build --target OsaurusCore` from `Packages/OsaurusCore`.
+- Build: `swift build --target MuwaCore` from `Packages/MuwaCore`.
 - Unit test when the toolchain supports it:
   `swift test --filter LiveVoiceAudioSnapshotTests`.
 - Manual app smoke:
@@ -332,10 +332,10 @@ is gated by `ModelMediaCapabilities.supportsAudio`.
   2. Confirm source contains `NemotronHParakeetEncoder`,
      `NemotronHRADIOVisionModel`, `extractAudioEmbeds`, `extractImageEmbeds`,
      and `OmniAudioChunkStabilityBench`.
-  3. Confirm Osaurus `Package.swift` plus workspace, app project, and
-     `OsaurusCore` `Package.resolved` files pin full revision
+  3. Confirm Muwa `Package.swift` plus workspace, app project, and
+     `MuwaCore` `Package.resolved` files pin full revision
      `6561a72f93d6cd5e0202e8067b53fed5cf21a660`.
-  4. Confirm the Osaurus-resolved checkout contains the same Parakeet/RADIO
+  4. Confirm the Muwa-resolved checkout contains the same Parakeet/RADIO
      functions and docs after dependency resolution.
 
 ## Remaining Work

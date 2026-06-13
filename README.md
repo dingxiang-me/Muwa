@@ -1,8 +1,8 @@
 <p align="center">
-<img width="1920" height="1080" alt="osaurus-techcrunch-1" src="https://github.com/user-attachments/assets/d7905005-71fe-41ba-b69f-e8968af29b5c" />
+<img width="1920" height="1080" alt="muwa-techcrunch-1" src="https://github.com/user-attachments/assets/d7905005-71fe-41ba-b69f-e8968af29b5c" />
 </p>
 
-<h1 align="center">Osaurus</h1>
+<h1 align="center">Muwa</h1>
 
 <p align="center">
   <strong>Own your AI.</strong><br>
@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/osaurus-ai/osaurus/releases/latest"><img src="https://img.shields.io/github/v/release/osaurus-ai/osaurus?sort=semver" alt="Release"></a>
-  <a href="https://github.com/osaurus-ai/osaurus/releases"><img src="https://img.shields.io/github/downloads/osaurus-ai/osaurus/total" alt="Downloads"></a>
-  <a href="https://github.com/osaurus-ai/osaurus/blob/main/LICENSE"><img src="https://img.shields.io/github/license/osaurus-ai/osaurus" alt="License"></a>
-  <a href="https://github.com/osaurus-ai/osaurus/stargazers"><img src="https://img.shields.io/github/stars/osaurus-ai/osaurus?style=social" alt="Stars"></a>
+  <a href="https://github.com/muwa-ai/muwa/releases/latest"><img src="https://img.shields.io/github/v/release/muwa-ai/muwa?sort=semver" alt="Release"></a>
+  <a href="https://github.com/muwa-ai/muwa/releases"><img src="https://img.shields.io/github/downloads/muwa-ai/muwa/total" alt="Downloads"></a>
+  <a href="https://github.com/muwa-ai/muwa/blob/main/LICENSE"><img src="https://img.shields.io/github/license/muwa-ai/muwa" alt="License"></a>
+  <a href="https://github.com/muwa-ai/muwa/stargazers"><img src="https://img.shields.io/github/stars/muwa-ai/muwa?style=social" alt="Stars"></a>
 </p>
 
 <p align="center">
@@ -23,26 +23,26 @@
   <img src="https://img.shields.io/badge/Ollama%20API-compatible-0A7CFF" alt="Ollama API">
   <img src="https://img.shields.io/badge/MCP-server-0A7CFF" alt="MCP Server">
   <img src="https://img.shields.io/badge/Apple%20Foundation%20Models-supported-0A7CFF" alt="Foundation Models">
-  <a href="https://huggingface.co/OsaurusAI"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-OsaurusAI-FFD21E" alt="Hugging Face"></a>
+  <a href="https://huggingface.co/MuwaAI"><img src="https://img.shields.io/badge/%F0%9F%A4%97%20Hugging%20Face-MuwaAI-FFD21E" alt="Hugging Face"></a>
   <img src="https://img.shields.io/badge/PRs-welcome-brightgreen" alt="PRs Welcome">
 </p>
 
 <p align="center">
-  <a href="https://github.com/osaurus-ai/osaurus/releases/latest/download/Osaurus.dmg">Download for Mac</a> ·
-  <a href="https://docs.osaurus.ai">Docs</a> ·
-  <a href="https://huggingface.co/OsaurusAI">Models</a> ·
-  <a href="https://discord.gg/osaurus">Discord</a> ·
-  <a href="https://x.com/OsaurusAI">Twitter</a> ·
-  <a href="https://github.com/osaurus-ai/osaurus-tools">Plugin Registry</a>
+  <a href="https://github.com/muwa-ai/muwa/releases/latest/download/Muwa.dmg">Download for Mac</a> ·
+  <a href="https://docs.muwa.ai">Docs</a> ·
+  <a href="https://huggingface.co/MuwaAI">Models</a> ·
+  <a href="https://discord.gg/muwa">Discord</a> ·
+  <a href="https://x.com/MuwaAI">Twitter</a> ·
+  <a href="https://github.com/muwa-ai/muwa-tools">Plugin Registry</a>
 </p>
 
 ---
 
 ## Inference is all you need. Everything else can be owned by you.
 
-Models are getting cheaper and more interchangeable by the day. What's irreplaceable is the layer around them -- your context, your memory, your tools, your identity. Others keep that layer on their servers. Osaurus keeps it on your machine.
+Models are getting cheaper and more interchangeable by the day. What's irreplaceable is the layer around them -- your context, your memory, your tools, your identity. Others keep that layer on their servers. Muwa keeps it on your machine.
 
-Osaurus is the AI harness for macOS. It sits between you and any model -- local or cloud -- and provides the continuity that makes AI personal: agents that remember, execute autonomously, run real code, and stay reachable from anywhere. The models are interchangeable. The harness is what compounds.
+Muwa is the AI harness for macOS. It sits between you and any model -- local or cloud -- and provides the continuity that makes AI personal: agents that remember, execute autonomously, run real code, and stay reachable from anywhere. The models are interchangeable. The harness is what compounds.
 
 Works fully offline with local models. Connect to any cloud provider when you want more power. Nothing leaves your Mac unless you choose.
 
@@ -51,22 +51,22 @@ Native Swift on Apple Silicon. No Electron. No compromises. MIT licensed.
 ## Install
 
 ```bash
-brew install --cask osaurus
+brew install --cask muwa
 ```
 
-Or download the latest `.dmg` from [Releases](https://github.com/osaurus-ai/osaurus/releases/latest). After installing, launch from Spotlight (`⌘ Space` → "Osaurus") or the CLI:
+Or download the latest `.dmg` from [Releases](https://github.com/muwa-ai/muwa/releases/latest). After installing, launch from Spotlight (`⌘ Space` → "Muwa") or the CLI:
 
 ```bash
-osaurus ui       # Open the chat UI
-osaurus serve    # Start the server
-osaurus status   # Check status
+muwa-cli ui       # Open the chat UI
+muwa-cli serve    # Start the server
+muwa-cli status   # Check status
 ```
 
 > Requires macOS 15.5+ and Apple Silicon.
 
 ## Agents
 
-Agents are the core of Osaurus. Each one gets its own prompts, memory, and visual theme -- a research assistant, a coding partner, a file organizer, whatever you need. Tools and skills are automatically selected via RAG search based on the task at hand -- no manual configuration needed. Everything else in the harness exists to make agents smarter, faster, and more capable over time.
+Agents are the core of Muwa. Each one gets its own prompts, memory, and visual theme -- a research assistant, a coding partner, a file organizer, whatever you need. Tools and skills are automatically selected via RAG search based on the task at hand -- no manual configuration needed. Everything else in the harness exists to make agents smarter, faster, and more capable over time.
 
 Agents can also opt into a private encrypted database and a single self-scheduled next run -- see [Agent DB & Self-Scheduling](docs/AGENT_DB.md).
 
@@ -78,14 +78,14 @@ Every chat is an agent loop. Pick a working folder and the agent gets file, sear
 
 Agents execute code in an isolated Linux VM powered by Apple's [Containerization](https://developer.apple.com/documentation/containerization) framework. Full dev environment -- shell, Python, Node.js, compilers, package managers -- with zero risk to your Mac.
 
-Each agent gets its own Linux user and home directory. The VM connects back to Osaurus (inference, memory, secrets) via a vsock bridge -- sandboxed but not disconnected. Extend with simple JSON plugin recipes, no Xcode or code signing required.
+Each agent gets its own Linux user and home directory. The VM connects back to Muwa (inference, memory, secrets) via a vsock bridge -- sandboxed but not disconnected. Extend with simple JSON plugin recipes, no Xcode or code signing required.
 
 ```
 ┌────────────────┐       ┌────────────────────────────┐
-│    Osaurus     │       │   Linux VM (Alpine)        │
+│    Muwa     │       │   Linux VM (Alpine)        │
 │                │       │                            │
 │  Sandbox Mgr ──┼───────┤→ /workspace  (VirtioFS)    │
-│  Host API   ←──┼─vsock─┤→ osaurus-host bridge       │
+│  Host API   ←──┼─vsock─┤→ muwa-host bridge       │
 │                │       │                            │
 │                │       │  agent-alice  (Linux user) │
 │                │       │  agent-bob    (Linux user) │
@@ -108,11 +108,11 @@ Every participant -- human, agent, device -- gets a secp256k1 cryptographic addr
 
 ### Relay
 
-Expose agents to the internet via secure WebSocket tunnels through `agent.osaurus.ai`. Unique URL per agent based on its crypto address. No port forwarding, no ngrok, no configuration.
+Expose agents to the internet via secure WebSocket tunnels through `agent.muwa.ai`. Unique URL per agent based on its crypto address. No port forwarding, no ngrok, no configuration.
 
 ### Secure Channel
 
-When two Osaurus agents talk -- across your LAN or across the world through the relay -- the conversation is **end-to-end encrypted**: a forward-secret X25519 handshake authenticated by each agent's crypto identity, with every request, streamed token, and access key sealed in ChaCha20-Poly1305. The relay becomes a blind pipe that forwards ciphertext it cannot open; a man-in-the-middle cannot complete a handshake; replayed or truncated traffic is detected and refused; and there is no plaintext fallback an attacker can force. Zero configuration -- pairing is all it takes. See the [Secure Channel docs](docs/SECURE_CHANNEL.md).
+When two Muwa agents talk -- across your LAN or across the world through the relay -- the conversation is **end-to-end encrypted**: a forward-secret X25519 handshake authenticated by each agent's crypto identity, with every request, streamed token, and access key sealed in ChaCha20-Poly1305. The relay becomes a blind pipe that forwards ciphertext it cannot open; a man-in-the-middle cannot complete a handshake; replayed or truncated traffic is detected and refused; and there is no plaintext fallback an attacker can force. Zero configuration -- pairing is all it takes. See the [Secure Channel docs](docs/SECURE_CHANNEL.md).
 
 ## Models
 
@@ -120,11 +120,11 @@ The harness is model-agnostic. Swap freely -- your agents, memory, and tools sta
 
 ### Local
 
-Run Gemma 4, Qwen3.6, GPT-OSS, Llama, and more on Apple Silicon with optimized MLX inference. Osaurus maintains its own [optimized model library on Hugging Face](https://huggingface.co/OsaurusAI) with curated quantizations for the best quality-to-size ratio on Apple Silicon. Models stored at `~/MLXModels` (override with `OSU_MODELS_DIR`). Fully private, fully offline.
+Run Gemma 4, Qwen3.6, GPT-OSS, Llama, and more on Apple Silicon with optimized MLX inference. Muwa maintains its own [optimized model library on Hugging Face](https://huggingface.co/MuwaAI) with curated quantizations for the best quality-to-size ratio on Apple Silicon. Models stored at `~/MLXModels` (override with `OSU_MODELS_DIR`). Fully private, fully offline.
 
 ### Liquid Foundation Models
 
-Osaurus supports [Liquid AI's LFM](https://www.liquid.ai/models) family -- on-device models built on a non-transformer architecture optimized for edge deployment. Fast decode, low memory footprint, and strong tool calling out of the box.
+Muwa supports [Liquid AI's LFM](https://www.liquid.ai/models) family -- on-device models built on a non-transformer architecture optimized for edge deployment. Fast decode, low memory footprint, and strong tool calling out of the box.
 
 ### Apple Foundation Models
 
@@ -136,28 +136,28 @@ Connect to OpenAI, Anthropic, Gemini, xAI/Grok, [Venice AI](https://venice.ai), 
 
 ## MCP
 
-Osaurus is a full MCP (Model Context Protocol) server. Give any MCP-compatible client access to your tools with the command-based stdio bridge:
+Muwa is a full MCP (Model Context Protocol) server. Give any MCP-compatible client access to your tools with the command-based stdio bridge:
 
 ```json
 {
   "mcpServers": {
-    "osaurus": {
-      "command": "osaurus",
+    "muwa": {
+      "command": "muwa-cli",
       "args": ["mcp"]
     }
   }
 }
 ```
 
-`osaurus mcp` starts a stdio MCP server for the client and proxies tool discovery/calls to your local Osaurus HTTP server. In the other direction, Osaurus can also act as an MCP client and aggregate tools from URL-based remote MCP providers. One-tap connect to ~25 well-known providers (Linear, Notion, GitHub, Vercel, Supabase, Sentry, Stripe, Cloudflare, ...) with auto OAuth 2.1 + Dynamic Client Registration, or paste an API key. The Remote MCP Providers UI is for HTTP/SSE MCP endpoints; it does not launch third-party `command`/`args` stdio providers. See the [Remote MCP Providers Guide](docs/REMOTE_MCP_PROVIDERS.md) for details.
+`muwa-cli mcp` starts a stdio MCP server for the client and proxies tool discovery/calls to your local Muwa HTTP server. In the other direction, Muwa can also act as an MCP client and aggregate tools from URL-based remote MCP providers. One-tap connect to ~25 well-known providers (Linear, Notion, GitHub, Vercel, Supabase, Sentry, Stripe, Cloudflare, ...) with auto OAuth 2.1 + Dynamic Client Registration, or paste an API key. The Remote MCP Providers UI is for HTTP/SSE MCP endpoints; it does not launch third-party `command`/`args` stdio providers. See the [Remote MCP Providers Guide](docs/REMOTE_MCP_PROVIDERS.md) for details.
 
 ## Tools & Plugins
 
 ```bash
-osaurus tools install osaurus.browser    # Install from registry
-osaurus tools list                       # List installed
-osaurus tools create MyPlugin --swift    # Create a plugin
-osaurus tools dev com.acme.my-plugin     # Dev with hot reload
+muwa-cli tools install muwa.browser       # Install from registry
+muwa-cli tools list                       # List installed
+muwa-cli tools create MyPlugin --swift    # Create a plugin
+muwa-cli tools dev com.acme.my-plugin     # Dev with hot reload
 ```
 
 20+ native plugins: Mail, Calendar, Vision, macOS Use, XLSX, PPTX, Browser, Music, Git, Filesystem, Search, Fetch, and more. Plugins target the v3 host API surface — register HTTP routes, serve web apps, persist data in SQLite, dispatch agent tasks, and call inference through any model. Older v1/v2 plugins continue to load unchanged. See the [Plugin Authoring Guide](docs/plugins/README.md).
@@ -172,13 +172,13 @@ Document attachments keep structure where the file format exposes it: CSV/TSV ta
 
 **Voice** -- On-device transcription via FluidAudio on Apple's Neural Engine. Voice input in chat, VAD mode with wake-word activation, and a global hotkey to transcribe into any app. No audio leaves your Mac. See [Voice Input Guide](docs/VOICE_INPUT.md).
 
-**Shortcuts, Spotlight & Siri** -- Osaurus ships App Intents, so "Ask Osaurus" and "Run Osaurus Agent" are available system-wide the moment you install -- no setup. Ask your active agent and get the reply inline, or kick off a custom agent in the background. See [App Intents Guide](docs/APP_INTENTS.md).
+**Shortcuts, Spotlight & Siri** -- Muwa ships App Intents, so "Ask Muwa" and "Run Muwa Agent" are available system-wide the moment you install -- no setup. Ask your active agent and get the reply inline, or kick off a custom agent in the background. See [App Intents Guide](docs/APP_INTENTS.md).
 
 **Developer Tools** -- Server explorer, MCP tool inspector, inference monitoring, plugin debugging. See [Developer Tools Guide](docs/DEVELOPER_TOOLS.md). For the inference scheduler, model leases, continuous-batching engine, and feature flags that tune them, see [Inference Runtime](docs/INFERENCE_RUNTIME.md).
 
 ## Telemetry
 
-Osaurus collects **anonymous, aggregated usage analytics** via [Aptabase](https://aptabase.com), an [open-source](https://github.com/aptabase/aptabase), privacy-first analytics project. We collect this only to understand broad user trends and preferences (how the app is used and where people run into friction) so we can make it better. It **never** includes your chats, prompts, files, model outputs, or keys. There are no accounts or device profiles, so events aren't tied to you.
+Muwa collects **anonymous, aggregated usage analytics** via [Aptabase](https://aptabase.com), an [open-source](https://github.com/aptabase/aptabase), privacy-first analytics project. We collect this only to understand broad user trends and preferences (how the app is used and where people run into friction) so we can make it better. It **never** includes your chats, prompts, files, model outputs, or keys. There are no accounts or device profiles, so events aren't tied to you.
 
 For the exact, exhaustive list of every event and property we capture — and an explicit list of what we never collect — see [Telemetry & KPIs](docs/TELEMETRY.md).
 
@@ -190,7 +190,7 @@ For the exact, exhaustive list of every event and property we capture — and an
 
 Telemetry is **off by default in source builds**: with no key, the SDK is never initialized and every event is a silent no-op, so you can build and contribute without any of this. To enable it locally:
 
-1. Create `App/osaurus/Secrets.xcconfig` (gitignored — never commit it) with the keys you want:
+1. Create `App/Muwa/Secrets.xcconfig` (gitignored — never commit it) with the keys you want:
    - `APTABASE_APP_KEY = A-XX-...` — your Aptabase app key (analytics).
    - `SENTRY_DSN` — your Sentry project DSN (crash reporting). Optional; omit it to leave crash reporting off. **Escape the scheme slashes**: an `.xcconfig` treats `//` as a comment, so a raw `https://…` DSN gets silently truncated to `https:`. Add a slash variable and reference it:
 
@@ -199,7 +199,7 @@ Telemetry is **off by default in source builds**: with no key, the SDK is never 
      SENTRY_DSN = https:$(SENTRY_SLASH)$(SENTRY_SLASH)yourPublicKey@o123.ingest.sentry.io/456
      ```
 
-2. In Xcode, add `Secrets.xcconfig` to the project (**no** target membership), then under **Project → Info → Configurations → Debug → osaurus** set "Based on Configuration File" to **Secrets**.
+2. In Xcode, add `Secrets.xcconfig` to the project (**no** target membership), then under **Project → Info → Configurations → Debug → Muwa** set "Based on Configuration File" to **Secrets**.
 3. Clean build (⇧⌘K) and relaunch.
 
 The keys flow `Secrets.xcconfig` → `$(APTABASE_APP_KEY)` / `$(SENTRY_DSN)` build settings → `AptabaseAppKey` / `SentryDSN` in `Info.plist`. Debug builds report to Aptabase's **Debug** bucket (enable the Debug view on the dashboard to see them) and to Sentry's `debug` environment, so local testing never pollutes production data.
@@ -214,22 +214,22 @@ Drop-in endpoints for existing tools:
 | Anthropic | `http://127.0.0.1:1337/anthropic/v1/messages` |
 | Ollama    | `http://127.0.0.1:1337/api/chat`              |
 
-All prefixes supported (`/v1`, `/api`, `/v1/api`). Full function calling with streaming tool call deltas. `/chat/completions` keeps **strict OpenAI semantics** -- it returns `tool_calls` and the client executes them, so Osaurus drops in cleanly behind harnesses that already manage their own tool loop. For server-side autonomous loops use `POST /agents/{id}/run`; to expose Osaurus tools to remote MCP harnesses use `/mcp/tools` + `/mcp/call`. See [OpenAI API Guide](docs/OpenAI_API_GUIDE.md) for tool calling, streaming, and SDK examples. Building a macOS app that connects to Osaurus? See the [Shared Configuration Guide](docs/SHARED_CONFIGURATION_GUIDE.md).
+All prefixes supported (`/v1`, `/api`, `/v1/api`). Full function calling with streaming tool call deltas. `/chat/completions` keeps **strict OpenAI semantics** -- it returns `tool_calls` and the client executes them, so Muwa drops in cleanly behind harnesses that already manage their own tool loop. For server-side autonomous loops use `POST /agents/{id}/run`; to expose Muwa tools to remote MCP harnesses use `/mcp/tools` + `/mcp/call`. See [OpenAI API Guide](docs/OpenAI_API_GUIDE.md) for tool calling, streaming, and SDK examples. Building a macOS app that connects to Muwa? See the [Shared Configuration Guide](docs/SHARED_CONFIGURATION_GUIDE.md).
 
 ## CLI
 
 ```bash
-osaurus serve --port 1337              # Start on localhost
-osaurus serve --port 1337 --expose     # Expose on LAN
-osaurus ui                             # Open the chat UI
-osaurus status                         # Check status
-osaurus stop                           # Stop the server
+muwa-cli serve --port 1337              # Start on localhost
+muwa-cli serve --port 1337 --expose     # Expose on LAN
+muwa-cli ui                             # Open the chat UI
+muwa-cli status                         # Check status
+muwa-cli stop                           # Stop the server
 ```
 
 Homebrew auto-links the CLI, or symlink manually:
 
 ```bash
-ln -sf "/Applications/Osaurus.app/Contents/MacOS/osaurus" "$(brew --prefix)/bin/osaurus"
+ln -sf "/Applications/Muwa.app/Contents/MacOS/Muwa" "$(brew --prefix)/bin/muwa-cli"
 ```
 
 ## Architecture
@@ -259,12 +259,12 @@ Most features are accessible through the Management window (`⌘ ⇧ M`).
 ## Build from Source
 
 ```bash
-git clone https://github.com/osaurus-ai/osaurus.git
-cd osaurus
-open osaurus.xcworkspace
+git clone https://github.com/muwa-ai/muwa.git
+cd muwa
+open Muwa.xcworkspace
 ```
 
-Build and run the `osaurus` target. Requires Xcode 16+ and macOS 15.5+.
+Build and run the `Muwa` target. Requires Xcode 16+ and macOS 15.5+.
 
 ### Git Hooks (lefthook)
 
@@ -280,10 +280,10 @@ This installs a `pre-push` hook that runs `swift-format` over the `Packages/` di
 ## Project Structure
 
 ```
-osaurus/
+muwa/
 ├── App/                          # macOS app target (SwiftUI entry point, assets, entitlements)
 ├── Packages/
-│   ├── OsaurusCore/              # Core library — all app logic
+│   ├── MuwaCore/              # Core library — all app logic
 │   │   ├── Models/               # Data types, DTOs, configuration stores
 │   │   ├── Services/             # Business logic (actors and stateless types)
 │   │   ├── Managers/             # UI-facing state holders (@MainActor, observable)
@@ -295,8 +295,8 @@ osaurus/
 │   │   ├── Folder/               # Working-folder context, file ops, batch tool
 │   │   ├── Utils/                # Cross-cutting utilities
 │   │   └── Tests/                # Unit and integration tests
-│   ├── OsaurusCLI/               # CLI (osaurus command)
-│   └── OsaurusRepository/        # Plugin registry and installation
+│   ├── MuwaCLI/               # CLI (muwa-cli command)
+│   └── MuwaRepository/        # Plugin registry and installation
 ├── docs/                         # Feature guides and documentation
 ├── scripts/                      # Build, release, and benchmark scripts
 ├── sandbox/                      # Sandbox VM Dockerfile
@@ -307,22 +307,22 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the architecture guide and layer
 
 ## Contributing
 
-Osaurus is actively developed and we welcome contributions: bug fixes, new plugins, documentation, UI/UX improvements, and testing.
+Muwa is actively developed and we welcome contributions: bug fixes, new plugins, documentation, UI/UX improvements, and testing.
 
-Check out [Good First Issues](https://github.com/osaurus-ai/osaurus/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), read the [Contributing Guide](CONTRIBUTING.md), or join [Discord](https://discord.gg/osaurus). See [docs/FEATURES.md](docs/FEATURES.md) for the full feature inventory.
+Check out [Good First Issues](https://github.com/muwa-ai/muwa/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), read the [Contributing Guide](CONTRIBUTING.md), or join [Discord](https://discord.gg/muwa). See [docs/FEATURES.md](docs/FEATURES.md) for the full feature inventory.
 
 > [!NOTE]
-> **🌐 Help translate Osaurus.** We're looking for contributors to localize the app into **Spanish**, **Korean**, **Japanese**, and **Traditional Chinese** -- these locales are already wired up in Xcode, so you can start translating right away. See [docs/TRANSLATORS.md](docs/TRANSLATORS.md) for how to contribute and the contributor leaderboard.
+> **🌐 Help translate Muwa.** We're looking for contributors to localize the app into **Spanish**, **Korean**, **Japanese**, and **Traditional Chinese** -- these locales are already wired up in Xcode, so you can start translating right away. See [docs/TRANSLATORS.md](docs/TRANSLATORS.md) for how to contribute and the contributor leaderboard.
 
 ## Community
 
-- [Discord](https://discord.gg/osaurus) -- chat, feedback, show-and-tell
-- [Twitter](https://x.com/OsaurusAI) -- updates and demos
-- [Hugging Face](https://huggingface.co/OsaurusAI) -- optimized models for Apple Silicon
-- [Community Calls](https://lu.ma/osaurus) -- bi-weekly, open to everyone
-- [Blog](https://osaurus.ai/blog) -- long-form thinking on personal AI
-- [Docs](https://docs.osaurus.ai) -- guides and tutorials
-- [Plugin Registry](https://github.com/osaurus-ai/osaurus-tools) -- browse and contribute tools
+- [Discord](https://discord.gg/muwa) -- chat, feedback, show-and-tell
+- [Twitter](https://x.com/MuwaAI) -- updates and demos
+- [Hugging Face](https://huggingface.co/MuwaAI) -- optimized models for Apple Silicon
+- [Community Calls](https://lu.ma/muwa) -- bi-weekly, open to everyone
+- [Blog](https://muwa.ai/blog) -- long-form thinking on personal AI
+- [Docs](https://docs.muwa.ai) -- guides and tutorials
+- [Plugin Registry](https://github.com/muwa-ai/muwa-tools) -- browse and contribute tools
 
 ## License
 
@@ -331,5 +331,5 @@ Check out [Good First Issues](https://github.com/osaurus-ai/osaurus/issues?q=is%
 ---
 
 <p align="center">
-  Osaurus, Inc. · <a href="https://osaurus.ai">osaurus.ai</a>
+  Muwa, Inc. · <a href="https://muwa.ai">muwa.ai</a>
 </p>

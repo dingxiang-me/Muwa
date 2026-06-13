@@ -1,6 +1,6 @@
 # Memory
 
-Osaurus has a persistent, on-device memory system that learns from your conversations and surfaces relevant context only when it actually helps. Memory runs in the background, stores very little, and injects ~800 tokens (or zero) per turn instead of the firehose-style stuffing that v1 did.
+Muwa has a persistent, on-device memory system that learns from your conversations and surfaces relevant context only when it actually helps. Memory runs in the background, stores very little, and injects ~800 tokens (or zero) per turn instead of the firehose-style stuffing that v1 did.
 
 The mental model is simple: a smart secretary that knows what you've discussed and surfaces only what matters right now — not a tape recorder.
 
@@ -78,7 +78,7 @@ Memory and `SOUL.md` are **separate surfaces by design** — do not cross-pollin
 
 | | Memory | `SOUL.md` |
 |---|---|---|
-| Author | Distilled from conversations by Osaurus | The agent itself, via `sandbox_write_file` (whole-file write or in-place edit) |
+| Author | Distilled from conversations by Muwa | The agent itself, via `sandbox_write_file` (whole-file write or in-place edit) |
 | Scope | Session facts, episodes, user identity | Stable preferences and patterns the agent learned about working with you |
 | Update cadence | Background after each session | Whenever the agent observes a durable pattern |
 | Where it lands | Prepended to the latest user message (volatile) | Static section in the system prompt (KV-cacheable) |
@@ -165,7 +165,7 @@ Consolidation never runs on the request path, so chat latency is unaffected.
 
 ## Configuration Reference
 
-The full configuration lives in `~/.osaurus/config/memory.json` and is editable from the Memory tab in the Management window.
+The full configuration lives in `~/.muwa/config/memory.json` and is editable from the Memory tab in the Management window.
 
 | Setting | Default | Range | Description |
 |---|---|---|---|
@@ -188,13 +188,13 @@ That's the entire surface. v1's 18 knobs (`mmrLambda`, `mmrFetchMultiplier`, `ve
 
 All memory data is stored in a local SQLite database with WAL mode. Since 0.17.7 the database is **encrypted at rest** with [SQLCipher](STORAGE.md) using a key kept in your macOS Keychain — the same key chat history, methods, and tool indexes use.
 
-**Location:** `~/.osaurus/memory/memory.sqlite` (SQLCipher)
+**Location:** `~/.muwa/memory/memory.sqlite` (SQLCipher)
 
-**Configuration:** `~/.osaurus/config/memory.json` (plaintext)
+**Configuration:** `~/.muwa/config/memory.json` (plaintext)
 
-**Vector index:** `~/.osaurus/memory/vectura/<agentId>/` — partitioned per agent so one agent's vectors never collide with another's. The vector files themselves are not yet encrypted (see [STORAGE.md → Limitations](STORAGE.md#limitations-and-trade-offs)); they are rebuilt from the encrypted SQLite source on first read after migration.
+**Vector index:** `~/.muwa/memory/vectura/<agentId>/` — partitioned per agent so one agent's vectors never collide with another's. The vector files themselves are not yet encrypted (see [STORAGE.md → Limitations](STORAGE.md#limitations-and-trade-offs)); they are rebuilt from the encrypted SQLite source on first read after migration.
 
-The schema is versioned. The v1 → v2 migration ([`migrateToV5`](../Packages/OsaurusCore/Storage/MemoryDatabase.swift)) carries forward your identity, episodes (renamed from `conversation_summaries`), and transcript (renamed from `conversation_chunks`). The noisy v1 working-memory entries, profile events, verification audit log, agent activity, embeddings cache, and graph tables are all dropped — `pinned_facts` rebuilds organically from new conversations.
+The schema is versioned. The v1 → v2 migration ([`migrateToV5`](../Packages/MuwaCore/Storage/MemoryDatabase.swift)) carries forward your identity, episodes (renamed from `conversation_summaries`), and transcript (renamed from `conversation_chunks`). The noisy v1 working-memory entries, profile events, verification audit log, agent activity, embeddings cache, and graph tables are all dropped — `pinned_facts` rebuilds organically from new conversations.
 
 The v6 migration adds three FTS5 mirror tables (`fts_pinned`, `fts_episodes`, `fts_transcript`) backed by triggers on the source tables. Tokenizer is `unicode61 remove_diacritics 2`, which folds accents and case so non-English queries don't miss obvious matches. Existing rows are backfilled in a single `INSERT … SELECT` pass, so the migration is one short transaction even for large memory databases.
 
@@ -212,16 +212,16 @@ The MMR reranker uses 4-character word shingles for cheap content overlap — mu
 
 ### Runtime Context Injection
 
-Memory context is injected only by Osaurus-composed agent surfaces: app chat windows, `POST /agents/{id}/run`, and plugin host inference. Those paths run the relevance gate against the user's message, pick at most one memory section, and prepend it to the latest user message.
+Memory context is injected only by Muwa-composed agent surfaces: app chat windows, `POST /agents/{id}/run`, and plugin host inference. Those paths run the relevance gate against the user's message, pick at most one memory section, and prepend it to the latest user message.
 
-Strict `POST /chat/completions` requests do not inject Osaurus memory, agent prompts, skills, or tools. `X-Osaurus-Agent-Id` may associate persisted HTTP history with an agent/session, but it is not a memory injection switch.
+Strict `POST /chat/completions` requests do not inject Muwa memory, agent prompts, skills, or tools. `X-Muwa-Agent-Id` may associate persisted HTTP history with an agent/session, but it is not a memory injection switch.
 
 ```python
 from openai import OpenAI
 
 client = OpenAI(
     base_url="http://127.0.0.1:1337/v1",
-    api_key="osaurus",
+    api_key="muwa",
 )
 
 response = client.chat.completions.create(
@@ -326,4 +326,4 @@ The v5 schema migration is automatic on first launch after an upgrade. It runs a
 
 `pinned_facts` starts empty and accrues organically as new sessions are distilled. The Vectura vector index is wiped and rebuilt lazily on first read.
 
-Alongside the schema migration, the [storage encryption migration](STORAGE.md) runs once on first launch of 0.17.7+ and re-keys `memory.sqlite` (and every other Osaurus database) into SQLCipher. It's automatic and shows a brief overlay; details, key-rotation, and plaintext-export instructions live in [STORAGE.md](STORAGE.md).
+Alongside the schema migration, the [storage encryption migration](STORAGE.md) runs once on first launch of 0.17.7+ and re-keys `memory.sqlite` (and every other Muwa database) into SQLCipher. It's automatic and shows a brief overlay; details, key-rotation, and plaintext-export instructions live in [STORAGE.md](STORAGE.md).

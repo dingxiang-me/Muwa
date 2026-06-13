@@ -19,8 +19,8 @@ manual UI save proof on PR #1462.
 
 Current PR #1465 proof baseline:
 
-- Osaurus PR: `#1465`
-- Osaurus proof/code branch: `codex/request-cancel-model-admission` (PR head is authoritative)
+- Muwa PR: `#1465`
+- Muwa proof/code branch: `codex/request-cancel-model-admission` (PR head is authoritative)
 - vMLX Swift pin: `76047f3b4492d4fae316267a30fba55163b1c5cd`
 - GitHub checks: `test-core`, `test-cli`, `swiftlint`, `shellcheck`, and
   `update_release_draft` were green on the previous pushed PR head; recheck after each new push.
@@ -33,7 +33,7 @@ Current PR #1465 proof baseline:
 
 ## Gemma 4 Live Proof
 
-Current PR #1465 live Osaurus API proof passed for all ten local Gemma 4 text
+Current PR #1465 live Muwa API proof passed for all ten local Gemma 4 text
 rows:
 
 - `gemma-4-e2b-it-qat-mxfp4`
@@ -221,7 +221,7 @@ Prior PR #1462 UI proof shows:
 Current PR #1462 app/API proof:
 
 - Artifact root: `.agents/gemma-final/artifacts/memory-safety-apply-pr1462-20260610-220637`
-- Built app: `/Users/eric/Library/Developer/Xcode/DerivedData/osaurus-fknwhdrdztffeoffkagufseezytr/Build/Products/Debug/osaurus.app`
+- Built app: `/Users/eric/Library/Developer/Xcode/DerivedData/muwa-fknwhdrdztffeoffkagufseezytr/Build/Products/Debug/osaurus.app`
 - Default isolated launch reported Safe Auto through `/admin/cache-stats.memory_safety`:
   `mode=safe_auto slider=2 load_cap=0.7 allocator_cap=absolute(134217728) max_concurrent=1 kv_cap=65536`.
 - Changed isolated launch reported Strict through `/admin/cache-stats.memory_safety`:
@@ -315,11 +315,11 @@ not expose a launchable `nex-n2-pro-jangtq2` runtime bundle. Current inventory:
   DB files and `server.log`, with no config/tokenizer/safetensors runtime
   bundle files.
 - Other `/Users/eric/jang/build/n2-*` directories are analysis/proof/smoke
-  outputs, not launchable Osaurus model bundles.
+  outputs, not launchable Muwa model bundles.
 
 Current N2 JANGTQ status is `BLOCKED` on bundle availability/discovery. The next
 gate is to place or build a real launchable runtime bundle, then run the same
-Osaurus live `/v1/models`, load, multi-turn tool, no-leak, token/s, topology
+Muwa live `/v1/models`, load, multi-turn tool, no-leak, token/s, topology
 cache, and health proof used for Gemma.
 
 ## Required Release Checkers
@@ -327,15 +327,15 @@ cache, and health proof used for Gemma.
 Before final checkpoint release, run:
 
 ```sh
-scripts/live-proof/assert-osaurus-pr-hygiene.sh
-scripts/live-proof/assert-osaurus-vmlx-pr-readiness.sh
+scripts/live-proof/assert-muwa-pr-hygiene.sh
+scripts/live-proof/assert-muwa-vmlx-pr-readiness.sh
 scripts/live-proof/assert-no-hidden-local-sampler-defaults.sh
-scripts/live-proof/assert-osaurus-no-forced-behavior-pr.sh
+scripts/live-proof/assert-muwa-no-forced-behavior-pr.sh
 scripts/live-proof/assert-openresponses-cache-proof-wiring.sh
 scripts/live-proof/assert-server-settings-runtime-wiring.sh
 scripts/live-proof/assert-tool-choice-required-routing.sh
 scripts/live-proof/assert-model-tool-capability-surfaces.sh
 ```
 
-Then run live Osaurus app/API proof, not only source tests, for any model row
+Then run live Muwa app/API proof, not only source tests, for any model row
 claimed fixed.

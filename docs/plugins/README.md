@@ -1,8 +1,8 @@
-# Osaurus Plugin Authoring
+# Muwa Plugin Authoring
 
-Welcome. This is the entry point for everything related to building Osaurus plugins.
+Welcome. This is the entry point for everything related to building Muwa plugins.
 
-Plugins are macOS dynamic libraries (`.dylib`) that extend Osaurus with new tools, HTTP routes, web UIs, and background tasks. They run in-process with full access to a curated host API for inference, storage, secrets, networking, and dispatch.
+Plugins are macOS dynamic libraries (`.dylib`) that extend Muwa with new tools, HTTP routes, web UIs, and background tasks. They run in-process with full access to a curated host API for inference, storage, secrets, networking, and dispatch.
 
 ## Pick your path
 
@@ -13,7 +13,7 @@ Plugins are macOS dynamic libraries (`.dylib`) that extend Osaurus with new tool
 | **Look up a specific host API callback** | [HOST_API.md](HOST_API.md) |
 | **Build HTTP routes or a web UI for my plugin** | [ROUTES_AND_WEB.md](ROUTES_AND_WEB.md) |
 | **Sign, package, and distribute my plugin** | [PACKAGING.md](PACKAGING.md) |
-| **Test my plugin (`tools dev` loop, unit tests with `OsaurusPluginTestKit`)** | [TESTING.md](TESTING.md) |
+| **Test my plugin (`tools dev` loop, unit tests with `MuwaPluginTestKit`)** | [TESTING.md](TESTING.md) |
 | **Debug why my plugin won't load** | [DEBUGGING.md](DEBUGGING.md) |
 | **See what changed in each ABI version** | [ABI_VERSIONS.md](ABI_VERSIONS.md) |
 | **Find an answer to a quick question** | [FAQ.md](FAQ.md) |
@@ -41,25 +41,25 @@ The full reference for each callback lives in [HOST_API.md](HOST_API.md).
 A plugin is a single `.dylib` that exports one symbol:
 
 ```c
-const osr_plugin_api* osaurus_plugin_entry_v2(const osr_host_api* host);
+const osr_plugin_api* muwa_plugin_entry_v2(const osr_host_api* host);
 ```
 
 It returns a struct describing how to:
 
 - Initialize and tear down the plugin (`init`, `destroy`)
-- Describe its capabilities to Osaurus (`get_manifest`)
+- Describe its capabilities to Muwa (`get_manifest`)
 - Run tool calls from chat (`invoke`)
 - Optionally handle HTTP routes (`handle_route`)
 - Optionally react to config changes and task lifecycle events
 
-The `host` pointer gives the plugin everything it needs to call back into Osaurus.
+The `host` pointer gives the plugin everything it needs to call back into Muwa.
 
 ## Repository
 
-The plugin registry lives at [github.com/osaurus-ai/osaurus-tools](https://github.com/osaurus-ai/osaurus-tools). Approved plugins are mirrored to the in-app marketplace. See [PACKAGING.md](PACKAGING.md) to publish.
+The plugin registry lives at [github.com/muwa-ai/muwa-tools](https://github.com/muwa-ai/muwa-tools). Approved plugins are mirrored to the in-app marketplace. See [PACKAGING.md](PACKAGING.md) to publish.
 
 ## Quick links
 
-- C ABI header: `Packages/OsaurusCore/Tools/PluginABI/osaurus_plugin.h`
+- C ABI header: `Packages/MuwaCore/Tools/PluginABI/muwa_plugin.h`
 - Tool result envelope contract: [../TOOL_CONTRACT.md](../TOOL_CONTRACT.md)
 - Storage layout: [../STORAGE.md](../STORAGE.md)

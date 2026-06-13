@@ -1,0 +1,176 @@
+//
+//  PluginConfigurationDomain.swift
+//  Muwa
+//
+//  Default-agent configure tools for Muwa plugins (central registry):
+//   - muwa_plugin_install
+//   - muwa_plugin_uninstall
+//
+//  Secrets are intentionally NOT entered through the chat. If an
+//  install reports `needs_secrets`, the tool surfaces that signal to
+//  the model so it can direct the user to the Plugin Secrets sheet.
+//
+
+import Foundation
+
+enum PluginConfigurationDomain {
+    static let domain = ConfigurationDomain(
+        id: "plugins",
+        displayName: "Plugins",
+        summary: "Muwa plugins from the central registry. Install and uninstall by `plugin_id`.",
+        menuHint: "install / uninstall plugins (e.g. weather, search, calendar)",
+        searchKeywords: [
+            "plugin", "plugins",
+            "install plugin", "add plugin", "enable plugin",
+            "uninstall plugin", "remove plugin", "disable plugin",
+        ],
+        exampleQueries: [
+            "install the weather plugin",
+            "add a calendar plugin",
+            "uninstall the search plugin",
+        ],
+        tools: [
+            MuwaPluginInstallTool(),
+            MuwaPluginUninstallTool(),
+        ],
+        writeToolNames: [
+            "muwa_plugin_install",
+            "muwa_plugin_uninstall",
+        ]
+    )
+}
+
+// MARK: - muwa_plugin_install
+
+public final class MuwaPluginInstallTool: MuwaTool, PermissionedTool, @unchecked Sendable {
+    public let name = "muwa_plugin_install"
+    public let description =
+        "Install a plugin from the central registry by `plugin_id` (e.g. `muwa.weather`). "
+        + "If the plugin needs secrets, the response carries `needs_secrets: true` — direct the user "
+        + "to the Plugin Secrets sheet; never accept secrets as tool arguments."
+    public let parameters: JSONValue? = .object([
+        "type": .string("object"),
+        "additionalProperties": .bool(false),
+        "properties": .object([
+            "plugin_id": .object([
+                "type": .string("string"),
+                "description": .string("Registry plugin id, e.g. `muwa.weather`."),
+            ])
+        ]),
+        "required": .array([.string("plugin_id")]),
+    ])
+
+    public var requirements: [String] { [ConfigurationToolBase.requirement] }
+    var defaultPermissionPolicy: ToolPermissionPolicy { ConfigurationToolBase.defaultPolicy }
+
+    public init() {}
+
+    public func execute(argumentsJSON: String) async throws -> String {
+        if let gate = ConfigurationToolBase.defaultAgentGateFailure(tool: name) {
+            return gate
+        }
+        let argsReq = requireArgumentsDictionary(argumentsJSON, tool: name)
+        guard case .value(let args) = argsReq else { return argsReq.failureEnvelope ?? "" }
+        let req = requireString(args, "plugin_id", expected: "registry plugin id", tool: name)
+        guard case .value(let pluginId) = req else { return req.failureEnvelope ?? "" }
+
+        do {
+            try await PluginRepositoryService.shared.install(pluginId: pluginId)
+        } catch {
+            return ToolEnvelope.failure(
+                kind: .executionError,
+                message: "Failed to install `\(pluginId)`: \(error.localizedDescription)",
+                tool: name,
+                retryable: false
+            )
+        }
+
+        // Inspect the freshly loaded manifest for required secrets the user
+        // hasn't supplied yet. Secrets never travel through chat — we only
+        // surface the signal + labels so the model can route the user to the
+        // Plugin Secrets sheet.
+        let missingSecretLabels: [String] = await MainActor.run {
+            guard
+                let loaded = PluginManager.shared.plugins
+                    .first(where: { $0.plugin.id == pluginId }),
+                let secrets = loaded.plugin.manifest.secrets
+            else {
+                return []
+            }
+            return
+                secrets
+                .filter { spec in
+                    spec.required
+                        && !ToolSecretsKeychain.hasSecret(
+                            id: spec.id,
+                            for: pluginId,
+                            agentId: Agent.defaultId
+                        )
+                }
+                .map { $0.label }
+        }
+
+        let needsSecrets = !missingSecretLabels.isEmpty
+        var result: [String: Any] = [
+            "plugin_id": pluginId,
+            "status": "installed",
+            "needs_secrets": needsSecrets,
+        ]
+        if needsSecrets {
+            result["missing_secrets"] = missingSecretLabels
+            result["next_steps"] = [
+                "This plugin needs secrets (\(missingSecretLabels.joined(separator: ", "))). "
+                    + "Direct the user to Settings → Plugins → Secrets; never accept secrets as tool arguments.",
+                "Use muwa_describe({scope: 'plugins', id: '\(pluginId)'}) to inspect its tools.",
+            ]
+        } else {
+            result["next_steps"] = [
+                "Use muwa_describe({scope: 'plugins', id: '\(pluginId)'}) to inspect its tools."
+            ]
+        }
+        return ToolEnvelope.success(tool: name, result: result)
+    }
+}
+
+// MARK: - muwa_plugin_uninstall
+
+public final class MuwaPluginUninstallTool: MuwaTool, PermissionedTool, @unchecked Sendable {
+    public let name = "muwa_plugin_uninstall"
+    public let description = "Uninstall a plugin by `plugin_id` and clean up its keychain secrets."
+    public let parameters: JSONValue? = .object([
+        "type": .string("object"),
+        "additionalProperties": .bool(false),
+        "properties": .object(["plugin_id": .object(["type": .string("string")])]),
+        "required": .array([.string("plugin_id")]),
+    ])
+
+    public var requirements: [String] { [ConfigurationToolBase.requirement] }
+    var defaultPermissionPolicy: ToolPermissionPolicy { ConfigurationToolBase.defaultPolicy }
+
+    public init() {}
+
+    public func execute(argumentsJSON: String) async throws -> String {
+        if let gate = ConfigurationToolBase.defaultAgentGateFailure(tool: name) {
+            return gate
+        }
+        let argsReq = requireArgumentsDictionary(argumentsJSON, tool: name)
+        guard case .value(let args) = argsReq else { return argsReq.failureEnvelope ?? "" }
+        let req = requireString(args, "plugin_id", expected: "installed plugin id", tool: name)
+        guard case .value(let pluginId) = req else { return req.failureEnvelope ?? "" }
+
+        do {
+            try await PluginRepositoryService.shared.uninstall(pluginId: pluginId)
+        } catch {
+            return ToolEnvelope.failure(
+                kind: .executionError,
+                message: "Failed to uninstall `\(pluginId)`: \(error.localizedDescription)",
+                tool: name,
+                retryable: false
+            )
+        }
+        return ToolEnvelope.success(
+            tool: name,
+            result: ["plugin_id": pluginId, "status": "uninstalled"]
+        )
+    }
+}

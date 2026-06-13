@@ -1,0 +1,756 @@
+//
+//  RemoteProviderManager.swift
+//  Muwa
+//
+//  Manages remote OpenAI-compatible API provider connections.
+//
+
+import Foundation
+
+/// Notification posted when remote provider connection status changes
+extension Foundation.Notification.Name {
+    static let remoteProviderStatusChanged = Foundation.Notification.Name("RemoteProviderStatusChanged")
+    static let remoteProviderModelsChanged = Foundation.Notification.Name("RemoteProviderModelsChanged")
+}
+
+/// Errors for remote provider operations
+public enum RemoteProviderError: LocalizedError {
+    case providerNotFound
+    case providerDisabled
+    case notConnected
+    case invalidURL
+    case timeout
+    case connectionFailed(String)
+
+    public var errorDescription: String? {
+        switch self {
+        case .providerNotFound:
+            return "Provider not found"
+        case .providerDisabled:
+            return "Provider is disabled"
+        case .notConnected:
+            return "Not connected to provider"
+        case .invalidURL:
+            return "Invalid server URL"
+        case .timeout:
+            return "Request timed out"
+        case .connectionFailed(let message):
+            return "Connection failed: \(message)"
+        }
+    }
+}
+
+/// Manages all remote OpenAI-compatible API provider connections
+@MainActor
+public final class RemoteProviderManager: ObservableObject {
+    public static let shared = RemoteProviderManager()
+
+    /// Current configuration
+    @Published public private(set) var configuration: RemoteProviderConfiguration
+
+    /// Runtime state for each provider
+    @Published public private(set) var providerStates: [UUID: RemoteProviderState] = [:]
+
+    /// Active service instances keyed by provider ID
+    private var services: [UUID: RemoteProviderService] = [:]
+
+    /// Provider IDs created from Bonjour discovery — not persisted to disk
+    private var ephemeralProviderIds: Set<UUID> = []
+
+    private init() {
+        self.configuration = RemoteProviderConfigurationStore.load()
+
+        // Initialize states for all providers
+        for provider in configuration.providers {
+            providerStates[provider.id] = RemoteProviderState(providerId: provider.id)
+        }
+    }
+
+    // MARK: - Provider Management
+
+    /// Returns true if the provider was created ephemerally from Bonjour discovery
+    public func isEphemeral(id: UUID) -> Bool {
+        ephemeralProviderIds.contains(id)
+    }
+
+    /// Add a new provider. Pass `isEphemeral: true` for Bonjour-discovered providers so they
+    /// are held only in memory and removed when the agent is deselected or goes offline.
+    public func addProvider(
+        _ provider: RemoteProvider,
+        apiKey: String?,
+        oauthTokens: RemoteProviderOAuthTokens? = nil,
+        isEphemeral: Bool = false
+    ) {
+        configuration.add(provider)
+        if isEphemeral {
+            ephemeralProviderIds.insert(provider.id)
+        } else {
+            RemoteProviderConfigurationStore.save(configuration)
+            // KPI: a user-configured remote provider. Only the closed-enum
+            // type is captured. Ephemeral Bonjour-discovered providers are
+            // excluded — they aren't a deliberate configuration action.
+            FeatureTelemetry.remoteProviderAdded(providerType: provider.providerType.rawValue)
+        }
+
+        // Save API key to Keychain if provided
+        if let apiKey = apiKey, !apiKey.isEmpty {
+            RemoteProviderKeychain.saveAPIKey(apiKey, for: provider.id)
+        }
+        if let oauthTokens {
+            RemoteProviderKeychain.saveOAuthTokens(oauthTokens, for: provider.id)
+            RemoteProviderKeychain.deleteAPIKey(for: provider.id)
+        }
+
+        // Initialize state
+        providerStates[provider.id] = RemoteProviderState(providerId: provider.id)
+
+        // Auto-connect if enabled
+        if provider.enabled {
+            Task {
+                try? await connect(providerId: provider.id)
+            }
+        }
+
+        notifyStatusChanged()
+    }
+
+    /// Update an existing provider
+    public func updateProvider(
+        _ provider: RemoteProvider,
+        apiKey: String?,
+        oauthTokens: RemoteProviderOAuthTokens? = nil
+    ) {
+        let wasConnected = providerStates[provider.id]?.isConnected ?? false
+
+        // Disconnect if connected
+        if wasConnected {
+            disconnect(providerId: provider.id)
+        }
+
+        configuration.update(provider)
+        RemoteProviderConfigurationStore.save(configuration)
+
+        // Update API key if provided (nil means no change, empty string means clear)
+        if let apiKey = apiKey {
+            if apiKey.isEmpty {
+                RemoteProviderKeychain.deleteAPIKey(for: provider.id)
+            } else {
+                RemoteProviderKeychain.saveAPIKey(apiKey, for: provider.id)
+            }
+        }
+        if let oauthTokens {
+            RemoteProviderKeychain.saveOAuthTokens(oauthTokens, for: provider.id)
+            RemoteProviderKeychain.deleteAPIKey(for: provider.id)
+        }
+
+        // Reconnect if was connected and still enabled
+        if wasConnected && provider.enabled {
+            Task {
+                try? await connect(providerId: provider.id)
+            }
+        }
+
+        notifyStatusChanged()
+    }
+
+    /// Remove a provider
+    public func removeProvider(id: UUID) {
+        // Disconnect first
+        disconnect(providerId: id)
+
+        // Remove from configuration (also cleans up Keychain)
+        configuration.remove(id: id)
+        ephemeralProviderIds.remove(id)
+        RemoteProviderConfigurationStore.save(configuration)
+
+        // Clean up state
+        providerStates.removeValue(forKey: id)
+
+        notifyStatusChanged()
+        notifyModelsChanged()
+    }
+
+    /// Set enabled state for a provider
+    /// When enabled is true, automatically connects to the provider
+    /// When enabled is false, disconnects from the provider
+    public func setEnabled(_ enabled: Bool, for providerId: UUID) {
+        configuration.setEnabled(enabled, for: providerId)
+        RemoteProviderConfigurationStore.save(configuration)
+
+        if enabled {
+            // Always auto-connect when toggled ON
+            Task {
+                try? await connect(providerId: providerId)
+            }
+        } else {
+            disconnect(providerId: providerId)
+        }
+
+        notifyStatusChanged()
+    }
+
+    /// Reorder providers to match `orderedIds` and persist. Omitted IDs keep
+    /// their relative position after the requested ones, so a partial list never
+    /// drops providers. Connection state is untouched — only display order moves.
+    public func reorder(orderedIds: [UUID]) {
+        configuration.reorder(orderedIds: orderedIds)
+        RemoteProviderConfigurationStore.save(configuration)
+        notifyStatusChanged()
+    }
+
+    // MARK: - Connection Management
+
+    /// Connect to a provider (fetch models and create service)
+    public func connect(providerId: UUID) async throws {
+        guard let provider = configuration.provider(id: providerId) else {
+            throw RemoteProviderError.providerNotFound
+        }
+
+        guard provider.enabled else {
+            throw RemoteProviderError.providerDisabled
+        }
+
+        // Update state to connecting
+        var state = providerStates[providerId] ?? RemoteProviderState(providerId: providerId)
+        state.isConnecting = true
+        state.lastError = nil
+        providerStates[providerId] = state
+
+        do {
+            if provider.authType == .openAICodexOAuth {
+                if let tokens = await provider.getOAuthTokensOffMainActor(), tokens.isExpired {
+                    let refreshed = try await OpenAICodexOAuthService.refresh(tokens)
+                    await RemoteProviderKeychain.saveOAuthTokensOffMainActor(refreshed, for: provider.id)
+                }
+            } else if provider.authType == .xaiOAuth {
+                if let tokens = await provider.getOAuthTokensOffMainActor(), tokens.isExpired {
+                    let refreshed = try await XAIOAuthService.refresh(tokens)
+                    await RemoteProviderKeychain.saveOAuthTokensOffMainActor(refreshed, for: provider.id)
+                }
+            }
+
+            // Fetch models from the provider and merge any manually configured deployment IDs.
+            let discoveredModels: [String]
+            do {
+                discoveredModels = try await RemoteProviderService.fetchModels(from: provider)
+            } catch {
+                if provider.providerType == .azureOpenAI && !provider.manualModelIds.isEmpty {
+                    discoveredModels = []
+                } else {
+                    throw error
+                }
+            }
+            let models = provider.mergedModelIds(discovered: discoveredModels)
+            let resolvedHeaders = await provider.resolvedHeadersOffMainActor()
+            let cachedOAuthTokens =
+                (provider.authType == .openAICodexOAuth || provider.authType == .xaiOAuth)
+                ? await provider.getOAuthTokensOffMainActor()
+                : nil
+
+            // Create service instance with headers resolved without holding
+            // @MainActor in synchronous Keychain calls.
+            let service = RemoteProviderService(
+                provider: provider,
+                models: models,
+                resolvedHeaders: resolvedHeaders,
+                cachedOAuthTokens: cachedOAuthTokens
+            )
+            services[providerId] = service
+
+            // Update state to connected
+            state.isConnecting = false
+            state.isConnected = true
+            state.discoveredModels = models
+            state.lastConnectedAt = Date()
+            state.lastError = nil
+            providerStates[providerId] = state
+
+            print("[Muwa] Remote Provider '\(provider.name)': Connected with \(models.count) models")
+
+            notifyStatusChanged()
+            notifyModelsChanged()
+
+        } catch {
+            let errorMessage = userFacingErrorMessage(error, for: provider)
+            // Update state with error
+            state.isConnecting = false
+            state.isConnected = false
+            state.lastError = errorMessage
+            state.discoveredModels = []
+            providerStates[providerId] = state
+
+            // Clean up — invalidate URLSession before discarding
+            if let service = services.removeValue(forKey: providerId) {
+                Task { await service.invalidateSession() }
+            }
+
+            print("[Muwa] Remote Provider '\(provider.name)': Connection failed - \(errorMessage)")
+
+            notifyStatusChanged()
+            throw error
+        }
+    }
+
+    /// Disconnect from a provider
+    public func disconnect(providerId: UUID) {
+        // Invalidate the URLSession before discarding the service to prevent leaking
+        if let service = services.removeValue(forKey: providerId) {
+            Task { await service.invalidateSession() }
+        }
+
+        // Update state
+        if var state = providerStates[providerId] {
+            state.isConnected = false
+            state.isConnecting = false
+            state.discoveredModels = []
+            providerStates[providerId] = state
+        }
+
+        if let provider = configuration.provider(id: providerId) {
+            print("[Muwa] Remote Provider '\(provider.name)': Disconnected")
+        }
+
+        notifyStatusChanged()
+        notifyModelsChanged()
+    }
+
+    /// Reconnect to a provider
+    public func reconnect(providerId: UUID) async throws {
+        disconnect(providerId: providerId)
+        try await connect(providerId: providerId)
+    }
+
+    /// Connect to all enabled providers on app launch
+    public func connectEnabledProviders() async {
+        for provider in configuration.enabledProviders {
+            do {
+                try await connect(providerId: provider.id)
+            } catch {
+                print("[Muwa] Failed to auto-connect to '\(provider.name)': \(error)")
+            }
+        }
+    }
+
+    private var refreshConnectedTask: Task<Void, Never>?
+
+    /// Last successful refetch per provider for throttling
+    private var lastModelRefetchAt: [UUID: Date] = [:]
+
+    static let modelRefetchThrottle: TimeInterval = 10
+
+    /// Test seam: when set, used in place of `RemoteProviderService.fetchModels`.
+    var testFetchModelsOverride: (@MainActor (RemoteProvider) async throws -> [String])?
+
+    /// Re-query `/models` for one connected provider without tearing down its
+    /// service, flipping `isConnecting`, or refreshing OAuth.
+    public func refetchModels(providerId: UUID) async {
+        guard let provider = configuration.provider(id: providerId),
+            provider.enabled,
+            var state = providerStates[providerId],
+            state.isConnected
+        else { return }
+
+        let discovered: [String]
+        do {
+            if let override = testFetchModelsOverride {
+                discovered = try await override(provider)
+            } else {
+                discovered = try await RemoteProviderService.fetchModels(from: provider)
+            }
+        } catch {
+            return
+        }
+
+        let merged = provider.mergedModelIds(discovered: discovered)
+        lastModelRefetchAt[providerId] = Date()
+        guard merged != state.discoveredModels else { return }
+
+        state.discoveredModels = merged
+        providerStates[providerId] = state
+        if let service = services[providerId] {
+            await service.updateModels(merged)
+        }
+        notifyModelsChanged()
+    }
+
+    /// Refresh every enabled provider's model list, coalesced and throttled.
+    /// Called from the picker-open path.
+    public func refreshConnectedProviders() async {
+        if let existing = refreshConnectedTask {
+            await existing.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            let now = Date()
+            let throttle = Self.modelRefetchThrottle
+            let dueIds: [UUID] = self.configuration.enabledProviders.compactMap { provider in
+                let lastRefetch = self.lastModelRefetchAt[provider.id]
+                let isThrottled = lastRefetch.map { now.timeIntervalSince($0) < throttle } ?? false
+                if isThrottled {
+                    return nil
+                }
+                return provider.id
+            }
+            for id in dueIds {
+                await self.refetchModels(providerId: id)
+            }
+        }
+        refreshConnectedTask = task
+        await task.value
+        refreshConnectedTask = nil
+    }
+
+    /// Disconnect from all providers
+    public func disconnectAll() {
+        for providerId in services.keys {
+            disconnect(providerId: providerId)
+        }
+    }
+
+    // MARK: - Service Access
+
+    /// Get the service for a provider
+    public func service(for providerId: UUID) -> RemoteProviderService? {
+        return services[providerId]
+    }
+
+    /// Get all connected services
+    public func connectedServices() -> [RemoteProviderService] {
+        return Array(services.values)
+    }
+
+    /// Get all available models across all connected providers (with prefixes)
+    public func allAvailableModels() -> [String] {
+        var models: [String] = []
+        for (providerId, service) in services {
+            if let state = providerStates[providerId], state.isConnected {
+                Task {
+                    let prefixedModels = await service.getPrefixedModels()
+                    models.append(contentsOf: prefixedModels)
+                }
+            }
+        }
+        return models
+    }
+
+    /// Get all available models synchronously from cached state
+    public func cachedAvailableModels() -> [(providerId: UUID, providerName: String, models: [String])] {
+        var result: [(providerId: UUID, providerName: String, models: [String])] = []
+
+        for provider in configuration.providers {
+            if let state = providerStates[provider.id], state.isConnected {
+                // Create prefixed model names
+                let prefix = provider.name
+                    .lowercased()
+                    .replacingOccurrences(of: " ", with: "-")
+                    .replacingOccurrences(of: "/", with: "-")
+                let prefixedModels = state.discoveredModels.map { "\(prefix)/\($0)" }
+                result.append((providerId: provider.id, providerName: provider.name, models: prefixedModels))
+            }
+        }
+
+        return result
+    }
+
+    /// Find the service that handles a given model
+    public func findService(forModel model: String) -> RemoteProviderService? {
+        for service in services.values where service.handles(requestedModel: model) {
+            return service
+        }
+        return nil
+    }
+
+    // MARK: - Test Connection
+
+    /// Test connection to a provider configuration without persisting
+    public func testConnection(
+        host: String,
+        providerProtocol: RemoteProviderProtocol,
+        port: Int?,
+        basePath: String,
+        authType: RemoteProviderAuthType,
+        providerType: RemoteProviderType = .openaiLegacy,
+        apiKey: String?,
+        headers: [String: String]
+    ) async throws -> [String] {
+        if authType == .openAICodexOAuth && providerType == .openAICodex {
+            // testConnection runs before sign-in (no OAuth tokens exist yet), so
+            // we can't query the live /models endpoint here. The static fallback
+            // is enough to render the "test succeeded" UI; the real catalog is
+            // fetched on connect via RemoteProviderService.fetchModels.
+            return OpenAICodexOAuthService.supportedModels
+        }
+
+        if authType == .xaiOAuth {
+            // xAI OAuth tokens cannot list models (HTTP 403); use the built-in
+            // catalog, matching RemoteProviderService.fetchModels.
+            return XAIOAuthService.supportedModels
+        }
+
+        // Build temporary provider for testing
+        let tempProvider = RemoteProvider(
+            name: "Test",
+            host: host,
+            providerProtocol: providerProtocol,
+            port: port,
+            basePath: basePath,
+            customHeaders: headers,
+            authType: authType,
+            providerType: providerType,
+            enabled: true,
+            autoConnect: false,
+            timeout: 30
+        )
+
+        // Manually add API key to headers for test (since it's not in Keychain)
+        var testHeaders = headers
+        if authType == .apiKey, let apiKey = apiKey, !apiKey.isEmpty {
+            switch providerType {
+            case .anthropic:
+                if testHeaders["x-api-key"] == nil {
+                    testHeaders["x-api-key"] = apiKey
+                }
+                // Add required Anthropic version header if not already set
+                if testHeaders["anthropic-version"] == nil {
+                    testHeaders["anthropic-version"] = "2023-06-01"
+                }
+            case .gemini:
+                if testHeaders["x-goog-api-key"] == nil {
+                    testHeaders["x-goog-api-key"] = apiKey
+                }
+            case .azureOpenAI:
+                if testHeaders["api-key"] == nil {
+                    testHeaders["api-key"] = apiKey
+                }
+            case .openaiLegacy, .openResponses, .openAICodex, .muwa:
+                if testHeaders["Authorization"] == nil {
+                    testHeaders["Authorization"] = "Bearer \(apiKey)"
+                }
+            }
+        }
+
+        // Anthropic uses /models endpoint (same as OpenAI-compatible providers)
+        if providerType == .anthropic {
+            return try await testAnthropicConnection(tempProvider: tempProvider, testHeaders: testHeaders)
+        }
+
+        // OpenAI-compatible and Gemini providers use /models endpoint
+        guard let url = tempProvider.url(for: "/models") else {
+            print("[Muwa] Test Connection: Invalid URL")
+            throw RemoteProviderError.invalidURL
+        }
+
+        print("[Muwa] Test Connection: Requesting \(url.absoluteString)")
+
+        var request = URLRequest(url: url)
+        request.httpMethod = "GET"
+        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.timeoutInterval = 30
+
+        // Add headers
+        for (key, value) in testHeaders {
+            let logValue = RemoteProviderHeaderRedactor.valueForLogging(
+                headerName: key,
+                value: value,
+                configuredSecretHeaderKeys: tempProvider.secretHeaderKeys
+            )
+            print("[Muwa] Test Connection: Adding header \(key)=\(logValue)")
+            request.setValue(value, forHTTPHeaderField: key)
+        }
+
+        do {
+            let (data, response) = try await GlobalProxySettings.sharedSession().data(for: request)
+
+            guard let httpResponse = response as? HTTPURLResponse else {
+                print("[Muwa] Test Connection: Invalid response type")
+                throw RemoteProviderError.connectionFailed("Invalid response")
+            }
+
+            print("[Muwa] Test Connection: HTTP \(httpResponse.statusCode)")
+
+            if httpResponse.statusCode >= 400 {
+                let errorMessage = extractErrorMessage(from: data, statusCode: httpResponse.statusCode)
+                print("[Muwa] Test Connection: Error response: \(errorMessage)")
+                throw RemoteProviderError.connectionFailed(errorMessage)
+            }
+
+            // Parse models response based on provider type
+            if providerType == .gemini {
+                let modelsResponse = try JSONDecoder().decode(GeminiModelsResponse.self, from: data)
+                let models = (modelsResponse.models ?? [])
+                    .filter { model in
+                        guard let methods = model.supportedGenerationMethods else { return false }
+                        return methods.contains("generateContent")
+                    }
+                    .map { $0.modelId }
+                print("[Muwa] Test Connection (Gemini): Success - found \(models.count) models")
+                return models
+            } else {
+                let modelsResponse = try JSONDecoder().decode(ModelsResponse.self, from: data)
+                print("[Muwa] Test Connection: Success - found \(modelsResponse.data.count) models")
+                return modelsResponse.data.map { $0.id }
+            }
+        } catch let error as RemoteProviderError {
+            throw error
+        } catch {
+            print("[Muwa] Test Connection: Network error: \(error)")
+            throw RemoteProviderError.connectionFailed(error.localizedDescription)
+        }
+    }
+
+    /// Extract a human-readable error message from API error response data
+    private func extractErrorMessage(from data: Data, statusCode: Int) -> String {
+        // Try to parse as JSON error response (OpenAI/xAI format)
+        if let json = try? JSONSerialization.jsonObject(with: data) as? [String: Any] {
+            // OpenAI/xAI format: {"error": {"message": "...", "type": "...", "code": "..."}}
+            if let error = json["error"] as? [String: Any] {
+                if let message = error["message"] as? String {
+                    // Include error code if available for more context
+                    if let code = error["code"] as? String {
+                        return "\(message) (code: \(code))"
+                    }
+                    return message
+                }
+            }
+            // Alternative format: {"message": "..."}
+            if let message = json["message"] as? String {
+                return message
+            }
+            // Alternative format: {"detail": "..."}
+            if let detail = json["detail"] as? String {
+                return detail
+            }
+        }
+
+        // Fallback to raw string if JSON parsing fails
+        if let rawMessage = String(data: data, encoding: .utf8), !rawMessage.isEmpty {
+            // Truncate very long error messages
+            let truncated = rawMessage.count > 200 ? String(rawMessage.prefix(200)) + "..." : rawMessage
+            return "HTTP \(statusCode): \(truncated)"
+        }
+
+        return "HTTP \(statusCode): Unknown error"
+    }
+
+    /// Test Anthropic connection by fetching models from the /models endpoint
+    private func testAnthropicConnection(
+        tempProvider: RemoteProvider,
+        testHeaders: [String: String]
+    ) async throws -> [String] {
+        guard let baseURL = tempProvider.url(for: "/models") else {
+            print("[Muwa] Test Connection (Anthropic): Invalid URL")
+            throw RemoteProviderError.invalidURL
+        }
+
+        print("[Muwa] Test Connection (Anthropic): Requesting \(baseURL.absoluteString)")
+
+        do {
+            let models = try await RemoteProviderService.fetchAnthropicModels(
+                baseURL: baseURL,
+                headers: testHeaders
+            )
+            print("[Muwa] Test Connection (Anthropic): Success - found \(models.count) models")
+            return models
+        } catch {
+            print("[Muwa] Test Connection (Anthropic): Error: \(error)")
+            throw RemoteProviderError.connectionFailed(error.localizedDescription)
+        }
+    }
+
+    // MARK: - Private Helpers
+
+    private func notifyStatusChanged() {
+        NotificationCenter.default.post(name: .remoteProviderStatusChanged, object: nil)
+    }
+
+    private func notifyModelsChanged() {
+        NotificationCenter.default.post(name: .remoteProviderModelsChanged, object: nil)
+    }
+
+    private func userFacingErrorMessage(_ error: Error, for provider: RemoteProvider) -> String {
+        guard provider.authType == .openAICodexOAuth || provider.providerType == .openAICodex else {
+            return error.localizedDescription
+        }
+        return OpenAICodexOAuthService.diagnosticMessage(for: error)
+    }
+
+    // MARK: - Test Helpers
+
+    /// Insert a fake connected provider directly into state, optionally with a
+    /// matching service instance for tests that assert routing state. Test-only.
+    @discardableResult
+    func _testInstallConnectedProvider(
+        _ provider: RemoteProvider,
+        discoveredModels: [String],
+        installService: Bool = false
+    ) -> RemoteProviderService? {
+        configuration.add(provider)
+        ephemeralProviderIds.insert(provider.id)
+        var state = RemoteProviderState(providerId: provider.id)
+        state.isConnected = true
+        state.discoveredModels = discoveredModels
+        state.lastConnectedAt = Date()
+        providerStates[provider.id] = state
+
+        guard installService else { return nil }
+
+        let service = RemoteProviderService(
+            provider: provider,
+            models: discoveredModels,
+            resolvedHeaders: provider.resolvedHeaders()
+        )
+        services[provider.id] = service
+        return service
+    }
+
+    /// Mutate a test-installed provider's state. Test-only.
+    func _testSetState(_ state: RemoteProviderState, for id: UUID) {
+        providerStates[id] = state
+    }
+
+    /// Tear down test state added by `_testInstallConnectedProvider` and
+    /// reset throttle / in-flight task so each test starts clean.
+    func _testRemoveProviders(ids: [UUID]) {
+        for id in ids {
+            configuration.remove(id: id)
+            ephemeralProviderIds.remove(id)
+            providerStates.removeValue(forKey: id)
+            lastModelRefetchAt.removeValue(forKey: id)
+            if let service = services.removeValue(forKey: id) {
+                Task { await service.invalidateSession() }
+            }
+        }
+        refreshConnectedTask = nil
+        testFetchModelsOverride = nil
+    }
+}
+
+// MARK: - OpenAI Models Integration
+
+extension RemoteProviderManager {
+    /// Get OpenAI-compatible model objects for all connected providers
+    func getOpenAIModels() -> [OpenAIModel] {
+        var models: [OpenAIModel] = []
+
+        for provider in configuration.providers {
+            guard let state = providerStates[provider.id], state.isConnected else {
+                continue
+            }
+
+            let prefix = provider.name
+                .lowercased()
+                .replacingOccurrences(of: " ", with: "-")
+                .replacingOccurrences(of: "/", with: "-")
+
+            for modelId in state.discoveredModels {
+                let prefixedId = "\(prefix)/\(modelId)"
+                var model = OpenAIModel(modelName: prefixedId)
+                model.owned_by = provider.name
+                models.append(model)
+            }
+        }
+
+        return models
+    }
+}

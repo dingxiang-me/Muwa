@@ -9,7 +9,7 @@ if [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
   TAG="${GITHUB_REF#refs/tags/}"
   VERSION_NO_V="${TAG#v}"
   echo "VERSION=${VERSION_NO_V}" >> "$GITHUB_ENV"
-  echo "OSAURUS_VERSION=${VERSION_NO_V}" >> "$GITHUB_ENV"
+  echo "MUWA_VERSION=${VERSION_NO_V}" >> "$GITHUB_ENV"
   export VERSION="${VERSION_NO_V}"
   echo "Building version: ${VERSION_NO_V}"
 
@@ -23,11 +23,11 @@ if [[ "${GITHUB_REF:-}" == refs/tags/* ]]; then
   fi
 else
   echo "VERSION=1.0.0-dev" >> "$GITHUB_ENV"
-  echo "OSAURUS_VERSION=1.0.0-dev" >> "$GITHUB_ENV"
+  echo "MUWA_VERSION=1.0.0-dev" >> "$GITHUB_ENV"
   echo "IS_BETA=false" >> "$GITHUB_ENV"
   echo "SPARKLE_CHANNEL=release" >> "$GITHUB_ENV"
   export VERSION="1.0.0-dev"
   echo "Building version: 1.0.0-dev"
 fi
 
-echo "OSAURUS_BUILD_NUMBER=${GITHUB_RUN_NUMBER:-1}" >> "$GITHUB_ENV"
+echo "MUWA_BUILD_NUMBER=${GITHUB_RUN_NUMBER:-1}" >> "$GITHUB_ENV"

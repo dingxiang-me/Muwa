@@ -34,7 +34,7 @@ fi
 
 # Same sources package_dsyms.sh draws from (it only removes its own staging
 # copy, not these originals).
-ARCHIVE_DSYMS_DIR="build/osaurus.xcarchive/dSYMs"
+ARCHIVE_DSYMS_DIR="build/muwa.xcarchive/dSYMs"
 CLI_BUILD_DIR="build/Build/Products/Release"
 
 SOURCES=()

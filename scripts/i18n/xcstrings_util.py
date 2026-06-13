@@ -1,4 +1,4 @@
-"""Shared helpers for Osaurus .xcstrings tooling."""
+"""Shared helpers for Muwa .xcstrings tooling."""
 
 from __future__ import annotations
 

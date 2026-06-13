@@ -1,9 +1,9 @@
 # Example: Building a Telegram Plugin
 
-This is a deep, hands-on walkthrough of building a real Osaurus plugin. We use Telegram as the lens, but the goal is to teach the host API. By the end you should understand:
+This is a deep, hands-on walkthrough of building a real Muwa plugin. We use Telegram as the lens, but the goal is to teach the host API. By the end you should understand:
 
 - How `handle_route` receives webhook deliveries and why it must return fast
-- How `dispatch` runs the agent in the background and how `session_id` makes a chat one continuous Osaurus conversation
+- How `dispatch` runs the agent in the background and how `session_id` makes a chat one continuous Muwa conversation
 - How the agent uses plugin-exposed `reply` / `reply_typing` tools to push messages back to the user — the **primary delivery path**
 - How **reply tokens** keep chat destinations out of the agent's prompt context (and why that matters)
 - How `dispatch_interrupt` solves concurrent-message races without queues
@@ -11,7 +11,7 @@ This is a deep, hands-on walkthrough of building a real Osaurus plugin. We use T
 - How `config_*` and `db_exec` keep per-chat state safely
 - How `tunnel_exposed: true` opts a route into public reachability
 
-This is also the architecture brief for `osaurus.telegram` v1.5 — a fully conversational, multi-turn Telegram bot that maps cleanly onto the v3 host API.
+This is also the architecture brief for `muwa.telegram` v1.5 - a fully conversational, multi-turn Telegram bot that maps cleanly onto the v3 host API.
 
 > See [HOST_API.md](./HOST_API.md) for the canonical reference of every primitive used here.
 
@@ -23,14 +23,14 @@ This is also the architecture brief for `osaurus.telegram` v1.5 — a fully conv
 sequenceDiagram
   participant User as Telegram User
   participant TG as Telegram API
-  participant Tunnel as Osaurus Tunnel
+  participant Tunnel as Muwa Tunnel
   participant Route as handle_route
   participant Agent as Agent (dispatch)
   participant Tool as reply tool (invoke)
   participant Event as on_task_event
 
   User->>TG: "what's on my calendar today?"
-  TG->>Tunnel: POST /plugins/osaurus.telegram/webhook
+  TG->>Tunnel: POST /plugins/muwa.telegram/webhook
   Tunnel->>Route: handle_route(request)
   Route->>Route: verify secret, dedup, mint reply_token
   Route->>Agent: dispatch(prompt with [reply_token ...], session_id=UUID5(chat))
@@ -50,7 +50,7 @@ The plugin is **agent-driven end-to-end**. `handle_route` is purely the entry po
 - Send a typing indicator before slow work (`reply_typing`)
 - Send multiple messages in a single run (call `reply` more than once — natural for streaming long answers in chunks)
 - Send rich content later (`reply_photo`)
-- Use the standard Osaurus toolkit (calendar, browser, sandbox) and decide what to surface to the user
+- Use the standard Muwa toolkit (calendar, browser, sandbox) and decide what to surface to the user
 
 `on_task_event` is purely observability + safety net: log lifecycle, and if a run completed without ever calling `reply`, post `summary` so the user isn't left hanging.
 
@@ -60,10 +60,10 @@ The plugin is **agent-driven end-to-end**. `handle_route` is purely the entry po
 
 ```json
 {
-  "plugin_id": "osaurus.telegram",
+  "plugin_id": "muwa.telegram",
   "name": "Telegram",
   "version": "1.5.0",
-  "description": "Conversational Telegram bot. Each chat becomes a continuous Osaurus session and the agent talks to the user via reply tools.",
+  "description": "Conversational Telegram bot. Each chat becomes a continuous Muwa session and the agent talks to the user via reply tools.",
   "instructions": "You are connected to a Telegram chat. The user message is prefixed with [reply_token <token>]. To talk back, call the `reply` tool and pass that token verbatim. Use `reply_typing` before slow work, and call `reply` as many times as needed — one message per major thought. Keep each message under 4000 characters. Do not echo the reply_token or any meta text — only conversational content.",
   "secrets": [
     {
@@ -82,7 +82,7 @@ The plugin is **agent-driven end-to-end**. `handle_route` is purely the entry po
     {
       "id": "public_base_url",
       "label": "Public Base URL",
-      "description": "Your Osaurus tunnel base URL, e.g. https://0xabc.agent.osaurus.ai. Used to register the webhook with Telegram.",
+      "description": "Your Muwa tunnel base URL, e.g. https://0xabc.agent.muwa.ai. Used to register the webhook with Telegram.",
       "required": true
     }
   ],
@@ -231,7 +231,7 @@ This is the hot path. Everything has to happen in milliseconds because Telegram 
 
 ```swift
 // inside api.handle_route closure
-let req = try OsaurusHTTPRequest.decode(from: requestJSON)
+let req = try MuwaHTTPRequest.decode(from: requestJSON)
 
 // 1. Verify Telegram's secret token header (auth: "verify" handles routing
 //    but the plugin still owns secret comparison).
@@ -725,7 +725,7 @@ api.on_config_changed = { ctxPtr, keyPtr, valuePtr in
               hostConfigGet("bot_token") != nil else { return }
 
         let webhookUrl = baseUrl.trimmingCharacters(in: .init(charactersIn: "/"))
-                       + "/plugins/osaurus.telegram/webhook"
+                       + "/plugins/muwa.telegram/webhook"
         let secret = hostConfigGet("webhook_secret") ?? ""
 
         let response = postBotAPI(method: "setWebhook", body: [
@@ -744,7 +744,7 @@ api.on_config_changed = { ctxPtr, keyPtr, valuePtr in
 
 ### Why `public_base_url` is a config field
 
-Telegram needs to know your tunnel URL, but the plugin can't currently derive it from the host (no `host_get_route_url` primitive in v3). The cleanest solution is to ask the user for it once during install. The Osaurus tunnel page shows the URL; the user copies it into the plugin's config; `on_config_changed` fires; webhook gets registered.
+Telegram needs to know your tunnel URL, but the plugin can't currently derive it from the host (no `host_get_route_url` primitive in v3). The cleanest solution is to ask the user for it once during install. The Muwa tunnel page shows the URL; the user copies it into the plugin's config; `on_config_changed` fires; webhook gets registered.
 
 This is more robust than trying to learn the URL from the first incoming request (chicken-and-egg: Telegram won't deliver until `setWebhook` runs) or via a fake dispatch round-trip. Once `host_get_route_url` lands, this field can become optional.
 
@@ -783,8 +783,8 @@ The host force-redelivers the full per-agent config snapshot when an agent's rel
 ## 12. File layout
 
 ```
-osaurus-telegram/
-├── osaurus-plugin.json
+muwa-telegram/
+├── muwa-plugin.json
 ├── Package.swift
 ├── Sources/
 │   └── Telegram/
@@ -807,7 +807,7 @@ osaurus-telegram/
 
 See [TESTING.md](./TESTING.md) for general patterns. Telegram-specific cases worth covering:
 
-- **Manifest decode** with `osaurus manifest validate`.
+- **Manifest decode** with `muwa manifest validate`.
 - **Signature verification**: mocked headers with right and wrong secrets.
 - **`session_id` derivation**: stability across reboots and salt bumps. Same chat + same salt → same UUID. Different salt → different UUID.
 - **Reply token validation**: valid token sends, expired token returns `stale_token`, unknown token returns `stale_token`, blocked chat returns `chat_blocked`.
@@ -822,7 +822,7 @@ See [TESTING.md](./TESTING.md) for general patterns. Telegram-specific cases wor
 
 **Agent-driven and conversational.** The agent decides what to say, when to say it, and how to break it up. Multi-message replies, mid-run progress, and rich content require zero plugin changes — they're just additional tool calls.
 
-**Session continuity for free.** `session_id` reattachment means every new Telegram message lands as the next turn in an existing Osaurus session. The user sees one growing thread per Telegram chat in the sidebar.
+**Session continuity for free.** `session_id` reattachment means every new Telegram message lands as the next turn in an existing Muwa session. The user sees one growing thread per Telegram chat in the sidebar.
 
 **Reply tokens keep destinations out of agent context.** Prompt injection from web pages, RAG documents, or hostile user input can't redirect outbound messages. Tokens are unguessable, scoped, expiring.
 

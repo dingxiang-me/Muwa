@@ -25,14 +25,14 @@ require_text() {
   fi
 }
 
-COMPOSER_TESTS="$ROOT/Packages/OsaurusCore/Tests/Chat/SystemPromptComposerToolResolutionTests.swift"
-PREVIEW_TESTS="$ROOT/Packages/OsaurusCore/Tests/Chat/ContextBudgetPreviewTests.swift"
-CAPABILITY_TESTS="$ROOT/Packages/OsaurusCore/Tests/Tool/CapabilityToolsTests.swift"
-SEARCH_TESTS="$ROOT/Packages/OsaurusCore/Tests/Tool/ToolSearchServiceTests.swift"
-TOKENIZER_TESTS="$ROOT/Packages/OsaurusCore/Tests/Service/SwiftTransformersTokenizerLoaderTests.swift"
-GUIDANCE="$ROOT/Packages/OsaurusCore/Services/Chat/ModelFamilyGuidance.swift"
-TOOL_INDEX="$ROOT/Packages/OsaurusCore/Services/Tool/ToolIndexService.swift"
-TOOL_SEARCH="$ROOT/Packages/OsaurusCore/Services/Tool/ToolSearchService.swift"
+COMPOSER_TESTS="$ROOT/Packages/MuwaCore/Tests/Chat/SystemPromptComposerToolResolutionTests.swift"
+PREVIEW_TESTS="$ROOT/Packages/MuwaCore/Tests/Chat/ContextBudgetPreviewTests.swift"
+CAPABILITY_TESTS="$ROOT/Packages/MuwaCore/Tests/Tool/CapabilityToolsTests.swift"
+SEARCH_TESTS="$ROOT/Packages/MuwaCore/Tests/Tool/ToolSearchServiceTests.swift"
+TOKENIZER_TESTS="$ROOT/Packages/MuwaCore/Tests/Service/SwiftTransformersTokenizerLoaderTests.swift"
+GUIDANCE="$ROOT/Packages/MuwaCore/Services/Chat/ModelFamilyGuidance.swift"
+TOOL_INDEX="$ROOT/Packages/MuwaCore/Services/Tool/ToolIndexService.swift"
+TOOL_SEARCH="$ROOT/Packages/MuwaCore/Services/Tool/ToolSearchService.swift"
 
 for entry in \
   "$COMPOSER_TESTS:SystemPromptComposerToolResolutionTests" \

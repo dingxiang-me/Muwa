@@ -2,9 +2,9 @@
 
 Run agent code in an isolated Linux virtual machine — safely, locally, and with full dev environment capabilities.
 
-The Sandbox is a shared Linux container powered by Apple's [Containerization](https://developer.apple.com/documentation/containerization) framework. It gives every Osaurus agent access to a real Linux environment with shell, package managers, compilers, and file system access — all running natively on Apple Silicon with zero risk to your Mac.
+The Sandbox is a shared Linux container powered by Apple's [Containerization](https://developer.apple.com/documentation/containerization) framework. It gives every Muwa agent access to a real Linux environment with shell, package managers, compilers, and file system access — all running natively on Apple Silicon with zero risk to your Mac.
 
-> **Sandbox Tools vs Native Plugins:** Osaurus has two distinct extensibility systems. **Sandbox tools** (this guide) are JSON recipes that run inside the Linux container — no compiler, no code signing, ideal for shell-based workflows. **Native plugins** are compiled `.dylib` files with full host API access (inference, storage, HTTP routes, web UIs); see [`docs/plugins/README.md`](plugins/README.md). The terms used to overlap; this doc uses **Sandbox Tools** consistently.
+> **Sandbox Tools vs Native Plugins:** Muwa has two distinct extensibility systems. **Sandbox tools** (this guide) are JSON recipes that run inside the Linux container — no compiler, no code signing, ideal for shell-based workflows. **Native plugins** are compiled `.dylib` files with full host API access (inference, storage, HTTP routes, web UIs); see [`docs/plugins/README.md`](plugins/README.md). The terms used to overlap; this doc uses **Sandbox Tools** consistently.
 
 ---
 
@@ -32,7 +32,7 @@ Everything runs on-device using Apple's Virtualization framework. No Docker, no 
 
 ### Seamless Host Bridge
 
-Despite running in isolation, agents inside the VM retain full access to Osaurus services — inference, memory, secrets, agent dispatch, and events — via a vsock bridge. The sandbox is isolated but not disconnected.
+Despite running in isolation, agents inside the VM retain full access to Muwa services — inference, memory, secrets, agent dispatch, and events — via a vsock bridge. The sandbox is isolated but not disconnected.
 
 ---
 
@@ -70,11 +70,11 @@ Switch to the **Sandbox** tab in the Tools manager to browse, import, or create 
 │                        macOS Host                            │
 │                                                              │
 │  ┌──────────────┐     ┌──────────────────────────────┐       │
-│  │   Osaurus    │     │   Linux VM (Alpine)          │       │
+│  │   Muwa    │     │   Linux VM (Alpine)          │       │
 │  │              │     │                              │       │
 │  │  SandboxMgr ─┼─────┤→ /workspace (VirtioFS)      │       │
 │  │              │     │→ /output    (VirtioFS)       │       │
-│  │  HostAPI  ←──┼─vsock─→ /run/osaurus-bridge.sock  │       │
+│  │  HostAPI  ←──┼─vsock─→ /run/muwa-bridge.sock  │       │
 │  │  Bridge      │     │                              │       │
 │  │              │     │  agent-alice  (Linux user)   │       │
 │  │  ToolReg  ←──┼─────┤  agent-bob    (Linux user)  │       │
@@ -88,11 +88,11 @@ Switch to the **Sandbox** tab in the Tools manager to browse, import, or create 
 | Component | Description |
 |-----------|-------------|
 | **Linux VM** | Alpine Linux with Kata Containers 3.17.0 ARM64 kernel, 8 GiB root filesystem |
-| **VirtioFS Mounts** | `/workspace` maps to `~/.osaurus/container/workspace/`, `/output` maps to `~/.osaurus/container/output/` |
+| **VirtioFS Mounts** | `/workspace` maps to `~/.muwa/container/workspace/`, `/output` maps to `~/.muwa/container/output/` |
 | **NAT Networking** | Container gets `10.0.2.15/24` via `VZNATNetworkDeviceAttachment` |
 | **Vsock Bridge** | Unix socket relayed via vsock connects the container to the Host API Bridge server |
 | **Per-Agent Users** | Each agent gets a Linux user `agent-{name}` with home at `/workspace/agents/{name}/` |
-| **Host API Bridge** | HTTP server on the host, accessible from the container via `osaurus-host` CLI shim |
+| **Host API Bridge** | HTTP server on the host, accessible from the container via `muwa-host` CLI shim |
 
 ---
 
@@ -105,11 +105,11 @@ Configure the container via the Management window → **Sandbox** → **Containe
 | CPUs | 1–8 | 2 | Virtual CPU cores allocated to the VM |
 | Memory | 1–8 GB | 2 GB | RAM allocated to the VM |
 | Network | outbound / none | outbound | NAT networking for outbound internet access |
-| Auto-Start | on / off | on | Automatically start the container when Osaurus launches |
+| Auto-Start | on / off | on | Automatically start the container when Muwa launches |
 
 Changes require a container restart to take effect.
 
-**Config file:** `~/.osaurus/config/sandbox.json`
+**Config file:** `~/.muwa/config/sandbox.json`
 
 ```json
 {
@@ -124,7 +124,7 @@ Changes require a container restart to take effect.
 
 ## SOUL.md — Per-Agent Identity Layer
 
-Every sandboxed agent gets a `SOUL.md` file at `~/SOUL.md` inside its home (host path: `~/.osaurus/container/workspace/agents/{name}/SOUL.md`). This is the agent-authored complement to the user-authored persona slot — a place for the agent to record stable preferences and patterns it learns about working with you, persisted across sessions.
+Every sandboxed agent gets a `SOUL.md` file at `~/SOUL.md` inside its home (host path: `~/.muwa/container/workspace/agents/{name}/SOUL.md`). This is the agent-authored complement to the user-authored persona slot — a place for the agent to record stable preferences and patterns it learns about working with you, persisted across sessions.
 
 ### What belongs in SOUL.md
 
@@ -152,7 +152,7 @@ Persona (the user-authored `systemPrompt` on the Agent) wins on conflict. Two re
 
 ### Reset
 
-To wipe an agent's soul, delete `~/.osaurus/container/workspace/agents/{name}/SOUL.md`. The next provision will re-seed the boilerplate; the next chat compose will pick it up.
+To wipe an agent's soul, delete `~/.muwa/container/workspace/agents/{name}/SOUL.md`. The next provision will re-seed the boilerplate; the next chat compose will pick it up.
 
 Sandbox-only by design — folder-mode agents are short-lived and project-bound.
 
@@ -204,7 +204,7 @@ model descends by copying a field rather than parsing a tree. The agent loop's
 | `sandbox_write_file` | Write a whole file via `content` (creates parent directories), **or** edit in place via `old_string`+`new_string` (exact match, must match exactly once). The presence of `old_string` selects the edit path; folds in the previously-separate `sandbox_edit_file`. |
 | `sandbox_exec` | Run a shell command. Foreground (default, max 300s) **or** `background:true` for servers/long tasks (the spawn shim returns immediately with `pid` + `log_file`). Pair the background form with `sandbox_process`. |
 | `sandbox_process` | Manage background jobs: `action="poll"` (alive + log tail), `"wait"` (block until exit, capped by `timeout`), `"kill"` (`force:true` for SIGKILL). |
-| `sandbox_install` | Install packages, one tool for all three managers via the required `manager` argument: `apk` (system packages, runs as root, auto-refreshes the index, serializes globally on apk's container-wide lock), `pip` (Python packages into the agent venv at `~/.venv/`, auto-created on first use, `--disable-pip-version-check --no-input`), or `npm` (Node packages into a per-agent workspace at `~/.osaurus/node_workspace/`, bootstraps `package.json`, `--no-audit --no-fund --no-update-notifier`). Installed `python3`/CLI binaries are on PATH from any `sandbox_exec` cwd. 240s timeout for pip/npm, 120s for apk. |
+| `sandbox_install` | Install packages, one tool for all three managers via the required `manager` argument: `apk` (system packages, runs as root, auto-refreshes the index, serializes globally on apk's container-wide lock), `pip` (Python packages into the agent venv at `~/.venv/`, auto-created on first use, `--disable-pip-version-check --no-input`), or `npm` (Node packages into a per-agent workspace at `~/.muwa/node_workspace/`, bootstraps `package.json`, `--no-audit --no-fund --no-update-notifier`). Installed `python3`/CLI binaries are on PATH from any `sandbox_exec` cwd. 240s timeout for pip/npm, 120s for apk. |
 | `sandbox_secret_check` | Check whether a secret exists for this agent (never reveals the value) |
 | `sandbox_secret_set` | Store a secret securely — pass `value` directly or omit to prompt the user |
 | `sandbox_plugin_register` | Register an agent-created plugin (requires `pluginCreate` permission) |
@@ -224,13 +224,13 @@ All file paths are validated on the host side before container execution by `San
 | **Per-agent serialization** | `SandboxInstallLock` queues install operations behind each other per agent so two concurrent calls can't race on `node_modules/` / venv / apk db. **apk's lock is container-wide**, so `sandbox_install` calls serialize *globally across every agent* under a synthetic key — a slow `apk add` on agent A briefly blocks agent B's `apk add`. npm/pip installs are isolated per-agent and run concurrently across agents. |
 | **Auto-recovery** | If the first attempt fails AND its output matches a known stale-state signature (`Tracker "idealTree" already exists`, `EEXIST`, `ELOCKED` for npm; `Could not install packages due to an OSError`, `ReadTimeoutError` for pip; `temporary error`, `unable to lock database` for apk), the tool runs a tool-specific cleanup and retries once. The result envelope includes `retried: true` so the model can see the recovery happened. |
 | **Cleanup actions** | npm: `rm -rf node_modules/.package-lock.json && npm cache clean --force`. pip: `pip cache purge`. apk: `apk update`. All run in the same exec context (agent for npm/pip, root for apk) as the install attempt. |
-| **Workspace isolation** | npm installs into `~/.osaurus/node_workspace/` (bootstraps `package.json` on first use). pip installs into the agent's venv at `~/.venv/`. Both have their `bin/` on PATH from any `sandbox_exec` cwd. |
+| **Workspace isolation** | npm installs into `~/.muwa/node_workspace/` (bootstraps `package.json` on first use). pip installs into the agent's venv at `~/.venv/`. Both have their `bin/` on PATH from any `sandbox_exec` cwd. |
 | **Stable flags** | npm: `--no-audit --no-fund --no-update-notifier`. pip: `--disable-pip-version-check --no-input`. apk: `--no-cache` plus a leading `apk update --quiet`. |
 | **Timeouts** | npm/pip: 240s (covers cold-cache installs of large packages like torch / pandas / scoped npm packages). apk: 120s. |
 
 ### Installed-package awareness
 
-So the model doesn't re-probe or reinstall what it already has, `SandboxPackageManifest` keeps a host-side, per-agent record (`~/.osaurus/agents/<uuid>/installed-packages.json`) of installed packages by manager. Two writers feed it: `SandboxAgentProvisioner` seeds it once per provision via a cheap lazy reconcile (lists the agent's pip venv and reads its npm `package.json` — `apk` is skipped because the base image carries hundreds of system packages and bare `apk add` can't succeed unprivileged), and `sandbox_install` appends successful installs. `SystemPromptComposer` renders it as a compact, capped **"Already installed"** block inside the *dynamic* `## Sandbox state` section (alongside configured secrets), which sits after the static prefix break — so a mid-session `sandbox_install` or new secret stays fresh turn-to-turn without rewriting the cached KV prefix. The static sandbox framing above it never changes mid-session. The manifest is cleared on unprovision so a rebuilt container starts from observed truth.
+So the model doesn't re-probe or reinstall what it already has, `SandboxPackageManifest` keeps a host-side, per-agent record (`~/.muwa/agents/<uuid>/installed-packages.json`) of installed packages by manager. Two writers feed it: `SandboxAgentProvisioner` seeds it once per provision via a cheap lazy reconcile (lists the agent's pip venv and reads its npm `package.json` — `apk` is skipped because the base image carries hundreds of system packages and bare `apk add` can't succeed unprivileged), and `sandbox_install` appends successful installs. `SystemPromptComposer` renders it as a compact, capped **"Already installed"** block inside the *dynamic* `## Sandbox state` section (alongside configured secrets), which sits after the static prefix break — so a mid-session `sandbox_install` or new secret stays fresh turn-to-turn without rewriting the cached KV prefix. The static sandbox framing above it never changes mid-session. The manifest is cleared on unprovision so a rebuilt container starts from observed truth.
 
 ### Result shape
 
@@ -265,7 +265,7 @@ The pane is capped at ~14 lines of monospaced text (240 pt); content beyond that
 
 Phase 1 dropped the wall-clock timeouts that used to kill long commands at ~2 minutes:
 
-- The registry-level 120 s safety net is bypassed for `sandbox_exec` and `shell_run` via `OsaurusTool.bypassRegistryTimeout`.
+- The registry-level 120 s safety net is bypassed for `sandbox_exec` and `shell_run` via `MuwaTool.bypassRegistryTimeout`.
 - The tool's own `timeout` parameter is now an **optional inactivity ceiling**, not a wall-clock cap. When the model omits it, the command runs to completion or until the user terminates.
 - Pass `timeout: <seconds>` ONLY when you want a hard idle ceiling (kill if no output for N seconds). The user's `[Terminate]` button is the primary control.
 
@@ -468,40 +468,40 @@ The shared pipeline rejects a registration up-front (no library state is written
 
 ### Plugin Persistence
 
-Registered plugins are saved to the `SandboxPluginLibrary` (`~/.osaurus/sandbox-plugins/`) and survive app restarts. Per-agent install state lives under `~/.osaurus/agents/{agent-id}/sandbox-plugins/installed.json`. Manage, export, or remove plugins from the **Sandbox → Plugins** tab.
+Registered plugins are saved to the `SandboxPluginLibrary` (`~/.muwa/sandbox-plugins/`) and survive app restarts. Per-agent install state lives under `~/.muwa/agents/{agent-id}/sandbox-plugins/installed.json`. Manage, export, or remove plugins from the **Sandbox → Plugins** tab.
 
 ---
 
 ## Host API Bridge
 
-The Host API Bridge connects the container to Osaurus services on the host. Inside the container, the `osaurus-host` CLI communicates with the bridge server over a vsock-relayed Unix socket.
+The Host API Bridge connects the container to Muwa services on the host. Inside the container, the `muwa-host` CLI communicates with the bridge server over a vsock-relayed Unix socket.
 
 | Command | Description |
 |---------|-------------|
-| `osaurus-host secrets get <name>` | Read a secret from the macOS Keychain |
-| `osaurus-host config get <key>` | Read a plugin config value |
-| `osaurus-host config set <key> <value>` | Write a plugin config value |
-| `osaurus-host inference chat -m <message>` | Run a chat completion through Osaurus |
-| `osaurus-host agent dispatch <id> <task>` | Dispatch a task to an agent |
-| `osaurus-host agent memory query <text>` | Search agent memory |
-| `osaurus-host agent memory store <text>` | Store a memory entry |
-| `osaurus-host events emit <type> [payload]` | Emit a cross-plugin event |
-| `osaurus-host plugin create` | Create a plugin from stdin JSON |
-| `osaurus-host log <message>` | Append to the sandbox log buffer |
+| `muwa-host secrets get <name>` | Read a secret from the macOS Keychain |
+| `muwa-host config get <key>` | Read a plugin config value |
+| `muwa-host config set <key> <value>` | Write a plugin config value |
+| `muwa-host inference chat -m <message>` | Run a chat completion through Muwa |
+| `muwa-host agent dispatch <id> <task>` | Dispatch a task to an agent |
+| `muwa-host agent memory query <text>` | Search agent memory |
+| `muwa-host agent memory store <text>` | Store a memory entry |
+| `muwa-host events emit <type> [payload]` | Emit a cross-plugin event |
+| `muwa-host plugin create` | Create a plugin from stdin JSON |
+| `muwa-host log <message>` | Append to the sandbox log buffer |
 
 ### Bridge authentication
 
 Every request authenticates with a per-agent bearer token:
 
 - The host mints a 256-bit token per agent and writes it to `/run/osaurus/<linuxName>.token` inside the guest, mode `0600`, owned by that agent's Linux user. The directory is mode `0711` so users can open their own file by name without enumerating siblings.
-- The `osaurus-host` shim reads the token (allowed by uid) and sends it as `Authorization: Bearer <token>`. The shim refuses to run if the token file is missing or unreadable.
+- The `muwa-host` shim reads the token (allowed by uid) and sends it as `Authorization: Bearer <token>`. The shim refuses to run if the token file is missing or unreadable.
 - The bridge resolves the token to an `(agentId, linuxName)` pair via `SandboxBridgeTokenStore`. Unknown or missing tokens get `401` — there is **no fallback to a default agent**.
-- `X-Osaurus-User` is no longer trusted. Identity is bound to the token, which is bound to a Linux uid by file permissions inside the guest.
-- `X-Osaurus-Plugin` is still self-reported by the shim. It namespaces config and secrets within an agent but is not a security boundary between plugins of the same agent.
+- `X-Muwa-User` is no longer trusted. Identity is bound to the token, which is bound to a Linux uid by file permissions inside the guest.
+- `X-Muwa-Plugin` is still self-reported by the shim. It namespaces config and secrets within an agent but is not a security boundary between plugins of the same agent.
 
 The `agent dispatch` route additionally rejects any body whose `agent_id` doesn't match the token-bound identity (`403`); `agent memory query` filters results to the calling agent's pinned facts.
 
-Tokens are revoked when the agent is unprovisioned or the container is stopped, and re-minted on the next `ensureProvisioned`. After an Osaurus upgrade, plugin bridge calls fail closed until the container restarts and the new shim and token files are written — this happens automatically when Sparkle relaunches the app.
+Tokens are revoked when the agent is unprovisioned or the container is stopped, and re-minted on the next `ensureProvisioned`. After an Muwa upgrade, plugin bridge calls fail closed until the container restarts and the new shim and token files are written — this happens automatically when Sparkle relaunches the app.
 
 ### Request size limits
 
@@ -581,14 +581,14 @@ Access these operations from the **Container** tab → **Danger Zone** section.
 
 | Path | Description |
 |------|-------------|
-| `~/.osaurus/container/` | Container root directory |
-| `~/.osaurus/container/kernel/vmlinux` | Linux kernel |
-| `~/.osaurus/container/initfs.ext4` | Initial filesystem |
-| `~/.osaurus/container/workspace/` | Mounted as `/workspace` in the VM |
-| `~/.osaurus/container/workspace/agents/{name}/` | Per-agent home directory |
-| `~/.osaurus/container/workspace/agents/{name}/SOUL.md` | Per-agent SOUL identity layer (seeded on first provision; agent-editable) |
-| `~/.osaurus/container/output/` | Mounted as `/output` in the VM |
-| `~/.osaurus/sandbox-plugins/` | Plugin library (JSON recipes) |
-| `~/.osaurus/agents/{agentId}/sandbox-plugins/installed.json` | Per-agent installed plugin records |
-| `~/.osaurus/config/sandbox.json` | Sandbox configuration |
-| `~/.osaurus/config/sandbox-agent-map.json` | Linux username to agent UUID mapping |
+| `~/.muwa/container/` | Container root directory |
+| `~/.muwa/container/kernel/vmlinux` | Linux kernel |
+| `~/.muwa/container/initfs.ext4` | Initial filesystem |
+| `~/.muwa/container/workspace/` | Mounted as `/workspace` in the VM |
+| `~/.muwa/container/workspace/agents/{name}/` | Per-agent home directory |
+| `~/.muwa/container/workspace/agents/{name}/SOUL.md` | Per-agent SOUL identity layer (seeded on first provision; agent-editable) |
+| `~/.muwa/container/output/` | Mounted as `/output` in the VM |
+| `~/.muwa/sandbox-plugins/` | Plugin library (JSON recipes) |
+| `~/.muwa/agents/{agentId}/sandbox-plugins/installed.json` | Per-agent installed plugin records |
+| `~/.muwa/config/sandbox.json` | Sandbox configuration |
+| `~/.muwa/config/sandbox-agent-map.json` | Linux username to agent UUID mapping |

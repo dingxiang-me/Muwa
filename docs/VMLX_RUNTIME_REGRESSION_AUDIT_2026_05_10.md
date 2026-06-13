@@ -7,7 +7,7 @@ generic "model is slow" or "model is incoherent" bucket.
 
 ## Current Pin Chain
 
-Osaurus PR #1057 is expected to use these runtime pins:
+Muwa PR #1057 is expected to use these runtime pins:
 
 - `vmlx-swift-lm` `21adfc8` - Hy3 compiled decode deny-list, ZAYA batch forward repair, MiniMax routing and terminal-info fixes.
 - `mlx-swift` `0a56f90`
@@ -25,14 +25,14 @@ Symptom:
   MiniMax answers can stay on the reasoning rail instead of transitioning to a
   visible content chunk.
 - Earlier investigations also showed `tokenCount=0` when terminal `.info` did
-  not reach Osaurus after cancellation or early stream close.
+  not reach Muwa after cancellation or early stream close.
 
 Fixes:
 
 - vmlx routes generation text through the same tool-call processor for both
   content and reasoning channels, then flushes pending routed text on EOS.
 - vmlx synthesizes terminal info if a stream closes without upstream `.info`.
-- Osaurus promotes MiniMax `.reasoning` deltas to visible `.tokens` for chat UI
+- Muwa promotes MiniMax `.reasoning` deltas to visible `.tokens` for chat UI
   rendering and suppresses `unclosedReasoning` for MiniMax reasoning-only
   completions, because that shape is normal for this family.
 
@@ -47,7 +47,7 @@ Verification:
 Still not claimed:
 
 - This does not prove every MiniMax prompt will close `</think>` naturally.
-  It proves Osaurus no longer hides normal MiniMax reasoning-only output or
+  It proves Muwa no longer hides normal MiniMax reasoning-only output or
   loses terminal stats when the stream closes.
 
 ### Hy3 coherent decode path
@@ -61,9 +61,9 @@ Fixes:
 
 - vmlx denies compiled batch decode for Hy3/Hunyuan-style models and keeps Hy3
   on the coherent uncompiled decode path.
-- Osaurus `MLXBatchAdapter` mirrors this by disabling compiled batch decode
+- Muwa `MLXBatchAdapter` mirrors this by disabling compiled batch decode
   when the model id matches Hy3.
-- Osaurus preflight fallback generation forces `reasoningEffort: no_think` so
+- Muwa preflight fallback generation forces `reasoningEffort: no_think` so
   capability ranking does not spend its timeout generating a full reasoning
   trace.
 
@@ -95,11 +95,11 @@ Symptom:
 Fix:
 
 - vmlx adds the ZAYA batch forward overload required by BatchEngine.
-- Osaurus pins the vmlx commit containing that repair.
+- Muwa pins the vmlx commit containing that repair.
 
 Verification:
 
-- Osaurus source-policy tests verify the pin.
+- Muwa source-policy tests verify the pin.
 - vmlx has ZAYA forward-contract coverage.
 - ZAYA JANGTQ4 was user-validated as coherent in the live app.
 - ZAYA MXFP4 was user-validated as coherent in the live app.
@@ -208,33 +208,33 @@ Required next proof:
 - ZAYA: reasoning-capable, but default thinking off; explicit user opt-in should
   pass `enable_thinking=true`.
 - MiniMax M2/M2.7: inherently reasoning-heavy and can produce normal answers on
-  the reasoning rail; Osaurus must display that output instead of waiting for a
+  the reasoning rail; Muwa must display that output instead of waiting for a
   content rail transition.
 - VLM routing: text ZAYA (`model_type=zaya`) is not ZAYA1-VL
   (`model_type=zaya1_vl`). Keep the registry distinction.
 
 ## Regression Commands
 
-Targeted Osaurus tests:
+Targeted Muwa tests:
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
 xcodebuild test \
-  -workspace osaurus.xcworkspace \
-  -scheme OsaurusCoreTests \
+  -workspace Muwa.xcworkspace \
+  -scheme MuwaCoreTests \
   -destination 'platform=macOS,arch=arm64' \
-  -only-testing:OsaurusCoreTests/MLXBatchAdapterTests \
-  -only-testing:OsaurusCoreTests/RuntimePolicySourceTests \
-  -only-testing:OsaurusCoreTests/ChatEngineTests \
-  -only-testing:OsaurusCoreTests/GenerationEventMapperTests \
-  -only-testing:OsaurusCoreTests/ModelRuntimeIsHybridTests \
-  -only-testing:OsaurusCoreTests/IsKnownHybridModelMCDCTests
+  -only-testing:MuwaCoreTests/MLXBatchAdapterTests \
+  -only-testing:MuwaCoreTests/RuntimePolicySourceTests \
+  -only-testing:MuwaCoreTests/ChatEngineTests \
+  -only-testing:MuwaCoreTests/GenerationEventMapperTests \
+  -only-testing:MuwaCoreTests/ModelRuntimeIsHybridTests \
+  -only-testing:MuwaCoreTests/IsKnownHybridModelMCDCTests
 ```
 
 Full PR gate:
 
 ```sh
-gh pr checks 1057 --repo osaurus-ai/osaurus
+gh pr checks 1057 --repo muwa-ai/muwa
 ```
 
 ## Non-Goals For This PR

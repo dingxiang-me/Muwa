@@ -1,7 +1,7 @@
 # Post-1263 production family live matrix ledger
 
 This ledger tracks the follow-on production matrix work after the Gemma reasoning-tool routing PR head.
-It is intentionally live-proof oriented: source tests are useful, but a row is not promoted unless the no-sign Osaurus app path proves chat/tool/cache behavior.
+It is intentionally live-proof oriented: source tests are useful, but a row is not promoted unless the no-sign Muwa app path proves chat/tool/cache behavior.
 
 ## Required proof shape
 
@@ -43,8 +43,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:28 PDT Nemotron Omni MXFP4 live red row
 
-- Current Osaurus PR head checked before this row: `a1d101d6f22dfff41052c1af33975c25663175cd`; CI was green for `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` before this documentation update.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`; app was healthy and cache counters were reset before the run.
+- Current Muwa PR head checked before this row: `a1d101d6f22dfff41052c1af33975c25663175cd`; CI was green for `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` before this documentation update.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`; app was healthy and cache counters were reset before the run.
 - Cold artifact: `/tmp/osaurus-pr1268-a1d101d6-nemotron-omni-mxfp4-tool-cache-20260528-102745`.
   - `nemotron-omni-nano-mxfp4-crack` turn 1 returned one structured `line_count` call with exact `red\ngreen\nblue` arguments and no visible protocol leak.
   - Turn 2 returned visible answer `Three lines were counted.` with no extra tool call and no protocol leak.
@@ -60,8 +60,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:34 PDT ZAYA text JANGTQ4 live red row
 
-- Current Osaurus PR head checked before this row: `c9fdc4c38ee53f748805d89c0312a9c61ecf1662`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `c9fdc4c38ee53f748805d89c0312a9c61ecf1662`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-c9fdc4c3-zaya-text-jangtq4-tool-cache-20260528-103322`.
 - `zaya1-8b-jangtq4` turn 1 returned one structured `line_count` call with exact `red\ngreen\nblue` arguments and no visible protocol leak.
 - Turn 2 returned visible answer `3 lines were counted.` with no extra tool call and no protocol leak.
@@ -72,8 +72,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:35 PDT Ling JANGTQ2 live parser/tool green, cache partial row
 
-- Current Osaurus PR head checked before this row: `3a46be1f783a504aac284c489ed81f34d34d0809`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `3a46be1f783a504aac284c489ed81f34d34d0809`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-3a46be1f-ling-jangtq2-tool-cache-20260528-103538`.
 - `ling-2.6-flash-jangtq2-crack` turn 1 returned one structured `line_count` call with exact `red\ngreen\nblue` arguments and no visible protocol leak.
 - Turn 2 returned visible answer `The tool counted 3 lines.` with no extra tool call and no protocol leak.
@@ -83,8 +83,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:37 PDT MiniMax M2.7 small JANGTQ live green row
 
-- Current Osaurus PR head checked before this row: `0bba84c9bc8d1b60a872d29bd28e9af3aee586dd`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `0bba84c9bc8d1b60a872d29bd28e9af3aee586dd`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-0bba84c9-minimax-small-jangtq-tool-cache-20260528-103659`.
 - `minimax-m2.7-small-jangtq` turn 1 returned one structured `line_count` call with exact `red\ngreen\nblue` arguments and no visible protocol leak.
 - Turn 2 returned visible answer `There were three lines counted.` with no extra tool call and no protocol leak.
@@ -94,8 +94,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:38 PDT Gemma4 JANG_4M live red row
 
-- Current Osaurus PR head checked before this row: `213d0ffd823a4c61181b308aa6b5c24a2fd4b194`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `213d0ffd823a4c61181b308aa6b5c24a2fd4b194`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-213d0ffd-gemma4-jang4m-tool-cache-20260528-103834`.
 - `gemma-4-26b-a4b-it-jang_4m-crack` turn 1 failed required-tool behavior: `finish_reason` was `stop`, visible content was empty, and `reasoning_content` was `thought<tool_call|>` instead of a structured `tool_calls` response.
 - Cache topology was still detected correctly: 30 layers, 5 KV layers, 25 rotating KV layers, disk-backed restore required, TurboQuant KV layer count 0.
@@ -104,8 +104,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:40 PDT Qwen 27B MXFP4 CRACK MTP live parser/tool green, cache partial row
 
-- Current Osaurus PR head checked before this row: `2ac8d31f87f4d82ab9de9f8e4188bdab8800bb71`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `2ac8d31f87f4d82ab9de9f8e4188bdab8800bb71`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-2ac8d31f-qwen27-mxfp4-crack-mtp-tool-cache-20260528-103947`.
 - `qwen3.6-27b-mxfp4-crack-mtp` turn 1 returned one structured `line_count` call with exact `red\ngreen\nblue` arguments and no visible protocol leak.
 - Turn 2 returned visible answer `3 lines were counted.` with no extra tool call and no protocol leak.
@@ -115,8 +115,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:41 PDT ZAYA-VL JANGTQ4 red image media/cache green row
 
-- Current Osaurus PR head checked before this row: `b780e33737cbf51d3045c97c694a8ee7104caebb`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `b780e33737cbf51d3045c97c694a8ee7104caebb`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-b780e337-zaya-vl-jangtq4-red-media-cache-20260528-104101`.
 - Harness generated a real 64x64 red PNG and sent it as an OpenAI image content part.
 - First response was `Red`, `finish_reason: "stop"`, no protocol leak, token rate about 0.155 tok/s.
@@ -126,8 +126,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:52 PDT DSV4 JANGTQ-K live red row
 
-- Current Osaurus PR head checked before this row: `50b38bc8b2b4b4ee8b639d16c798de19782cc75d`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `50b38bc8b2b4b4ee8b639d16c798de19782cc75d`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-50b38bc8-dsv4-jangtq-k-tool-cache-20260528-104417`.
 - `deepseek-v4-flash-jangtq-k` turn 1 took 517.5 seconds and ended with `finish_reason: "length"` instead of a structured tool call.
 - Visible content was empty, but `reasoning_content` looped over line-count interpretation of `red\ngreen\nblue` and never emitted DSML.
@@ -137,8 +137,8 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:57 PDT DSV4 JANGTQ-K explicit instruct tool-call green row
 
-- Current Osaurus PR head checked before this row: `be665ebf425104bd52e5b02cbe823080f7bf64ed`.
-- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app`.
+- Current Muwa PR head checked before this row: `be665ebf425104bd52e5b02cbe823080f7bf64ed`.
+- No-sign app path: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app`.
 - Artifact: `/tmp/osaurus-pr1268-be665ebf-dsv4-jangtq-k-explicit-instruct-tool-20260528-105634`.
 - Request used `reasoning_effort: "instruct"`, `max_tokens: 256`, `tool_choice: "required"`, and the `line_count` schema.
 - Result: one structured `line_count` tool call with exact `red\ngreen\nblue` arguments, `finish_reason: "tool_calls"`, no visible content, and no DSML/protocol leak.
@@ -146,22 +146,22 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 10:09 PDT current coordination boundary
 
-- Current Osaurus PR: `#1268`, head `80e8749144d50b9783c5cc37a84b1cb03b8fdfa4`, open, not draft, mergeable, not merged by agent.
-- Current vMLX main and Osaurus pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified local vMLX worktree and `osaurus-ai/vmlx-swift` main match.
+- Current Muwa PR: `#1268`, head `80e8749144d50b9783c5cc37a84b1cb03b8fdfa4`, open, not draft, mergeable, not merged by agent.
+- Current vMLX main and Muwa pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified local vMLX worktree and `osaurus-ai/vmlx-swift` main match.
 - GitHub checks on `80e87491`: `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` all passed.
-- Only `#1268` remains open from the `#1247` through `#1268` runtime stack. Keep Osaurus fixes in this one PR until the user manually merges it.
+- Only `#1268` remains open from the `#1247` through `#1268` runtime stack. Keep Muwa fixes in this one PR until the user manually merges it.
 - Source cache policy remains `engineSelected` with topology gating: prefix cache, paged KV, block-disk L2, and SSM rederive default on; proven simple full-KV rows may use TurboQuant KV by default, while DSV4, ZAYA/ZAYA-VL, Gemma rotating, Qwen/Ling/Nemotron/HY3-style hybrid and CCA/SSM/path-dependent rows stay native/fp16 unless exact topology proof promotes them.
-- Current no-sign app observation: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app` is healthy with `deepseek-v4-flash-jangtq2` resident, no in-flight requests, and DSV4 cache topology still 43 layers / 41 hybrid-pool / 2 rotating / TurboQuant KV 0.
+- Current no-sign app observation: `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app` is healthy with `deepseek-v4-flash-jangtq2` resident, no in-flight requests, and DSV4 cache topology still 43 layers / 41 hybrid-pool / 2 rotating / TurboQuant KV 0.
 - Fresh DSV4 `/v1/messages` tool-result repeat-cache artifact: `/tmp/osaurus-pr1268-80e87491-dsv4-messages-tool-result-repeat-cache-20260528-100913`. Two repeated tool-result follow-up requests returned visible answer `The line count is 3.`, `stop_reason: "end_turn"`, no extra tool call, and disk L2 hits moved from 0 to 1 on the second turn. This proves Messages tool-result follow-up repeat L2 reuse for this surface only; Responses repeat-cache and active-tool DSV4 repeat-cache coverage remain partial.
 - Fresh DSV4 `/v1/responses` tool-result repeat-cache artifact: `/tmp/osaurus-pr1268-a1d101d6-dsv4-responses-tool-result-repeat-cache-clean-20260528-102858`. With DSV4 already resident, two repeated Responses tool-result follow-up requests returned visible line-count answers, no function/tool item, no DSML/tool-marker leak, and disk L2 hits moved `+1` on each repeat with no new misses. This proves Responses tool-result follow-up repeat L2 reuse for this surface only; active-tool DSV4 repeat-cache coverage and omitted-control rows remain partial.
-- No agent should merge Osaurus without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
+- No agent should merge Muwa without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
 
 ### 2026-05-28 09:03 PDT checked proof boundary
 
-- Current Osaurus PR: `#1268`, open, not draft, mergeable, not merged by agent. The checked code/proof boundary is Osaurus app build `695d5869ea9821732649bffb3789469568e6db55` plus documentation correction `8d3ce5d15156e5c6a5dc3f04601b02442dfd2c3a`; verify the live GitHub PR head and CI before merge because documentation-only commits can advance after this line.
-- Current vMLX main and Osaurus pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified present on `osaurus-ai/vmlx-swift` main.
+- Current Muwa PR: `#1268`, open, not draft, mergeable, not merged by agent. The checked code/proof boundary is Muwa app build `695d5869ea9821732649bffb3789469568e6db55` plus documentation correction `8d3ce5d15156e5c6a5dc3f04601b02442dfd2c3a`; verify the live GitHub PR head and CI before merge because documentation-only commits can advance after this line.
+- Current vMLX main and Muwa pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified present on `osaurus-ai/vmlx-swift` main.
 - Current CI must be checked on the live PR head; do not reuse older green-status lines after another documentation-only head commit.
-- Code-equivalent no-sign/keychain-free app from `695d5869` launched at `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/osaurus.app` and `/health` returned healthy with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- Code-equivalent no-sign/keychain-free app from `695d5869` launched at `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app` and `/health` returned healthy with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 - Final source guard on `695d5869` passed: migrated cache defaults use `liveKVCodec: .engineSelected`, `ModelRuntime.shouldUseTurboQuantByDefault` remains the topology gate, and DSV4/ZAYA/ZAYA-VL/hybrid topologies are not defaulted into generic TurboQuant KV.
 - Final source policy keeps the no-forced-behavior contract: no DSV4 hidden repetition-penalty doc, no forced sampler defaults, no parser output repair, no forced reasoning tags, and required/named local tool choice still flows through the template context.
 - DSV4 required-tool proof that is green: `/tmp/osaurus-pr1268-ad233f70-dsv4-required-repeat-instruct-max256-20260528-085603`, five turns, explicit `reasoning_effort: "instruct"`, explicit `max_tokens: 256`, exact multiline args, no visible DSML leak, no reasoning leakage, resident model, disk L2 stores.
@@ -173,43 +173,43 @@ Each promoted row needs current-head evidence for:
 - DSV4 `/v1/messages` tool-result follow-up repeat-cache proof that is green: `/tmp/osaurus-pr1268-80e87491-dsv4-messages-tool-result-repeat-cache-20260528-100913`, two identical Messages tool-result follow-up requests, both HTTP 200 with visible answer `The line count is 3.`, `stop_reason: "end_turn"`, no extra tool call, no visible DSML/tool-marker leak, and turn 2 produced `disk_l2_hits +1` with no new disk L2 misses. This is a repeat disk-hit proof for the Messages tool-result follow-up surface only.
 - DSV4 rows that are not green: `/tmp/osaurus-pr1268-695d5869-dsv4-required-repeat-20260528-084132` timed out on turns 4-5 without `max_tokens` and left lingering inflight requests; `/tmp/osaurus-pr1268-ad233f70-dsv4-required-repeat-max256-20260528-085227` had one whitespace-drift tool argument and one `finish_reason: length` reasoning turn when DSV4 reasoning controls were omitted.
 - This is a checked consolidation boundary, not a blanket production-clear claim for every architecture row. Nemo Omni audio/video, HY3/Hunyuan import/live rows, Ling long-prompt/runtime crash work, ZAYA CCA companion-hit depth, `/v1/responses`/`/v1/messages` parity, UI screenshots, full saved-settings carryover, and omitted-reasoning DSV4 behavior remain follow-on matrix work unless fixed in this PR.
-- No agent should merge Osaurus without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
+- No agent should merge Muwa without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
 
 ### 2026-05-28 07:20 PDT final PR merge boundary
 
-- Current Osaurus PR: `#1268`, head `13f7fd9455006d55242d77375a5c9dcf2841266c`, open, not draft, mergeable, not merged by agent.
-- Current vMLX main and Osaurus pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `osaurus-ai/vmlx-swift` main.
+- Current Muwa PR: `#1268`, head `13f7fd9455006d55242d77375a5c9dcf2841266c`, open, not draft, mergeable, not merged by agent.
+- Current vMLX main and Muwa pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `osaurus-ai/vmlx-swift` main.
 - GitHub checks on `13f7fd94`: `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` all passed.
 - Final local source/hygiene guard on `13f7fd94` passed: keychain-free proof path, no hidden sampler defaults, no forced behavior, OpenResponses/cache wiring, server-settings runtime wiring, reasoning routing, HTTP cancellation, required tool-choice routing, model tool/capability surfaces, vMLX pin/checkout readiness, and PR artifact hygiene.
-- Final no-sign/keychain-free app from `13f7fd94` launched at `build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/osaurus.app` and `/health` returned healthy.
-- Gemma3n required-tool handling is a support-boundary fix, not a promotion: vMLX no longer infers tool support from Gemma3n `model_type`, and Osaurus blocks known unsupported Gemma3n tool requests before decode.
+- Final no-sign/keychain-free app from `13f7fd94` launched at `build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/Muwa.app` and `/health` returned healthy.
+- Gemma3n required-tool handling is a support-boundary fix, not a promotion: vMLX no longer infers tool support from Gemma3n `model_type`, and Muwa blocks known unsupported Gemma3n tool requests before decode.
 - Default cache policy is `engineSelected` with topology gating: proven simple full-KV rows may default to TurboQuant KV; DSV4, ZAYA/ZAYA-VL, Gemma rotating, and hybrid SSM/companion-cache rows stay native/fp16 unless explicitly overridden or separately proven safe.
-- No agent should merge Osaurus without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
+- No agent should merge Muwa without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
 
 ### 2026-05-28 06:16 PDT runtime-proof boundary
 
-- Current Osaurus PR: `#1268`, open, not draft, mergeable, not merged by agent.
-- Current vMLX main and Osaurus pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `osaurus-ai/vmlx-swift` main.
+- Current Muwa PR: `#1268`, open, not draft, mergeable, not merged by agent.
+- Current vMLX main and Muwa pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `osaurus-ai/vmlx-swift` main.
 - Runtime-proof head `2a2a6d4b039e61fd9338c42287fa9b35798328cb`: `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` all passed.
 - Only `#1268` remains open from the `#1247` through `#1268` runtime stack; older related PRs are consolidated/superseded rather than separate merge targets.
 - No-sign/keychain-free DSV4 app proof is recorded in `POST1266-LIVE-FAMILY-CACHE-MATRIX.md` for the `1503be2f` runtime commit that sits directly below the documentation-only proof boundary.
 - Source guards passed after the documentation-only proof boundary: PR hygiene, vMLX pin/checkout readiness, keychain-free proof path, no hidden sampler defaults, no forced behavior, OpenResponses/cache wiring, server-settings runtime wiring, reasoning routing, HTTP cancellation, required tool-choice routing, and model tool/capability surfaces.
 - Default cache policy is `engineSelected` with topology gating: proven full-KV rows may default to TurboQuant KV; DSV4, ZAYA/ZAYA-VL, Gemma rotating, and hybrid SSM/companion-cache rows stay native/fp16 unless explicitly overridden or separately proven safe.
-- No agent should merge Osaurus without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
+- No agent should merge Muwa without explicit user approval. vMLX main is managed directly and contains the runtime fixes consumed by this PR.
 
 ### Historical boundary notes
 
-- Current Osaurus PR: `#1268`, head `395cc49479101fc0a9e0fa01d4ce25095c55dfa6` before this ledger-only correction.
-- Current vMLX main and Osaurus pin: `de07006a2426f482d3c16adea5644c0803efb2cd`.
+- Current Muwa PR: `#1268`, head `395cc49479101fc0a9e0fa01d4ce25095c55dfa6` before this ledger-only correction.
+- Current vMLX main and Muwa pin: `de07006a2426f482d3c16adea5644c0803efb2cd`.
 - GitHub status at 2026-05-28 03:22 PDT for head `395cc494`: PR open, not draft, mergeable, not merged; `shellcheck`, `swiftlint`, `test-cli`, and `update_release_draft` passed; `test-core` was still running at the time of this ledger update.
 - Only `#1268` remains open from the `#1247` through `#1268` runtime stack; older related work has been consolidated rather than kept as separate merge targets.
-- Exact-head no-sign Release app proof is refreshed for `395cc494`: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-395cc494/Build/Products/Release/osaurus.app`, built with signing disabled and vMLX checkout `de07006a2426f482d3c16adea5644c0803efb2cd`.
+- Exact-head no-sign Release app proof is refreshed for `395cc494`: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-395cc494/Build/Products/Release/Muwa.app`, built with signing disabled and vMLX checkout `de07006a2426f482d3c16adea5644c0803efb2cd`.
 - Exact-head source guard is refreshed for `395cc494`: `RuntimePolicySourceTests/vmlxPinIncludesRuntimeHardening` passed against the vMLX main pin `de07006a2426f482d3c16adea5644c0803efb2cd`.
 - Focused vMLX proof for the open DSV4 action-rail fix passed before repin: `DeepseekV4ChatTemplateFallbackFocusedTests` ran 29 tests with 0 failures against vMLX `bd6c6808`.
 - Exact-head no-sign live model proof is intentionally not promoted as complete for every family on `86304f7e`. Nemo Omni, Ling, ZAYA, DSV4, Qwen, MiniMax, and HY3/Hunyuan need follow-on exact-head rows before claiming the broader post-merge runtime matrix is complete.
-- MiMo V2.5 is explicitly excluded from the current merge gate because the current local MiMo lane is not working/imported enough for a meaningful Osaurus live row.
+- MiMo V2.5 is explicitly excluded from the current merge gate because the current local MiMo lane is not working/imported enough for a meaningful Muwa live row.
 - TurboQuant/`engineSelected` is the default live-KV policy, but it is resolved per loaded model topology rather than applied globally. Proven full-KV rows may default to TurboQuant KV; DSV4, ZAYA/ZAYA-VL, Gemma rotating, and hybrid SSM/companion-cache rows stay native/fp16 unless explicitly overridden or separately proven safe.
-- No agent should merge Osaurus without explicit user approval. vMLX main is managed directly and already contains the no-forced-thinking fix required by this PR.
+- No agent should merge Muwa without explicit user approval. vMLX main is managed directly and already contains the no-forced-thinking fix required by this PR.
 
 ## Row status ledger
 
@@ -231,12 +231,12 @@ Each promoted row needs current-head evidence for:
 | MiniMax M2.7 JANGTQ_K | #1268 current-head API pass, full-KV cache proof | current row `/tmp/osaurus-pr1268-5442b551-minimax-jangtq-k-required-tool-20260528-032630`; old cold row `/tmp/osaurus-pr1264-aa5f44d8-minimax-m27-jangtq-k-crack-20260527-084805/minimax-m27-jangtq-k-crack/minimax-m2.7-jangtq_k-crack_summary.json`; old warm row `/tmp/osaurus-pr1264-aa5f44d8-minimax-m27-jangtq-k-crack-warm-20260527-084845/minimax-m27-jangtq-k-crack/minimax-m2.7-jangtq_k-crack_summary.json` | current row used no-sign Release app runtime-equivalent to `5442b551` pinned to vMLX main `bd6c6808`. Turn 1 exact required `line_count` args `red\ngreen\nblue`, `content=null`, no protocol leak; turn 2 visible `The text had 3 lines.`, finish `stop`, no loop; turn 3 exact required `line_count` args `one\ntwo` after assistant/tool history. Cache topology captured: 62 full-KV layers, paged/prefix cache enabled, TurboQuant KV 0. Current row proved `paged_hits=2` and `prefix_hits=2`; disk L2 stored new blocks but did not hit on this row. |
 | MiniMax M2.7 JANG_K | pass | cold row `/tmp/osaurus-pr1264-31a3ba86-minimax-m27-jang-k-crack-20260527-085022/minimax-m27-jang-k-crack/minimax-m2.7-jang_k-crack_summary.json`; warm row `/tmp/osaurus-pr1264-31a3ba86-minimax-m27-jang-k-crack-warm-20260527-085056/minimax-m27-jang-k-crack/minimax-m2.7-jang_k-crack_summary.json`; current-head clean-start proof `/tmp/osaurus-pr1264-4369301f-minimax-jang-k-store-20260527-090636/SUMMARY.json` | exact multi-turn `line_count`, no protocol leak, visible post-tool answer, 62 full-KV layers, TurboQuant KV 0. Current-head clean-start proof began with no loaded model and passed with `disk_l2_hits +2`, `disk_l2_misses 0`, `disk_l2_stores +7`, turn2 visible `Three lines were counted.`, and 39.45 tok/s on the visible answer |
 | MiMo V2.5 | excluded from current #1268 merge gate | prior source note `/Users/eric/jang`: `uv run --project jang-tools pytest -q jang-tools/tests/mimo_v2_contract_test.py`; vMLX `d69a12168fe6d5c89cb2756ca478f0ea7e18c7d3` | Current user decision is to forget MiMo for this PR because it is not working right now. Keep the old topology note only as future context: expected `mimo_v2_flash` topology is 9 full-attention `KVCacheSimple` layers plus 39 SWA `RotatingKVCache` layers, with TurboQuant KV limited to full-attention KV layers only. Do not block #1268 on MiMo live proof, and do not claim MiMo is production-ready. |
-| HY3/Hunyuan local rows | live blocked | `/v1/models` on the current `775e785e` no-sign app did not list `hy3`/`hunyuan`; raw source bundle exists at `/Volumes/EricsLLMDrive/sources/Hy3-preview` with `config.json`, tokenizer files, and 112 safetensor shards | live Osaurus proof is blocked by missing imported model id, not by a completed runtime row. Do not infer HY3/CAA/CCA behavior from ZAYA, MiniMax, or MiMo source guards |
+| HY3/Hunyuan local rows | live blocked | `/v1/models` on the current `775e785e` no-sign app did not list `hy3`/`hunyuan`; raw source bundle exists at `/Volumes/EricsLLMDrive/sources/Hy3-preview` with `config.json`, tokenizer files, and 112 safetensor shards | live Muwa proof is blocked by missing imported model id, not by a completed runtime row. Do not infer HY3/CAA/CCA behavior from ZAYA, MiniMax, or MiMo source guards |
 
 ### 2026-05-28 07:02 PDT Gemma3n unsupported-tool boundary tightened
 
 - Current local worktree head before commit: `319bfeb06ae082f0a77b48c992bcd93bb3e8e04a`, pinned to vMLX main `cc3f5f4dc1317ffa09c46050ba0847f495887747`.
-- Fresh no-sign Release app from that head was launched keychain-free from `build/DerivedData-pr1268-release-nosign-319bfeb0/Build/Products/Release/osaurus.app` with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- Fresh no-sign Release app from that head was launched keychain-free from `build/DerivedData-pr1268-release-nosign-319bfeb0/Build/Products/Release/Muwa.app` with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 - Fresh inventory artifact: `/tmp/osaurus-pr1268-319bfeb0-current-inventory-20260528-065436`, 43 models visible.
 - Fresh DSV4 JANGTQ2 artifact: `/tmp/osaurus-pr1268-319bfeb0-dsv4-jangtq2-20260528-065445`.
   - Turn 1 required `line_count`: pass.
@@ -244,7 +244,7 @@ Each promoted row needs current-head evidence for:
   - Turn 3 second required tool after assistant/tool history: pass.
   - DSV4 topology: 43 layers, 41 hybrid-pool/rotating-wrapper layers, 2 rotating layers, disk-backed restore required, TurboQuant KV 0.
   - Boundary remains: disk L2 stores/misses moved but no current-row hit was proven.
-- Fresh Gemma3n boundary artifact before the Osaurus-side guard: `/tmp/osaurus-pr1268-319bfeb0-gemma3n-boundary-20260528-065603`.
+- Fresh Gemma3n boundary artifact before the Muwa-side guard: `/tmp/osaurus-pr1268-319bfeb0-gemma3n-boundary-20260528-065603`.
   - Classification: fail/unsupported for required tools.
   - Failure shape: visible `<|tool>model:model` fragments and missing structured tool call.
 - Follow-up source fix in this worktree blocks known unsupported Gemma3n local tool requests in `MLXService.validateRuntimePolicy` before decode and updates the tokenizer fallback so Gemma3n does not synthesize required-tool declarations/instructions.
@@ -255,9 +255,9 @@ Each promoted row needs current-head evidence for:
 
 ### 2026-05-28 07:21 PDT latest-head DSV4/ZAYA repeat-cache probes
 
-Current Osaurus head: `13f7fd9455006d55242d77375a5c9dcf2841266c`.
+Current Muwa head: `13f7fd9455006d55242d77375a5c9dcf2841266c`.
 Current vMLX main pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`.
-No-sign/keychain-free app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/osaurus.app`.
+No-sign/keychain-free app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/Muwa.app`.
 
 DSV4 repeat-cache artifact:
 
@@ -304,7 +304,7 @@ ZAYA CCA repeat-cache artifact:
   - `MLXBatchAdapterTests/additionalContext_defaultsGemma4ThinkingOffButHonorsExplicitOptIn`
   - `RuntimePolicySourceTests`
   - `MLXBatchAdapterTests`
-- No-sign app build: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-gemma-default-nosign/Build/Products/Release/osaurus.app`, built with signing disabled and launched through `scripts/live-proof/open-keychain-free-osaurus.sh` with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign app build: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-gemma-default-nosign/Build/Products/Release/Muwa.app`, built with signing disabled and launched through `scripts/live-proof/open-keychain-free-muwa.sh` with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 - Cold artifact: `/tmp/osaurus-pr1268-gemma-default-gemma4-jang4m-tool-cache-20260528-112756`.
   - Turn 1 required `line_count`: exact args `red\ngreen\nblue`, `finish_reason=tool_calls`, no visible content, no protocol leak.
   - Turn 2 after tool result: visible `3 lines were counted.`, no tool calls, no protocol leak.
@@ -337,12 +337,12 @@ ZAYA CCA repeat-cache artifact:
 
 ### 2026-06-07 23:16 PDT Nemotron Ultra PR #1411 live app boundary
 
-- Osaurus PR branch: `codex/vmlx-nemotron-runtime-pin`, head
+- Muwa PR branch: `codex/vmlx-nemotron-runtime-pin`, head
   `975aca2fceb222aa6ab9c3eddc2f0edfbef69367`.
 - vMLX pin in `Package.swift` / resolved files:
   `ef15137a47fa5cda7329c840366ecc02e345d7ed`.
 - No-sign app:
-  `/private/tmp/osaurus-vmlx-pin-integration/build/DerivedData-nemotron-nosign-975aca2f/Build/Products/Release/osaurus.app`.
+  `/private/tmp/osaurus-vmlx-pin-integration/build/DerivedData-nemotron-nosign-975aca2f/Build/Products/Release/Muwa.app`.
 - Build proof:
   `/tmp/osaurus-nemotron-nosign-build-975aca2f-20260607-225616.log`;
   `** BUILD SUCCEEDED **`, ad-hoc signature, no keychain signing prompt.
@@ -384,7 +384,7 @@ ZAYA CCA repeat-cache artifact:
 
 ### 2026-06-07 23:39 PDT Nemotron Ultra PR #1411 compiled-decode boundary fix
 
-- Osaurus PR branch: `codex/vmlx-nemotron-runtime-pin`, head
+- Muwa PR branch: `codex/vmlx-nemotron-runtime-pin`, head
   `b7121367f5b8e33fdd0eb5f655392fd1e8db0bf2`.
 - Source fix: `MLXBatchAdapter.shouldEnableCompiledBatchDecode` now refuses
   B=1 compiled batch decode for `ModelRuntime.isKnownHybridModel` families.
@@ -393,7 +393,7 @@ ZAYA CCA repeat-cache artifact:
 - Focused source proof passed:
   `MLXBatchAdapterTests/compiledBatchDecodeDisabledForKnownUnsafeSoloModels`.
 - No-sign app:
-  `/private/tmp/osaurus-vmlx-pin-integration/build/DerivedData-nemotron-nosign-b7121367/Build/Products/Release/osaurus.app`.
+  `/private/tmp/osaurus-vmlx-pin-integration/build/DerivedData-nemotron-nosign-b7121367/Build/Products/Release/Muwa.app`.
 - Build proof:
   `/tmp/osaurus-nemotron-nosign-build-b7121367-20260607-232638.log`;
   `** BUILD SUCCEEDED **`, ad-hoc signature, no keychain signing prompt.
@@ -430,6 +430,6 @@ ZAYA CCA repeat-cache artifact:
     not the direct vMLX sustained decode target.
 - Status: Nemotron Ultra JANGTQ_1L is now behavior-pass, parser-pass,
   topology-pass, and warm hybrid SSM cache-hit-pass on the `b7121367` no-sign
-  Osaurus PR app path. Speed remains separately tracked by direct vMLX
-  sustained rows; do not claim an Osaurus UI speed promotion from this short
+  Muwa PR app path. Speed remains separately tracked by direct vMLX
+  sustained rows; do not claim an Muwa UI speed promotion from this short
   tool-cache harness alone.

@@ -1,11 +1,11 @@
-# Nemotron Ultra Osaurus Wiring - 2026-06-06
+# Nemotron Ultra Muwa Wiring - 2026-06-06
 
 ## Scope
 
 Model family: Nemotron 3 Ultra text reasoning bundles, including
 `NVIDIA-Nemotron-3-Ultra-550B-A55B-JANGTQ_1L`.
 
-This note tracks the Osaurus-side wiring that sits above the vMLX runtime pin.
+This note tracks the Muwa-side wiring that sits above the vMLX runtime pin.
 It does not claim new decode speed. Current vMLX evidence keeps the resident
 Swift row separate from the low-footprint mmap row:
 
@@ -14,7 +14,7 @@ Swift row separate from the low-footprint mmap row:
 - low-footprint mmap decode: `3.9-4.5 tok/s`, coherent and hybrid-cache
   correct, but still below the 8-10 tok/s target.
 
-## Osaurus Fix
+## Muwa Fix
 
 The chat composer previously allowed a generic `fallbackSupportsImages` bit to
 promote an explicit text-only model id to image support. Nemotron Ultra is a
@@ -35,7 +35,7 @@ Focused source test:
 
 ```sh
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-  xcrun swift test --package-path Packages/OsaurusCore \
+  xcrun swift test --package-path Packages/MuwaCore \
   --filter 'ModelMediaCapabilitiesMCDCTests|ModelRuntimeIsHybridTests|MLXBatchAdapterTests/cacheCoordinatorModelKey_alignsWithKnownHybridFamilies|MLXBatchAdapterTests/additionalContext_defaultsNemotronThinkingOffButHonorsExplicitOptIn' \
   --jobs 1 --no-parallel
 ```
@@ -51,7 +51,7 @@ Covered surfaces:
 - Nemotron reasoning ids default local API context to `enable_thinking=false`
   while preserving explicit thinking opt-in.
 
-## Live Osaurus Row - 2026-06-06
+## Live Muwa Row - 2026-06-06
 
 Keychain-free no-sign app build:
 
@@ -70,7 +70,7 @@ The app served the local model id
 Cold row:
 
 - Artifact:
-  `/tmp/osaurus-bbd5d5ce-nemotron-ultra-tool-cache-20260606-071215`
+  `/tmp/muwa-bbd5d5ce-nemotron-ultra-tool-cache-20260606-071215`
 - The three-turn required-tool harness passed parser and history checks:
   turn 1 exact `line_count` call, turn 2 visible answer, turn 3 exact
   `line_count` call after tool history.
@@ -84,7 +84,7 @@ Cold row:
 Warm relaunch row using the same test-root disk cache:
 
 - Artifact:
-  `/tmp/osaurus-bbd5d5ce-nemotron-ultra-tool-cache-warm-20260606-071921`
+  `/tmp/muwa-bbd5d5ce-nemotron-ultra-tool-cache-warm-20260606-071921`
 - Harness result: `passed=true`, `failed_checks=[]`.
 - Tool/history/parser checks all passed again with no marker leak.
 - Warm cache proof passed:
@@ -96,7 +96,7 @@ Warm relaunch row using the same test-root disk cache:
 
 Boundary:
 
-- This proves Osaurus wiring, model autodetection, text-only media policy,
+- This proves Muwa wiring, model autodetection, text-only media policy,
   required-tool parsing, tool-history replay, disk L2 warm restore, and SSM
   companion cache hits for the low-footprint app path.
 - It does not change the speed boundary above: current release wording may

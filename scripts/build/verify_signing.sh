@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-APP="build_output/Osaurus.app"
+APP="build_output/Muwa.app"
 
 echo "Verifying ARM64 app (default)..."
 codesign -vvv --deep --strict "$APP"

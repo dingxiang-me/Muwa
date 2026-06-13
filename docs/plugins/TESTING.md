@@ -1,6 +1,6 @@
 # Testing Plugins
 
-How to validate your plugin without installing it into Osaurus.
+How to validate your plugin without installing it into Muwa.
 
 ## What you can test in isolation
 
@@ -13,8 +13,8 @@ How to validate your plugin without installing it into Osaurus.
 
 - The full `dlopen` + `init` + `get_manifest` lifecycle
 - Live host API calls (inference, dispatch, file_read)
-- The `osaurus tools dev` reload loop
-- Web UI rendering against `window.__osaurus`
+- The `muwa-cli tools dev` reload loop
+- Web UI rendering against `window.__muwa`
 
 ## Unit testing the plugin in Swift
 
@@ -46,7 +46,7 @@ import Testing
 
 Run with `swift test`.
 
-For tests that drive the plugin's host-API callbacks (`init`, `invoke`, `on_config_changed`), use the [`OsaurusPluginTestKit`](../../Packages/OsaurusPluginTestKit/README.md) package — it provides a `MockHost` that records every host call your plugin made.
+For tests that drive the plugin's host-API callbacks (`init`, `invoke`, `on_config_changed`), use the [`MuwaPluginTestKit`](../../Packages/MuwaPluginTestKit/README.md) package — it provides a `MockHost` that records every host call your plugin made.
 
 ## Unit testing in Rust
 
@@ -72,14 +72,14 @@ The host parses your manifest with `JSONDecoder().decode(PluginManifest.self, ..
 
 ```bash
 # Extract the manifest from a built dylib (loads it in a stub host):
-osaurus manifest extract ./.build/release/libmy-plugin.dylib > manifest.json
+muwa manifest extract ./.build/release/libmy-plugin.dylib > manifest.json
 
 # Validate the JSON against PluginManifest. Reports decode errors with the
 # field path so you can fix typos before install time.
-osaurus manifest validate manifest.json
+muwa manifest validate manifest.json
 ```
 
-`osaurus manifest extract` loads your dylib in a stub host and prints what `get_manifest()` returned. `osaurus manifest validate` runs the same `JSONDecoder` Osaurus uses at install time, but on a file you control — so you can iterate without rebuilding.
+`muwa manifest extract` loads your dylib in a stub host and prints what `get_manifest()` returned. `muwa manifest validate` runs the same `JSONDecoder` Muwa uses at install time, but on a file you control — so you can iterate without rebuilding.
 
 ## Mocking the host API in unit tests
 
@@ -113,10 +113,10 @@ Two approaches:
 ### A. Manual smoke test against a dev-loaded plugin
 
 ```bash
-osaurus tools dev   # builds + reloads on save
+muwa-cli tools dev   # builds + reloads on save
 ```
 
-While `osaurus tools dev` is running, the simplest way to invoke your plugin is from chat — open Osaurus and ask the model to use the tool by name.
+While `muwa-cli tools dev` is running, the simplest way to invoke your plugin is from chat — open Muwa and ask the model to use the tool by name.
 
 For HTTP route testing you'll need an access key and an agent UUID. Both are visible in **Settings → Network** inside the app:
 
@@ -126,7 +126,7 @@ For HTTP route testing you'll need an access key and an agent UUID. Both are vis
 Then:
 
 ```bash
-curl -H "X-Osaurus-Agent-Id: <agent-uuid>" \
+curl -H "X-Muwa-Agent-Id: <agent-uuid>" \
      -H "Authorization: Bearer <osk-v1-key>" \
      http://127.0.0.1:1338/plugins/dev.example.MyPlugin/health
 
@@ -137,29 +137,29 @@ curl -X POST http://127.0.0.1:1338/v1/chat/completions \
 
 ### B. CI integration
 
-The release workflow scaffolded by `osaurus tools create` sets up a CI job. Extend it with a test step that boots Osaurus headless, installs your plugin, and runs the smoke tests above.
+The release workflow scaffolded by `muwa-cli tools create` sets up a CI job. Extend it with a test step that boots Muwa headless, installs your plugin, and runs the smoke tests above.
 
 ## What to test before publishing
 
 A pre-flight checklist:
 
-- [ ] Plugin loads cleanly: `osaurus tools list` shows it without an error column
-- [ ] Manifest is valid: `osaurus manifest validate <manifest.json>` passes
+- [ ] Plugin loads cleanly: `muwa-cli tools list` shows it without an error column
+- [ ] Manifest is valid: `muwa manifest validate <manifest.json>` passes
 - [ ] All declared tools are reachable from chat
 - [ ] Tool returns conform to `ToolEnvelope`
 - [ ] Routes return expected status codes for `none`/`verify`/`owner` auth scenarios
 - [ ] Web UI loads via the **Open Web App** button (not by typing the URL)
-- [ ] `osaurus tools doctor MyPlugin` reports no warnings
+- [ ] `muwa-cli tools doctor MyPlugin` reports no warnings
 - [ ] No host API calls log `context_unavailable` in Insights
-- [ ] Plugin survives `osaurus tools reload` without leaking memory or losing state
+- [ ] Plugin survives `muwa-cli tools reload` without leaking memory or losing state
 
 ## Existing test suites for reference
 
-The Osaurus codebase ships test patterns you can adapt:
+The Muwa codebase ships test patterns you can adapt:
 
-- `Packages/OsaurusCore/Tests/Plugin/PluginTests.swift` — manifest decode, route matching, MIME, rate limiter
-- `Packages/OsaurusCore/Tests/Plugin/PluginRoutingTests.swift` — path-parameter encoding, web mount config
-- `Packages/OsaurusCore/Tests/Plugin/PluginHostAPITests.swift` — host API helpers, SSRF, dispatch shapes
+- `Packages/MuwaCore/Tests/Plugin/PluginTests.swift` — manifest decode, route matching, MIME, rate limiter
+- `Packages/MuwaCore/Tests/Plugin/PluginRoutingTests.swift` — path-parameter encoding, web mount config
+- `Packages/MuwaCore/Tests/Plugin/PluginHostAPITests.swift` — host API helpers, SSRF, dispatch shapes
 
 These are the canonical examples of how to construct manifests, decode JSON, and assert on plugin behavior in tests.
 

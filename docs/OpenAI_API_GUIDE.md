@@ -1,6 +1,6 @@
 # API Endpoints Guide
 
-This guide explains how to use the API endpoints in Osaurus, including OpenAI-compatible, Anthropic-compatible, and Open Responses formats.
+This guide explains how to use the API endpoints in Muwa, including OpenAI-compatible, Anthropic-compatible, and Open Responses formats.
 
 ## Available Endpoints
 
@@ -22,13 +22,13 @@ Example response:
       "id": "llama-3.2-3b-instruct",
       "object": "model",
       "created": 1738193123,
-      "owned_by": "osaurus"
+      "owned_by": "muwa"
     },
     {
       "id": "qwen2.5-7b-instruct",
       "object": "model",
       "created": 1738193123,
-      "owned_by": "osaurus"
+      "owned_by": "muwa"
     }
   ]
 }
@@ -38,9 +38,9 @@ Example response:
 
 Generate chat completions using the specified model.
 
-> **Tool calling:** `/chat/completions` follows **strict OpenAI semantics** — when the model emits `tool_calls`, the response (or final SSE chunk) returns those calls and the **client is expected to execute them and POST the results back** in the next request. Osaurus deliberately does **not** auto-execute tools on this endpoint so it can serve as a drop-in backend for harnesses that already manage their own tool loop.
+> **Tool calling:** `/chat/completions` follows **strict OpenAI semantics** — when the model emits `tool_calls`, the response (or final SSE chunk) returns those calls and the **client is expected to execute them and POST the results back** in the next request. Muwa deliberately does **not** auto-execute tools on this endpoint so it can serve as a drop-in backend for harnesses that already manage their own tool loop.
 >
-> If you want server-side autonomous loops, use `POST /agents/{id}/run` (it executes tools, manages iteration budget, and streams hint/done frames). If you want to expose Osaurus tools to a remote model harness, use the MCP endpoints (`GET /mcp/tools`, `POST /mcp/call`).
+> If you want server-side autonomous loops, use `POST /agents/{id}/run` (it executes tools, manages iteration budget, and streams hint/done frames). If you want to expose Muwa tools to a remote model harness, use the MCP endpoints (`GET /mcp/tools`, `POST /mcp/call`).
 
 #### Non-streaming Request
 
@@ -117,7 +117,7 @@ data: [DONE]
 
 ### Function/Tool Calling
 
-Osaurus implements OpenAI‑compatible function calling via the `tools` array and optional `tool_choice` in the request. Local model templates receive the active tool schema; a named `tool_choice` narrows that schema to the requested function instead of adding a generic prompt directive. The server parses assistant outputs for top-level `tool_calls`, tolerating minor formatting (e.g., code fences).
+Muwa implements OpenAI‑compatible function calling via the `tools` array and optional `tool_choice` in the request. Local model templates receive the active tool schema; a named `tool_choice` narrows that schema to the requested function instead of adding a generic prompt directive. The server parses assistant outputs for top-level `tool_calls`, tolerating minor formatting (e.g., code fences).
 
 Supported tool type: `function`.
 
@@ -180,7 +180,7 @@ Example non‑streaming response (simplified):
 }
 ```
 
-Streaming with tool calls: Osaurus emits OpenAI‑style deltas. First a role delta, then for each tool call: an id/type delta, a function name delta, and one or more argument deltas (chunked). The final chunk has `finish_reason: "tool_calls"`, followed by `[DONE]`.
+Streaming with tool calls: Muwa emits OpenAI‑style deltas. First a role delta, then for each tool call: an id/type delta, a function name delta, and one or more argument deltas (chunked). The final chunk has `finish_reason: "tool_calls"`, followed by `[DONE]`.
 
 ```
 data: {"id":"chatcmpl-xyz","object":"chat.completion.chunk","choices":[{"index":0,"delta":{"role":"assistant"}}]}
@@ -202,7 +202,7 @@ Tool execution loop: After receiving tool calls, execute them client‑side and 
 import json
 from openai import OpenAI
 
-client = OpenAI(base_url="http://127.0.0.1:1337/v1", api_key="osaurus")
+client = OpenAI(base_url="http://127.0.0.1:1337/v1", api_key="muwa")
 
 tools = [{
     "type": "function",
@@ -249,21 +249,21 @@ Notes and limitations:
 
 ### Server-side autonomous tool loops: `POST /agents/{id}/run`
 
-When you want Osaurus to execute tools on your behalf (manage the iteration budget, stream tool-execution hints, and only return when the model is done), use the agent run endpoint. This is the path the in-app chat UI uses.
+When you want Muwa to execute tools on your behalf (manage the iteration budget, stream tool-execution hints, and only return when the model is done), use the agent run endpoint. This is the path the in-app chat UI uses.
 
 - Each pending `tool_call` is executed against the registered `ToolRegistry` (sandbox, folder, MCP, plugin tools — everything the agent has access to).
 - Independent tool calls within a single model turn run **in parallel**.
 - The loop is capped at 30 iterations; if the budget is exhausted while still requesting tools, a notice is appended to the stream so the client sees a clear reason rather than a silent stop.
 - Honors client-supplied `tools` (merged with the agent's always-loaded set) and `tool_choice` (defaults to `"auto"` when tools are present).
 
-### Aggregating Osaurus tools through MCP
+### Aggregating Muwa tools through MCP
 
-The Model Context Protocol endpoints let any MCP-aware harness connect and discover Osaurus tools without committing to the agent endpoint:
+The Model Context Protocol endpoints let any MCP-aware harness connect and discover Muwa tools without committing to the agent endpoint:
 
 - `GET /mcp/tools` — list registered tools as MCP `Tool` definitions
 - `POST /mcp/call` — invoke a tool by name with structured arguments
 
-Combine `/chat/completions` (your harness's own tool loop) with `/mcp/tools` + `/mcp/call` (Osaurus tool surface) to keep both sides authoritative.
+Combine `/chat/completions` (your harness's own tool loop) with `/mcp/tools` + `/mcp/call` (Muwa tool surface) to keep both sides authoritative.
 
 #### External surface deny list
 
@@ -294,7 +294,7 @@ Keep `session_id` stable per conversation and per model. Omitting it never disab
 
 ### Prefix Caching and `prefix_hash`
 
-KV cache reuse across requests is **automatic and content-addressed** — Osaurus delegates prefix cache management to vmlx-swift's `CacheCoordinator`. Two requests that share the same prefix tokens (system prompt, tools, prior turns) automatically share the cached KV blocks. There is no client-side opt-in or cache key to manage.
+KV cache reuse across requests is **automatic and content-addressed** — Muwa delegates prefix cache management to vmlx-swift's `CacheCoordinator`. Two requests that share the same prefix tokens (system prompt, tools, prior turns) automatically share the cached KV blocks. There is no client-side opt-in or cache key to manage.
 
 For visibility, every response carries a `prefix_hash` field — a stable hash of the system prompt + canonical tool schemas that produced this generation. Clients can use it to detect when the system prefix changed across requests:
 
@@ -306,7 +306,7 @@ For visibility, every response carries a `prefix_hash` field — a stable hash o
 
 ### Chat Templates
 
-Osaurus defers chat templating to MLX `ChatSession`, which uses the model's configuration to format prompts. System messages are combined and passed as `instructions`; user content is supplied as the prompt to `respond/streamResponse`.
+Muwa defers chat templating to MLX `ChatSession`, which uses the model's configuration to format prompts. System messages are combined and passed as `instructions`; user content is supplied as the prompt to `respond/streamResponse`.
 
 ## Model Naming
 
@@ -324,15 +324,15 @@ Models are automatically named based on their display names in ModelManager. The
 
 ## Usage with OpenAI Python Library
 
-You can use the official OpenAI Python library with Osaurus:
+You can use the official OpenAI Python library with Muwa:
 
 ```python
 from openai import OpenAI
 
-# Point to your local Osaurus server
+# Point to your local Muwa server
 client = OpenAI(
     base_url="http://127.0.0.1:1337/v1",  # Use /v1 for OpenAI client compatibility
-    api_key="not-needed"  # Osaurus doesn't require authentication
+    api_key="not-needed"  # Muwa doesn't require authentication
 )
 
 # List available models
@@ -369,7 +369,7 @@ for chunk in stream:
 
 ## Open Responses API
 
-Osaurus supports the [Open Responses](https://www.openresponses.org) specification, providing a semantic, item-based API format for multi-provider interoperability.
+Muwa supports the [Open Responses](https://www.openresponses.org) specification, providing a semantic, item-based API format for multi-provider interoperability.
 
 ### 3. Responses - `POST /responses` (also available at `POST /v1/responses`)
 
@@ -552,19 +552,19 @@ curl http://127.0.0.1:1337/v1/responses \
 
 ## Memory API
 
-Osaurus provides a persistent memory system that can be used by the app chat and agent APIs. The v2 system distills sessions in the background, then composed agent context can include at most one compact memory section (~800 tokens by default) when the user's query actually needs it. See [docs/MEMORY.md](MEMORY.md) for the full architecture.
+Muwa provides a persistent memory system that can be used by the app chat and agent APIs. The v2 system distills sessions in the background, then composed agent context can include at most one compact memory section (~800 tokens by default) when the user's query actually needs it. See [docs/MEMORY.md](MEMORY.md) for the full architecture.
 
 ### Agent Context and `/chat/completions`
 
-`POST /chat/completions` is a strict OpenAI-compatible inference endpoint. It does not inject Osaurus agent prompts, memory, skills, or tools into the request. Client-supplied `messages`, `tools`, and `tool_choice` are passed through as the server-side inference contract.
+`POST /chat/completions` is a strict OpenAI-compatible inference endpoint. It does not inject Muwa agent prompts, memory, skills, or tools into the request. Client-supplied `messages`, `tools`, and `tool_choice` are passed through as the server-side inference contract.
 
-Use these surfaces when you want Osaurus-composed agent context:
+Use these surfaces when you want Muwa-composed agent context:
 
 - App chat windows: system prompt, memory, folder/sandbox context, selected skills, and tools are composed by the app before inference.
 - `POST /agents/{id}/run`: runs a server-side autonomous agent loop with that agent's context and tool execution.
 - Plugin host inference APIs: carry the plugin's active agent context by design.
 
-`X-Osaurus-Agent-Id` on `/chat/completions` may still be used to associate persisted HTTP chat history with an agent/session, but it is not a prompt/context injection switch.
+`X-Muwa-Agent-Id` on `/chat/completions` may still be used to associate persisted HTTP chat history with an agent/session, but it is not a prompt/context injection switch.
 
 Strict pass-through example:
 
@@ -586,7 +586,7 @@ from openai import OpenAI
 
 client = OpenAI(
     base_url="http://127.0.0.1:1337/v1",
-    api_key="osaurus",
+    api_key="muwa",
 )
 
 response = client.chat.completions.create(
@@ -598,7 +598,7 @@ print(response.choices[0].message.content)
 
 ### Memory Ingestion — `POST /memory/ingest`
 
-Bulk-ingest conversation turns. Osaurus inserts each turn into the transcript and then flushes session distillation immediately at the end of the batch — you do not have to wait for the writer's debounce. Distillation produces an episode and (when warranted) a small set of pinned facts.
+Bulk-ingest conversation turns. Muwa inserts each turn into the transcript and then flushes session distillation immediately at the end of the batch — you do not have to wait for the writer's debounce. Distillation produces an episode and (when warranted) a small set of pinned facts.
 
 ```bash
 curl http://127.0.0.1:1337/memory/ingest \
@@ -629,7 +629,7 @@ Response:
 
 ### List Agents — `GET /agents`
 
-Returns all configured agents along with their pinned-fact counts. Use this to discover agent IDs for the `X-Osaurus-Agent-Id` header.
+Returns all configured agents along with their pinned-fact counts. Use this to discover agent IDs for the `X-Muwa-Agent-Id` header.
 
 ```bash
 curl http://127.0.0.1:1337/agents
@@ -642,7 +642,7 @@ Example response:
   "agents": [
     {
       "id": "00000000-0000-0000-0000-000000000001",
-      "name": "Osaurus",
+      "name": "Muwa",
       "description": "Default assistant",
       "default_model": null,
       "supports_vision": false,
@@ -661,7 +661,7 @@ Example response:
 
 ## Notes
 
-1. **Model Availability**: Only models that have been downloaded through the Osaurus UI will be available via the API.
+1. **Model Availability**: Only models that have been downloaded through the Muwa UI will be available via the API.
 
 2. **Performance**: The first request to a model loads it; subsequent requests skip this step. Concurrent same-model requests share a single forward pass via vmlx-swift's `BatchEngine` continuous batching. Multi-turn KV cache reuse is automatic and content-addressed via vmlx's `CacheCoordinator` — repeated prefixes (system prompt, tools, prior turns) are matched without any client opt-in. The `prefix_hash` response field is informational; `session_id` groups history but is not a cache key.
 
@@ -669,4 +669,4 @@ Example response:
 
 4. **GPU Acceleration**: MLX uses Apple Silicon unified memory for GPU-accelerated inference.
 
-5. **Context Length**: Each model has its own architectural context limit (the engine respects per-layer sliding windows, e.g. Gemma-4's 1024-position windows, automatically). Osaurus does not expose a user-facing global KV cache cap any more — vmlx-swift picks model-aware defaults per release.
+5. **Context Length**: Each model has its own architectural context limit (the engine respects per-layer sliding windows, e.g. Gemma-4's 1024-position windows, automatically). Muwa does not expose a user-facing global KV cache cap any more — vmlx-swift picks model-aware defaults per release.

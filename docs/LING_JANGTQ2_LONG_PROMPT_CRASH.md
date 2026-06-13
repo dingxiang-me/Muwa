@@ -34,7 +34,7 @@ Reproduces deterministically on the same bundle / prompt combination.
 The same prompt against the same model in the `MXFP4` quant tier
 streams without issue.
 
-## Crash signature (`~/Library/Logs/DiagnosticReports/osaurus-...ips`)
+## Crash signature (`~/Library/Logs/DiagnosticReports/muwa-...ips`)
 
 ```
 exception:
@@ -79,7 +79,7 @@ codebook entries on Metal).
   neither touches the `recurrentGLA` kernel state.
 * Ling MXFP4 / JANGTQ4 (4-bit) variants stream the same long prompt
   cleanly. The codebook tier is the discriminator.
-* Historical note: the original osaurus-side stream-wiring fixes included
+* Historical note: the original muwa-side stream-wiring fixes included
   a Ling `enable_thinking=false` clamp and reasoning merge. PR #1147 has
   since replaced that with default-off profile policy, explicit opt-in, and
   reasoning-channel preservation. The crash investigated here is still

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a live local Osaurus chat/tool/cache proof against the app server.
+"""Run a live local Muwa chat/tool/cache proof against the app server.
 
 This is a proof harness, not model-runtime code. It intentionally talks to the
 same OpenAI-compatible endpoint used by clients so rows can be replayed against
@@ -62,7 +62,7 @@ def save(path: pathlib.Path, value: Any) -> None:
 def process_snapshot() -> str:
     cmd = (
         "ps -axo pid,ppid,stat,etime,rss,command | "
-        "rg -i 'CodeSigningHelper|/Contents/MacOS/osaurus|RunBench|vmlx_engine\\.cli' | "
+        "rg -i 'CodeSigningHelper|/Contents/MacOS/muwa|RunBench|vmlx_engine\\.cli' | "
         "rg -v 'rg -i|codex|zsh -lc' || true"
     )
     return subprocess.run(cmd, shell=True, text=True, capture_output=True).stdout
@@ -248,7 +248,7 @@ def run(args: argparse.Namespace) -> int:
 
 def main() -> int:
     parser = argparse.ArgumentParser()
-    parser.add_argument("--base-url", default=os.environ.get("OSAURUS_BASE_URL", "http://127.0.0.1:1337"))
+    parser.add_argument("--base-url", default=os.environ.get("MUWA_BASE_URL", "http://127.0.0.1:1337"))
     parser.add_argument("--model", required=True)
     parser.add_argument("--label", default="local")
     parser.add_argument("--artifact-root")

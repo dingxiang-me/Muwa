@@ -9,7 +9,7 @@ Usage:
     python3 generate_acknowledgements.py
 
 Output:
-    App/osaurus/Acknowledgements.json
+    App/Muwa/Acknowledgements.json
 """
 
 import json
@@ -80,9 +80,9 @@ def parse_package_resolved(path: Path) -> List[Dict]:
 def get_all_dependencies(project_root: Path) -> Dict[str, Dict]:
     """Get all unique dependencies from all Package.resolved files."""
     resolved_files = [
-        project_root / "Packages" / "OsaurusCore" / "Package.resolved",
-        project_root / "Packages" / "OsaurusCLI" / "Package.resolved",
-        project_root / "osaurus.xcworkspace" / "xcshareddata" / "swiftpm" / "Package.resolved",
+        project_root / "Packages" / "MuwaCore" / "Package.resolved",
+        project_root / "Packages" / "MuwaCLI" / "Package.resolved",
+        project_root / "Muwa.xcworkspace" / "xcshareddata" / "swiftpm" / "Package.resolved",
     ]
     
     dependencies = {}
@@ -139,11 +139,11 @@ def main():
     # Write output
     output = {
         "generated": True,
-        "description": "Open source libraries used by Osaurus",
+        "description": "Open source libraries used by Muwa",
         "acknowledgements": acknowledgements
     }
     
-    output_path = project_root / "App" / "osaurus" / "Acknowledgements.json"
+    output_path = project_root / "App" / "muwa" / "Acknowledgements.json"
     with open(output_path, 'w') as f:
         json.dump(output, f, indent=2)
         f.write("\n")

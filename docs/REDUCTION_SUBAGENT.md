@@ -1,9 +1,9 @@
 # Reduction Subagent (Design)
 
 > Status: **implemented.** The shared loop primitive ships as
-> `AgentToolLoop` (`Packages/OsaurusCore/Services/Chat/AgentToolLoop.swift`),
+> `AgentToolLoop` (`Packages/MuwaCore/Services/Chat/AgentToolLoop.swift`),
 > adopted by all three loop surfaces, and `sandbox_reduce`
-> (`Packages/OsaurusCore/Tools/SandboxReduceTool.swift`) is registered with
+> (`Packages/MuwaCore/Tools/SandboxReduceTool.swift`) is registered with
 > the other exec-gated sandbox tools. This document remains as the design
 > rationale; details below describe the original proposal. The driver's
 > current behavior — policy knobs, two-phase parallel batches, KV-stable
@@ -12,7 +12,7 @@
 
 ## Problem
 
-Osaurus targets small, local models with tight context budgets. A recurring
+Muwa targets small, local models with tight context budgets. A recurring
 need is "read a lot, return a little": scan five log files and return the ten
 relevant errors, walk a directory tree and summarize what changed, fetch N
 pages and extract the one fact that matters. The raw bytes must **not** land in
@@ -50,7 +50,7 @@ today.
 - **The agent loop is duplicated, not extracted.** The
   `stream → run tools → append messages → repeat` loop exists in three places
   with no shared entry point:
-  - `ChatSession.send` ([ChatView.swift](../Packages/OsaurusCore/Views/Chat/ChatView.swift), outer `while attempts < maxAttempts`)
+  - `ChatSession.send` ([ChatView.swift](../Packages/MuwaCore/Views/Chat/ChatView.swift), outer `while attempts < maxAttempts`)
   - `HTTPHandler` (OpenAI-style streaming completions, `while iteration < maxIterations`)
   - `PluginHostAPI.complete` / `complete_stream` (`for iteration in 1...maxIterations`)
 

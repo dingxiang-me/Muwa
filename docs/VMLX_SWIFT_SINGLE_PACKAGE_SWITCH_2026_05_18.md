@@ -1,16 +1,16 @@
 # vmlx-swift Single Package Switch
 
-This branch starts the Osaurus migration from the old split runtime graph to one
+This branch starts the Muwa migration from the old split runtime graph to one
 consolidated `vmlx-swift` package.
 
 ## Dependency Contract
 
-OsaurusCore now has one direct inference dependency:
+MuwaCore now has one direct inference dependency:
 
 - `https://github.com/osaurus-ai/vmlx-swift`
 - revision `0218591ed6ae02bf998a6ec6f8d204a89c26a7f7`
 
-That package is expected to export the runtime modules Osaurus previously pulled
+That package is expected to export the runtime modules Muwa previously pulled
 from separate roots:
 
 - `MLX`
@@ -20,14 +20,14 @@ from separate roots:
 - `Tokenizers`
 - `Jinja`
 
-The Osaurus manifest must not add direct inference roots for `mlx-swift`,
+The Muwa manifest must not add direct inference roots for `mlx-swift`,
 `vmlx-swift-lm`, `swift-transformers`, or `Jinja`. Any new runtime surface should
-land in `vmlx-swift` first, then Osaurus should consume it through this single
+land in `vmlx-swift` first, then Muwa should consume it through this single
 pin.
 
 ## Transitive Module Collision Handling
 
-Osaurus still depends on non-inference packages that bring their own tokenizer
+Muwa still depends on non-inference packages that bring their own tokenizer
 or HTTP helper stacks:
 
 - `VecturaKit` -> `swift-embeddings` -> `swift-transformers`
@@ -45,9 +45,9 @@ prefixes its vendored implementation targets internally:
 - `Generation` -> `VMLXGeneration`
 - `Models` -> `VMLXModels`
 
-This keeps Osaurus direct runtime imports bound to the consolidated vMLX package,
+This keeps Muwa direct runtime imports bound to the consolidated vMLX package,
 allows VecturaKit and MCP transitive modules to keep their normal module names,
-and avoids Osaurus-side SwiftPM `moduleAliases` that would diverge from the
+and avoids Muwa-side SwiftPM `moduleAliases` that would diverge from the
 package's own public contract.
 
 `yyjson` is intentionally not prefixed. It is a C package with public
@@ -80,7 +80,7 @@ The pinned package commit keeps the Qwen MTP gate tensor/tuning based: the
 27B/35B MXFP4/MXFP8 MTP variants all require real `mtp.*` tensors and usable
 `vmlx_mtp_tuning.json` before auto-launch; 27B MXFP4 selects D2, while 27B
 MXFP8 and both 35B variants select D3 from their tuning files.
-Those MXFP rows are the current Osaurus PR release scope. JANG_4M/JANG_2K MTP
+Those MXFP rows are the current Muwa PR release scope. JANG_4M/JANG_2K MTP
 rows may remain useful reference evidence, but they do not close the MXFP
 production gate and must not auto-enable unless their own tensor/tuning/live
 rows are explicitly in scope.
@@ -88,7 +88,7 @@ rows are explicitly in scope.
 ## Release Gate Still Required
 
 This package switch is compile and wiring work. It is not a production claim by
-itself. Before merging a full Osaurus runtime switch, run the live gate against
+itself. Before merging a full Muwa runtime switch, run the live gate against
 local models and record artifacts for:
 
 - multi-turn text coherence and no looping;
@@ -101,9 +101,9 @@ local models and record artifacts for:
 - Nemotron Omni live voice input / Parakeet encoder path;
 - Qwen MTP bundles with `vmlx_mtp_tuning.json`, including MTP on/off speed and
   coherence comparisons; and
-- API surfaces used by Osaurus and OpenAI-compatible clients.
+- API surfaces used by Muwa and OpenAI-compatible clients.
 
-The full Osaurus-facing UI/API/cache/media checklist is tracked in
+The full Muwa-facing UI/API/cache/media checklist is tracked in
 [`VMLX_SWIFT_OSAURUS_LIVE_MATRIX_2026_05_18.md`](VMLX_SWIFT_OSAURUS_LIVE_MATRIX_2026_05_18.md).
 That matrix is the merge gate for user-facing confidence: it requires real chat
 app and API rows for Qwen-VL, Gemma VLM/Gemma3n, ZAYA-VL, Nemotron Omni,
@@ -115,7 +115,7 @@ coordination channel rather than committing private live-gate artifacts.
 
 Any incoherent output, repeated EOS loop, missing reasoning close, or cache hit
 with the wrong architecture state is a runtime bug to root-cause in `vmlx-swift`.
-Do not compensate in Osaurus by forcing temperature, top-p, top-k, repetition
+Do not compensate in Muwa by forcing temperature, top-p, top-k, repetition
 penalty, close tokens, or parser repairs.
 
 Forced behavior cleanup is part of the switch, not a follow-up. Search for any
@@ -139,21 +139,21 @@ the `vmlx-swift` DSV4 fallback. That fallback must render:
 - original OpenAI tool-call ids so the next tool result can correlate with the
   correct assistant call.
 
-Osaurus only bridges OpenAI chat messages into `MLXLMCommon.Chat.Message`; it
+Muwa only bridges OpenAI chat messages into `MLXLMCommon.Chat.Message`; it
 must not stringify assistant tool calls into prompt text or repair DSV4 output
 after the fact. The parser/template behavior belongs in `vmlx-swift`, while
-Osaurus preserves structured ids, arguments, and tool-result content across the
+Muwa preserves structured ids, arguments, and tool-result content across the
 bridge.
 
 DSV4 reasoning mode selection follows the same rule. `reasoningEffort=max`
 is passed through to `vmlx-swift` as `reasoning_effort: "max"` with thinking
-enabled. Osaurus must not downgrade it to `"high"` behind an environment flag;
+enabled. Muwa must not downgrade it to `"high"` behind an environment flag;
 if max-mode output is incoherent, that is an engine/runtime issue to reproduce
 and fix in `vmlx-swift`.
 
 ## DSV4 Settings Renderer Gate
 
-The Osaurus server settings panel and CLI preview must treat DSV4 as a
+The Muwa server settings panel and CLI preview must treat DSV4 as a
 dedicated cache/runtime topology. Before this PR can be treated as production
 ready, the final renderer needs a row proving all of:
 
@@ -196,7 +196,7 @@ was rebuilt in release mode and re-tested with fresh process rows under:
 docs/local/live-model-matrix/20260518T_fresh_user_allowed_process_rows/
 ```
 
-Current results relevant to Osaurus wiring:
+Current results relevant to Muwa wiring:
 
 - `dsv4_dsml_toolcall_fresh.log`: `DeepSeek-V4-Flash-JANGTQ-K` loads through
   the vMLX `BatchEngine`, reports `Tool format: dsml`, emits one structured
@@ -207,11 +207,11 @@ Current results relevant to Osaurus wiring:
   rep=nil`), no reasoning parser, no loop, about 122 tok/s, and disk L2 stats
   `hits=1,misses=21,stores=21`. This is text-only proof; Gemma3n vision/audio
   support is not claimed.
-- `gemma4_e2b_prod_default_cache_fresh.log`: the Osaurus-local Gemma4 E2B row
+- `gemma4_e2b_prod_default_cache_fresh.log`: the Muwa-local Gemma4 E2B row
   is retained as a red default-sampling artifact. It passes 6/7 without loop or
   crash, but at bundle defaults (`temp=1.000 topP=0.950 topK=64 rep=nil`) the
   UTF-8 inclusion prompt produced coherent Chinese with `你好` and omitted the
   literal `cafe`/`café` token. The paired
   `gemma4_e2b_prod_greedy_cache_fresh.log` passes 7/7 with explicit greedy
-  parameters and no repetition penalty. Osaurus must not turn that into a hidden
+  parameters and no repetition penalty. Muwa must not turn that into a hidden
   default sampler clamp; it is a visible validation/default-temperature caveat.

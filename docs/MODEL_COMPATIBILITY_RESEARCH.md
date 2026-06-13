@@ -3,24 +3,24 @@
 This note covers the research-first lane for local model compatibility
 requests:
 
-- [#443](https://github.com/osaurus-ai/osaurus/issues/443) - Hugging Face
+- [#443](https://github.com/muwa-ai/muwa/issues/443) - Hugging Face
   cache import
-- [#358](https://github.com/osaurus-ai/osaurus/issues/358) - Hunyuan
+- [#358](https://github.com/muwa-ai/muwa/issues/358) - Hunyuan
   `hunyuan_v1_dense`
-- [#1065](https://github.com/osaurus-ai/osaurus/issues/1065) - DFlash
+- [#1065](https://github.com/muwa-ai/muwa/issues/1065) - DFlash
   speculative decoding
-- [#886](https://github.com/osaurus-ai/osaurus/issues/886) - LongCat
+- [#886](https://github.com/muwa-ai/muwa/issues/886) - LongCat
   families
-- [#833](https://github.com/osaurus-ai/osaurus/issues/833) - tensor
+- [#833](https://github.com/muwa-ai/muwa/issues/833) - tensor
   parallelism
 
 The current deliverable is host-side discovery and diagnostics only. Runtime
-family enablement still belongs in vmlx-backed PRs with live proof; Osaurus
+family enablement still belongs in vmlx-backed PRs with live proof; Muwa
 surfaces unsupported or unproven states instead of coercing model configs.
 
 ## Current Boundary
 
-Osaurus owns model discovery, download state, user-visible catalog entries,
+Muwa owns model discovery, download state, user-visible catalog entries,
 storage paths, model residency policy, request mapping, and health reporting.
 The local generation path delegates model loading, family factories,
 architecture-specific cache geometry, tool-call parsing, reasoning parsing,
@@ -34,7 +34,7 @@ that prove the right boundary is being crossed.
 Current source map:
 
 - `ModelManager`, `HuggingFaceService`, and `ExternalModelLocator` discover
-  Hugging Face repos, local Osaurus model folders, Hugging Face cache
+  Hugging Face repos, local Muwa model folders, Hugging Face cache
   snapshots, and LM Studio-style external bundles.
 - `MLXModel.isDownloaded` accepts a directory with `config.json`, tokenizer
   assets, and at least one `*.safetensors` file.
@@ -51,10 +51,10 @@ Current source map:
 | Request | Current status | First shippable step | Runtime boundary |
 | --- | --- | --- | --- |
 | Hugging Face local cache (#443) | Read-only HF cache and LM Studio discovery are implemented for verified MLX safetensors bundles; skipped candidates now have Settings diagnostics. | Add optional manifest/digest verification before load if mutation protection is required. | Host-only discovery/storage work; no vmlx change if the snapshot already loads as MLX. |
-| Hunyuan `hunyuan_v1_dense` (#358) | `mlx-community/HY-MT1.5-7B-bf16` advertises `model_type: hunyuan_v1_dense`; Osaurus now reports it as unsupported until vmlx has a native factory. | Enable catalog/runtime only after vmlx support and live validation land. | vmlx must own config mapping, weights, tokenizer/template behavior, and generation tests. |
-| DFlash speculative decoding (#1065) | Osaurus has one target model per local generation request and no draft-model contract. | Design a feature-flagged draft/target request shape plus benchmark evidence requirements. | vmlx or a dedicated MLX adapter must own the speculative loop and acceptance verification. |
-| LongCat Flash/Next (#886) | LongCat repos use custom code and new LongCat config shapes; LongCat-Next is a 74B any-to-any model that documents at least three 80GB GPUs for Transformers usage. Osaurus now reports LongCat local bundles as unsupported. | Keep local catalog entries hidden or blocked until native support and multimodal proof exist. | Native LongCat model classes, multimodal processors, lazy decoder paths, and cache geometry belong upstream. |
-| Tensor parallelism (#833) | Osaurus runs one local MLX process and one local `BatchEngine` per resident model. | Produce a cluster design behind explicit auth and network policy; do not auto-discover or auto-join peers. | Distributed execution belongs in vmlx/external cluster runtime; host owns identity, policy, and UI only. |
+| Hunyuan `hunyuan_v1_dense` (#358) | `mlx-community/HY-MT1.5-7B-bf16` advertises `model_type: hunyuan_v1_dense`; Muwa now reports it as unsupported until vmlx has a native factory. | Enable catalog/runtime only after vmlx support and live validation land. | vmlx must own config mapping, weights, tokenizer/template behavior, and generation tests. |
+| DFlash speculative decoding (#1065) | Muwa has one target model per local generation request and no draft-model contract. | Design a feature-flagged draft/target request shape plus benchmark evidence requirements. | vmlx or a dedicated MLX adapter must own the speculative loop and acceptance verification. |
+| LongCat Flash/Next (#886) | LongCat repos use custom code and new LongCat config shapes; LongCat-Next is a 74B any-to-any model that documents at least three 80GB GPUs for Transformers usage. Muwa now reports LongCat local bundles as unsupported. | Keep local catalog entries hidden or blocked until native support and multimodal proof exist. | Native LongCat model classes, multimodal processors, lazy decoder paths, and cache geometry belong upstream. |
+| Tensor parallelism (#833) | Muwa runs one local MLX process and one local `BatchEngine` per resident model. | Produce a cluster design behind explicit auth and network policy; do not auto-discover or auto-join peers. | Distributed execution belongs in vmlx/external cluster runtime; host owns identity, policy, and UI only. |
 
 ## Hugging Face Cache Import
 
@@ -66,19 +66,19 @@ Hugging Face Hub uses a shared cache rooted at
 
 Implementation shape:
 
-1. Add a cache root setting with this precedence: explicit Osaurus setting,
+1. Add a cache root setting with this precedence: explicit Muwa setting,
    `HF_HUB_CACHE`, `HF_HOME/hub`, then `~/.cache/huggingface/hub`.
 2. Scan only `models--*` folders and resolve `refs/main` to a concrete
    snapshot revision. Do not treat `refs` as model directories.
 3. Register a snapshot only if it satisfies the same minimum shape as
    `MLXModel.isDownloaded`: `config.json`, tokenizer assets, and
    `*.safetensors`.
-4. Store an Osaurus-local manifest keyed by repo id, revision, relative file
+4. Store an Muwa-local manifest keyed by repo id, revision, relative file
    path, file size, and SHA-256 for every file the runtime will load.
 5. Before `ModelRuntime` loads a cache-backed model, verify the manifest still
    matches. If a file changed, mark the model as stale and require a rescan.
-6. Never mutate the HF cache from Osaurus. Delete/uninstall controls should
-   clearly say "remove from Osaurus catalog" unless the implementation later
+6. Never mutate the HF cache from Muwa. Delete/uninstall controls should
+   clearly say "remove from Muwa catalog" unless the implementation later
    adds an explicit cache-management mode.
 
 Security notes:
@@ -112,7 +112,7 @@ architecture family, not an alias for an existing dense Llama/Qwen family.
 Implementation sequence:
 
 1. Add a host-side unsupported-family diagnostic so users see:
-   `Unsupported local model type: hunyuan_v1_dense. Osaurus needs vmlx Hunyuan
+   `Unsupported local model type: hunyuan_v1_dense. Muwa needs vmlx Hunyuan
    Dense support before this model can run locally.`
 2. Add no-load tests that feed a minimal Hunyuan config into detection code and
    assert the diagnostic, without trying to instantiate MLX.
@@ -121,7 +121,7 @@ Implementation sequence:
 4. Only after real-model validation, allow curated or direct-import catalog
    entries to present as runnable.
 
-Do not implement this by rewriting `model_type` in Osaurus. That would route
+Do not implement this by rewriting `model_type` in Muwa. That would route
 unknown weights through a wrong factory and risk shape traps or silent quality
 loss.
 
@@ -141,7 +141,7 @@ Implementation sequence:
    normal local models before either can load.
 3. Keep the speculative loop in vmlx or a dedicated MLX adapter so acceptance
    and rollback happen close to the token sampler and KV cache.
-4. Expose only diagnostics in Osaurus at first: accepted tokens, rejected
+4. Expose only diagnostics in Muwa at first: accepted tokens, rejected
    tokens, target forward passes, draft forward passes, TTFT, and steady-state
    tokens/sec.
 5. Gate UI and API access behind a runtime feature flag until at least one
@@ -181,7 +181,7 @@ Implementation sequence:
 
 Tensor parallelism is a cluster/runtime feature, not a model picker tweak.
 External projects such as exo and distributed-llama show viable directions for
-splitting inference across devices, but Osaurus's current local runtime is
+splitting inference across devices, but Muwa's current local runtime is
 single-process and single-host. Adding transparent peer discovery would cross
 the identity, networking, and model-integrity boundaries at the same time.
 
@@ -222,5 +222,5 @@ Runtime-family work that follows this design should use
 [`RUNTIME_VALIDATION_STANDARD.md`](./RUNTIME_VALIDATION_STANDARD.md). A source
 test can prove routing and policy, but it cannot prove model quality, cache
 correctness, speed, or memory safety. Any future PR that enables a new runnable
-family must include real-model evidence with the Osaurus SHA, vmlx SHA, model
+family must include real-model evidence with the Muwa SHA, vmlx SHA, model
 revision, prompt set, cache tier, timing, memory, and verdict.

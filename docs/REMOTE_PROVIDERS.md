@@ -1,6 +1,6 @@
 # Remote Providers
 
-Remote Providers allow you to connect Osaurus to external APIs (OpenAI, Anthropic, Open Responses, and compatible endpoints), giving you access to cloud models alongside your local MLX models.
+Remote Providers allow you to connect Muwa to external APIs (OpenAI, Anthropic, Open Responses, and compatible endpoints), giving you access to cloud models alongside your local MLX models.
 
 ---
 
@@ -8,7 +8,7 @@ Remote Providers allow you to connect Osaurus to external APIs (OpenAI, Anthropi
 
 With Remote Providers, you can:
 
-- Access cloud models (ChatGPT, Claude via OpenRouter, etc.) through Osaurus
+- Access cloud models (ChatGPT, Claude via OpenRouter, etc.) through Muwa
 - Use multiple inference backends simultaneously
 - Switch between local and remote models seamlessly
 - Keep API keys secure in the macOS Keychain
@@ -28,7 +28,7 @@ With Remote Providers, you can:
 
 ### Provider Presets
 
-Osaurus includes presets for common providers:
+Muwa includes presets for common providers:
 
 | Preset         | Host              | Port | Base Path | API Format | Auth             |
 | -------------- | ----------------- | ---- | --------- | ---------- | ---------------- |
@@ -74,7 +74,7 @@ Osaurus includes presets for common providers:
 | Setting            | Description                               | Default |
 | ------------------ | ----------------------------------------- | ------- |
 | **Enabled**        | Whether the provider is active            | true    |
-| **Auto-connect**   | Connect automatically when Osaurus starts | true    |
+| **Auto-connect**   | Connect automatically when Muwa starts | true    |
 | **Timeout**        | Request timeout in seconds                | 60      |
 | **Custom Headers** | Additional HTTP headers to send           | {}      |
 
@@ -119,7 +119,7 @@ The model name should match what the remote provider expects.
 ```python
 from openai import OpenAI
 
-client = OpenAI(base_url="http://127.0.0.1:1337/v1", api_key="osaurus")
+client = OpenAI(base_url="http://127.0.0.1:1337/v1", api_key="muwa")
 
 # Use a remote model
 response = client.chat.completions.create(
@@ -163,7 +163,7 @@ Useful rows:
 - **Authentication** shows whether the provider has a Keychain API key, a
   custom/secret credential header, ChatGPT/Codex OAuth tokens, or a missing
   sign-in/key.
-- **Model discovery** shows whether Osaurus requires `/models`, can use manual
+- **Model discovery** shows whether Muwa requires `/models`, can use manual
   model IDs as a fallback, uses Azure deployment IDs, or reads the
   ChatGPT/Codex catalog.
 - **Request format** shows the outbound API format and endpoint family. Local
@@ -251,7 +251,7 @@ Custom headers marked as "secret" are also stored in the Keychain.
 Non-secret provider configuration is stored at:
 
 ```
-~/.osaurus/providers/remote.json
+~/.muwa/providers/remote.json
 ```
 
 This file contains connection settings but **not** API keys or secret headers.

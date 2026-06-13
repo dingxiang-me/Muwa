@@ -34,15 +34,15 @@ reject_text() {
   fi
 }
 
-CACHE_UI="$ROOT/Packages/OsaurusCore/Views/Settings/ServerSettings/CacheSection.swift"
-CONCURRENCY_UI="$ROOT/Packages/OsaurusCore/Views/Settings/ServerSettings/ConcurrencySection.swift"
-MTP_UI="$ROOT/Packages/OsaurusCore/Views/Settings/ServerSettings/MTPSection.swift"
-MEMORY_SAFETY_UI="$ROOT/Packages/OsaurusCore/Views/Settings/ServerSettings/MemorySafetySection.swift"
-STORE="$ROOT/Packages/OsaurusCore/Models/Configuration/ServerRuntimeSettingsStore.swift"
-RUNTIME="$ROOT/Packages/OsaurusCore/Services/ModelRuntime.swift"
-CONTROLLER="$ROOT/Packages/OsaurusCore/Networking/ServerController.swift"
-FLAGS="$ROOT/Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift"
-ADAPTER="$ROOT/Packages/OsaurusCore/Services/ModelRuntime/MLXBatchAdapter.swift"
+CACHE_UI="$ROOT/Packages/MuwaCore/Views/Settings/ServerSettings/CacheSection.swift"
+CONCURRENCY_UI="$ROOT/Packages/MuwaCore/Views/Settings/ServerSettings/ConcurrencySection.swift"
+MTP_UI="$ROOT/Packages/MuwaCore/Views/Settings/ServerSettings/MTPSection.swift"
+MEMORY_SAFETY_UI="$ROOT/Packages/MuwaCore/Views/Settings/ServerSettings/MemorySafetySection.swift"
+STORE="$ROOT/Packages/MuwaCore/Models/Configuration/ServerRuntimeSettingsStore.swift"
+RUNTIME="$ROOT/Packages/MuwaCore/Services/ModelRuntime.swift"
+CONTROLLER="$ROOT/Packages/MuwaCore/Networking/ServerController.swift"
+FLAGS="$ROOT/Packages/MuwaCore/Services/ModelRuntime/InferenceFeatureFlags.swift"
+ADAPTER="$ROOT/Packages/MuwaCore/Services/ModelRuntime/MLXBatchAdapter.swift"
 
 for pair in \
   "$CACHE_UI:CacheSection" \
@@ -166,21 +166,21 @@ require_text "$RUNTIME" 'memorySafetyPlan\.loadConfiguration' \
   "runtime applies memory-safety load configuration"
 require_text "$RUNTIME" 'memorySafety=\\\(mtpPlan\.memorySafetySummary' \
   "runtime logs resolved memory-safety summary during load"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" '"memory_safety": Self\.memorySafetyJSONObject' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" '"memory_safety": Self\.memorySafetyJSONObject' \
   "cache stats expose memory-safety status"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" '"display_summary": plan\.displaySummary' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" '"display_summary": plan\.displaySummary' \
   "memory-safety status exposes display summary"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" '"memory_status": memoryStatusJSONObject' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" '"memory_status": memoryStatusJSONObject' \
   "memory-safety status exposes live memory status"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" 'path == "/admin/runtime-settings"' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" 'path == "/admin/runtime-settings"' \
   "runtime settings admin endpoint is routed"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" 'previous\.network != next\.network' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" 'previous\.network != next\.network' \
   "runtime settings endpoint rejects network rebind changes"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" 'ServerRuntimeSettingsStore\.save\(next\)' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" 'ServerRuntimeSettingsStore\.save\(next\)' \
   "runtime settings endpoint persists through ServerRuntimeSettingsStore"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" 'await ModelRuntime\.shared\.clearAll\(\)' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" 'await ModelRuntime\.shared\.clearAll\(\)' \
   "runtime settings endpoint refreshes loaded models after cache/media/MTP changes"
-require_text "$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift" 'await ModelRuntime\.shared\.invalidateConfig\(\)' \
+require_text "$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift" 'await ModelRuntime\.shared\.invalidateConfig\(\)' \
   "runtime settings endpoint invalidates runtime config after generation/concurrency changes"
 require_text "$ADAPTER" 'turboQuantCompressions' \
   "runtime diagnostics report TurboQuant compression count"
@@ -189,13 +189,13 @@ require_text "$ADAPTER" 'nativeMTPDepthSummary' \
 
 active_forbidden="$({ ps -axo pid,ppid,rss,etime,command || true; } \
   | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' \
-  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/osaurus-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*osaurus-staging)' \
+  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/muwa-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*muwa-staging)' \
   | rg -v 'rg -i|assert-server-settings-runtime-wiring' || true)"
 if [[ -n "$active_forbidden" ]]; then
   echo "$active_forbidden" >&2
-  fail_msg "active Osaurus keychain-sensitive validation process detected"
+  fail_msg "active Muwa keychain-sensitive validation process detected"
 else
-  pass "no active Osaurus keychain-sensitive validation process"
+  pass "no active Muwa keychain-sensitive validation process"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

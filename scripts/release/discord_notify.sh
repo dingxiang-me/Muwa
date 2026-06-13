@@ -21,16 +21,16 @@ fi
 TRUNCATED=$(printf '%s' "$RAW_CHANGELOG" | head -c 1900)
 
 jq -n \
-  --arg content  "🚀 **New Osaurus Release!**" \
+  --arg content  "🚀 **New Muwa Release!**" \
   --arg version  "${VERSION}" \
   --arg desc     "$TRUNCATED" \
-  --arg download "[Download Osaurus.dmg](https://github.com/osaurus-ai/osaurus/releases/latest/download/Osaurus.dmg)" \
-  --arg page     "[View on GitHub](https://github.com/osaurus-ai/osaurus/releases/tag/${VERSION})" \
+  --arg download "[Download Muwa.dmg](https://github.com/muwa-ai/muwa/releases/latest/download/Muwa.dmg)" \
+  --arg page     "[View on GitHub](https://github.com/muwa-ai/muwa/releases/tag/${VERSION})" \
   '{
     content: $content,
     embeds: [
       {
-        title: ("Osaurus " + $version),
+        title: ("Muwa " + $version),
         description: $desc,
         color: 5814783,
         fields: [
@@ -46,5 +46,4 @@ jq -n \
 curl -f -X POST -H "Content-Type: application/json" --data @payload.json "$DISCORD_WEBHOOK"
 
 echo "✅ Discord notification sent"
-
 

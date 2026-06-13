@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-CHAT_VIEW="$ROOT/Packages/OsaurusCore/Views/Chat/ChatView.swift"
-PROCESSOR="$ROOT/Packages/OsaurusCore/Utils/StreamingDeltaProcessor.swift"
-TESTS="$ROOT/Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift"
+CHAT_VIEW="$ROOT/Packages/MuwaCore/Views/Chat/ChatView.swift"
+PROCESSOR="$ROOT/Packages/MuwaCore/Utils/StreamingDeltaProcessor.swift"
+TESTS="$ROOT/Packages/MuwaCore/Tests/Service/RuntimePolicySourceTests.swift"
 fail=0
 
 pass() { echo "PASS $*"; }
@@ -90,7 +90,7 @@ require_text "$TESTS" 'Chat UI sends accumulated history and marks implicit samp
 
 active="$({ ps -axo pid,ppid,rss,etime,command || true; } \
   | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' \
-  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/osaurus-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*osaurus-staging)' \
+  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/muwa-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*muwa-staging)' \
   | rg -v 'rg -i|assert-chat-ui-reasoning-routing' || true)"
 if [[ -n "$active" ]]; then
   echo "$active" >&2

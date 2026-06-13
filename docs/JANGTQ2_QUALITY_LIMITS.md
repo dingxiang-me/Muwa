@@ -41,10 +41,10 @@ documented quality floor:
   default `2` because Swift checked the wrong fallback). Resolved
   upstream in vmlx + HF bundle metadata; ZAYA configs are flat (no
   `text_config` wrapper) so the bug doesn't apply.
-* The osaurus-side wiring in PR #1147 is topology- and family-specific:
+* The muwa-side wiring in PR #1147 is topology- and family-specific:
   Ling defaults `disableThinking=true` to emit the upstream Bailing
   "detailed thinking off" directive, but explicit `disableThinking=false`
-  and positive reasoning requests are preserved as real opt-ins. Osaurus no
+  and positive reasoning requests are preserved as real opt-ins. Muwa no
   longer merges Ling `.reasoning` into visible content or suppresses
   unclosed-reasoning flags; if a no-thinking row emits reasoning, that row
   stays red for template/parser/runtime root cause. ZAYA keeps the family
@@ -82,13 +82,13 @@ documented quality floor:
 
 ## What this PR does NOT change
 
-* No osaurus-side per-bundle override of sampler params — JANG
+* No muwa-side per-bundle override of sampler params — JANG
   guidance explicitly warns against masking model behavior with
   `repetition_penalty` / `min_p` / `top_k` defaults.
-* No osaurus-side `max_tokens` cap for JANGTQ2 — leaving the knob to
+* No muwa-side `max_tokens` cap for JANGTQ2 — leaving the knob to
   user / API caller, with the doc above as the rationale for picking
   a sensible value.
-* No Ling reasoning-merge remains in Osaurus: Ling defaults to
+* No Ling reasoning-merge remains in Muwa: Ling defaults to
   `enable_thinking=false` through profile policy, explicit opt-in reaches
   vmlx, and any reasoning stream remains on the reasoning channel. ZAYA is
   reasoning-capable; osaurus must trust its bundle stamps, default
@@ -102,10 +102,10 @@ documented quality floor:
   kernel manager. See `LING_JANGTQ2_LONG_PROMPT_CRASH.md` for the
   pre-fix crash trace; the doc is retained for archival reference.
 * ✅ Closed in vmlx pin `b9da180`: `coordinator.storeAfterGeneration`
-  now runs AFTER `.info` is yielded, not before. Osaurus defaults
+  now runs AFTER `.info` is yielded, not before. Muwa defaults
   `enableSSMReDerive: true` so hybrid SSM/linear-attention cache rows
   restore companion state by default.
-* Osaurus prompt-bloat reduction (lazy tool schemas) — see
+* Muwa prompt-bloat reduction (lazy tool schemas) — see
   `PROMPT_BLOAT_FOLLOWUP.md`. Most impactful single change to make
   JANGTQ2 useful again on chat workloads (since the 3500-token
   preamble pushes cumulative output past the coherence ceiling).

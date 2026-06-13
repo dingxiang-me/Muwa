@@ -1,11 +1,11 @@
-# Gemma 4 12B Osaurus E2E Evidence - 2026-06-03
+# Gemma 4 12B Muwa E2E Evidence - 2026-06-03
 
 This note records the current Gemma 4 12B merge-prep boundary for the
-Osaurus PR branch `codex/gemma4-12b-vmlx-pin`.
+Muwa PR branch `codex/gemma4-12b-vmlx-pin`.
 
 ## Source Boundary
 
-- Osaurus pins `osaurus-ai/vmlx-swift` at
+- Muwa pins `muwa-ai/vmlx-swift` at
   `43e0e82d515eb3de480fcb18bc0a6f2430d18389`.
 - The vMLX change is a Gemma4 required-tool prompt-contract hardening:
   the latest required-tool user turn no longer exposes raw multiline user
@@ -26,12 +26,12 @@ Osaurus PR branch `codex/gemma4-12b-vmlx-pin`.
 - The log shows `BUILD SUCCEEDED`; the app has an ad-hoc signature and
   `TeamIdentifier=not set`.
 - Launch path used `scripts/live-proof/open-keychain-free-osaurus.sh` with
-  `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1` and `OSU_MODELS_DIR=/Users/eric/models`.
+  `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1` and `OSU_MODELS_DIR=/Users/eric/models`.
 
 ## Fresh Per-Model Required Tool Rows
 
 Artifact root:
-`/tmp/osaurus-gemma4-fresh-per-model-20260603-144111`
+`/tmp/muwa-gemma4-fresh-per-model-20260603-144111`
 
 All three rows started from a fresh app/root with:
 
@@ -46,9 +46,9 @@ prior chat memory, resident model state, prefix reuse, or L2 disk-cache restore.
 
 | Model | Verdict | Artifact | Notes |
 | --- | --- | --- | --- |
-| `gemma-4-12b-it-jang_4m` | Green | `/tmp/osaurus-gemma4-fresh-per-model-20260603-144111/art-gemma-4-12b-it-jang_4m` | Strict required/none/required tool row passed. Turn 1 exact `red\ngreen\nblue`, visible turn 2 answer, turn 3 exact `one\ntwo`, no protocol leak, no inflight after. |
-| `gemma-4-12b-it-mxfp8` | Green | `/tmp/osaurus-gemma4-fresh-per-model-20260603-144111/art-gemma-4-12b-it-mxfp8` | Strict required/none/required tool row passed with the same exact args and no leak. |
-| `gemma-4-12b-it-mxfp4` | Red/partial | `/tmp/osaurus-gemma4-fresh-per-model-20260603-144111/art-gemma-4-12b-it-mxfp4` | Fails only `turn1_args_exact`: emitted `red\n green\n blue`. Turn 2 visible answer and turn 3 exact `one\ntwo` passed; topology passed; no protocol leak. |
+| `gemma-4-12b-it-jang_4m` | Green | `/tmp/muwa-gemma4-fresh-per-model-20260603-144111/art-gemma-4-12b-it-jang_4m` | Strict required/none/required tool row passed. Turn 1 exact `red\ngreen\nblue`, visible turn 2 answer, turn 3 exact `one\ntwo`, no protocol leak, no inflight after. |
+| `gemma-4-12b-it-mxfp8` | Green | `/tmp/muwa-gemma4-fresh-per-model-20260603-144111/art-gemma-4-12b-it-mxfp8` | Strict required/none/required tool row passed with the same exact args and no leak. |
+| `gemma-4-12b-it-mxfp4` | Red/partial | `/tmp/muwa-gemma4-fresh-per-model-20260603-144111/art-gemma-4-12b-it-mxfp4` | Fails only `turn1_args_exact`: emitted `red\n green\n blue`. Turn 2 visible answer and turn 3 exact `one\ntwo` passed; topology passed; no protocol leak. |
 
 ## Cache And Engine Topology
 
@@ -68,7 +68,7 @@ eviction/reload warm row is still needed before claiming disk-L2 hit proof.
 ## Reasoning Rail
 
 Artifact:
-`/tmp/osaurus-gemma4-reasoning-rail-20260603-144259`
+`/tmp/muwa-gemma4-reasoning-rail-20260603-144259`
 
 - Default/no-thinking responses for JANG_4M, MXFP8, and MXFP4 did not place
   Gemma4 thinking text into visible `content`.

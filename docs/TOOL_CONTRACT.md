@@ -1,10 +1,10 @@
 # Tool Contract
 
-Every Osaurus tool — global built-in, folder tool, sandbox tool, **plugin tool** — returns a
+Every Muwa tool — global built-in, folder tool, sandbox tool, **plugin tool** — returns a
 JSON string in exactly one of two shapes. This page is the one-stop
 reference for tool authors.
 
-The type lives at [`Tools/ToolEnvelope.swift`](../Packages/OsaurusCore/Tools/ToolEnvelope.swift).
+The type lives at [`Tools/ToolEnvelope.swift`](../Packages/MuwaCore/Tools/ToolEnvelope.swift).
 
 > **Plugin authors:** the contract on this page applies to your tools too.
 > The `invoke` callback's return JSON must match the success or failure
@@ -143,7 +143,7 @@ mis-classify.
 
 ## Writing a tool
 
-Use the `require…` helpers on `OsaurusTool` to build failure envelopes
+Use the `require…` helpers on `MuwaTool` to build failure envelopes
 with the right `field` / `expected` automatically:
 
 ```swift
@@ -250,7 +250,7 @@ the `[Terminate]` button still works (signals SIGTERM via
 
 Tools that drive long-running shell commands (`sandbox_exec`,
 `shell_run`) opt out of the registry's 120 s wall-clock race via
-`var bypassRegistryTimeout: Bool { true }` on `OsaurusTool`. They have
+`var bypassRegistryTimeout: Bool { true }` on `MuwaTool`. They have
 no usable wall-clock budget — a `cargo build` legitimately runs for
 30+ minutes — and rely on:
 
@@ -286,7 +286,7 @@ integers (`"timeout": "15"`), JSON-encoded arrays
 (`"packages": "[\"a\",\"b\"]"`), empty-string fillers for unused
 optional fields (`"description": ""`), and mixed-case enums
 (`"scope": "Pinned"`). The platform handles every one of these at the
-preflight layer ([`SchemaValidator.coerceArguments`](../Packages/OsaurusCore/Tools/SchemaValidator.swift)
+preflight layer ([`SchemaValidator.coerceArguments`](../Packages/MuwaCore/Tools/SchemaValidator.swift)
 + `validate`) before your tool body sees the arguments. To stay
 inside that contract:
 
@@ -298,7 +298,7 @@ inside that contract:
 - Set `"additionalProperties": .bool(false)` on every top-level (and
   nested object) schema so the central preflight rejects unknown keys
   with a pointed envelope. The matrix test
-  [`BuiltinToolResilienceTests.allBuiltInsRejectUnknownProperties`](../Packages/OsaurusCore/Tests/Tool/BuiltinToolResilienceTests.swift)
+  [`BuiltinToolResilienceTests.allBuiltInsRejectUnknownProperties`](../Packages/MuwaCore/Tests/Tool/BuiltinToolResilienceTests.swift)
   pins this for every built-in.
 - Declare `enum` for closed-set string values. The preflight
   case-normalises to the canonical declared form, so the body's

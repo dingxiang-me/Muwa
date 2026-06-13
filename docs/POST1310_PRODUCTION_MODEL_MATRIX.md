@@ -2,16 +2,16 @@
 
 Date: 2026-06-01
 
-Final updated-branch Osaurus PR head after GitHub "update branch" and the
+Final updated-branch Muwa PR head after GitHub "update branch" and the
 runtime top-p projection source-guard repair:
 `5f7c108ac055dd1b99d03cef7663a14763c7dbac`.
 
 Final updated-branch no-sign app:
 `build/DerivedData-post1314-final-5f7c108a/Build/Products/Release/osaurus.app`.
 
-Final updated-branch live proof used `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, a
-fresh `OSAURUS_TEST_ROOT=/tmp/osaurus-post1314-final-5f7c108a-live-open-20260601-222454/state`,
-and `OSU_MODELS_DIR=/tmp/osaurus-post1314-step-final-root/models`. The app was
+Final updated-branch live proof used `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, a
+fresh `MUWA_TEST_ROOT=/tmp/muwa-post1314-final-5f7c108a-live-open-20260601-222454/state`,
+and `OSU_MODELS_DIR=/tmp/muwa-post1314-step-final-root/models`. The app was
 launched through LaunchServices after setting those env vars with `launchctl`.
 The proof lane did not invoke `security`, notarytool, Developer ID signing,
 signing identities, or a password/keychain prompt. The app stayed healthy after
@@ -21,13 +21,13 @@ Final updated-branch served model ids:
 `step-3.7-flash-jang_2l` and `step-3.7-flash-jang_k`.
 
 Final updated-branch Step JANG_K parser/topology artifact:
-`/tmp/osaurus-post1314-final-5f7c108a-jangk-20260601-222508/step-3.7-flash-jang_k_summary.json`.
+`/tmp/muwa-post1314-final-5f7c108a-jangk-20260601-222508/step-3.7-flash-jang_k_summary.json`.
 
 Final updated-branch Step JANG_K restart/L2-hit artifact:
-`/tmp/osaurus-post1314-final-5f7c108a-jangk-l2hit-20260601-222546/step-3.7-flash-jang_k_summary.json`.
+`/tmp/muwa-post1314-final-5f7c108a-jangk-l2hit-20260601-222546/step-3.7-flash-jang_k_summary.json`.
 
 Final updated-branch Step JANG_2L parser/topology artifact:
-`/tmp/osaurus-post1314-final-5f7c108a-jang2l-20260601-222604/step-3.7-flash-jang_2l_summary.json`.
+`/tmp/muwa-post1314-final-5f7c108a-jang2l-20260601-222604/step-3.7-flash-jang_2l_summary.json`.
 
 These updated-branch rows supersede the older `25f8111...` app proof directly
 below. On the exact `5f7c108a...` app, Step JANG_K and Step JANG_2L both pass
@@ -41,7 +41,7 @@ rotating KV layers, `requires_disk_backed_restore=true`,
 restart row proves actual disk L2 reuse with `block_disk_hits=1`,
 `block_disk_misses=0`, and `block_disk_stores=5`.
 
-Current local Osaurus PR head before the final vMLX repin commit:
+Current local Muwa PR head before the final vMLX repin commit:
 `1bc3202c0ccc36f791d27ef7ce7943eba0b691b8`.
 
 Current local vMLX pin after the final Step XML parser fix:
@@ -50,21 +50,21 @@ Current local vMLX pin after the final Step XML parser fix:
 Final no-sign app built for the current pin:
 `build/DerivedData-post1314-step-parser-25f8111/Build/Products/Release/osaurus.app`.
 
-Final Step 3.7 live proof used `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
-isolated `OSAURUS_TEST_ROOT=/tmp/osaurus-post1314-step-final-root/state-open`,
-and `OSU_MODELS_DIR=/tmp/osaurus-post1314-step-final-root/models`. The app was
+Final Step 3.7 live proof used `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+isolated `MUWA_TEST_ROOT=/tmp/muwa-post1314-step-final-root/state-open`,
+and `OSU_MODELS_DIR=/tmp/muwa-post1314-step-final-root/models`. The app was
 launched through LaunchServices with those env vars set by `launchctl`; no
 `security`, notary, Developer ID signing, signing identity, or password/keychain
 prompt was used. The app stayed healthy after the final rows.
 
 Final Step JANG_K parser/cache artifact:
-`/tmp/osaurus-post1314-25f8111-step-jangk-restart-l2-20260601-192211/step-3.7-flash-jang_k_summary.json`.
+`/tmp/muwa-post1314-25f8111-step-jangk-restart-l2-20260601-192211/step-3.7-flash-jang_k_summary.json`.
 
 Final Step JANG_2L tool/topology artifact:
-`/tmp/osaurus-post1314-25f8111-step-jang2l-final-20260601-191743/step-3.7-flash-jang_2l_summary.json`.
+`/tmp/muwa-post1314-25f8111-step-jang2l-final-20260601-191743/step-3.7-flash-jang_2l_summary.json`.
 
 Final Step JANG_K parser-only cold artifact before restart/L2:
-`/tmp/osaurus-post1314-25f8111-step-jangk-final-20260601-191716/step-3.7-flash-jang_k_summary.json`.
+`/tmp/muwa-post1314-25f8111-step-jangk-final-20260601-191716/step-3.7-flash-jang_k_summary.json`.
 
 These final rows supersede the older `eb116ef...` Step proof boundary below:
 Step JANG_K and Step JANG_2L both pass the strict required/none/required
@@ -85,16 +85,16 @@ reasoning tags, or template coercion. Focused vMLX test
 `Step37ParserDispatchTests/stepParserAcceptsBareXMLFunctionEnvelopeAfterHistory`
 passed before the pin was updated.
 
-Earlier Osaurus PR head after the Step proof-boundary refresh:
+Earlier Muwa PR head after the Step proof-boundary refresh:
 `9804bb474ad73cd107a493ccaba2e9b3f5c964c1`.
 
-Earlier Osaurus PR head after Step proof-harness hardening:
+Earlier Muwa PR head after Step proof-harness hardening:
 `31911e2319b324250bca3f3660a75d2d182e55a9`.
 
-Earlier Osaurus PR head after the ZAYA evidence refresh:
+Earlier Muwa PR head after the ZAYA evidence refresh:
 `dceaf9edf85ffe0d20a0b142b6dbe585b4874828`.
 
-Osaurus PR head used for the Qwen/Nemotron proof before the later Ling,
+Muwa PR head used for the Qwen/Nemotron proof before the later Ling,
 MiniMax, Step, and ZAYA evidence refreshes:
 `63f8ee52ef44eb2a988594d2065ffaf70a07024a`.
 
@@ -102,7 +102,7 @@ Live no-sign app proofs were run from this PR worktree as the matrix was built
 up across several commits. Individual artifact paths below are the source of
 truth for the exact live rows and the row-specific PR head where listed.
 
-Previous local vMLX pin in Osaurus after the Step required-template refresh:
+Previous local vMLX pin in Muwa after the Step required-template refresh:
 `eb116ef735d9445cfac30b6a3346ff162483122e`.
 
 Previous fully pushed/CI-green PR head used `3043cc98d7c2a0fd9df34376e6b42beec5517516`.
@@ -111,20 +111,20 @@ reinterpret older live rows as fresh proof for the `eb116ef...` pin unless a
 current artifact explicitly says so.
 
 No-sign app used for live proof:
-`/tmp/osaurus-post1314-nosign-3043cc98/Build/Products/Release/osaurus.app`
+`/tmp/muwa-post1314-nosign-3043cc98/Build/Products/Release/osaurus.app`
 
 Previous no-sign app built for the `eb116ef...` refresh:
 `build/DerivedData-post1314-step-template-eb116ef/Build/Products/Release/osaurus.app`
 
-Model root used for live proof: `/tmp/osaurus-post1310-modelroot`
+Model root used for live proof: `/tmp/muwa-post1310-modelroot`
 
 The app was built through `scripts/live-proof/build-keychain-free-osaurus.sh`.
 The Xcode build used `CODE_SIGNING_ALLOWED=NO`, `CODE_SIGNING_REQUIRED=NO`,
 `CODE_SIGN_IDENTITY=`, and `AD_HOC_CODE_SIGNING_ALLOWED=NO`. The final bundle
 was sealed locally with an ad-hoc signature only: `Signature=adhoc`,
 `TeamIdentifier=not set`. The live app was launched through the keychain-free
-LaunchServices path with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
-`OSAURUS_TEST_ROOT`, and `OSU_MODELS_DIR` set by `launchctl`.
+LaunchServices path with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+`MUWA_TEST_ROOT`, and `OSU_MODELS_DIR` set by `launchctl`.
 
 ## Served Models
 
@@ -142,7 +142,7 @@ keychain-free app root:
 - `step-3.7-flash-jang_k`
 
 `Step-3.7-Flash-JANG_K` is promoted by the final `25f8111...` refresh for this
-strict Osaurus app lane. The earlier `eb116ef...` JANG_K timeout/leak boundary
+strict Muwa app lane. The earlier `eb116ef...` JANG_K timeout/leak boundary
 is superseded by the final parser/cache artifact listed above.
 
 ## Source and Guard Coverage
@@ -165,19 +165,19 @@ Passed on the final vMLX pin:
   attention side-tensor sanitization, and the final bare
   `<function=line_count>` XML envelope observed from Step JANG_K after tool
   history.
-- Osaurus source tests:
+- Muwa source tests:
   `RuntimePolicySourceTests/vmlxPinIncludesRuntimeHardening` passed on the
   `25f8111...` pin, earlier `RuntimePolicySourceTests` passed 75/75 on the
   `eb116ef...` pin, and
   `SwiftTransformersTokenizerLoaderTests/step37LocalTokenizerUsesRequiredToolFallbackAndClosesThinkingRail`
   passed on the same pin. Earlier LFM tokenizer/source guards remain covered by
   the previous proof rows.
-- Osaurus guard bundle:
+- Muwa guard bundle:
   `assert-keychain-free-proof-path.sh`,
   `assert-server-settings-runtime-wiring.sh`,
-  `assert-osaurus-vmlx-pr-readiness.sh`,
-  `assert-osaurus-no-forced-behavior-pr.sh`, and
-  `assert-osaurus-pr-hygiene.sh`.
+  `assert-muwa-vmlx-pr-readiness.sh`,
+  `assert-muwa-no-forced-behavior-pr.sh`, and
+  `assert-muwa-pr-hygiene.sh`.
 
 These guards cover the vMLX pin surfaces, server settings wiring for prefix,
 paged, L2 disk cache, live KV codec, TurboQuant bits, SSM rederive, MTP mode,
@@ -192,11 +192,11 @@ PR head used for this Qwen endpoint artifact:
 `43970ed1ffcc9cae01a07efa3897a2b652dcf61c`.
 
 Qwen endpoint artifact:
-`/tmp/osaurus-post1314-qwen-endpoint-smoke-20260531-193244/endpoint-smoke/SUMMARY.json`
+`/tmp/muwa-post1314-qwen-endpoint-smoke-20260531-193244/endpoint-smoke/SUMMARY.json`
 
 The Qwen endpoint smoke used the same no-sign app build with
-`OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, a fresh `OSAURUS_TEST_ROOT`, and local
-model root `/tmp/osaurus-post1314-qwen-endpoint-smoke-20260531-193244/models`.
+`MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, a fresh `MUWA_TEST_ROOT`, and local
+model root `/tmp/muwa-post1314-qwen-endpoint-smoke-20260531-193244/models`.
 Served model id: `qwen3.6-35b-a3b-jangtq-crack`.
 
 Passed live endpoints:
@@ -218,7 +218,7 @@ hybrid topology: 40 layers, 10 KV layers, 30 Mamba/SSM companion layers,
 `turbo_quant_kv_layer_count=0`.
 
 LFM endpoint boundary artifact:
-`/tmp/osaurus-post1314-endpoint-smoke-ls-20260531-192859/endpoint-smoke-256/SUMMARY.json`
+`/tmp/muwa-post1314-endpoint-smoke-ls-20260531-192859/endpoint-smoke-256/SUMMARY.json`
 
 The same endpoint smoke against `lfm2.5-8b-a1b-jang_2l` is not promoted as a
 full endpoint-visible-chat proof: OpenAI streaming, OpenResponses
@@ -231,19 +231,19 @@ rail and follow-up tool-result turns produce visible answers.
 
 ## LFM2.5 JANG_2L
 
-Verdict: green for the final PR scope: live no-sign Osaurus app, strict
+Verdict: green for the final PR scope: live no-sign Muwa app, strict
 multi-turn required/none/required tool behavior, no visible protocol leakage, no
 incoherent loop, no length-stop fake pass on the accepted rows, LFM hybrid
 topology, disk-backed restore requirement, and warm disk/SSM companion reuse.
 
 Cold artifact:
-`/tmp/osaurus-post1314-lfm-jang2l-3043cc98-cold-20260531-165836/lfm2.5-8b-a1b-jang_2l_summary.json`
+`/tmp/muwa-post1314-lfm-jang2l-3043cc98-cold-20260531-165836/lfm2.5-8b-a1b-jang_2l_summary.json`
 
 Warm artifact with larger explicit output budget:
-`/tmp/osaurus-post1314-lfm-jang2l-3043cc98-warm4096-20260531-170036/lfm2.5-8b-a1b-jang_2l_summary.json`
+`/tmp/muwa-post1314-lfm-jang2l-3043cc98-warm4096-20260531-170036/lfm2.5-8b-a1b-jang_2l_summary.json`
 
 Warm repeat artifact at 1024 output tokens:
-`/tmp/osaurus-post1314-lfm-jang2l-3043cc98-warm1024-repeat-20260531-170112/lfm2.5-8b-a1b-jang_2l_summary.json`
+`/tmp/muwa-post1314-lfm-jang2l-3043cc98-warm1024-repeat-20260531-170112/lfm2.5-8b-a1b-jang_2l_summary.json`
 
 Confirmed:
 
@@ -267,7 +267,7 @@ Confirmed:
   resident and current.
 
 Rejected intermediate artifact:
-`/tmp/osaurus-post1314-lfm-jang2l-3043cc98-warm-20260531-165903/lfm2.5-8b-a1b-jang_2l_summary.json`
+`/tmp/muwa-post1314-lfm-jang2l-3043cc98-warm-20260531-165903/lfm2.5-8b-a1b-jang_2l_summary.json`
 
 That row failed on turn 1 with `finish_reason=length`, hidden reasoning, no tool
 call, and no disk L2 hit. It is recorded here so the matrix does not hide the
@@ -277,7 +277,7 @@ session.
 
 ## Step 3.7 Flash JANG_2L
 
-Historical final-head verdict before the `eb116ef...` refresh: green for strict no-sign Osaurus app
+Historical final-head verdict before the `eb116ef...` refresh: green for strict no-sign Muwa app
 multi-turn required/none/required tool behavior, no visible protocol leakage,
 no incoherent loop, no length-stop fake pass on the accepted rows, Step mixed
 KV/rotating topology, disk-backed restore requirement, and warm disk-L2 reuse.
@@ -287,13 +287,13 @@ readiness, and no-forced-behavior checks passed. A fresh no-sign app
 strict Step JANG_2L row ran while another Step CRACK process was consuming about
 74 GB RSS and did not finish the full three-turn harness, so there is no single
 current-head `*_summary.json` green row. The partial strict artifact
-`/tmp/osaurus-post1314-eda7ac94-step-jang2l-20260601-132614` did complete turn 1
+`/tmp/muwa-post1314-eda7ac94-step-jang2l-20260601-132614` did complete turn 1
 and turn 2: turn 1 produced exact structured `line_count` args
 `red\ngreen\nblue`, `finish_reason=tool_calls`, no visible prose, and zero
 completion tokens; turn 2 answered visibly with `Three lines were counted.` and
 no tool call or protocol leak. Because turn 3 was missing from that harness, a
 focused no-sign app direct turn-3 probe
-`/tmp/osaurus-post1314-eda7ac94-step-jang2l-turn3-direct-20260601-134409`
+`/tmp/muwa-post1314-eda7ac94-step-jang2l-turn3-direct-20260601-134409`
 replayed the same assistant/tool history and passed with exact structured
 `line_count` args `one\ntwo`, `finish=tool_calls`, no visible prose, and zero
 completion tokens in 3.83s. `/health` after the direct row was healthy with no
@@ -310,22 +310,22 @@ focused source test
 now explicitly covers `Step-3.7-Flash-JANG_2L`, proving that required tool
 choice reaches vMLX and disables thinking for this model id as well as the
 Step JANG_K spelling. A fresh current-head no-sign app attempt at
-`/tmp/osaurus-post1314-31911e23-step-jang2l-full-20260601-140154` was stopped
+`/tmp/muwa-post1314-31911e23-step-jang2l-full-20260601-140154` was stopped
 after turn 1 stayed in flight under the same external 74 GB Step CRACK-v8 job;
 it has the pre-call request/health/cache artifacts but no response and is not a
 model pass or fail.
 
 The `9804bb47` refresh reran the cheap production source guards and another
 fresh no-sign app attempt without touching signing/keychain paths:
-`assert-osaurus-vmlx-pr-readiness.sh`,
-`assert-osaurus-no-forced-behavior-pr.sh`, and
+`assert-muwa-vmlx-pr-readiness.sh`,
+`assert-muwa-no-forced-behavior-pr.sh`, and
 `assert-tool-choice-required-routing.sh` passed on the `eb116ef...` pin. The
 no-sign app at
 `build/DerivedData-post1314-step-template-eb116ef/Build/Products/Release/osaurus.app`
-was launched with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, a fresh
-`OSAURUS_TEST_ROOT`, and a model root containing only
+was launched with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, a fresh
+`MUWA_TEST_ROOT`, and a model root containing only
 `Step-3.7-Flash-JANG_2L`; `/v1/models` served `step-3.7-flash-jang_2l`.
-Artifact `/tmp/osaurus-post1314-9804bb47-step-jang2l-full-20260601-140957`
+Artifact `/tmp/muwa-post1314-9804bb47-step-jang2l-full-20260601-140957`
 was stopped after more than five minutes with `/health` still healthy, one
 in-flight request, no turn-1 response artifact, and the external
 `Step-3.7-Flash-JANG_K-CRACK-v8` job still consuming about 74 GB RSS. The
@@ -334,11 +334,11 @@ resource-blocked current-head attempt, not a model pass and not a model
 coherency/parser failure.
 
 Additional isolation artifact:
-`/tmp/osaurus-post1314-920fa406-step-probe-20260601-141746`. The same no-sign
+`/tmp/muwa-post1314-920fa406-step-probe-20260601-141746`. The same no-sign
 app and one-model root served `step-3.7-flash-jang_2l`; a tiny plain chat
 request (`Reply with ok.`, `max_tokens=8`, no tools) also stayed in flight with
 an empty response file under the active external Step CRACK-v8 job. Sample
-`/tmp/osaurus-post1314-920fa406-step-plain-sample.txt` showed the request inside
+`/tmp/muwa-post1314-920fa406-step-plain-sample.txt` showed the request inside
 `TokenIterator.next()` / `mlx::core::scheduler::Scheduler::wait_for_one()`.
 That isolates the current live blocker below chat/autodetect/tool-parser
 wiring: plain decode cannot complete on this machine while the external Step
@@ -346,14 +346,14 @@ job owns the memory/GPU lane.
 
 Final fix boundary:
 
-- Osaurus disables the single-slot compiled batch-decode trace for Step 3.7 in
+- Muwa disables the single-slot compiled batch-decode trace for Step 3.7 in
   `MLXBatchAdapter.shouldEnableCompiledBatchDecode`. This is a narrow runtime
   route fix, not a prompt, parser, sampler, or repetition-penalty workaround.
 - Focused test:
   `MLXBatchAdapterTests/compiledBatchDecodeDisabledForKnownUnsafeSoloModels`
   passed with Step JANG_2L and Step JANGTQ_K pinned as explicit exceptions.
 - Source guard:
-  `assert-osaurus-no-forced-behavior-pr.sh` passed after the patch, including
+  `assert-muwa-no-forced-behavior-pr.sh` passed after the patch, including
   the no hidden sampler/default, no forced reasoning, no parser repair, and no
   decode close/open-token bias checks.
 
@@ -367,23 +367,23 @@ Keychain/signing boundary for the final Step proof:
   `CODE_SIGNING_REQUIRED=NO`, `CODE_SIGN_IDENTITY=`, and
   `AD_HOC_CODE_SIGNING_ALLOWED=NO`.
 - Final seal was local ad-hoc only.
-- Launched with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, a fresh
-  `OSAURUS_TEST_ROOT`, and `OSU_MODELS_DIR` pointing at a root containing only
+- Launched with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, a fresh
+  `MUWA_TEST_ROOT`, and `OSU_MODELS_DIR` pointing at a root containing only
   `Step-3.7-Flash-JANG_2L`.
 - `/v1/models` served the exact id `step-3.7-flash-jang_2l`.
 
 Final smoke artifact:
-`/tmp/osaurus-post1314-step37-compiled-off-20260601-012207`
+`/tmp/muwa-post1314-step37-compiled-off-20260601-012207`
 
 The final smoke proved the old resident-speed blocker was removed on the patched
 app path: cold two-token request returned `\nok` in 19.56s including load, and
 the immediately following resident two-token request returned `\nok` in 0.148s.
 
 Final strict cold/tool/topology artifact:
-`/tmp/osaurus-post1314-step37-compiled-off-tool-cache-20260601-012335/step-3.7-flash-jang_2l_summary.json`
+`/tmp/muwa-post1314-step37-compiled-off-tool-cache-20260601-012335/step-3.7-flash-jang_2l_summary.json`
 
 Final warm disk-L2 artifact:
-`/tmp/osaurus-post1314-step37-compiled-off-warm-cache-20260601-012404/step-3.7-flash-jang_2l_summary.json`
+`/tmp/muwa-post1314-step37-compiled-off-warm-cache-20260601-012404/step-3.7-flash-jang_2l_summary.json`
 
 Confirmed in both accepted strict rows:
 
@@ -411,22 +411,22 @@ refresh live row, `Step-3.7-Flash-JANG_K`, or `Step-3.7-Flash-JANGTQ_K`.
 Superseded failed/partial artifacts are retained below for traceability.
 
 Attempted artifact directory:
-`/tmp/osaurus-post1314-step37-jang2l-3043cc98-cold-20260531-170148`
+`/tmp/muwa-post1314-step37-jang2l-3043cc98-cold-20260531-170148`
 
 Fresh bounded retry artifact:
-`/tmp/osaurus-post1314-step37-jang2l-bounded-20260531-175434`
+`/tmp/muwa-post1314-step37-jang2l-bounded-20260531-175434`
 
 Fresh LaunchServices no-sign retry artifact:
-`/tmp/osaurus-post1314-step37-open-20260531-200006`
+`/tmp/muwa-post1314-step37-open-20260531-200006`
 
 Fresh tiny no-tool sanity artifact:
-`/tmp/osaurus-post1314-step37-simple-20260531-202306`
+`/tmp/muwa-post1314-step37-simple-20260531-202306`
 
 Fresh resident-speed split artifact:
-`/tmp/osaurus-post1314-step37-resident-20260531-204840`
+`/tmp/muwa-post1314-step37-resident-20260531-204840`
 
 Step JANGTQ_K bounded artifact:
-`/tmp/osaurus-post1314-step37-jangtqk-resident-20260531-205347`
+`/tmp/muwa-post1314-step37-jangtqk-resident-20260531-205347`
 
 The superseded pre-fix row was started against the final app and loaded
 `step-3.7-flash-jang_2l`, but it stayed in-flight for several minutes without
@@ -441,8 +441,8 @@ strict harness timed out waiting for the first `/v1/chat/completions` response
 after 300 seconds, before any turn response JSON was written. This is a pre-fix
 Step decode/runtime latency or hang artifact, not a tool-parser pass.
 
-The superseded LaunchServices retry used the no-sign app with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
-a fresh `OSAURUS_TEST_ROOT`, and a model root containing only
+The superseded LaunchServices retry used the no-sign app with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+a fresh `MUWA_TEST_ROOT`, and a model root containing only
 `Step-3.7-Flash-JANG_2L`. `/v1/models` served `step-3.7-flash-jang_2l`; the
 strict required/none/required harness then timed out on turn 1 after 420
 seconds, before any response summary was written. `/health` at timeout remained
@@ -465,8 +465,8 @@ exclusion. It was not a prompt/tool parser leak and was not solved by extending
 tool-harness timeouts.
 
 The superseded resident-speed split removed the ambiguity that this was only a
-cold-load artifact. Using the same no-sign app, `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`,
-a fresh `OSAURUS_TEST_ROOT`, and a model root containing only
+cold-load artifact. Using the same no-sign app, `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`,
+a fresh `MUWA_TEST_ROOT`, and a model root containing only
 `Step-3.7-Flash-JANG_2L`, two consecutive two-token requests were sent through
 `/v1/chat/completions`. The cold request returned `\nok` in 92.86s with
 `finish_reason=length`; the immediately following resident request returned the
@@ -484,42 +484,42 @@ bundles exist at `/Users/eric/models/dealign.ai/Step-3.7-Flash-JANG_K-CRACK`
 and `/Users/eric/models/dealign.ai/Step-3.7-Flash-JANG_K-CRACK-v5`, and the
 current no-sign app served `step-3.7-flash-jang_k-crack-v5`. A direct first-turn
 required-tool probe at
-`/tmp/osaurus-post1314-step37-jangk-crackv5-eb116ef-direct1-20260601-125242`
+`/tmp/muwa-post1314-step37-jangk-crackv5-eb116ef-direct1-20260601-125242`
 timed out after 180s, and the strict harness attempt
-`/tmp/osaurus-post1314-step37-jangk-crackv5-eb116ef-cold-20260601-124101`
+`/tmp/muwa-post1314-step37-jangk-crackv5-eb116ef-cold-20260601-124101`
 was stopped after it ran past the useful proof window with one in-flight request.
 This is blocked current live proof, not a green row.
 
 `Step-3.7-Flash-JANGTQ_K` exists locally at
 `/Volumes/EricsLLMDrive/jangq-ai/Step-3.7-Flash-JANGTQ_K` and has the expected
 JANGTQ_K metadata (`profile=JANGTQ_K`, 55 shards, 126 routed TQ triplets,
-mixed routed expert bits gate/up/down = 2/2/4). A bounded no-sign Osaurus app
+mixed routed expert bits gate/up/down = 2/2/4). A bounded no-sign Muwa app
 retry served `step-3.7-flash-jangtq_k`, but the first two-token chat request
 timed out at 300s and the model was not resident afterward. This row is also
 not promoted by this final Step JANG_2L repair proof. Prior JANG-side provenance says
-JANGTQ_K is the coherent Step target, but it still needs a current Osaurus
+JANGTQ_K is the coherent Step target, but it still needs a current Muwa
 load/runtime fix and fresh no-sign app proof before this matrix can claim it.
 
 Older Step 3.7 artifacts from earlier local work showed strict tool behavior and
-L2 reuse but very poor no-sign Osaurus decode speed. They are superseded by the
+L2 reuse but very poor no-sign Muwa decode speed. They are superseded by the
 compiled-batch-decode exclusion proof above.
 
 ## LFM2.5 MXFP4 and MXFP8
 
-Current final-head verdict: green for the same strict no-sign Osaurus app
+Current final-head verdict: green for the same strict no-sign Muwa app
 multi-turn tool/cache scope as JANG_2L.
 
 MXFP4 cold artifact:
-`/tmp/osaurus-post1314-lfm-mxfp4-cold-20260531-175253/lfm2.5-8b-a1b-mxfp4_summary.json`
+`/tmp/muwa-post1314-lfm-mxfp4-cold-20260531-175253/lfm2.5-8b-a1b-mxfp4_summary.json`
 
 MXFP4 warm artifact:
-`/tmp/osaurus-post1314-lfm-mxfp4-warm-20260531-175323/lfm2.5-8b-a1b-mxfp4_summary.json`
+`/tmp/muwa-post1314-lfm-mxfp4-warm-20260531-175323/lfm2.5-8b-a1b-mxfp4_summary.json`
 
 MXFP8 cold artifact:
-`/tmp/osaurus-post1314-lfm-mxfp8-cold-20260531-175341/lfm2.5-8b-a1b-mxfp8_summary.json`
+`/tmp/muwa-post1314-lfm-mxfp8-cold-20260531-175341/lfm2.5-8b-a1b-mxfp8_summary.json`
 
 MXFP8 warm artifact:
-`/tmp/osaurus-post1314-lfm-mxfp8-warm-20260531-175405/lfm2.5-8b-a1b-mxfp8_summary.json`
+`/tmp/muwa-post1314-lfm-mxfp8-warm-20260531-175405/lfm2.5-8b-a1b-mxfp8_summary.json`
 
 Confirmed for both MXFP4 and MXFP8:
 
@@ -552,7 +552,7 @@ This matrix does not prove TurboQuant KV for Step or LFM.
   reuse, not a claim that Step rotating layers are using TurboQuant KV.
 
 The server settings/source guards prove topology-gated engine-selected
-TurboQuant wiring and UI/runtime settings. On the current `eb116ef...` Osaurus
+TurboQuant wiring and UI/runtime settings. On the current `eb116ef...` Muwa
 patch, Step 3.7 is deliberately native/fp16 by default because its mixed
 full-attention plus rotating/SWA topology has not produced a current warm
 tool-history TurboQuant-KV stability proof. This is conservative runtime policy,
@@ -561,21 +561,21 @@ not a hidden sampler or prompt workaround.
 ## Expanded Family Boundary
 
 An expanded no-sign app launch served additional local model ids when pointed at
-`/tmp/osaurus-post1314-expanded-modelroot`: `qwen3.6-35b-a3b-jangtq-crack`,
+`/tmp/muwa-post1314-expanded-modelroot`: `qwen3.6-35b-a3b-jangtq-crack`,
 `nemotron-omni-nano-jangtq-crack`, `ling-2.6-flash-jangtq2-crack`,
 `gemma-4-26b-a4b-it-jang_4m-crack`, and `minimax-m2.7-small-jangtq`.
 The external-drive model-root path itself is not promoted by this PR evidence.
 
 The Qwen35 strict harness attempt
-`/tmp/osaurus-post1314-expanded-qwen35-cold-20260531-174411` did not reach model
+`/tmp/muwa-post1314-expanded-qwen35-cold-20260531-174411` did not reach model
 decode. The app accepted the HTTP connection but `/health` continued to report
 no loaded model and no in-flight request. A process sample at
-`/tmp/osaurus-sample-qwen-stall.txt` showed both the model picker rebuild and
+`/tmp/muwa-sample-qwen-stall.txt` showed both the model picker rebuild and
 the chat request blocked in metadata/capability reads:
 `VLMDetection.isVLM`, `ModelMediaCapabilities.from(directory:modelId:)`, and
 `Data(contentsOf:)`/`_fcntl_overlay_open`. A single-model Qwen LaunchServices
 retry reproduced the same metadata-read stall; sample:
-`/tmp/osaurus-sample-qwen-single-stall.txt`.
+`/tmp/muwa-sample-qwen-single-stall.txt`.
 
 Shell reads of the same Qwen and Nemotron `config.json` files from
 `/Volumes/EricsLLMDrive` were instantaneous, so this is recorded as a current
@@ -591,12 +591,12 @@ Local copy used for proof:
 `/Users/eric/.mlxstudio/models/dealignai/Qwen3.6-35B-A3B-JANGTQ-CRACK`
 
 Cold artifact:
-`/tmp/osaurus-post1314-qwen35-local-cold-20260531-181616/qwen3.6-35b-a3b-jangtq-crack_summary.json`
+`/tmp/muwa-post1314-qwen35-local-cold-20260531-181616/qwen3.6-35b-a3b-jangtq-crack_summary.json`
 
 Warm artifact:
-`/tmp/osaurus-post1314-qwen35-local-warm-20260531-181632/qwen3.6-35b-a3b-jangtq-crack_summary.json`
+`/tmp/muwa-post1314-qwen35-local-warm-20260531-181632/qwen3.6-35b-a3b-jangtq-crack_summary.json`
 
-Verdict: green for strict no-sign Osaurus app multi-turn tool/cache scope.
+Verdict: green for strict no-sign Muwa app multi-turn tool/cache scope.
 
 - Turn 1 required tool call: exact `line_count` args `red\ngreen\nblue`.
 - Turn 2 no-tool answer: visible coherent answer, no unexpected tool call, no
@@ -616,12 +616,12 @@ Local copy used for proof:
 `/Users/eric/.mlxstudio/models/dealignai/Nemotron-Omni-Nano-JANGTQ-CRACK`
 
 Cold artifact:
-`/tmp/osaurus-post1314-nemo-local-cold-20260531-181738/nemotron-omni-nano-jangtq-crack_summary.json`
+`/tmp/muwa-post1314-nemo-local-cold-20260531-181738/nemotron-omni-nano-jangtq-crack_summary.json`
 
 Warm artifact:
-`/tmp/osaurus-post1314-nemo-local-warm-20260531-181754/nemotron-omni-nano-jangtq-crack_summary.json`
+`/tmp/muwa-post1314-nemo-local-warm-20260531-181754/nemotron-omni-nano-jangtq-crack_summary.json`
 
-Verdict: green for strict no-sign Osaurus app multi-turn tool/cache scope.
+Verdict: green for strict no-sign Muwa app multi-turn tool/cache scope.
 
 - Turn 1 required tool call: exact `line_count` args `red\ngreen\nblue`.
 - Turn 2 no-tool answer: visible coherent answer, no unexpected tool call, no
@@ -641,12 +641,12 @@ Local copy used for proof:
 `/Users/eric/.mlxstudio/models/dealignai/Ling-2.6-flash-JANGTQ2-CRACK`
 
 Cold artifact:
-`/tmp/osaurus-post1314-ling-local-cold-20260531-183358/ling-2.6-flash-jangtq2-crack_summary.json`
+`/tmp/muwa-post1314-ling-local-cold-20260531-183358/ling-2.6-flash-jangtq2-crack_summary.json`
 
 Warm artifact:
-`/tmp/osaurus-post1314-ling-local-warm-20260531-183610/ling-2.6-flash-jangtq2-crack_summary.json`
+`/tmp/muwa-post1314-ling-local-warm-20260531-183610/ling-2.6-flash-jangtq2-crack_summary.json`
 
-Verdict: green for strict no-sign Osaurus app multi-turn tool/cache scope.
+Verdict: green for strict no-sign Muwa app multi-turn tool/cache scope.
 
 - Turn 1 required tool call: exact `line_count` args `red\ngreen\nblue`.
 - Turn 2 no-tool answer: visible coherent answer, no unexpected tool call, no
@@ -666,15 +666,15 @@ Local copy used for proof:
 `/Users/eric/.mlxstudio/models/dealignai/Gemma-4-26B-A4B-it-JANG_4M-CRACK`
 
 Cold text/tool artifact:
-`/tmp/osaurus-post1314-gemma26-local-cold-20260531-185325/gemma-4-26b-a4b-it-jang_4m-crack_summary.json`
+`/tmp/muwa-post1314-gemma26-local-cold-20260531-185325/gemma-4-26b-a4b-it-jang_4m-crack_summary.json`
 
 Warm disk-hit text/tool artifact:
-`/tmp/osaurus-post1314-gemma26-local-warm-hit-20260531-185438/gemma-4-26b-a4b-it-jang_4m-crack_summary.json`
+`/tmp/muwa-post1314-gemma26-local-warm-hit-20260531-185438/gemma-4-26b-a4b-it-jang_4m-crack_summary.json`
 
 Real-media VL artifact:
-`/tmp/osaurus-post1314-gemma26-vl-red-20260531-185459/SUMMARY.json`
+`/tmp/muwa-post1314-gemma26-vl-red-20260531-185459/SUMMARY.json`
 
-Verdict: green for strict no-sign Osaurus app text/tool/cache scope and for a
+Verdict: green for strict no-sign Muwa app text/tool/cache scope and for a
 real single-image VL/cache row. One earlier warm text/tool rerun is recorded as
 flaky below and is not hidden.
 
@@ -697,7 +697,7 @@ flaky below and is not hidden.
   1.000s.
 
 Rejected Gemma warm artifact:
-`/tmp/osaurus-post1314-gemma26-local-warm-20260531-185343/gemma-4-26b-a4b-it-jang_4m-crack_summary.json`
+`/tmp/muwa-post1314-gemma26-local-warm-20260531-185343/gemma-4-26b-a4b-it-jang_4m-crack_summary.json`
 
 That row failed turn 1 with `finish_reason=stop`, no structured tool call, no
 disk L2 hit, and `reasoning_content="thought<tool_call|>"`. A subsequent warm
@@ -711,19 +711,19 @@ Local copy used for proof:
 `/Users/eric/.mlxstudio/models/JANGQ-AI/MiniMax-M2.7-Small-JANGTQ`
 
 Superseded blocked attempt artifact:
-`/tmp/osaurus-post1314-minimax-small-cold-20260531-185719`
+`/tmp/muwa-post1314-minimax-small-cold-20260531-185719`
 
 Current proof artifacts:
 
 - Native-KV cold smoke:
-  `/tmp/osaurus-post1314-minimax-native-ls-probe-20260601-024219/native-smoke.json`
+  `/tmp/muwa-post1314-minimax-native-ls-probe-20260601-024219/native-smoke.json`
 - Native-KV strict tool/topology:
-  `/tmp/osaurus-post1314-minimax-native-tool-cache-20260601-024325/minimax-m2.7-small-jangtq_summary.json`
+  `/tmp/muwa-post1314-minimax-native-tool-cache-20260601-024325/minimax-m2.7-small-jangtq_summary.json`
 - Native-KV repeat with disk-L2 requirement intentionally failed only
   `cache_evidence_disk_l2_hits`:
-  `/tmp/osaurus-post1314-minimax-native-warm-disk-20260601-024352/minimax-m2.7-small-jangtq_summary.json`
+  `/tmp/muwa-post1314-minimax-native-warm-disk-20260601-024352/minimax-m2.7-small-jangtq_summary.json`
 - Engine-selected/default strict tool/topology:
-  `/tmp/osaurus-post1314-minimax-engine-selected-tool-cache-20260601-024500/minimax-m2.7-small-jangtq_summary.json`
+  `/tmp/muwa-post1314-minimax-engine-selected-tool-cache-20260601-024500/minimax-m2.7-small-jangtq_summary.json`
 
 Verdict: promoted for the current bounded MiniMax no-sign app path.
 
@@ -760,11 +760,11 @@ Local copies used for proof:
 Current proof artifacts:
 
 - Text cold strict tool/topology:
-  `/tmp/osaurus-post1314-zaya-text-jangtq4-current-20260601-032237/zaya1-8b-jangtq4_summary.json`
+  `/tmp/muwa-post1314-zaya-text-jangtq4-current-20260601-032237/zaya1-8b-jangtq4_summary.json`
 - Text warm strict tool/disk-L2/topology:
-  `/tmp/osaurus-post1314-zaya-text-jangtq4-warmdisk-20260601-032427/zaya1-8b-jangtq4_summary.json`
+  `/tmp/muwa-post1314-zaya-text-jangtq4-warmdisk-20260601-032427/zaya1-8b-jangtq4_summary.json`
 - VL red-image repeat/cache:
-  `/tmp/osaurus-post1314-zaya-vl-jangtq4-red-current-20260601-032534/SUMMARY.json`
+  `/tmp/muwa-post1314-zaya-vl-jangtq4-red-current-20260601-032534/SUMMARY.json`
 
 Verdict: promoted for the current bounded ZAYA no-sign app path.
 

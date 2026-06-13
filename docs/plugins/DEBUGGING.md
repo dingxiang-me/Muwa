@@ -6,40 +6,40 @@ Decision trees and tactics for fault-finding when something isn't working.
 
 | Symptom | Best signal |
 |---|---|
-| Plugin not appearing | `osaurus tools list` and Console.app log messages prefixed `[Osaurus]` |
+| Plugin not appearing | `muwa-cli tools list` and Console.app log messages prefixed `[Muwa]` |
 | Plugin loaded but tool not callable | Insights → Plugin Activity, then chat transcripts |
 | Tool runs but returns wrong data | `host->log` from inside your tool plus Insights body capture |
 | Web UI shows 401 | [Why does my web UI 401?](#why-does-my-web-ui-401) |
-| Plugin crashes during init | Console.app for `[Plugin:<id>]` and `[Osaurus]` lines |
-| Hot reload not picking up changes | Make sure `osaurus tools dev` is running and shows a successful build |
+| Plugin crashes during init | Console.app for `[Plugin:<id>]` and `[Muwa]` lines |
+| Hot reload not picking up changes | Make sure `muwa-cli tools dev` is running and shows a successful build |
 
 Console.app filter to capture all plugin-related logs:
 
 ```
-process:Osaurus AND (subsystem:com.dinoki.osaurus OR message:"[Plugin:")
+process:Muwa AND (subsystem:com.dinoki.muwa OR message:"[Plugin:")
 ```
 
 ## Plugin failed to load — decision tree
 
 ```mermaid
 flowchart TD
-    Start[Plugin fails to load] --> ConsoleCheck["Console.app: [Osaurus] log message"]
+    Start[Plugin fails to load] --> ConsoleCheck["Console.app: [Muwa] log message"]
     ConsoleCheck -->|"dlopen failed"| Sig["Check codesign -vv MyPlugin.dylib"]
-    ConsoleCheck -->|"Missing entry"| Symbols["Check exports with nm -gU MyPlugin.dylib | grep osaurus_plugin"]
+    ConsoleCheck -->|"Missing entry"| Symbols["Check exports with nm -gU MyPlugin.dylib | grep muwa_plugin"]
     ConsoleCheck -->|"v2 entry returned null API"| InitCrash["Plugin's init returned NULL — check init code"]
     ConsoleCheck -->|"Plugin initialization failed"| InitCrash
     ConsoleCheck -->|"Failed to parse plugin manifest"| ManifestJSON["JSON-validate the get_manifest output"]
     ConsoleCheck -->|"declares route ... under web mount"| Mount["Move the route or change the web.mount in the manifest"]
     ConsoleCheck -->|"consent_required"| Consent["DEBUG builds: skipped. Release: open the plugin in app and grant consent"]
     Sig -->|"unsigned or invalid"| Resign["Re-sign with Developer ID Application certificate"]
-    Symbols -->|"missing v2 symbol"| Export["Add @_cdecl(\"osaurus_plugin_entry_v2\") in Swift, or pub extern \"C\" fn osaurus_plugin_entry_v2 in Rust"]
+    Symbols -->|"missing v2 symbol"| Export["Add @_cdecl(\"muwa_plugin_entry_v2\") in Swift, or pub extern \"C\" fn muwa_plugin_entry_v2 in Rust"]
 ```
 
 ### Common diagnostic commands
 
 ```bash
 # What symbols does the dylib export?
-nm -gU MyPlugin.dylib | grep osaurus_plugin
+nm -gU MyPlugin.dylib | grep muwa_plugin
 
 # Is it signed correctly?
 codesign -vv MyPlugin.dylib
@@ -53,27 +53,27 @@ otool -L MyPlugin.dylib
 
 ## Why does my web UI 401?
 
-The most common cause is opening the plugin's URL directly in a browser without the `X-Osaurus-Agent-Id` header. Browsers can't add custom headers on top-level navigation.
+The most common cause is opening the plugin's URL directly in a browser without the `X-Muwa-Agent-Id` header. Browsers can't add custom headers on top-level navigation.
 
 **Fix**:
 
-- Use the **Open Web App** button inside the Osaurus plugin detail page. It appends `?osr_agent=<agent_uuid>` automatically.
+- Use the **Open Web App** button inside the Muwa plugin detail page. It appends `?muwa_agent=<agent_uuid>` automatically.
 - If you're scripting deep links, append the same query parameter.
-- Inside your web UI, use `window.__osaurus.fetch(...)` instead of the global `fetch` — the helper attaches the agent header to every request.
+- Inside your web UI, use `window.__muwa.fetch(...)` instead of the global `fetch` — the helper attaches the agent header to every request.
 
-If you're seeing 401 *after* the page has loaded, the injected helper might not be running. Check the page source for the `<script>window.__osaurus = {...}</script>` block. If it's absent, either:
+If you're seeing 401 *after* the page has loaded, the injected helper might not be running. Check the page source for the `<script>window.__muwa = {...}</script>` block. If it's absent, either:
 
 - The response wasn't `text/html` (the helper is only injected into HTML)
-- You bypassed `window.__osaurus.fetch` on a fetch call
+- You bypassed `window.__muwa.fetch` on a fetch call
 
 ## Tool not invoked
 
 You think your tool should run but the model doesn't call it.
 
-1. **Check the manifest** — does the tool actually appear in `osaurus tools list`?
+1. **Check the manifest** — does the tool actually appear in `muwa-cli tools list`?
 2. **Check the description** — is it specific enough that the model knows when to use it? "Get user data" is vague; "Fetch the authenticated user's profile from the GitHub API" is better.
 3. **Check the model** — small local models often don't tool-call well. Try `gpt-4o-mini` or a tool-calling-capable local model.
-4. **Check for permission denial** — Insights logs `[Osaurus][Tool] permission denied: <name>` if the user denied a prior prompt. Reset in Settings → Tool Permissions.
+4. **Check for permission denial** — Insights logs `[Muwa][Tool] permission denied: <name>` if the user denied a prior prompt. Reset in Settings → Tool Permissions.
 
 ## Tool runs but returns the wrong shape
 
@@ -97,12 +97,12 @@ For long-running work, return 202 immediately and dispatch a background task via
 
 ## `context_unavailable` errors
 
-If you see `{"error": "context_unavailable"}` from a host call, your plugin called a host API from a thread Osaurus never registered. Common causes:
+If you see `{"error": "context_unavailable"}` from a host call, your plugin called a host API from a thread Muwa never registered. Common causes:
 
 - Spawning your own `DispatchQueue.global().async` and calling `host->complete` from inside without capturing the host pointer
 - Calling host APIs from a callback fired by a third-party library on its own thread
 
-**Fix**: capture the `host` pointer and the relevant inputs on the dispatching thread, do the heavy lifting on your own thread, then wrap host calls in something that hops back to a thread Osaurus knows about. The simplest pattern is to do all host work synchronously inside `invoke` / `handle_route` / `on_*`.
+**Fix**: capture the `host` pointer and the relevant inputs on the dispatching thread, do the heavy lifting on your own thread, then wrap host calls in something that hops back to a thread Muwa knows about. The simplest pattern is to do all host work synchronously inside `invoke` / `handle_route` / `on_*`.
 
 ## `plugin_busy` errors
 
@@ -144,7 +144,7 @@ Two systems share the word "plugin":
 
 | | **Native plugin** (this guide) | **Sandbox plugin** |
 |---|---|---|
-| Distribution | dylib in `~/Library/.../Osaurus/Tools` | JSON recipe |
+| Distribution | dylib in `~/Library/.../Muwa/Tools` | JSON recipe |
 | Runtime | In-process C ABI | Linux container subprocess |
 | Manifest | `get_manifest()` returns JSON | `plugin.json` file |
 | Use cases | Tools, routes, web UIs, host API access | Shell-based tools that need package isolation |

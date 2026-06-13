@@ -5,7 +5,7 @@ osaurus's MLX inference path is a thin shell around `vmlx-swift`'s
 management, and per-model scheduling all live inside the library. This
 document describes the small slice osaurus owns.
 
-Native Swift image generation is a separate pending lane. Osaurus does not
+Native Swift image generation is a separate pending lane. Muwa does not
 currently route local `/v1/images/generations` or `/v1/images/edits` through
 `vMLXFlux`; see `NATIVE_SWIFT_IMAGE_GENERATION_INTEGRATION.md` for the wiring
 contract and the current blocked vMLX matrix.
@@ -27,7 +27,7 @@ ChatEngine (route resolution, attribution, logging)
 - `.chunk(String)` -- pure user-visible text. Reasoning markers and
   tool-call markers are stripped by the library before they reach
   osaurus.
-- `.reasoning(String)` -- model reasoning text. Osaurus forwards this to
+- `.reasoning(String)` -- model reasoning text. Muwa forwards this to
   `ModelRuntimeEvent.reasoning`, HTTP `reasoning_content`, the ChatView
   Think panel, and plugin `chunk.delta.reasoning_content`.
 - `.toolCall(ToolCall)` -- a fully-parsed tool call. Every supported
@@ -45,12 +45,12 @@ ChatEngine (route resolution, attribution, logging)
 vmlx's `CacheCoordinator` owns KV cache geometry. osaurus configures it
 per container at load time
 (`installCacheCoordinator` / `buildCacheCoordinatorConfig` in
-[`ModelRuntime.swift`](../Packages/OsaurusCore/Services/ModelRuntime.swift)):
+[`ModelRuntime.swift`](../Packages/MuwaCore/Services/ModelRuntime.swift)):
 
 | Field | Value | Why |
 |---|---|---|
 | `modelKey` | `"<modelName>\|kv=turbo(3,3)\|cachefmt=2\|restore=fullhit-trim-eval1\|..."` for engine-selected proven full-KV rows; `kv=fp16` for hybrid/rotating/CCA/DSV4 rows unless explicitly overridden | per-model isolation across loads; KV-mode, serializer, restore-contract, and topology tags prevent serving disk entries encoded under a different cache contract after a runtime update |
-| `diskCacheDir` | `OsaurusPaths.diskKVCache()` | osaurus-managed sandbox path |
+| `diskCacheDir` | `MuwaPaths.diskKVCache()` | muwa-managed sandbox path |
 | `enableDiskCache` | `true` when probe-write succeeds, else `false` | graceful fallback to memory-only when the dir is read-only / out-of-disk |
 | `usePagedCache` | `true` | content-addressed paged blocks for prefix reuse |
 | `defaultKVMode` | `engine_selected` by default, resolved per model/topology: proven full-KV rows get TurboQuant, while hybrid/rotating/CCA/DSV4 rows stay native/fp16 unless explicitly overridden | TurboQuant is enabled by default only where the cache topology is simple full KV; DSV4/ZAYA/SSM/rotating companion caches keep their typed serializers and are not replaced by generic KV compression |
@@ -63,7 +63,7 @@ per container at load time
 overridden; vmlx's defaults are used so a library tuning bump lands
 without an app-layer redeploy.
 
-DSV4 is intentionally left to vmlx's default cache topology. Osaurus does
+DSV4 is intentionally left to vmlx's default cache topology. Muwa does
 not set `DSV4_KV_MODE`; unset means the production SWA+CSA+HSA
 `DeepseekV4Cache` path. Operator-provided `DSV4_KV_MODE=full` or `tq`
 is treated as a diagnostic override and disables the hybrid pool.
@@ -81,7 +81,7 @@ DSV4 must omit invalid generic flags: `--kv-cache-quantization`, `--enable-jit`,
 
 The broader switch gate is
 [`VMLX_SWIFT_OSAURUS_LIVE_MATRIX_2026_05_18.md`](VMLX_SWIFT_OSAURUS_LIVE_MATRIX_2026_05_18.md).
-It requires real Osaurus chat-app and HTTP rows for VLM/omni media, reasoning
+It requires real Muwa chat-app and HTTP rows for VLM/omni media, reasoning
 settings, saved-setting isolation, generation defaults, parser leak checks, and
 cache stats before the consolidated package can be called production-clear.
 
@@ -92,7 +92,7 @@ evidence rows that separate `proven`, `partial`, `failed`, and `unproven`
 states. Source inspection or a load-only check is not enough to promote a
 model family, cache path, system-prompt path, cancellation path, or media route.
 
-[`RuntimeProofValidation.swift`](../Packages/OsaurusCore/Services/ModelRuntime/RuntimeProofValidation.swift)
+[`RuntimeProofValidation.swift`](../Packages/MuwaCore/Services/ModelRuntime/RuntimeProofValidation.swift)
 contains the source-level validator used to keep that language precise. A row
 marked `proven` is blocked unless the requirements it claims have matching
 evidence:
@@ -147,7 +147,7 @@ sliding-window attention layers (e.g. Gemma-4 with a fixed per-layer
 `[broadcast_shapes] (1,1,1,N) and (1,16,1,1024)` crashes on the first
 decode step.
 
-Before any local tool dictionary reaches a tokenizer chat template, Osaurus
+Before any local tool dictionary reaches a tokenizer chat template, Muwa
 normalizes only the template-facing JSON Schema copy: array-valued `type`
 unions become a scalar `type` plus `nullable`, malformed or missing schema
 types and bare boolean schemas get conservative renderable fallbacks, and
@@ -169,7 +169,7 @@ the `LayerKind.deepseekV4` disk serializer instead of generic paged KV blocks.
 | `BatchEngine` actor (vmlx) | Serializes Metal / model access. Continuous batching for same-model concurrent requests. |
 | `MLXBatchAdapter.Registry` | Keeps one `BatchEngine` per model name and coalesces concurrent first creation so two same-model requests cannot build duplicate engines for one `ModelContainer`. |
 | `ModelLease` | Pins a model name for the lifetime of one stream so eviction (`unload`, `clearAll`, GC) blocks until the lease drops to zero. |
-| `ModelResidencyManager` | Schedules Osaurus-owned idle unload policy after the final lease drops; it never owns execution, KV cache, or disk cache deletion. |
+| `ModelResidencyManager` | Schedules Muwa-owned idle unload policy after the final lease drops; it never owns execution, KV cache, or disk cache deletion. |
 | `PluginHostAPI` per-plugin in-flight cap | Caps concurrent inference calls per plugin (default 2). Excess returns `plugin_busy`. |
 | `MetalGate.enterEmbedding` | Embedding service (`MetalSafeEmbedder`) opt-in serialization point. The generation surface of the gate was retired; only embeddings call into it today. |
 
@@ -181,7 +181,7 @@ window-close GC behavior. Users can choose 5, 15, 30, or 60 minutes, or
 `Never`, to keep weights resident after the last stream releases its
 `ModelLease`.
 
-This is an Osaurus memory-residency policy around `ModelRuntime.unload(name:)`.
+This is an Muwa memory-residency policy around `ModelRuntime.unload(name:)`.
 It unloads model weights and runtime buffers only; it does not delete
 downloaded models or vmlx disk KV cache entries. Strict single-model eviction,
 manual unload, `clearAll`, app quit, and memory cleanup still win over idle
@@ -194,7 +194,7 @@ fields and adds `resident_models[]` with per-model `idle_unload_at` and
 A single `defaults` knob remains:
 
 ```bash
-defaults write ai.osaurus ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize -int 8
+defaults write ai.muwa ai.muwa.scheduler.mlxBatchEngineMaxBatchSize -int 8
 ```
 
 Defaults to `1`, clamped to `[1, 32]`. The default preserves vmlx's
@@ -214,7 +214,7 @@ then recurses into `engine(...)` so the next request lands through the
 coalescer's first-fetch path with a fresh BatchEngine constructed at the
 requested batch size. Other errors (e.g. caller-side
 `invalidMaxBatchSize`) leave the cached engine intact. See
-[`InferenceFeatureFlags.swift`](../Packages/OsaurusCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
+[`InferenceFeatureFlags.swift`](../Packages/MuwaCore/Services/ModelRuntime/InferenceFeatureFlags.swift).
 
 ## Upstream runtime boundaries
 
@@ -227,7 +227,7 @@ These are deliberately not papered over in osaurus because they belong in
   bug at ~2 k tokens, surfacing as `EXC_BAD_ACCESS` on Ling JANGTQ2 long
   prompts. `b9da180` ports the recurrent GLA to a fused Metal kernel
   (`bailing_recurrent_gla` via a singleton kernel manager) so the loop
-  runs in one command, eliminating the lifetime bug. Osaurus now defaults
+  runs in one command, eliminating the lifetime bug. Muwa now defaults
   Ling thinking off through the model profile, but preserves explicit
   user/API opt-in and keeps any `.reasoning` output on the reasoning rail
   for root-cause visibility. MXFP4/JANGTQ4 remain recommended for long
@@ -235,7 +235,7 @@ These are deliberately not papered over in osaurus because they belong in
   `LING_JANGTQ2_LONG_PROMPT_CRASH.md`.
 - vmlx pin `b9da180` reorders the SSM re-derive pass to run AFTER the
   generation yields completion `.info`, so the SSE stream no longer
-  stays open while the re-derive runs. Osaurus keeps
+  stays open while the re-derive runs. Muwa keeps
   `enableSSMReDerive=true` so hybrid SSM/linear-attention rows can
   restore companion state by default instead of silently degrading to
   KV-only reuse.

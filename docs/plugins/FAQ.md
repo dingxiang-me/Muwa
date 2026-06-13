@@ -6,7 +6,7 @@ Quick answers to common questions. For deeper guides see [README.md](README.md).
 
 ### Do old plugins still work?
 
-Yes. The Plugin ABI is **frozen** — the `osr_host_api` struct layout never changes; new versions only append optional slots at the end. Plugins compiled against v1 (`osaurus_plugin_entry`, no host API access) through v4 continue to load against the current v5 host unchanged. Two slots (`dispatch_clarify`, `dispatch_add_issue`) are reserved and return `not_supported` envelopes for backwards compat.
+Yes. The Plugin ABI is **frozen** — the `osr_host_api` struct layout never changes; new versions only append optional slots at the end. Plugins compiled against v1 (`muwa_plugin_entry`, no host API access) through v4 continue to load against the current v5 host unchanged. Two slots (`dispatch_clarify`, `dispatch_add_issue`) are reserved and return `not_supported` envelopes for backwards compat.
 
 You only need to rebuild to pick up new callbacks (`complete_cancel` in v3, `get_active_agent_id` in v4, `log_structured` in v5). There is no forced migration. See [ABI_VERSIONS.md](ABI_VERSIONS.md) for the per-version evolution and the `host->version >= N` defensive-check pattern.
 
@@ -26,8 +26,8 @@ This guide is exclusively about native plugins. For sandbox recipes see [../SAND
 
 Any language that produces a macOS dynamic library and exports the C ABI. Officially supported scaffolds:
 
-- **Swift** — `osaurus tools create my-plugin`
-- **Rust** — `osaurus tools create my-plugin --language rust`
+- **Swift** — `muwa-cli tools create my-plugin`
+- **Rust** — `muwa-cli tools create my-plugin --language rust`
 
 Zig, C, C++, and Go (via `cgo`) all work. The `osr_host_api` struct is plain C.
 
@@ -35,18 +35,18 @@ Zig, C, C++, and Go (via `cgo`) all work. The `osr_host_api` struct is plain C.
 
 ### How do I reload a plugin during development?
 
-`osaurus tools dev` watches your sources and reloads on save. To trigger a reload manually from anywhere:
+`muwa-cli tools dev` watches your sources and reloads on save. To trigger a reload manually from anywhere:
 
 ```bash
-osaurus tools reload
+muwa-cli tools reload
 ```
 
 Or send the distributed notification yourself:
 
 ```bash
 osascript -e 'tell application "System Events" to do shell script "echo"' \
-  ; defaults write com.dinoki.osaurus _ _ \
-  ; killall -USR1 Osaurus 2>/dev/null
+  ; defaults write com.dinoki.muwa _ _ \
+  ; killall -USR1 Muwa 2>/dev/null
 ```
 
 (The CLI subcommand is the supported path.)
@@ -71,16 +71,16 @@ Not directly. Plugins are isolated by design. Cross-plugin coordination should g
 - **`instructions`** — appended to the system prompt for inference calls **initiated by the plugin itself** (via `host->complete` etc.). Use sparingly; this isn't part of the user's chat system prompt.
 - **Tool `description`** — fed to the model when it picks tools. Be specific: "Fetch authenticated user's GitHub profile" beats "Get user data".
 
-### Why does my plugin need a `min_osaurus`?
+### Why does my plugin need a `muwa_min_version`?
 
-It's optional but recommended once your plugin uses host APIs added after a specific Osaurus version. The host doesn't currently enforce it at load time, but the marketplace surfaces it to users so they know whether to upgrade.
+It's optional but recommended once your plugin uses host APIs added after a specific Muwa version. The host doesn't currently enforce it at load time, but the marketplace surfaces it to users so they know whether to upgrade.
 
 ### Can I declare runtime tools dynamically?
 
 Not yet. The manifest is read once at load time. If you need to expose tools that depend on user config, you can:
 
 - Declare a generic tool with a `mode` parameter and dispatch internally
-- Trigger a reload after config changes via `host->log` and the `osaurus tools reload` workflow (won't work in installed builds without restarting)
+- Trigger a reload after config changes via `host->log` and the `muwa-cli tools reload` workflow (won't work in installed builds without restarting)
 
 A formal "dynamic tools" API may land in a future v4 surface.
 
@@ -88,11 +88,11 @@ A formal "dynamic tools" API may land in a future v4 surface.
 
 ### Why does my web UI 401 when I open the URL in Safari?
 
-Browsers can't add the `X-Osaurus-Agent-Id` header to top-level navigation. Use the **Open Web App** button in the Osaurus plugin detail page — it appends `?osr_agent=<agent_uuid>` automatically and the injected `window.__osaurus.fetch` carries the header forward. See [DEBUGGING.md#why-does-my-web-ui-401](DEBUGGING.md#why-does-my-web-ui-401).
+Browsers can't add the `X-Muwa-Agent-Id` header to top-level navigation. Use the **Open Web App** button in the Muwa plugin detail page - it appends `?muwa_agent=<agent_uuid>` automatically and the injected `window.__muwa.fetch` carries the header forward. See [DEBUGGING.md#why-does-my-web-ui-401](DEBUGGING.md#why-does-my-web-ui-401).
 
 ### Does the dev proxy work with Vite HMR?
 
-Yes. The proxy now forwards the original method, headers, and body — POSTs, HMR pings, fetch calls all flow through. Set `~/Library/Application Support/Osaurus/Config/dev-proxy.json` per [ROUTES_AND_WEB.md#dev-proxy](ROUTES_AND_WEB.md#dev-proxy).
+Yes. The proxy now forwards the original method, headers, and body — POSTs, HMR pings, fetch calls all flow through. Set `~/Library/Application Support/Muwa/Config/dev-proxy.json` per [ROUTES_AND_WEB.md#dev-proxy](ROUTES_AND_WEB.md#dev-proxy).
 
 ### Are paths case-sensitive?
 
@@ -138,7 +138,7 @@ Open Insights → Plugin Activity. Every host API call is logged with method, pa
 
 ### Why am I seeing `context_unavailable` errors?
 
-Your plugin called a host API from a thread Osaurus didn't register. See [DEBUGGING.md#context_unavailable-errors](DEBUGGING.md#context_unavailable-errors).
+Your plugin called a host API from a thread Muwa didn't register. See [DEBUGGING.md#context_unavailable-errors](DEBUGGING.md#context_unavailable-errors).
 
 ### Why am I seeing one-shot warnings in Console?
 
@@ -154,11 +154,11 @@ Each is logged once per plugin per process. Search Console.app for `[PluginHostA
 
 ### Does my plugin need to be code-signed?
 
-For release builds, yes. The host verifies signatures and refuses to load unsigned plugins. DEBUG builds (running through `osaurus tools dev`) skip signature verification.
+For release builds, yes. The host verifies signatures and refuses to load unsigned plugins. DEBUG builds (running through `muwa-cli tools dev`) skip signature verification.
 
 ### Can I host my own plugin registry?
 
-Today plugins are distributed via the [osaurus-tools](https://github.com/osaurus-ai/osaurus-tools) registry. Sideloading from arbitrary directories works for development and private distributions but is not user-facing in the marketplace.
+Today plugins are distributed via the [muwa-tools](https://github.com/muwa-ai/muwa-tools) registry. Sideloading from arbitrary directories works for development and private distributions but is not user-facing in the marketplace.
 
 ### How do I update an installed plugin?
 

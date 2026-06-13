@@ -8,7 +8,7 @@ Skills are packages of instructions, context, and resources that give your AI sp
 
 ## Quick Start
 
-Osaurus comes with 6 built-in skills ready to use:
+Muwa comes with 6 built-in skills ready to use:
 
 | Skill | Description |
 |-------|-------------|
@@ -38,9 +38,9 @@ Import skills from any GitHub repository that includes a skills marketplace:
 3. Browse available skills and select which to import
 4. Click **Import Selected**
 
-Osaurus looks for `.claude-plugin/marketplace.json` in the repository to discover available skills.
+Muwa looks for `.claude-plugin/marketplace.json` in the repository to discover available skills.
 
-> **Full Claude plugins:** Osaurus also recognises the directory-based Claude plugin layout (e.g. [`anthropics/claude-for-legal`](https://github.com/anthropics/claude-for-legal)) and can import scheduled agents, slash commands, MCP providers, and a shared `CLAUDE.md` context alongside the skills. See [Claude Plugins](CLAUDE_PLUGINS.md) for the full plugin import flow.
+> **Full Claude plugins:** Muwa also recognises the directory-based Claude plugin layout (e.g. [`anthropics/claude-for-legal`](https://github.com/anthropics/claude-for-legal)) and can import scheduled agents, slash commands, MCP providers, and a shared `CLAUDE.md` context alongside the skills. See [Claude Plugins](CLAUDE_PLUGINS.md) for the full plugin import flow.
 
 ### From Files
 
@@ -82,7 +82,7 @@ Export skills to share with others:
 
 1. Expand a skill and click **Export**
 2. Choose a format:
-   - **JSON** — Osaurus format for backup
+   - **JSON** — Muwa format for backup
    - **Markdown** — Agent Skills compatible `.md` file
    - **ZIP** — Complete package with references and assets
 
@@ -94,7 +94,7 @@ Click **Delete** to remove a custom skill. Built-in skills cannot be deleted.
 
 When you import a full Claude plugin from GitHub, the **Installed Plugins** card appears at the top of the Skills view. Each row shows the plugin name, source slug, and chips for its skill / schedule / command / MCP counts. Click **Uninstall** to remove every artifact the plugin contributed (skills, schedules, slash commands, MCP providers, and any Keychain-stored tokens) in one shot.
 
-Only plugins imported via the GitHub flow are listed here — Osaurus's built-in tool plugins are managed separately. See [Claude Plugins](CLAUDE_PLUGINS.md) for the full lifecycle.
+Only plugins imported via the GitHub flow are listed here — Muwa's built-in tool plugins are managed separately. See [Claude Plugins](CLAUDE_PLUGINS.md) for the full lifecycle.
 
 ---
 
@@ -121,7 +121,7 @@ Create your own skills with the built-in editor:
 
 ## Skill Format
 
-Osaurus follows the [Agent Skills specification](https://agentskills.io/), using `SKILL.md` files with YAML frontmatter:
+Muwa follows the [Agent Skills specification](https://agentskills.io/), using `SKILL.md` files with YAML frontmatter:
 
 ```markdown
 ---
@@ -158,7 +158,7 @@ Always include:
 Skills are stored as directories:
 
 ```
-~/.osaurus/skills/
+~/.muwa/skills/
 └── research-analyst/
     ├── SKILL.md           # Main skill file
     ├── references/        # Optional: files loaded into context
@@ -190,7 +190,7 @@ Add context files that are automatically loaded when the skill is active:
 
 ## Automated Capability Discovery
 
-Osaurus gives the agent a complete, statically-ordered view of every enabled capability and lets it load the ones it needs on demand. No manual per-turn configuration is needed -- the right skills surface as the conversation evolves.
+Muwa gives the agent a complete, statically-ordered view of every enabled capability and lets it load the ones it needs on demand. No manual per-turn configuration is needed -- the right skills surface as the conversation evolves.
 
 ### How It Works
 

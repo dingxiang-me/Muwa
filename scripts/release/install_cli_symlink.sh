@@ -2,12 +2,12 @@
 set -euo pipefail
 
 # install_cli_symlink.sh
-# Creates/updates a convenient `osaurus` symlink to either:
-#   1) the app's embedded CLI at Osaurus.app/Contents/MacOS/osaurus, or
+# Creates/updates a convenient `muwa` symlink to either:
+#   1) the app's embedded CLI at Muwa.app/Contents/Helpers/muwa, or
 #   2) a locally built CLI binary in DerivedData (dev mode).
 #
 # Usage:
-#   scripts/install_cli_symlink.sh [--dev] [--prefix <dir>] [<path-to-Osaurus.app>]
+#   scripts/install_cli_symlink.sh [--dev] [--prefix <dir>] [<path-to-Muwa.app>]
 #
 # Notes:
 # - When no path is provided, common install locations are checked.
@@ -45,8 +45,11 @@ resolve_cli_from_app() {
   local app_path="$1"
   local candidate
   for candidate in \
-    "$app_path/Contents/Helpers/osaurus" \
-    "$app_path/Contents/MacOS/osaurus"
+    "$app_path/Contents/Helpers/muwa" \
+    "$app_path/Contents/MacOS/muwa" \
+    "$app_path/Contents/MacOS/muwa" \
+    "$app_path/Contents/Helpers/muwa" \
+    "$app_path/Contents/MacOS/muwa"
   do
     if [[ -x "$candidate" ]]; then
       echo "$candidate"
@@ -60,14 +63,22 @@ resolve_cli_from_dev() {
   # Try common DerivedData product locations
   local base="$REPO_ROOT/build/DerivedData/Build/Products/Release"
   for candidate in \
-    "$base/osaurus" \
-    "$base/osaurus-cli" \
-    "$base/osaurus.app/Contents/Helpers/osaurus" \
-    "$base/osaurus.app/Contents/MacOS/osaurus" \
-    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/osaurus" \
-    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/osaurus-cli" \
-    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/osaurus.app/Contents/Helpers/osaurus" \
-    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/osaurus.app/Contents/MacOS/osaurus"
+    "$base/muwa" \
+    "$base/muwa-cli" \
+    "$base/Muwa.app/Contents/Helpers/muwa" \
+    "$base/Muwa.app/Contents/MacOS/muwa" \
+    "$base/muwa" \
+    "$base/muwa-cli" \
+    "$base/Muwa.app/Contents/Helpers/muwa" \
+    "$base/Muwa.app/Contents/MacOS/muwa" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/muwa" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/muwa-cli" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/Muwa.app/Contents/Helpers/muwa" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/Muwa.app/Contents/MacOS/muwa" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/muwa" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/muwa-cli" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/Muwa.app/Contents/Helpers/muwa" \
+    "$REPO_ROOT/build/DerivedData/Build/Products/Debug/Muwa.app/Contents/MacOS/muwa"
   do
     if [[ -x "$candidate" ]]; then
       echo "$candidate"
@@ -111,10 +122,14 @@ if [[ "$DEV_MODE" == "1" ]]; then
 else
   if [[ -z "$APP_PATH" ]]; then
     CANDIDATES=(
-      "/Applications/Osaurus.app"
-      "$HOME/Applications/Osaurus.app"
-      "/Applications/osaurus.app"
-      "$HOME/Applications/osaurus.app"
+      "/Applications/Muwa.app"
+      "$HOME/Applications/Muwa.app"
+      "/Applications/muwa.app"
+      "$HOME/Applications/muwa.app"
+      "/Applications/Muwa.app"
+      "$HOME/Applications/Muwa.app"
+      "/Applications/Muwa.app"
+      "$HOME/Applications/Muwa.app"
     )
     for c in "${CANDIDATES[@]}"; do
       if CLI_SRC="$(resolve_cli_from_app "$c")"; then
@@ -125,20 +140,20 @@ else
   else
     if CLI_SRC="$(resolve_cli_from_app "$APP_PATH")"; then :; else
       echo "CLI binary not found in: $APP_PATH" >&2
-      echo "Expected at: $APP_PATH/Contents/MacOS/osaurus" >&2
+      echo "Expected at: $APP_PATH/Contents/Helpers/muwa" >&2
       exit 1
     fi
   fi
 
   if [[ -z "$CLI_SRC" ]]; then
-    echo "Could not locate Osaurus.app automatically. Provide the path explicitly." >&2
-    echo "Example: scripts/install_cli_symlink.sh '/Applications/Osaurus.app'" >&2
+    echo "Could not locate Muwa.app automatically. Provide the path explicitly." >&2
+    echo "Example: scripts/install_cli_symlink.sh '/Applications/Muwa.app'" >&2
     exit 1
   fi
 fi
 
 TARGET_DIR="$(resolve_target_bin_dir)"
-TARGET_LINK="$TARGET_DIR/osaurus"
+TARGET_LINK="$TARGET_DIR/muwa"
 
 mkdir -p "$TARGET_DIR"
 
@@ -149,7 +164,7 @@ else
   # Fallback to user-local, avoid sudo prompts
   TARGET_DIR="$HOME/.local/bin"
   mkdir -p "$TARGET_DIR"
-  TARGET_LINK="$TARGET_DIR/osaurus"
+  TARGET_LINK="$TARGET_DIR/muwa"
   ln -sf "$CLI_SRC" "$TARGET_LINK"
   echo "Installed symlink (user): $TARGET_LINK -> $CLI_SRC"
   echo "Make sure $TARGET_DIR is on your PATH (e.g., add to your shell profile)."

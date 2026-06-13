@@ -4,28 +4,28 @@ Status: proposal for PR #1057 follow-up implementation. This document is intenti
 
 ## Goal
 
-Let users choose how long a local model stays resident after API or chat activity before Osaurus unloads the model from memory.
+Let users choose how long a local model stays resident after API or chat activity before Muwa unloads the model from memory.
 
-This is an Osaurus runtime policy, not a vmlx-swift engine feature. vmlx-swift should continue to own model execution, `BatchEngine`, tokenizer/cache primitives, and shutdown mechanics. Osaurus owns user settings, API semantics, window/session state, memory policy, and the future server control panel.
+This is an Muwa runtime policy, not a vmlx-swift engine feature. vmlx-swift should continue to own model execution, `BatchEngine`, tokenizer/cache primitives, and shutdown mechanics. Muwa owns user settings, API semantics, window/session state, memory policy, and the future server control panel.
 
 ## Current State
 
 The current runtime already has the primitives needed for a keep-awake policy:
 
-- `Packages/OsaurusCore/Models/Configuration/ServerConfiguration.swift`
+- `Packages/MuwaCore/Models/Configuration/ServerConfiguration.swift`
   - `modelEvictionPolicy` controls strict single-model eviction versus manual multi-model retention.
-- `Packages/OsaurusCore/Services/ModelRuntime.swift`
+- `Packages/MuwaCore/Services/ModelRuntime.swift`
   - `unload(name:)` shuts down the cached `BatchEngine`, waits on `ModelLease`, disables container caching, removes the holder, synchronizes GPU work, and clears MLX memory.
   - `unloadModelsNotIn(_:)` unloads cached models not referenced by active chat windows or active leases.
   - `clearAll()` shuts down all engines and containers.
   - `cachedModelSummaries()` exposes resident model names for status surfaces.
-- `Packages/OsaurusCore/Services/ModelRuntime/ModelLease.swift`
+- `Packages/MuwaCore/Services/ModelRuntime/ModelLease.swift`
   - active generations hold a per-model lease so unload paths wait before freeing buffers.
-- `Packages/OsaurusCore/Managers/Chat/ChatWindowManager.swift`
+- `Packages/MuwaCore/Managers/Chat/ChatWindowManager.swift`
   - window close currently calls `ModelRuntime.shared.unloadModelsNotIn(active)` as an immediate GC pass.
-- `Packages/OsaurusCore/Networking/HTTPHandler.swift`
+- `Packages/MuwaCore/Networking/HTTPHandler.swift`
   - health/status output already includes loaded model names and in-flight lease counts.
-- `Packages/OsaurusCore/Views/Settings/ConfigurationView.swift`
+- `Packages/MuwaCore/Views/Settings/ConfigurationView.swift`
   - Settings already has a Local Inference / Model Management section for model eviction policy.
 
 The missing piece is a residency timer that treats "no active lease" as the start of an idle countdown instead of unloading immediately or retaining indefinitely.
@@ -79,7 +79,7 @@ If any check fails, the timer exits without unloading.
 
 ### Manual multi-model retention can still use timers
 
-`ModelEvictionPolicy.manualMultiModel` means Osaurus does not evict other models just because a different model is used. If the idle setting is a positive timeout, each resident model gets its own independent idle countdown.
+`ModelEvictionPolicy.manualMultiModel` means Muwa does not evict other models just because a different model is used. If the idle setting is a positive timeout, each resident model gets its own independent idle countdown.
 
 ### Sleep means memory residency, not cache deletion
 
@@ -117,7 +117,7 @@ Validation:
 
 ## Proposed New Runtime Unit
 
-Create `Packages/OsaurusCore/Services/ModelRuntime/ModelResidencyManager.swift`.
+Create `Packages/MuwaCore/Services/ModelRuntime/ModelResidencyManager.swift`.
 
 Responsibilities:
 
@@ -163,8 +163,8 @@ The injectable closures keep the actor unit-testable without requiring real MLX 
 
 Files:
 
-- Modify `Packages/OsaurusCore/Models/Configuration/ServerConfiguration.swift`.
-- Modify `Packages/OsaurusCore/Tests/Networking/ServerConfigurationStoreTests.swift`.
+- Modify `Packages/MuwaCore/Models/Configuration/ServerConfiguration.swift`.
+- Modify `Packages/MuwaCore/Tests/Networking/ServerConfigurationStoreTests.swift`.
 
 Steps:
 
@@ -179,7 +179,7 @@ Expected tests:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter ServerConfigurationStoreTests
 ```
 
@@ -187,8 +187,8 @@ swift test --package-path Packages/OsaurusCore \
 
 Files:
 
-- Create `Packages/OsaurusCore/Services/ModelRuntime/ModelResidencyManager.swift`.
-- Create `Packages/OsaurusCore/Tests/Service/ModelResidencyManagerTests.swift`.
+- Create `Packages/MuwaCore/Services/ModelRuntime/ModelResidencyManager.swift`.
+- Create `Packages/MuwaCore/Tests/Service/ModelResidencyManagerTests.swift`.
 
 Steps:
 
@@ -200,7 +200,7 @@ Expected tests:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter ModelResidencyManagerTests
 ```
 
@@ -208,8 +208,8 @@ swift test --package-path Packages/OsaurusCore \
 
 Files:
 
-- Modify `Packages/OsaurusCore/Services/ModelRuntime.swift`.
-- Modify `Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift`.
+- Modify `Packages/MuwaCore/Services/ModelRuntime.swift`.
+- Modify `Packages/MuwaCore/Tests/Service/RuntimePolicySourceTests.swift`.
 
 Steps:
 
@@ -223,7 +223,7 @@ Expected tests:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter 'RuntimePolicySourceTests|ModelLeaseTests|MLXBatchAdapterTests'
 ```
 
@@ -231,8 +231,8 @@ swift test --package-path Packages/OsaurusCore \
 
 Files:
 
-- Modify `Packages/OsaurusCore/Managers/Chat/ChatWindowManager.swift`.
-- Extend `Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift` or add a focused ChatWindowManager source-policy test.
+- Modify `Packages/MuwaCore/Managers/Chat/ChatWindowManager.swift`.
+- Extend `Packages/MuwaCore/Tests/Service/RuntimePolicySourceTests.swift` or add a focused ChatWindowManager source-policy test.
 
 Steps:
 
@@ -245,7 +245,7 @@ Expected tests:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter RuntimePolicySourceTests
 ```
 
@@ -253,8 +253,8 @@ swift test --package-path Packages/OsaurusCore \
 
 Files:
 
-- Modify `Packages/OsaurusCore/Networking/HTTPHandler.swift`.
-- Modify `Packages/OsaurusCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift` or add a focused health/status test if the project already has one.
+- Modify `Packages/MuwaCore/Networking/HTTPHandler.swift`.
+- Modify `Packages/MuwaCore/Tests/Networking/HTTPHandlerChatStreamingTests.swift` or add a focused health/status test if the project already has one.
 
 Steps:
 
@@ -271,7 +271,7 @@ Expected tests:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter HTTPHandlerChatStreamingTests
 ```
 
@@ -279,8 +279,8 @@ swift test --package-path Packages/OsaurusCore \
 
 Files:
 
-- Modify `Packages/OsaurusCore/Views/Settings/ConfigurationView.swift`.
-- Add focused source-policy coverage to `Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift` if no SwiftUI settings test harness exists.
+- Modify `Packages/MuwaCore/Views/Settings/ConfigurationView.swift`.
+- Add focused source-policy coverage to `Packages/MuwaCore/Tests/Service/RuntimePolicySourceTests.swift` if no SwiftUI settings test harness exists.
 
 Steps:
 
@@ -294,7 +294,7 @@ Expected tests:
 
 ```bash
 DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer \
-swift test --package-path Packages/OsaurusCore \
+swift test --package-path Packages/MuwaCore \
   --filter RuntimePolicySourceTests
 ```
 
@@ -310,14 +310,14 @@ Steps:
 
 1. Document the distinction between eviction policy and idle residency policy.
 2. Document that idle unload preserves disk cache.
-3. Document that vmlx-swift remains the execution/cache primitive provider while Osaurus owns user residency policy.
+3. Document that vmlx-swift remains the execution/cache primitive provider while Muwa owns user residency policy.
 4. Document status fields if Task 5 lands.
 
 Expected checks:
 
 ```bash
 rg -n "modelIdleResidencyPolicy|ModelIdleResidencyPolicy|idle_unload|Keep model loaded" \
-  Packages/OsaurusCore docs
+  Packages/MuwaCore docs
 git diff --check
 ```
 
@@ -346,7 +346,7 @@ git diff --check
 
 ## Implementation Notes
 
-- Keep all runtime changes in Osaurus. Do not add app-policy timers to vmlx-swift.
+- Keep all runtime changes in Muwa. Do not add app-policy timers to vmlx-swift.
 - Keep timer code actor-isolated and injectable for unit tests.
 - Avoid using `Task.detached`; use regular tasks created from the actor and cancel them explicitly.
 - Avoid sleeping on the main actor.

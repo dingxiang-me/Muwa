@@ -1,12 +1,12 @@
 # Developer Tools
 
-Osaurus includes built-in developer tools for debugging, monitoring, and testing your integration. Access them via the Management window (`⌘ Shift M`).
+Muwa includes built-in developer tools for debugging, monitoring, and testing your integration. Access them via the Management window (`⌘ Shift M`).
 
 ---
 
 ## Insights
 
-The **Insights** tab provides real-time monitoring of all API requests flowing through Osaurus.
+The **Insights** tab provides real-time monitoring of all API requests flowing through Muwa.
 
 ### Accessing Insights
 
@@ -127,7 +127,7 @@ Browse all available endpoints, organized by category:
 | **Audio** | `/audio/transcriptions`                                |
 | **MCP**   | `/mcp/health`, `/mcp/tools`, `/mcp/call`               |
 
-The MCP endpoints are Osaurus's local HTTP MCP surface. Command-based stdio clients should launch `osaurus mcp`, which proxies to these endpoints.
+The MCP endpoints are Muwa's local HTTP MCP surface. Command-based stdio clients should launch `muwa-cli mcp`, which proxies to these endpoints.
 
 Each endpoint shows:
 
@@ -162,7 +162,7 @@ Test any endpoint directly:
 
 #### Documentation Link
 
-Quick access to the full documentation at docs.osaurus.ai.
+Quick access to the full documentation at docs.muwa.ai.
 
 ### Use Cases
 
@@ -228,7 +228,7 @@ Quick access to the full documentation at docs.osaurus.ai.
 4. Verify your expected tools are listed
 5. Test a specific tool with `POST /mcp/call`
 
-This verifies Osaurus's local MCP server surface, including tools discovered from connected URL-based Remote MCP Providers. It does not launch or inspect third-party stdio providers configured with `command` and `args`; those are outside the Remote MCP Providers transport supported by the current app.
+This verifies Muwa's local MCP server surface, including tools discovered from connected URL-based Remote MCP Providers. It does not launch or inspect third-party stdio providers configured with `command` and `args`; those are outside the Remote MCP Providers transport supported by the current app.
 
 ---
 
@@ -257,7 +257,7 @@ The Server Explorer requires the server to be running. If endpoints show as disa
 
 ## CI testing conventions
 
-How CI runs the Osaurus test suite, and the hooks that exist to debug it when it goes sideways.
+How CI runs the Muwa test suite, and the hooks that exist to debug it when it goes sideways.
 
 ### Reproduce CI locally
 
@@ -280,9 +280,9 @@ Tests that require external infrastructure (Apple Containerization, real GPU, ne
 
    ```swift
    private let isEnabled =
-       ProcessInfo.processInfo.environment["OSAURUS_RUN_FOO_TESTS"] == "1"
+       ProcessInfo.processInfo.environment["MUWA_RUN_FOO_TESTS"] == "1"
 
-   @Suite(.disabled(if: !isEnabled, "Set OSAURUS_RUN_FOO_TESTS=1 to run"))
+   @Suite(.disabled(if: !isEnabled, "Set MUWA_RUN_FOO_TESTS=1 to run"))
    struct FooIntegrationTests { … }
    ```
 
@@ -292,7 +292,7 @@ Currently env-gated:
 
 | Env var                                  | Suite                                                                                    | Notes                                            |
 | ---------------------------------------- | ---------------------------------------------------------------------------------------- | ------------------------------------------------ |
-| `OSAURUS_RUN_SANDBOX_INTEGRATION_TESTS=1` | [`SandboxIntegrationTests`](../Packages/OsaurusCore/Tests/Sandbox/SandboxIntegrationTests.swift) | Boots a Linux VM; runs `pip`/`npm`/`go` workloads. |
+| `MUWA_RUN_SANDBOX_INTEGRATION_TESTS=1` | [`SandboxIntegrationTests`](../Packages/MuwaCore/Tests/Sandbox/SandboxIntegrationTests.swift) | Boots a Linux VM; runs `pip`/`npm`/`go` workloads. |
 
 ### Document runtime discovery
 
@@ -309,8 +309,8 @@ Set either variable to point tests or local builds at a specific executable:
 
 | Env var | Purpose |
 | ------- | ------- |
-| `OSAURUS_OFFICE_RUNTIME_URL` | File URL for an explicit `soffice` executable. |
-| `OSAURUS_OFFICE_RUNTIME_PATH` | File-system path for an explicit `soffice` executable. |
+| `MUWA_OFFICE_RUNTIME_URL` | File URL for an explicit `soffice` executable. |
+| `MUWA_OFFICE_RUNTIME_PATH` | File-system path for an explicit `soffice` executable. |
 
 ### CI cache controls
 
@@ -332,7 +332,7 @@ A passing run produces ~1–2k log lines instead of the historical ~30k, and ind
 
 ### Deferred follow-up
 
-Test wall-time is now bounded by the build-from-scratch cost of the full `OsaurusCore` package. The biggest remaining lever is splitting `OsaurusCore` into focused SPM targets (`OsaurusFoundation`, `OsaurusInference`, `OsaurusVoice`, `OsaurusUpdater`, `OsaurusSandbox`, `OsaurusUI`) so a Foundation-only PR doesn't rebuild MLX / FluidAudio / Sparkle / VecturaKit. File-coupling counts that justify the split:
+Test wall-time is now bounded by the build-from-scratch cost of the full `MuwaCore` package. The biggest remaining lever is splitting `MuwaCore` into focused SPM targets (`MuwaFoundation`, `MuwaInference`, `MuwaVoice`, `MuwaUpdater`, `MuwaSandbox`, `MuwaUI`) so a Foundation-only PR doesn't rebuild MLX / FluidAudio / Sparkle / VecturaKit. File-coupling counts that justify the split:
 
 - MLX/MLXLLM/MLXVLM/MLXLMCommon/Tokenizers: ~10 files, all in `Services/ModelRuntime*`, `Managers/Model/ModelManager.swift`, `Models/Configuration/VLMDetection.swift`, `Utils/StreamingDeltaProcessor.swift`, `Views/Chat/ChatView.swift`.
 - `FluidAudio`: 2 files (`Managers/SpeechService.swift`, `Managers/Model/SpeechModelManager.swift`).
@@ -342,7 +342,7 @@ Test wall-time is now bounded by the build-from-scratch cost of the full `Osauru
 - `Containerization`: 1 file (`Services/Sandbox/SandboxManager.swift`).
 - `P256K`, `Highlightr`, `SwiftMath`: 1 file each.
 
-Yet **64 of 70 test files use `@testable import OsaurusCore`**, so even tiny tests rebuild the heavy graph today. The one boundary leak that needs cleaning before the split: `Models/Configuration/VLMDetection.swift` imports `MLXVLM` from the otherwise-pure `Models/` tree.
+Yet **64 of 70 test files use `@testable import MuwaCore`**, so even tiny tests rebuild the heavy graph today. The one boundary leak that needs cleaning before the split: `Models/Configuration/VLMDetection.swift` imports `MLXVLM` from the otherwise-pure `Models/` tree.
 
 ---
 

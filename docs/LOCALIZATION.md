@@ -1,15 +1,15 @@
 # Localization
 
-Osaurus uses **String Catalogs** (`.xcstrings`) for translations. There are no legacy `.strings` files or `.lproj` folders.
+Muwa uses **String Catalogs** (`.xcstrings`) for translations. There are no legacy `.strings` files or `.lproj` folders.
 
 ## Where strings live
 
 | Catalog | Path | Contents |
 | ------- | ---- | -------- |
-| **UI (all app screens)** | `Packages/OsaurusCore/Resources/Localizable.xcstrings` | Menus, settings, chat, agents, plugins, etc. |
-| **Info.plist** | `App/osaurus/InfoPlist.xcstrings` | Privacy usage descriptions, bundle display name |
+| **UI (all app screens)** | `Packages/MuwaCore/Resources/Localizable.xcstrings` | Menus, settings, chat, agents, plugins, etc. |
+| **Info.plist** | `App/Muwa/InfoPlist.xcstrings` | Privacy usage descriptions, bundle display name |
 
-All SwiftUI and `String` UI text in **OsaurusCore** must resolve against the **package bundle**, not the main app bundle.
+All SwiftUI and `String` UI text in **MuwaCore** must resolve against the **package bundle**, not the main app bundle.
 
 ## Supported locales
 
@@ -31,7 +31,7 @@ leaderboard. Add any further locales to `knownRegions` when expanding support.
 
 ## Swift API
 
-Helpers live in `Packages/OsaurusCore/Utils/`:
+Helpers live in `Packages/MuwaCore/Utils/`:
 
 | API | Use for |
 | --- | ------- |
@@ -48,13 +48,13 @@ Text(LocalizedStringKey(title), bundle: .module)
 
 After adding a key in code, add **de** and **zh-Hans** in `Localizable.xcstrings` (Xcode String Catalog editor).
 
-Avoid raw `Text("…")`, `.help("…")`, `Button("…")`, `panel.title = "…"`, and `UNMutableNotificationContent.title = "…"` in `Packages/OsaurusCore`. CI flags these because they usually resolve against the wrong bundle.
+Avoid raw `Text("…")`, `.help("…")`, `Button("…")`, `panel.title = "…"`, and `UNMutableNotificationContent.title = "…"` in `Packages/MuwaCore`. CI flags these because they usually resolve against the wrong bundle.
 
 ## Adding a new language
 
-1. Add the locale to `knownRegions` in `App/osaurus.xcodeproj/project.pbxproj`.
-2. Add translations in `Packages/OsaurusCore/Resources/Localizable.xcstrings`.
-3. Translate Info.plist strings in `App/osaurus/InfoPlist.xcstrings` when needed.
+1. Add the locale to `knownRegions` in `App/Muwa.xcodeproj/project.pbxproj`.
+2. Add translations in `Packages/MuwaCore/Resources/Localizable.xcstrings`.
+3. Translate Info.plist strings in `App/Muwa/InfoPlist.xcstrings` when needed.
 4. Run `bash scripts/i18n/check.sh`.
 5. Smoke-test with the system language set to the new locale.
 
@@ -62,7 +62,7 @@ Import from another catalog:
 
 ```bash
 python3 scripts/i18n/merge-locale.py \
-  --target Packages/OsaurusCore/Resources/Localizable.xcstrings \
+  --target Packages/MuwaCore/Resources/Localizable.xcstrings \
   --source path/to/other/Localizable.xcstrings \
   --locale <locale-code>
 ```
@@ -81,7 +81,7 @@ In Xcode: **Product → Export Localizations…** / **Import Localizations…** 
 
 ## Out of scope
 
-- **OsaurusCLI** is English-only.
+- **MuwaCLI** is English-only.
 - **User-generated content** (chat, model output) is not localized.
 
 ## Maintainer scripts
@@ -102,6 +102,6 @@ Xcode's indexer will occasionally inject empty stubs into the catalog for raw `T
 
 ```bash
 python3 scripts/i18n/prune-catalog.py \
-  Packages/OsaurusCore/Resources/Localizable.xcstrings \
+  Packages/MuwaCore/Resources/Localizable.xcstrings \
   --remove-stale
 ```

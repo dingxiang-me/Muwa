@@ -1,4 +1,4 @@
-name: Build and Release Osaurus
+name: Build and Release Muwa
 
 on:
   push:
@@ -23,6 +23,9 @@ env:
   # sync with `XCODE_VERSION` in .github/workflows/ci.yml — both files must
   # build against the same toolchain. Bump intentionally; never drift.
   XCODE_VERSION: "26.4.1"
+  # Short-term public distribution mode until a Developer ID certificate and
+  # notarization credentials are available.
+  ADHOC_SIGNING: "true"
 
 jobs:
   verify_ci:
@@ -111,13 +114,14 @@ jobs:
         run: bash scripts/setup_env.sh
 
       - name: Install certificates
+        if: env.ADHOC_SIGNING != 'true'
         env:
           MACOS_CERTIFICATE_BASE64: ${{ secrets.MACOS_CERTIFICATE_BASE64 }}
           MACOS_CERTIFICATE_PASSWORD: ${{ secrets.MACOS_CERTIFICATE_PASSWORD }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: bash scripts/build/install_certificates.sh
 
-      - name: Build Osaurus (ARM64)
+      - name: Build Muwa (ARM64)
         env:
           DEVELOPMENT_TEAM: ${{ secrets.APPLE_TEAM_ID }}
           DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
@@ -134,9 +138,11 @@ jobs:
       - name: Create DMGs
         env:
           DEVELOPER_ID_NAME: ${{ secrets.DEVELOPER_ID_NAME }}
+          ADHOC_SIGNING: ${{ env.ADHOC_SIGNING }}
         run: bash scripts/build/create_dmgs.sh
 
       - name: Notarize apps
+        if: env.ADHOC_SIGNING != 'true'
         env:
           APPLE_ID: ${{ secrets.APPLE_ID }}
           APPLE_ID_PASSWORD: ${{ secrets.APPLE_ID_PASSWORD }}
@@ -182,7 +188,7 @@ jobs:
         if: startsWith(github.ref, 'refs/tags/')
         env:
           SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          GH_TOKEN: ${{ github.token }}
           PUBLIC_REPO: ${{ github.repository }}
           SPARKLE_CHANNEL: ${{ env.SPARKLE_CHANNEL }}
         run: bash scripts/release/generate_and_deploy_appcast.sh
@@ -190,11 +196,11 @@ jobs:
       - name: Upload artifacts
         uses: actions/upload-artifact@v5
         with:
-          name: osaurus-release-${{ env.VERSION }}
+          name: muwa-release-${{ env.VERSION }}
           path: |
-            build_output/Osaurus-${{ env.VERSION }}.dmg
-            build_output/Osaurus.dmg
-            build_output/Osaurus-${{ env.VERSION }}-dSYMs.zip
+            build_output/Muwa-${{ env.VERSION }}.dmg
+            build_output/Muwa.dmg
+            build_output/Muwa-${{ env.VERSION }}-dSYMs.zip
             updates/appcast.xml
           if-no-files-found: warn
 

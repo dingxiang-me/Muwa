@@ -2,9 +2,9 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-PKG="$ROOT/Packages/OsaurusCore/Package.swift"
-RESOLVED="$ROOT/Packages/OsaurusCore/Package.resolved"
-CHECKOUT="$ROOT/Packages/OsaurusCore/.build/checkouts/vmlx-swift"
+PKG="$ROOT/Packages/MuwaCore/Package.swift"
+RESOLVED="$ROOT/Packages/MuwaCore/Package.resolved"
+CHECKOUT="$ROOT/Packages/MuwaCore/.build/checkouts/vmlx-swift"
 PARSER="$CHECKOUT/Libraries/MLXLMCommon/ReasoningParser.swift"
 TOOL_PARSER="$CHECKOUT/Libraries/MLXLMCommon/Tool/Parsers/GemmaFunctionParser.swift"
 TOKENIZER_MACROS="$CHECKOUT/Libraries/MLXHuggingFaceMacros/HuggingFaceIntegrationMacros.swift"
@@ -76,7 +76,7 @@ if [[ -f "$PARSER" ]]; then
     && rg -Fq 'harmonyChannelShouldStripName = false' "$PARSER"; then
     pass "SwiftPM checkout contains Gemma4 empty thought-channel fix"
   else
-    fail_msg "SwiftPM checkout lacks Gemma4 empty thought-channel fix; Osaurus will still surface bare thought in this edge case"
+    fail_msg "SwiftPM checkout lacks Gemma4 empty thought-channel fix; Muwa will still surface bare thought in this edge case"
   fi
 else
   warn "SwiftPM vmlx checkout missing; cannot inspect wired parser source"
@@ -238,18 +238,18 @@ else
   fail=1
 fi
 
-active="$({ ps -axo pid,ppid,rss,etime,command || true; } | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|swift-build --package-path Packages/OsaurusCore|swift-test --package-path Packages/OsaurusCore|/Users/eric/osaurus-staging/Packages/OsaurusCore/.build' | rg -v 'rg -i|assert-vmlx-gemma4-parser-fix-wired' || true)"
+active="$({ ps -axo pid,ppid,rss,etime,command || true; } | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|swift-build --package-path Packages/MuwaCore|swift-test --package-path Packages/MuwaCore|/Users/eric/muwa-staging/Packages/MuwaCore/.build' | rg -v 'rg -i|assert-vmlx-gemma4-parser-fix-wired' || true)"
 if [[ -n "$active" ]]; then
-  fail_msg "active Osaurus build/keychain-sensitive process detected"
+  fail_msg "active Muwa build/keychain-sensitive process detected"
   echo "$active" >&2
 else
-  pass "no active Osaurus build/keychain-sensitive process"
+  pass "no active Muwa build/keychain-sensitive process"
 fi
 
 if [[ "$fail" -ne 0 ]]; then
-  echo "Osaurus vmlx-swift parser wiring guard failed or is process-blocked." >&2
+  echo "Muwa vmlx-swift parser wiring guard failed or is process-blocked." >&2
   echo "If source assertions above pass and only the process gate fails, do not classify this as a pin/checkout mismatch." >&2
   exit 1
 fi
 
-echo "Osaurus vmlx-swift dependency is wired to the Gemma4 parser fix."
+echo "Muwa vmlx-swift dependency is wired to the Gemma4 parser fix."

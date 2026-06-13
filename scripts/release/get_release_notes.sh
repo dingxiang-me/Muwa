@@ -12,7 +12,7 @@ DRAFT_RELEASE=$(gh api \
 )
 
 if [ -z "${DRAFT_RELEASE}" ]; then
-  CHANGELOG="## What's Changed\n\n- New release of Osaurus v${VERSION}"
+  CHANGELOG="## What's Changed\n\n- New release of Muwa v${VERSION}"
 else
   CHANGELOG="${DRAFT_RELEASE}"
 fi

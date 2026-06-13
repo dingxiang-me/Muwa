@@ -1,6 +1,6 @@
 # Plugin Authoring Guide
 
-This is the conceptual guide for how Osaurus plugins are structured, loaded, and integrated. For a hands-on first run, start with [QUICKSTART.md](QUICKSTART.md). For an exhaustive callback list, see [HOST_API.md](HOST_API.md).
+This is the conceptual guide for how Muwa plugins are structured, loaded, and integrated. For a hands-on first run, start with [QUICKSTART.md](QUICKSTART.md). For an exhaustive callback list, see [HOST_API.md](HOST_API.md).
 
 ## Mental model
 
@@ -18,7 +18,7 @@ A plugin is a single dynamic library that:
 
 1. **Declares** what it can do via a JSON manifest returned from `get_manifest`
 2. **Implements** that capability via `invoke` (for tools) and `handle_route` (for HTTP)
-3. **Calls back** into Osaurus via the `osr_host_api*` it received at init
+3. **Calls back** into Muwa via the `osr_host_api*` it received at init
 
 The host enforces:
 
@@ -34,7 +34,7 @@ The host enforces:
 dlopen
    │
    ▼
-osaurus_plugin_entry_v2(host)   ← single export, returns osr_plugin_api*
+muwa_plugin_entry_v2(host)   ← single export, returns osr_plugin_api*
    │
    ▼
 init()                          ← plugin returns opaque ctx pointer
@@ -46,7 +46,7 @@ get_manifest(ctx)               ← plugin returns JSON manifest
 [Live: invoke / handle_route / on_config_changed / on_task_event]
    │
    ▼
-destroy(ctx)                    ← Osaurus shuts the plugin down
+destroy(ctx)                    ← Muwa shuts the plugin down
 ```
 
 The plugin context (`osr_plugin_ctx_t`) is opaque to the host. Plugins use it to carry their own per-instance state.
@@ -64,7 +64,7 @@ The plugin context (`osr_plugin_ctx_t`) is opaque to the host. Plugins use it to
   "license": "MIT",
   "authors": ["Your Name"],
   "min_macos": "15.0",
-  "min_osaurus": "0.5.0",
+  "muwa_min_version": "0.5.0",
   "instructions": "System prompt fragment appended during plugin-initiated inference",
   "secrets": [
     {
@@ -145,7 +145,7 @@ A route is an HTTP endpoint your plugin handles. See [ROUTES_AND_WEB.md](ROUTES_
 
 ### Config
 
-If your plugin has a settings UI, declare it in `capabilities.config`. Each field becomes an entry in the per-plugin config sheet inside Osaurus. Field types include `text`, `secret`, `toggle`, `select`, `multiselect`, `number`, `readonly`, and `status`.
+If your plugin has a settings UI, declare it in `capabilities.config`. Each field becomes an entry in the per-plugin config sheet inside Muwa. Field types include `text`, `secret`, `toggle`, `select`, `multiselect`, `number`, `readonly`, and `status`.
 
 ### Web
 
@@ -159,7 +159,7 @@ Set `"artifact_handler": true` if your plugin can act on files the user has shar
 
 When the agent calls one of your tools:
 
-1. Osaurus validates the arguments against the tool's JSON Schema.
+1. Muwa validates the arguments against the tool's JSON Schema.
 2. The user is prompted (if `permission_policy == "ask"`) and the answer is remembered.
 3. Your `invoke(ctx, "tool", "<tool_id>", payload)` is called with the arguments JSON.
 4. Your plugin returns a `ToolEnvelope` JSON string.
@@ -179,13 +179,13 @@ Per-plugin ephemeral consent is stored at install time. See [PACKAGING.md#user-c
 
 ## Hot reload during development
 
-`osaurus tools dev` watches your sources, rebuilds on save, and triggers a `com.dinoki.osaurus.control.toolsReload` distributed notification. Osaurus reloads all plugins. There's no need to restart the app.
+`muwa-cli tools dev` watches your sources, rebuilds on save, and triggers a `com.dinoki.muwa.control.toolsReload` distributed notification. Muwa reloads all plugins. There's no need to restart the app.
 
 For state persistence across reloads, write to your per-plugin SQLite database via `host->db_exec` / `host->db_query`. The DB file survives reloads and app restarts.
 
 ## Logging and observability
 
-- `host->log(level, message)` — writes to the unified macOS log AND to Osaurus Insights
+- `host->log(level, message)` — writes to the unified macOS log AND to Muwa Insights
 - Insights → Plugin Activity surfaces every host call your plugin makes (status, latency, request/response bodies)
 - Crashes during `init` are caught, surfaced in the UI, and quarantined so the plugin doesn't crash-loop the app
 

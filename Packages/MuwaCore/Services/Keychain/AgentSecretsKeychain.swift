@@ -1,0 +1,190 @@
+//
+//  AgentSecretsKeychain.swift
+//  Muwa
+//
+//  Secure Keychain storage for agent-level secrets (API keys, tokens, etc.).
+//  Unlike ToolSecretsKeychain which is plugin-scoped, this stores secrets
+//  per-agent only, making them accessible to any sandbox plugin.
+//
+
+import Foundation
+
+/// Keychain wrapper for agent-scoped secret storage.
+/// Account format: `"{agentId}.{key}"` — no plugin scoping.
+public enum AgentSecretsKeychain {
+    private static let service = "ai.muwa.agent-secrets"
+
+    #if DEBUG
+        private static let inMemoryStoreLock = NSLock()
+        nonisolated(unsafe) private static var inMemoryStoreForTesting: [String: String]?
+
+        static func _withInMemoryStoreForTesting<T>(
+            _ body: () throws -> T
+        ) rethrows -> T {
+            inMemoryStoreLock.lock()
+            let previous = inMemoryStoreForTesting
+            inMemoryStoreForTesting = [:]
+            inMemoryStoreLock.unlock()
+
+            defer {
+                inMemoryStoreLock.lock()
+                inMemoryStoreForTesting = previous
+                inMemoryStoreLock.unlock()
+            }
+
+            return try body()
+        }
+
+        private static func testingSave(_ value: String, account: String) -> (enabled: Bool, saved: Bool) {
+            inMemoryStoreLock.lock()
+            defer { inMemoryStoreLock.unlock() }
+            guard inMemoryStoreForTesting != nil else {
+                return (enabled: false, saved: false)
+            }
+            inMemoryStoreForTesting?[account] = value
+            return (enabled: true, saved: true)
+        }
+
+        private static func testingGet(account: String) -> (enabled: Bool, value: String?) {
+            inMemoryStoreLock.lock()
+            defer { inMemoryStoreLock.unlock() }
+            guard let store = inMemoryStoreForTesting else {
+                return (enabled: false, value: nil)
+            }
+            return (enabled: true, value: store[account])
+        }
+
+        private static func testingDelete(account: String) -> (enabled: Bool, deleted: Bool) {
+            inMemoryStoreLock.lock()
+            defer { inMemoryStoreLock.unlock() }
+            guard inMemoryStoreForTesting != nil else {
+                return (enabled: false, deleted: false)
+            }
+            inMemoryStoreForTesting?[account] = nil
+            return (enabled: true, deleted: true)
+        }
+
+        private static func testingAllAccounts() -> [String]? {
+            inMemoryStoreLock.lock()
+            defer { inMemoryStoreLock.unlock() }
+            guard let store = inMemoryStoreForTesting else { return nil }
+            return Array(store.keys)
+        }
+    #endif
+
+    @discardableResult
+    public static func saveSecret(_ value: String, id: String, agentId: UUID) -> Bool {
+        let account = "\(agentId.uuidString).\(id)"
+        guard let valueData = value.data(using: .utf8) else { return false }
+
+        #if DEBUG
+            let testing = testingSave(value, account: account)
+            if testing.enabled {
+                return testing.saved
+            }
+        #endif
+        if KeychainQueryHelpers.disablesKeychainForProcess { return false }
+        return Keychain.write(service: service, account: account, data: valueData)
+    }
+
+    public static func getSecret(id: String, agentId: UUID) -> String? {
+        let account = "\(agentId.uuidString).\(id)"
+
+        #if DEBUG
+            let testing = testingGet(account: account)
+            if testing.enabled {
+                return testing.value
+            }
+        #endif
+        if KeychainQueryHelpers.disablesKeychainForProcess { return nil }
+        return Keychain.read(service: service, account: account)
+            .flatMap { String(data: $0, encoding: .utf8) }
+    }
+
+    @discardableResult
+    public static func deleteSecret(id: String, agentId: UUID) -> Bool {
+        let account = "\(agentId.uuidString).\(id)"
+
+        #if DEBUG
+            let testing = testingDelete(account: account)
+            if testing.enabled {
+                return testing.deleted
+            }
+        #endif
+        if KeychainQueryHelpers.disablesKeychainForProcess { return true }
+        return Keychain.delete(service: service, account: account)
+    }
+
+    /// Enumerates accounts then fetches each value individually.
+    public static func getAllSecrets(agentId: UUID) -> [String: String] {
+        let prefix = "\(agentId.uuidString)."
+
+        var secrets: [String: String] = [:]
+        for account in allAccounts() where account.hasPrefix(prefix) {
+            let key = String(account.dropFirst(prefix.count))
+            if let value = getSecret(id: key, agentId: agentId) {
+                secrets[key] = value
+            }
+        }
+        return secrets
+    }
+
+    /// Enumerates secret identifiers without decrypting their values.
+    ///
+    /// Prompt construction only needs to tell the model which secret names are
+    /// available. Fetching the values here is both unnecessary and can hit the
+    /// slow Keychain data-decryption path during ordinary chat composition.
+    public static func secretIDs(agentId: UUID) -> [String] {
+        let prefix = "\(agentId.uuidString)."
+        return allAccounts()
+            .filter { $0.hasPrefix(prefix) }
+            .map { String($0.dropFirst(prefix.count)) }
+            .sorted()
+    }
+
+    public static func deleteAllSecrets(agentId: UUID) {
+        if KeychainQueryHelpers.disablesKeychainForProcess { return }
+        let prefix = "\(agentId.uuidString)."
+        for account in allAccounts() where account.hasPrefix(prefix) {
+            Keychain.delete(service: service, account: account)
+        }
+    }
+
+    // MARK: - Environment Safety
+
+    /// Env var names that must never be overridden by user-defined secrets.
+    private static let reservedEnvVarNames: Set<String> = [
+        "PATH", "HOME", "SHELL", "USER", "LOGNAME",
+        "LD_PRELOAD", "LD_LIBRARY_PATH", "DYLD_INSERT_LIBRARIES",
+        "VIRTUAL_ENV", "MUWA_PLUGIN", "MUWA_PLUGIN",
+    ]
+
+    /// Returns agent secrets with reserved env var names stripped out.
+    static func getFilteredSecrets(agentId: UUID) -> [String: String] {
+        getAllSecrets(agentId: agentId).filter { !reservedEnvVarNames.contains($0.key) }
+    }
+
+    /// Returns merged agent + plugin secrets with reserved names stripped out.
+    /// Plugin secrets override agent secrets of the same name.
+    static func mergedSecretsEnvironment(agentId: UUID, pluginId: String) -> [String: String] {
+        var env = getFilteredSecrets(agentId: agentId)
+        let pluginSecrets =
+            ToolSecretsKeychain
+            .getAllSecrets(for: pluginId, agentId: agentId)
+            .filter { !reservedEnvVarNames.contains($0.key) }
+        env.merge(pluginSecrets) { _, new in new }
+        return env
+    }
+
+    // MARK: - Private
+
+    private static func allAccounts() -> [String] {
+        #if DEBUG
+            if let accounts = testingAllAccounts() {
+                return accounts
+            }
+        #endif
+        if KeychainQueryHelpers.disablesKeychainForProcess { return [] }
+        return Keychain.allAccounts(service: service)
+    }
+}

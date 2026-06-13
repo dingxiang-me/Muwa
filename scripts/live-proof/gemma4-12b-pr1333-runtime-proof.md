@@ -2,7 +2,7 @@
 
 Date: 2026-06-03 PDT
 
-Scope: Osaurus PR #1333 proof app, branch
+Scope: Muwa PR #1333 proof app, branch
 `codex/main-gemma4-ci-proof-b965375f`, vMLX pin
 `454f16efe6b867bc33cb74d6d5cb554227949445`.
 
@@ -16,7 +16,7 @@ MXFP4/MXFP8 image routing. JANG_4M image quality remains partial/red.
   - `assert-chat-reasoning-delta-routing.sh`
   - `assert-chat-ui-reasoning-routing.sh`
   - `assert-no-hidden-local-sampler-defaults.sh`
-  - `assert-osaurus-no-forced-behavior-pr.sh`
+  - `assert-muwa-no-forced-behavior-pr.sh`
   - `assert-tool-choice-required-routing.sh`
   - `assert-model-tool-capability-surfaces.sh`
   - `assert-vmlx-gemma4-parser-fix-wired.sh`
@@ -103,5 +103,5 @@ Observed behavior:
   fusion.
 
 Classification: JANG_4M image failure is current-bundle artifact/model behavior
-under the live runtime, not an Osaurus image routing/cache failure. Do not hide
+under the live runtime, not an Muwa image routing/cache failure. Do not hide
 this with prompt coercion, sampler overrides, parser repair, or forced behavior.

@@ -1,0 +1,2206 @@
+//
+//  ServerView.swift
+//  Muwa
+//
+//  Developer tools and API reference for building with Muwa.
+//
+
+import AppKit
+import SwiftUI
+import UniformTypeIdentifiers
+
+// MARK: - Server Tab
+
+enum ServerTab: String, CaseIterable, AnimatedTabItem {
+    case overview = "Overview"
+    case settings = "Settings"
+    case apiReference = "API Reference"
+
+    var title: String {
+        switch self {
+        case .overview: return L("Overview")
+        case .settings: return L("Settings")
+        case .apiReference: return L("API Reference")
+        }
+    }
+}
+
+// MARK: - Cached Formatters
+
+private let sharedMediumDateFormatter: DateFormatter = {
+    let f = DateFormatter()
+    f.dateStyle = .medium
+    return f
+}()
+
+private nonisolated(unsafe) let sharedByteCountFormatter: ByteCountFormatter = {
+    let f = ByteCountFormatter()
+    f.countStyle = .file
+    return f
+}()
+
+// MARK: - ServerView
+
+struct ServerView: View {
+    @ObservedObject private var themeManager = ThemeManager.shared
+    @EnvironmentObject var server: ServerController
+
+    private var theme: ThemeProtocol { themeManager.currentTheme }
+
+    @State private var selectedTab: ServerTab = .overview
+    @State private var searchText: String = ""
+    @State private var hasAppeared = false
+
+    var body: some View {
+        VStack(spacing: 0) {
+            headerView
+                .opacity(hasAppeared ? 1 : 0)
+                .offset(y: hasAppeared ? 0 : -10)
+                .animation(.spring(response: 0.4, dampingFraction: 0.8), value: hasAppeared)
+
+            Group {
+                switch selectedTab {
+                case .overview:
+                    OverviewTabContent()
+                case .settings:
+                    ServerSettingsTabContent()
+                case .apiReference:
+                    APIReferenceTabContent(searchText: searchText)
+                }
+            }
+            .opacity(hasAppeared ? 1 : 0)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background(theme.primaryBackground)
+        .environment(\.theme, themeManager.currentTheme)
+        .onAppear {
+            withAnimation(.easeOut(duration: 0.25).delay(0.05)) {
+                hasAppeared = true
+            }
+        }
+    }
+
+    private var headerView: some View {
+        ManagerHeaderWithTabs(
+            title: L("Server"),
+            subtitle: L("Developer tools and API reference")
+        ) {
+            EmptyView()
+        } tabsRow: {
+            HeaderTabsRow(
+                selection: $selectedTab,
+                searchText: $searchText,
+                searchPlaceholder: "Search endpoints",
+                showSearch: selectedTab == .apiReference
+            )
+        }
+    }
+}
+
+// MARK: - Overview Tab Content
+
+private struct OverviewTabContent: View {
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                ServerStatusCard()
+                AccessKeysSection()
+                RelaysSectionView()
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
+        }
+    }
+}
+
+// MARK: - Server Status Card
+
+private struct ServerStatusCard: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject var server: ServerController
+
+    private var serverURL: String {
+        "http://\(server.localNetworkAddress):\(server.port)"
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label {
+                Text("Status", bundle: .module)
+            } icon: {
+                Image(systemName: "antenna.radiowaves.left.and.right")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(theme.primaryText)
+
+            HStack(spacing: 16) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Server URL", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.secondaryText)
+
+                    HStack(spacing: 10) {
+                        Text(serverURL)
+                            .font(.system(size: 14, weight: .medium, design: .monospaced))
+                            .foregroundColor(theme.primaryText)
+                            .padding(.horizontal, 12)
+                            .padding(.vertical, 8)
+                            .background(
+                                RoundedRectangle(cornerRadius: 8)
+                                    .fill(theme.inputBackground)
+                                    .overlay(
+                                        RoundedRectangle(cornerRadius: 8)
+                                            .stroke(theme.inputBorder, lineWidth: 1)
+                                    )
+                            )
+
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(serverURL, forType: .string)
+                        }) {
+                            Image(systemName: "doc.on.doc")
+                                .font(.system(size: 12, weight: .medium))
+                                .foregroundColor(theme.secondaryText)
+                                .padding(8)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 6)
+                                        .fill(theme.tertiaryBackground)
+                                )
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .localizedHelp("Copy URL")
+                    }
+                }
+
+                Spacer()
+
+                VStack(alignment: .trailing, spacing: 8) {
+                    Text("Status", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.secondaryText)
+
+                    ServerStatusBadge(health: server.serverHealth)
+                }
+            }
+
+            if !server.isRunning && server.serverHealth == .stopped {
+                Button(action: { Task { await server.startServer() } }) {
+                    HStack(spacing: 8) {
+                        Image(systemName: "play.fill")
+                            .font(.system(size: 11, weight: .semibold))
+                        Text("Start Server", bundle: .module)
+                            .font(.system(size: 13, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 10)
+                    .frame(maxWidth: .infinity)
+                    .background(
+                        RoundedRectangle(cornerRadius: 8)
+                            .fill(theme.accentColor)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(theme.secondaryBackground)
+        )
+    }
+}
+
+// MARK: - Access Keys Section
+
+private struct AccessKeysSection: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject var server: ServerController
+
+    @State private var accessKeys: [AccessKeyInfo] = []
+    /// Ids of access keys that look like pre-#950 pair-issued credentials —
+    /// master-scoped + never-expiring + labelled by the old pair flow.
+    /// These grant access to every agent and never expire; we surface a
+    /// "Legacy" pill so users can choose to revoke and re-pair.
+    @State private var legacyKeyIds: Set<UUID> = []
+    @State private var showingKeyGenerator = false
+    @State private var newKeyLabel = ""
+    @State private var newKeyExpiration: AccessKeyExpiration = .days90
+    @State private var generatedKey: String?
+    @State private var isGeneratingKey = false
+    @State private var keyGenError: String?
+    @State private var didLoadAccessKeys = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            HStack {
+                Label {
+                    Text("Access Keys", bundle: .module)
+                } icon: {
+                    Image(systemName: "key.horizontal")
+                }
+                .font(.system(size: 14, weight: .semibold))
+                .foregroundColor(theme.primaryText)
+
+                Spacer()
+
+                Button(action: { reloadAccessKeys(readKeychain: true) }) {
+                    Text("Refresh", bundle: .module)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.secondaryText)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(theme.primaryBorder.opacity(0.6), lineWidth: 1)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                Button(action: { showingKeyGenerator = true }) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "plus")
+                            .font(.system(size: 10, weight: .semibold))
+                        Text("Generate Key", bundle: .module)
+                            .font(.system(size: 12, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 6)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(theme.accentColor)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+
+            if let generatedKey {
+                generatedKeyBanner(key: generatedKey)
+            }
+
+            if accessKeys.isEmpty {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "lock.shield.fill")
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(theme.warningColor)
+                        Text("Server is locked", bundle: .module)
+                            .font(.system(size: 12, weight: .semibold))
+                            .foregroundColor(theme.warningColor)
+                    }
+                    Text(
+                        didLoadAccessKeys
+                            ? "All API endpoints are restricted until you create an access key. Click \"Generate Key\" above to get started."
+                            : "Access key metadata is loaded on demand so startup never reads Keychain. Refresh to inspect existing keys.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 12))
+                    .foregroundColor(theme.secondaryText)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(theme.warningColor.opacity(0.06))
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 10)
+                                .stroke(theme.warningColor.opacity(0.15), lineWidth: 1)
+                        )
+                )
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(accessKeys) { key in
+                        accessKeyRow(key)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(theme.secondaryBackground)
+        )
+        .sheet(isPresented: $showingKeyGenerator) {
+            AccessKeyGeneratorSheet(
+                theme: theme,
+                label: $newKeyLabel,
+                expiration: $newKeyExpiration,
+                isGenerating: $isGeneratingKey,
+                error: $keyGenError,
+                onGenerate: generateAccessKey,
+                onCancel: {
+                    showingKeyGenerator = false
+                    newKeyLabel = ""
+                    keyGenError = nil
+                }
+            )
+        }
+    }
+
+    private func generatedKeyBanner(key: String) -> some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 6) {
+                Image(systemName: "exclamationmark.triangle.fill")
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.warningColor)
+                Text("Copy this key now. It won't be shown again.", bundle: .module)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.warningColor)
+            }
+
+            HStack(spacing: 8) {
+                Text(key)
+                    .font(.system(size: 12, weight: .medium, design: .monospaced))
+                    .foregroundColor(theme.primaryText)
+                    .textSelection(.enabled)
+                    .lineLimit(1)
+
+                Spacer()
+
+                Button(action: {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(key, forType: .string)
+                }) {
+                    HStack(spacing: 4) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 10, weight: .medium))
+                        Text("Copy", bundle: .module)
+                            .font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(.white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(theme.accentColor)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                Button(action: {
+                    withAnimation { generatedKey = nil }
+                }) {
+                    Image(systemName: "xmark")
+                        .font(.system(size: 10, weight: .semibold))
+                        .foregroundColor(theme.secondaryText)
+                        .padding(5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(theme.tertiaryBackground)
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 8)
+                    .fill(theme.tertiaryBackground)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 8)
+                            .stroke(theme.warningColor.opacity(0.3), lineWidth: 1)
+                    )
+            )
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(theme.warningColor.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(theme.warningColor.opacity(0.15), lineWidth: 1)
+                )
+        )
+    }
+
+    private func accessKeyRow(_ key: AccessKeyInfo) -> some View {
+        let inactive = !key.isActive
+        let isLegacy = legacyKeyIds.contains(key.id)
+        return HStack(spacing: 12) {
+            Image(systemName: "key.fill")
+                .font(.system(size: 11))
+                .foregroundColor(inactive ? theme.tertiaryText : theme.accentColor)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 2) {
+                HStack(spacing: 6) {
+                    Text(key.label)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(inactive ? theme.tertiaryText : theme.primaryText)
+
+                    if key.revoked {
+                        keyBadge("Revoked", color: theme.errorColor)
+                    } else if key.isExpired {
+                        keyBadge("Expired", color: theme.warningColor)
+                    } else {
+                        keyBadge("Active", color: theme.successColor)
+                    }
+
+                    if TemporaryPairedKeyStore.shared.isTemporary(id: key.id) {
+                        keyBadge("Temporary", color: theme.warningColor)
+                    }
+
+                    if isLegacy {
+                        keyBadge("Legacy", color: theme.warningColor)
+                    } else if key.aud == key.iss {
+                        keyBadge("All Agents", color: theme.accentColor)
+                    }
+                }
+
+                HStack(spacing: 8) {
+                    Text(key.prefix + "...")
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(theme.tertiaryText)
+
+                    Text("Created \(sharedMediumDateFormatter.string(from: key.createdAt))", bundle: .module)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.tertiaryText)
+
+                    if let expiresAt = key.expiresAt {
+                        Text(
+                            key.isExpired
+                                ? "Expired \(sharedMediumDateFormatter.string(from: expiresAt))"
+                                : "Expires \(sharedMediumDateFormatter.string(from: expiresAt))"
+                        )
+                        .font(.system(size: 10))
+                        .foregroundColor(key.isExpired ? theme.warningColor : theme.tertiaryText)
+                    }
+                }
+
+                if isLegacy {
+                    Text(
+                        "Pre-upgrade pairing — grants access to all agents and never expires. Revoke and re-pair to scope it to a single agent.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 10))
+                    .foregroundColor(theme.warningColor)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.top, 2)
+                }
+            }
+
+            Spacer()
+
+            if !key.revoked {
+                Button(action: {
+                    APIKeyManager.shared.revoke(id: key.id)
+                    reloadAccessKeys()
+                    restartServerForKeyChange()
+                }) {
+                    Text("Revoke", bundle: .module)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(theme.errorColor)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 5)
+                        .background(
+                            RoundedRectangle(cornerRadius: 6)
+                                .fill(theme.errorColor.opacity(0.1))
+                        )
+                }
+                .buttonStyle(PlainButtonStyle())
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(inactive ? theme.tertiaryBackground.opacity(0.25) : theme.tertiaryBackground.opacity(0.5))
+        )
+    }
+
+    private func keyBadge(_ text: String, color: Color) -> some View {
+        Text(text)
+            .font(.system(size: 9, weight: .bold))
+            .foregroundColor(color)
+            .padding(.horizontal, 6)
+            .padding(.vertical, 2)
+            .background(Capsule().fill(color.opacity(0.12)))
+    }
+
+    private func reloadAccessKeys(readKeychain: Bool = false) {
+        if readKeychain {
+            APIKeyManager.shared.reload()
+            didLoadAccessKeys = true
+        }
+        accessKeys = APIKeyManager.shared.listKeys().sorted { $0.createdAt > $1.createdAt }
+        let knownAgentAddrs = Set(
+            AgentManager.shared.agents.compactMap { $0.agentAddress }
+        )
+        // Restrict to pair-issued keys (the old pair flow's label was
+        // "Paired – <host>") so a deliberately-generated all-agents key is
+        // not mislabelled. Combined with master-scoped + never-expiring,
+        // this is the exact pre-#950 pair-issued shape.
+        let legacy = APIKeyManager.shared
+            .legacyMasterScopedKeys(knownAgentAddresses: knownAgentAddrs)
+            .filter { $0.label.hasPrefix("Paired") }
+        legacyKeyIds = Set(legacy.map(\.id))
+    }
+
+    private func generateAccessKey() {
+        let label = newKeyLabel.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !label.isEmpty else { return }
+
+        isGeneratingKey = true
+        keyGenError = nil
+
+        let expiration = newKeyExpiration
+        Task {
+            do {
+                // Generation reads the master key and writes metadata to the
+                // keychain, both of which block on the security daemon over
+                // XPC. Run it off the main actor so the UI stays responsive.
+                let result = try await Task.detached(priority: .userInitiated) {
+                    try APIKeyManager.shared.generate(label: label, expiration: expiration)
+                }.value
+                generatedKey = result.fullKey
+                showingKeyGenerator = false
+                newKeyLabel = ""
+                reloadAccessKeys()
+                restartServerForKeyChange()
+            } catch {
+                keyGenError = error.localizedDescription
+            }
+
+            isGeneratingKey = false
+        }
+    }
+
+    private func restartServerForKeyChange() {
+        guard server.isRunning else { return }
+        Task { await server.restartServer() }
+    }
+}
+
+// MARK: - Relays Section
+
+private struct RelaysSectionView: View {
+    @Environment(\.theme) private var theme
+    @ObservedObject private var relayManager = RelayTunnelManager.shared
+    @ObservedObject private var agentManager = AgentManager.shared
+
+    @State private var showRelayConfirmation = false
+    @State private var pendingRelayAgentId: UUID?
+    @State private var copiedRelayURL: UUID?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label {
+                Text("Relays", bundle: .module)
+            } icon: {
+                Image(systemName: "globe")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(theme.primaryText)
+
+            Text("Expose agents to the public internet via relay tunnels.", bundle: .module)
+                .font(.system(size: 12))
+                .foregroundColor(theme.secondaryText)
+
+            let agents = agentManager.agents.filter { !$0.isBuiltIn }
+
+            if agents.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "person.crop.circle.badge.questionmark")
+                        .font(.system(size: 14))
+                        .foregroundColor(theme.tertiaryText)
+                    Text("No agents configured. Create an agent first.", bundle: .module)
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.tertiaryText)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 10)
+                        .fill(theme.tertiaryBackground.opacity(0.5))
+                )
+            } else {
+                VStack(spacing: 2) {
+                    ForEach(agents) { agent in
+                        relayAgentRow(agent)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(theme.secondaryBackground)
+        )
+        .alert(Text("Expose Agent to Internet?", bundle: .module), isPresented: $showRelayConfirmation) {
+            Button(role: .destructive) {
+                if let id = pendingRelayAgentId {
+                    relayManager.setTunnelEnabled(true, for: id)
+                }
+                pendingRelayAgentId = nil
+            } label: {
+                Text("Enable Tunnel", bundle: .module)
+            }
+            Button(role: .cancel) {
+                pendingRelayAgentId = nil
+            } label: {
+                Text("Cancel", bundle: .module)
+            }
+        } message: {
+            Text(
+                "This will create a public URL for this agent via agent.muwa.ai. Anyone with the URL can send requests to your local server. Your access keys still protect the API endpoints.",
+                bundle: .module
+            )
+        }
+        .task {
+            for agent in agentManager.agents where !agent.isBuiltIn && agent.agentAddress == nil {
+                try? agentManager.assignAddress(to: agent)
+            }
+        }
+    }
+
+    private func relayAgentRow(_ agent: Agent) -> some View {
+        let hasIdentity = agent.agentAddress != nil && agent.agentIndex != nil
+        let status = relayManager.agentStatuses[agent.id] ?? .disconnected
+        let isEnabled = relayManager.isTunnelEnabled(for: agent.id)
+
+        return HStack(spacing: 12) {
+            relayStatusDot(status)
+                .frame(width: 20)
+
+            VStack(alignment: .leading, spacing: 3) {
+                HStack(spacing: 6) {
+                    Text(agent.name)
+                        .font(.system(size: 13, weight: .medium))
+                        .foregroundColor(theme.primaryText)
+
+                    if agent.isBuiltIn {
+                        Text("Built-in", bundle: .module)
+                            .font(.system(size: 9, weight: .bold))
+                            .foregroundColor(theme.tertiaryText)
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 2)
+                            .background(Capsule().fill(theme.tertiaryText.opacity(0.12)))
+                    }
+                }
+
+                if let address = agent.agentAddress {
+                    let truncated = String(address.prefix(8)) + "..." + String(address.suffix(4))
+                    Text(truncated)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(theme.tertiaryText)
+                } else {
+                    Text("No identity set up", bundle: .module)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.warningColor)
+                }
+
+                if case .connected(let url) = status {
+                    HStack(spacing: 4) {
+                        Text(url)
+                            .font(.system(size: 10, design: .monospaced))
+                            .foregroundColor(theme.accentColor)
+                            .lineLimit(1)
+
+                        Button(action: {
+                            NSPasteboard.general.clearContents()
+                            NSPasteboard.general.setString(url, forType: .string)
+                            copiedRelayURL = agent.id
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 2) {
+                                if copiedRelayURL == agent.id { copiedRelayURL = nil }
+                            }
+                        }) {
+                            Image(systemName: copiedRelayURL == agent.id ? "checkmark" : "doc.on.doc")
+                                .font(.system(size: 9, weight: .medium))
+                                .foregroundColor(copiedRelayURL == agent.id ? theme.successColor : theme.tertiaryText)
+                        }
+                        .buttonStyle(PlainButtonStyle())
+                        .localizedHelp("Copy relay URL")
+                    }
+                }
+
+                if case .error(let msg) = status {
+                    Text(msg)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.errorColor)
+                }
+            }
+
+            Spacer()
+
+            if hasIdentity {
+                Toggle(
+                    "",
+                    isOn: Binding(
+                        get: { isEnabled },
+                        set: { newValue in
+                            if newValue {
+                                pendingRelayAgentId = agent.id
+                                showRelayConfirmation = true
+                            } else {
+                                relayManager.setTunnelEnabled(false, for: agent.id)
+                            }
+                        }
+                    )
+                )
+                .toggleStyle(SwitchToggleStyle(tint: theme.accentColor))
+                .labelsHidden()
+            } else {
+                Button(action: {
+                    AppDelegate.shared?.showManagementWindow(initialTab: .identity)
+                }) {
+                    Text("Identity →", bundle: .module)
+                        .font(.system(size: 11, weight: .medium))
+                        .foregroundColor(theme.accentColor)
+                }
+                .buttonStyle(PlainButtonStyle())
+                .localizedHelp("Set up this agent's identity in the Identity tab")
+            }
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(theme.tertiaryBackground.opacity(0.5))
+        )
+    }
+
+    @ViewBuilder
+    private func relayStatusDot(_ status: AgentRelayStatus) -> some View {
+        switch status {
+        case .disconnected:
+            Circle()
+                .fill(theme.tertiaryText.opacity(0.4))
+                .frame(width: 8, height: 8)
+        case .connecting:
+            Circle()
+                .fill(theme.warningColor)
+                .frame(width: 8, height: 8)
+                .overlay(
+                    Circle()
+                        .fill(theme.warningColor.opacity(0.3))
+                        .frame(width: 16, height: 16)
+                )
+        case .connected:
+            Circle()
+                .fill(theme.successColor)
+                .frame(width: 8, height: 8)
+        case .error:
+            Circle()
+                .fill(theme.errorColor)
+                .frame(width: 8, height: 8)
+        }
+    }
+}
+
+// MARK: - API Reference Tab Content
+
+private struct APIReferenceTabContent: View {
+    @Environment(\.theme) private var theme
+    @EnvironmentObject var server: ServerController
+
+    let searchText: String
+
+    @State private var expandedEndpoint: String?
+    @State private var editablePayloads: [String: String] = [:]
+    @State private var endpointResponses: [String: EndpointTestResult] = [:]
+    @State private var loadingEndpoints: Set<String> = []
+
+    private var serverURL: String {
+        "http://\(server.localNetworkAddress):\(server.port)"
+    }
+
+    /// URL used for the in-panel "Test endpoint" calls. Always points at the
+    /// loopback address, even when the server is exposed to the LAN, because
+    /// the request is issued from the Muwa UI process on the same machine
+    /// and the server's auth gate trusts loopback without a Bearer token
+    /// (see `HTTPHandler`'s `isLoopback` check). Using `localNetworkAddress`
+    /// here sent self-test requests through the authenticated path, where
+    /// the UI has no access key to attach, and the panel failed with
+    /// `{"error":{"message":"Invalid access key: Unrecognized token format"}}`
+    /// once exposure was enabled (issue #596).
+    private var testURL: String {
+        "http://127.0.0.1:\(server.port)"
+    }
+
+    private var filteredGroups: [(category: APIEndpoint.EndpointCategory, endpoints: [APIEndpoint])] {
+        let query = searchText.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()
+        guard !query.isEmpty else { return APIEndpoint.groupedEndpoints }
+        return APIEndpoint.groupedEndpoints.compactMap { group in
+            let filtered = group.endpoints.filter {
+                $0.path.lowercased().contains(query)
+                    || $0.description.lowercased().contains(query)
+                    || $0.method.lowercased().contains(query)
+                    || ($0.compatibility?.lowercased().contains(query) ?? false)
+            }
+            guard !filtered.isEmpty else { return nil }
+            return (category: group.category, endpoints: filtered)
+        }
+    }
+
+    var body: some View {
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 24) {
+                if !server.isRunning {
+                    serverStoppedBanner
+                }
+                endpointsCard
+                documentationSection
+            }
+            .padding(.horizontal, 24)
+            .padding(.vertical, 24)
+            .frame(maxWidth: .infinity)
+        }
+    }
+
+    // MARK: - Sections
+
+    private var serverStoppedBanner: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .semibold))
+                .foregroundColor(theme.warningColor)
+            VStack(alignment: .leading, spacing: 2) {
+                Text("Server is not running", bundle: .module)
+                    .font(.system(size: 12, weight: .semibold))
+                    .foregroundColor(theme.warningColor)
+                Text("Start the server from the Overview tab to test endpoints.", bundle: .module)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.secondaryText)
+            }
+            Spacer()
+        }
+        .padding(12)
+        .background(
+            RoundedRectangle(cornerRadius: 10)
+                .fill(theme.warningColor.opacity(0.06))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 10)
+                        .stroke(theme.warningColor.opacity(0.15), lineWidth: 1)
+                )
+        )
+    }
+
+    private var endpointsCard: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Label {
+                Text("API Endpoints", bundle: .module)
+            } icon: {
+                Image(systemName: "arrow.left.arrow.right")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(theme.primaryText)
+
+            Text("Available endpoints on your Muwa server. Expand to test directly.", bundle: .module)
+                .font(.system(size: 12))
+                .foregroundColor(theme.secondaryText)
+
+            let groups = filteredGroups
+
+            if groups.isEmpty {
+                HStack(spacing: 8) {
+                    Image(systemName: "magnifyingglass")
+                        .font(.system(size: 14))
+                        .foregroundColor(theme.tertiaryText)
+                    Text("No endpoints match \"\(searchText)\"", bundle: .module)
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.tertiaryText)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+            } else {
+                VStack(spacing: 16) {
+                    ForEach(groups, id: \.category.rawValue) { group in
+                        endpointCategoryGroup(group)
+                    }
+                }
+            }
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(theme.secondaryBackground)
+        )
+    }
+
+    private func endpointCategoryGroup(
+        _ group: (category: APIEndpoint.EndpointCategory, endpoints: [APIEndpoint])
+    ) -> some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 6) {
+                Image(systemName: group.category.icon)
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(group.category.color)
+                Text(group.category.rawValue)
+                    .font(.system(size: 11, weight: .semibold))
+                    .foregroundColor(theme.secondaryText)
+            }
+            .padding(.leading, 4)
+
+            VStack(spacing: 2) {
+                ForEach(group.endpoints, id: \.id) { endpoint in
+                    if endpoint.isAudioEndpoint {
+                        TranscriptionTestRow(
+                            endpoint: endpoint,
+                            serverURL: serverURL,
+                            isServerRunning: server.isRunning,
+                            isExpanded: expandedEndpoint == endpoint.id,
+                            isLoading: loadingEndpoints.contains(endpoint.id),
+                            response: endpointResponses[endpoint.id],
+                            onToggleExpand: { toggleEndpoint(endpoint.id) },
+                            onTest: { audioData in
+                                runAudioTranscriptionTest(endpoint, audioData: audioData)
+                            },
+                            onClearResponse: { endpointResponses[endpoint.id] = nil }
+                        )
+                    } else {
+                        EndpointRow(
+                            endpoint: endpoint,
+                            serverURL: serverURL,
+                            isServerRunning: server.isRunning,
+                            isExpanded: expandedEndpoint == endpoint.id,
+                            isLoading: loadingEndpoints.contains(endpoint.id),
+                            editablePayload: binding(for: endpoint),
+                            response: endpointResponses[endpoint.id],
+                            onToggleExpand: {
+                                toggleEndpoint(endpoint.id)
+                                if expandedEndpoint == endpoint.id,
+                                    editablePayloads[endpoint.id] == nil
+                                {
+                                    editablePayloads[endpoint.id] = endpoint.examplePayload ?? "{}"
+                                }
+                            },
+                            onTest: { runEndpointTest(endpoint) },
+                            onClearResponse: { endpointResponses[endpoint.id] = nil }
+                        )
+                    }
+                }
+            }
+        }
+    }
+
+    private var documentationSection: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label {
+                Text("Documentation", bundle: .module)
+            } icon: {
+                Image(systemName: "book")
+            }
+            .font(.system(size: 14, weight: .semibold))
+            .foregroundColor(theme.primaryText)
+
+            Text("Learn how to integrate Muwa into your applications.", bundle: .module)
+                .font(.system(size: 12))
+                .foregroundColor(theme.secondaryText)
+
+            Button(action: {
+                if let url = URL(string: "https://docs.muwa.ai/") {
+                    NSWorkspace.shared.open(url)
+                }
+            }) {
+                HStack(spacing: 8) {
+                    Image(systemName: "arrow.up.right.square")
+                        .font(.system(size: 12, weight: .medium))
+                    Text("Open Documentation", bundle: .module)
+                        .font(.system(size: 13, weight: .medium))
+                }
+                .foregroundColor(.white)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 8)
+                        .fill(theme.accentColor)
+                )
+            }
+            .buttonStyle(PlainButtonStyle())
+        }
+        .padding(16)
+        .background(
+            RoundedRectangle(cornerRadius: 12)
+                .fill(theme.secondaryBackground)
+        )
+    }
+
+    // MARK: - Actions
+
+    private func toggleEndpoint(_ path: String) {
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedEndpoint = expandedEndpoint == path ? nil : path
+        }
+    }
+
+    private func binding(for endpoint: APIEndpoint) -> Binding<String> {
+        Binding(
+            get: { editablePayloads[endpoint.id] ?? endpoint.examplePayload ?? "{}" },
+            set: { editablePayloads[endpoint.id] = $0 }
+        )
+    }
+
+    private func recordResult(_ endpoint: APIEndpoint, startTime: Date, data: Data, response: URLResponse) {
+        let durationMs = Date().timeIntervalSince(startTime) * 1000
+        let statusCode = (response as? HTTPURLResponse)?.statusCode ?? 0
+        endpointResponses[endpoint.id] = EndpointTestResult(
+            endpoint: endpoint,
+            statusCode: statusCode,
+            body: data,
+            duration: durationMs / 1000,
+            error: nil
+        )
+        loadingEndpoints.remove(endpoint.id)
+    }
+
+    private func recordError(_ endpoint: APIEndpoint, startTime: Date, error: Error) {
+        let durationMs = Date().timeIntervalSince(startTime) * 1000
+        endpointResponses[endpoint.id] = EndpointTestResult(
+            endpoint: endpoint,
+            statusCode: 0,
+            body: Data(),
+            duration: durationMs / 1000,
+            error: error.localizedDescription
+        )
+        loadingEndpoints.remove(endpoint.id)
+    }
+
+    private func runEndpointTest(_ endpoint: APIEndpoint) {
+        guard server.isRunning, !endpoint.hasPathParameters else { return }
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedEndpoint = endpoint.id
+            loadingEndpoints.insert(endpoint.id)
+        }
+
+        if editablePayloads[endpoint.id] == nil {
+            editablePayloads[endpoint.id] = endpoint.examplePayload ?? "{}"
+        }
+
+        let payload = editablePayloads[endpoint.id] ?? endpoint.examplePayload ?? "{}"
+
+        Task {
+            let startTime = Date()
+            do {
+                let url = URL(string: "\(testURL)\(endpoint.path)")!
+                let data: Data
+                let response: URLResponse
+
+                if endpoint.method == "POST" {
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "POST"
+                    request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+                    request.httpBody = payload.data(using: .utf8)
+                    (data, response) = try await URLSession.shared.data(for: request)
+                } else if endpoint.method == "DELETE" {
+                    var request = URLRequest(url: url)
+                    request.httpMethod = "DELETE"
+                    (data, response) = try await URLSession.shared.data(for: request)
+                } else {
+                    (data, response) = try await URLSession.shared.data(from: url)
+                }
+
+                await MainActor.run { recordResult(endpoint, startTime: startTime, data: data, response: response) }
+            } catch {
+                await MainActor.run { recordError(endpoint, startTime: startTime, error: error) }
+            }
+        }
+    }
+
+    private func runAudioTranscriptionTest(_ endpoint: APIEndpoint, audioData: Data) {
+        guard server.isRunning else { return }
+
+        let modelId = SpeechModelManager.shared.selectedModel?.id ?? "parakeet-v3"
+
+        withAnimation(.easeInOut(duration: 0.2)) {
+            expandedEndpoint = endpoint.path
+            loadingEndpoints.insert(endpoint.path)
+        }
+
+        Task {
+            let startTime = Date()
+            do {
+                let url = URL(string: "\(testURL)\(endpoint.path)")!
+                var request = URLRequest(url: url)
+                request.httpMethod = "POST"
+
+                let boundary = "Boundary-\(UUID().uuidString)"
+                request.setValue("multipart/form-data; boundary=\(boundary)", forHTTPHeaderField: "Content-Type")
+
+                var body = Data()
+                body.append("--\(boundary)\r\n".data(using: .utf8)!)
+                body.append(
+                    "Content-Disposition: form-data; name=\"file\"; filename=\"recording.wav\"\r\n".data(using: .utf8)!
+                )
+                body.append("Content-Type: audio/wav\r\n\r\n".data(using: .utf8)!)
+                body.append(audioData)
+                body.append("\r\n--\(boundary)\r\n".data(using: .utf8)!)
+                body.append("Content-Disposition: form-data; name=\"model\"\r\n\r\n".data(using: .utf8)!)
+                body.append(modelId.data(using: .utf8)!)
+                body.append("\r\n--\(boundary)--\r\n".data(using: .utf8)!)
+                request.httpBody = body
+
+                let (data, response) = try await URLSession.shared.data(for: request)
+                await MainActor.run { recordResult(endpoint, startTime: startTime, data: data, response: response) }
+            } catch {
+                await MainActor.run { recordError(endpoint, startTime: startTime, error: error) }
+            }
+        }
+    }
+}
+
+// MARK: - API Endpoint Model
+
+struct APIEndpoint {
+    let method: String
+    let path: String
+    let description: String
+    let compatibility: String?
+    let category: EndpointCategory
+    let examplePayload: String?
+    let isAudioEndpoint: Bool
+
+    var id: String { "\(method) \(path)" }
+    var hasPathParameters: Bool { path.contains("{") }
+
+    init(
+        method: String,
+        path: String,
+        description: String,
+        compatibility: String?,
+        category: EndpointCategory,
+        examplePayload: String?,
+        isAudioEndpoint: Bool = false
+    ) {
+        self.method = method
+        self.path = path
+        self.description = description
+        self.compatibility = compatibility
+        self.category = category
+        self.examplePayload = examplePayload
+        self.isAudioEndpoint = isAudioEndpoint
+    }
+
+    enum EndpointCategory: String {
+        case core = "Core"
+        case chat = "Chat"
+        case embeddings = "Embeddings"
+        case audio = "Audio"
+        case memory = "Memory"
+        case agents = "Agents"
+        case mcp = "MCP"
+
+        var icon: String {
+            switch self {
+            case .core: return "server.rack"
+            case .chat: return "bubble.left.and.bubble.right"
+            case .embeddings: return "text.viewfinder"
+            case .audio: return "waveform"
+            case .memory: return "brain.head.profile"
+            case .agents: return "person.2"
+            case .mcp: return "wrench.and.screwdriver"
+            }
+        }
+
+        var color: Color {
+            switch self {
+            case .core: return .blue
+            case .chat: return .green
+            case .embeddings: return .cyan
+            case .audio: return .orange
+            case .memory: return .pink
+            case .agents: return .indigo
+            case .mcp: return .purple
+            }
+        }
+    }
+
+    private static let _defaultExampleModel: String = {
+        if FoundationModelService.isDefaultModelAvailable() {
+            return "foundation"
+        }
+        if let first = ModelManager.discoverLocalModels().first {
+            return first.id
+        }
+        return "your-model-name"
+    }()
+
+    static let allEndpoints: [APIEndpoint] = {
+        let model = _defaultExampleModel
+        return [
+            APIEndpoint(
+                method: "GET",
+                path: "/",
+                description: L("Root endpoint - server status message"),
+                compatibility: nil,
+                category: .core,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/health",
+                description: L("Health check endpoint"),
+                compatibility: nil,
+                category: .core,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/models",
+                description: L("List available models"),
+                compatibility: "OpenAI",
+                category: .core,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/tags",
+                description: L("List available models"),
+                compatibility: "Ollama",
+                category: .core,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/show",
+                description: L("Show model metadata"),
+                compatibility: "Ollama",
+                category: .core,
+                examplePayload: "{\n  \"name\": \"\(model)\"\n}"
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/chat/completions",
+                description: L("Chat completions with streaming support"),
+                compatibility: "OpenAI",
+                category: .chat,
+                examplePayload: """
+                    {
+                      "model": "\(model)",
+                      "messages": [
+                        {"role": "user", "content": "Hello!"}
+                      ],
+                      "stream": false
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/chat",
+                description: L("Chat endpoint (NDJSON streaming)"),
+                compatibility: "Ollama",
+                category: .chat,
+                examplePayload: """
+                    {
+                      "model": "\(model)",
+                      "messages": [
+                        {"role": "user", "content": "Hello!"}
+                      ]
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/messages",
+                description: L("Messages endpoint with streaming support"),
+                compatibility: "Anthropic",
+                category: .chat,
+                examplePayload: """
+                    {
+                      "model": "\(model)",
+                      "max_tokens": 1024,
+                      "messages": [
+                        {"role": "user", "content": "Hello, Claude!"}
+                      ],
+                      "stream": false
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/v1/responses",
+                description: L("Responses endpoint with streaming support"),
+                compatibility: "Open Responses",
+                category: .chat,
+                examplePayload: """
+                    {
+                      "model": "\(model)",
+                      "input": "Hello!",
+                      "stream": false
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/embeddings",
+                description: L("Generate text embeddings"),
+                compatibility: "OpenAI",
+                category: .embeddings,
+                examplePayload: "{\n  \"model\": \"potion-base-4M\",\n  \"input\": \"Hello world\"\n}"
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/embed",
+                description: L("Generate text embeddings"),
+                compatibility: "Ollama",
+                category: .embeddings,
+                examplePayload: "{\n  \"model\": \"potion-base-4M\",\n  \"input\": \"Hello world\"\n}"
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/audio/transcriptions",
+                description: L("Transcribe audio to text"),
+                compatibility: "OpenAI",
+                category: .audio,
+                examplePayload: nil,
+                isAudioEndpoint: true
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/agents",
+                description: L("List all agents with memory counts"),
+                compatibility: "Muwa",
+                category: .memory,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/agents/{id}",
+                description: L("Return info for a single agent"),
+                compatibility: "Muwa",
+                category: .agents,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/memory/ingest",
+                description: L("Bulk-ingest conversation turns into memory"),
+                compatibility: "Muwa",
+                category: .memory,
+                examplePayload: """
+                    {
+                      "agent_id": "my-agent",
+                      "conversation_id": "session-1",
+                      "turns": [
+                        {"user": "Hi, my name is Alice", "assistant": "Hello Alice!"}
+                      ]
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/mcp/health",
+                description: L("MCP server health check"),
+                compatibility: "MCP",
+                category: .mcp,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/mcp/tools",
+                description: L("List available tools"),
+                compatibility: "MCP",
+                category: .mcp,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/mcp/call",
+                description: L("Execute a tool by name"),
+                compatibility: "MCP",
+                category: .mcp,
+                examplePayload: "{\n  \"name\": \"example_tool\",\n  \"arguments\": {}\n}"
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/agents/{id}/run",
+                description: L("Run the full agent chat loop server-side, streaming SSE text deltas"),
+                compatibility: "Muwa",
+                category: .agents,
+                examplePayload: """
+                    {
+                      "model": "default",
+                      "messages": [
+                        {"role": "user", "content": "Summarize the repo"}
+                      ],
+                      "stream": true
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/agents/{identifier}/dispatch",
+                description: L("Dispatch a work or chat task to an agent"),
+                compatibility: "Muwa",
+                category: .agents,
+                examplePayload: """
+                    {
+                      "prompt": "Summarize the latest changes",
+                      "mode": "work",
+                      "title": "Summary task"
+                    }
+                    """
+            ),
+            APIEndpoint(
+                method: "GET",
+                path: "/tasks/{task_id}",
+                description: L("Poll task status and activity"),
+                compatibility: "Muwa",
+                category: .agents,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "DELETE",
+                path: "/tasks/{task_id}",
+                description: L("Cancel a running task"),
+                compatibility: "Muwa",
+                category: .agents,
+                examplePayload: nil
+            ),
+            APIEndpoint(
+                method: "POST",
+                path: "/tasks/{task_id}/clarify",
+                description: L("Submit a clarification response to a waiting task"),
+                compatibility: "Muwa",
+                category: .agents,
+                examplePayload: "{\n  \"response\": \"Yes, proceed with the changes\"\n}"
+            ),
+        ]
+    }()
+
+    static let groupedEndpoints: [(category: EndpointCategory, endpoints: [APIEndpoint])] = {
+        let categories: [EndpointCategory] = [.core, .chat, .embeddings, .audio, .memory, .agents, .mcp]
+        return categories.map { cat in
+            (category: cat, endpoints: allEndpoints.filter { $0.category == cat })
+        }
+    }()
+}
+
+// MARK: - Endpoint Test Result
+
+struct EndpointTestResult: Equatable {
+    let endpoint: APIEndpoint
+    let statusCode: Int
+    let body: Data
+    let duration: TimeInterval
+    let error: String?
+
+    var isSuccess: Bool { statusCode >= 200 && statusCode < 300 }
+
+    var formattedBody: String {
+        if let error { return "Error: \(error)" }
+        if let json = try? JSONSerialization.jsonObject(with: body, options: []),
+            let prettyData = try? JSONSerialization.data(withJSONObject: json, options: [.prettyPrinted, .sortedKeys]),
+            let prettyString = String(data: prettyData, encoding: .utf8)
+        {
+            return prettyString
+        }
+        return String(data: body, encoding: .utf8) ?? "(Unable to decode response)"
+    }
+
+    static func == (lhs: EndpointTestResult, rhs: EndpointTestResult) -> Bool {
+        lhs.endpoint.path == rhs.endpoint.path && lhs.statusCode == rhs.statusCode && lhs.duration == rhs.duration
+    }
+}
+
+extension APIEndpoint: Equatable {
+    static func == (lhs: APIEndpoint, rhs: APIEndpoint) -> Bool {
+        lhs.path == rhs.path && lhs.method == rhs.method
+    }
+}
+
+// MARK: - Server Status Badge
+
+private struct ServerStatusBadge: View {
+    @Environment(\.theme) private var theme
+    let health: ServerHealth
+
+    var body: some View {
+        HStack(spacing: 6) {
+            Circle()
+                .fill(statusColor)
+                .frame(width: 8, height: 8)
+                .overlay(
+                    Circle()
+                        .fill(statusColor.opacity(0.3))
+                        .frame(width: 16, height: 16)
+                        .opacity(isAnimating ? 1 : 0)
+                        .animation(
+                            isAnimating ? .easeInOut(duration: 1).repeatForever(autoreverses: true) : .default,
+                            value: isAnimating
+                        )
+                )
+
+            Text(health.statusDescription)
+                .font(.system(size: 12, weight: .semibold))
+                .foregroundColor(statusColor)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(statusColor.opacity(0.1))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(statusColor.opacity(0.3), lineWidth: 1)
+                )
+        )
+    }
+
+    private var statusColor: Color {
+        switch health {
+        case .running: return theme.successColor
+        case .stopped: return theme.tertiaryText
+        case .starting, .restarting, .stopping: return theme.warningColor
+        case .error: return theme.errorColor
+        }
+    }
+
+    private var isAnimating: Bool {
+        switch health {
+        case .starting, .restarting, .stopping: return true
+        default: return false
+        }
+    }
+}
+
+// MARK: - Shared Endpoint Row Header
+
+private struct EndpointRowHeader: View {
+    @Environment(\.theme) private var theme
+
+    let endpoint: APIEndpoint
+    let isServerRunning: Bool
+    let isExpanded: Bool
+    let isLoading: Bool
+    let response: EndpointTestResult?
+    let onToggleExpand: () -> Void
+
+    @State private var isHovering = false
+
+    var body: some View {
+        Button(action: {
+            if isServerRunning { onToggleExpand() }
+        }) {
+            HStack(spacing: 12) {
+                Text(endpoint.method)
+                    .font(.system(size: 10, weight: .bold, design: .monospaced))
+                    .foregroundColor(methodColor)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 4)
+                    .background(
+                        RoundedRectangle(cornerRadius: 4)
+                            .fill(methodColor.opacity(0.15))
+                    )
+                    .frame(width: 58)
+
+                Text(endpoint.path)
+                    .font(.system(size: 13, weight: .medium, design: .monospaced))
+                    .foregroundColor(theme.primaryText)
+
+                if let compat = endpoint.compatibility {
+                    Text(compat)
+                        .font(.system(size: 9, weight: .semibold))
+                        .foregroundColor(compatColor(compat))
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 2)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(compatColor(compat).opacity(0.1))
+                        )
+                }
+
+                Spacer()
+
+                Text(endpoint.description)
+                    .font(.system(size: 11))
+                    .foregroundColor(theme.tertiaryText)
+                    .lineLimit(1)
+
+                if isLoading {
+                    ProgressView()
+                        .scaleEffect(0.6)
+                        .frame(width: 20, height: 20)
+                } else if let resp = response {
+                    Text("\(resp.statusCode)", bundle: .module)
+                        .font(.system(size: 10, weight: .bold, design: .monospaced))
+                        .foregroundColor(.white)
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            RoundedRectangle(cornerRadius: 4)
+                                .fill(resp.isSuccess ? Color.green : Color.red)
+                        )
+                }
+
+                Image(systemName: isExpanded ? "chevron.up" : "chevron.down")
+                    .font(.system(size: 10, weight: .semibold))
+                    .foregroundColor(theme.tertiaryText)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 10)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(PlainButtonStyle())
+        .disabled(!isServerRunning)
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isHovering || isExpanded ? theme.tertiaryBackground.opacity(0.5) : Color.clear)
+        )
+        .onHover { hovering in
+            withAnimation(.easeOut(duration: 0.15)) { isHovering = hovering }
+        }
+    }
+
+    private var methodColor: Color {
+        switch endpoint.method {
+        case "GET": return .green
+        case "POST": return .blue
+        case "PUT": return .orange
+        case "DELETE": return .red
+        default: return theme.tertiaryText
+        }
+    }
+
+    private func compatColor(_ compat: String) -> Color {
+        switch compat {
+        case "OpenAI": return .green
+        case "Ollama": return .orange
+        case "MCP": return .purple
+        default: return theme.accentColor
+        }
+    }
+}
+
+// MARK: - Shared Response Panel
+
+private struct ResponsePanel: View {
+    @Environment(\.theme) private var theme
+
+    let isLoading: Bool
+    let response: EndpointTestResult?
+    let emptyMessage: String
+    let onClearResponse: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label {
+                    Text("Response", bundle: .module)
+                } icon: {
+                    Image(systemName: "arrow.down.circle.fill")
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(theme.secondaryText)
+
+                Spacer()
+
+                if let resp = response {
+                    Text(String(format: "%.0fms", resp.duration * 1000))
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundColor(theme.tertiaryText)
+
+                    Button(action: {
+                        NSPasteboard.general.clearContents()
+                        NSPasteboard.general.setString(resp.formattedBody, forType: .string)
+                    }) {
+                        Image(systemName: "doc.on.doc")
+                            .font(.system(size: 10))
+                            .foregroundColor(theme.tertiaryText)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .localizedHelp("Copy response")
+
+                    Button(action: onClearResponse) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10))
+                            .foregroundColor(theme.tertiaryText)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .localizedHelp("Clear response")
+                }
+            }
+
+            if isLoading {
+                VStack {
+                    ProgressView().scaleEffect(0.8)
+                    Text("Waiting for response...", bundle: .module)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.tertiaryText)
+                }
+                .frame(maxWidth: .infinity, minHeight: 120)
+                .background(
+                    RoundedRectangle(cornerRadius: 6).fill(theme.codeBlockBackground)
+                )
+            } else if let resp = response {
+                ScrollView {
+                    Text(resp.formattedBody)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(resp.isSuccess ? theme.primaryText : theme.errorColor)
+                        .textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(8)
+                }
+                .frame(minHeight: 120, maxHeight: 200)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(theme.codeBlockBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(
+                                    resp.isSuccess ? Color.green.opacity(0.3) : Color.red.opacity(0.3),
+                                    lineWidth: 1
+                                )
+                        )
+                )
+            } else {
+                VStack(spacing: 8) {
+                    Image(systemName: "arrow.left.circle")
+                        .font(.system(size: 24))
+                        .foregroundColor(theme.tertiaryText.opacity(0.5))
+                    Text(emptyMessage)
+                        .font(.system(size: 11))
+                        .foregroundColor(theme.tertiaryText)
+                }
+                .frame(maxWidth: .infinity, minHeight: 120)
+                .background(
+                    RoundedRectangle(cornerRadius: 6).fill(theme.codeBlockBackground)
+                )
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Endpoint Row
+
+private struct EndpointRow: View {
+    @Environment(\.theme) private var theme
+
+    let endpoint: APIEndpoint
+    let serverURL: String
+    let isServerRunning: Bool
+    let isExpanded: Bool
+    let isLoading: Bool
+    @Binding var editablePayload: String
+    let response: EndpointTestResult?
+    let onToggleExpand: () -> Void
+    let onTest: () -> Void
+    let onClearResponse: () -> Void
+
+    var body: some View {
+        VStack(spacing: 0) {
+            EndpointRowHeader(
+                endpoint: endpoint,
+                isServerRunning: isServerRunning,
+                isExpanded: isExpanded,
+                isLoading: isLoading,
+                response: response,
+                onToggleExpand: onToggleExpand
+            )
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider().background(theme.primaryBorder.opacity(0.3))
+
+                    HStack(alignment: .top, spacing: 16) {
+                        requestPanel
+                        Rectangle().fill(theme.primaryBorder.opacity(0.3)).frame(width: 1)
+                        ResponsePanel(
+                            isLoading: isLoading,
+                            response: response,
+                            emptyMessage: endpoint.hasPathParameters
+                                ? L("Test with curl or your HTTP client")
+                                : L("Click 'Send Request' to test"),
+                            onClearResponse: onClearResponse
+                        )
+                    }
+                    .padding(16)
+                }
+                .background(theme.tertiaryBackground.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isExpanded ? theme.secondaryBackground : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isExpanded ? theme.primaryBorder.opacity(0.5) : Color.clear, lineWidth: 1)
+                )
+        )
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+    }
+
+    private var requestPanel: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Label {
+                    Text("Request", bundle: .module)
+                } icon: {
+                    Image(systemName: "arrow.up.circle.fill")
+                }
+                .font(.system(size: 11, weight: .semibold))
+                .foregroundColor(theme.secondaryText)
+                Spacer()
+                if endpoint.examplePayload != nil, !endpoint.hasPathParameters {
+                    Button(action: { editablePayload = endpoint.examplePayload ?? "{}" }) {
+                        Text("Reset", bundle: .module)
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(theme.tertiaryText)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                }
+            }
+
+            if endpoint.hasPathParameters {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("\(endpoint.method) \(serverURL)\(endpoint.path)", bundle: .module)
+                        .font(.system(size: 11, design: .monospaced))
+                        .foregroundColor(theme.primaryText)
+                        .textSelection(.enabled)
+
+                    if let payload = endpoint.examplePayload {
+                        Text(payload)
+                            .font(.system(size: 11, design: .monospaced))
+                            .foregroundColor(theme.secondaryText)
+                            .textSelection(.enabled)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(12)
+                .background(
+                    RoundedRectangle(cornerRadius: 6).fill(theme.codeBlockBackground)
+                )
+
+                HStack(spacing: 6) {
+                    Image(systemName: "info.circle")
+                        .font(.system(size: 10))
+                    Text(
+                        "Replace path parameters with real values. Test via curl or your HTTP client.",
+                        bundle: .module
+                    )
+                    .font(.system(size: 10))
+                }
+                .foregroundColor(theme.tertiaryText)
+            } else if endpoint.examplePayload != nil {
+                TextEditor(text: $editablePayload)
+                    .font(.system(size: 11, design: .monospaced))
+                    .frame(minHeight: 120, maxHeight: 200)
+                    .scrollContentBackground(.hidden)
+                    .padding(8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(theme.inputBackground)
+                            .overlay(
+                                RoundedRectangle(cornerRadius: 6)
+                                    .stroke(theme.inputBorder, lineWidth: 1)
+                            )
+                    )
+                    .foregroundColor(theme.primaryText)
+            } else {
+                Text("\(endpoint.method) \(serverURL)\(endpoint.path)", bundle: .module)
+                    .font(.system(size: 11, design: .monospaced))
+                    .foregroundColor(theme.primaryText)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(12)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6).fill(theme.codeBlockBackground)
+                    )
+            }
+
+            if !endpoint.hasPathParameters {
+                Button(action: onTest) {
+                    HStack(spacing: 6) {
+                        if isLoading {
+                            ProgressView().scaleEffect(0.7)
+                        } else {
+                            Image(systemName: "paperplane.fill").font(.system(size: 10))
+                        }
+                        Text(LocalizedStringKey(isLoading ? "Sending..." : "Send Request"), bundle: .module)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(isLoading ? theme.tertiaryText : theme.accentColor)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(isLoading)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+}
+
+// MARK: - Transcription Test Row
+
+private struct TranscriptionTestRow: View {
+    @Environment(\.theme) private var theme
+    @ObservedObject private var speechModelManager = SpeechModelManager.shared
+
+    let endpoint: APIEndpoint
+    let serverURL: String
+    let isServerRunning: Bool
+    let isExpanded: Bool
+    let isLoading: Bool
+    let response: EndpointTestResult?
+    let onToggleExpand: () -> Void
+    let onTest: (Data) -> Void
+    let onClearResponse: () -> Void
+
+    @State private var selectedFileURL: URL?
+    @State private var selectedFileName: String?
+    @State private var audioData: Data?
+    @State private var fileError: String?
+
+    var body: some View {
+        VStack(spacing: 0) {
+            EndpointRowHeader(
+                endpoint: endpoint,
+                isServerRunning: isServerRunning,
+                isExpanded: isExpanded,
+                isLoading: isLoading,
+                response: response,
+                onToggleExpand: onToggleExpand
+            )
+
+            if isExpanded {
+                VStack(spacing: 0) {
+                    Divider().background(theme.primaryBorder.opacity(0.3))
+
+                    HStack(alignment: .top, spacing: 16) {
+                        requestPanel
+                        Rectangle().fill(theme.primaryBorder.opacity(0.3)).frame(width: 1)
+                        ResponsePanel(
+                            isLoading: isLoading,
+                            response: response,
+                            emptyMessage: "Select an audio file and send to see transcription",
+                            onClearResponse: onClearResponse
+                        )
+                    }
+                    .padding(16)
+                }
+                .background(theme.tertiaryBackground.opacity(0.3))
+                .clipShape(RoundedRectangle(cornerRadius: 8))
+                .transition(.opacity.combined(with: .scale(scale: 0.98, anchor: .top)))
+            }
+        }
+        .background(
+            RoundedRectangle(cornerRadius: 8)
+                .fill(isExpanded ? theme.secondaryBackground : Color.clear)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 8)
+                        .stroke(isExpanded ? theme.primaryBorder.opacity(0.5) : Color.clear, lineWidth: 1)
+                )
+        )
+        .animation(.easeInOut(duration: 0.2), value: isExpanded)
+    }
+
+    private var requestPanel: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Label {
+                Text("Request", bundle: .module)
+            } icon: {
+                Image(systemName: "arrow.up.circle.fill")
+            }
+            .font(.system(size: 11, weight: .semibold))
+            .foregroundColor(theme.secondaryText)
+
+            VStack(alignment: .leading, spacing: 6) {
+                Text("Model", bundle: .module)
+                    .font(.system(size: 10, weight: .medium))
+                    .foregroundColor(theme.tertiaryText)
+
+                HStack(spacing: 8) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 12))
+                        .foregroundColor(.orange)
+
+                    if let model = speechModelManager.selectedModel {
+                        Text(model.name)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(theme.primaryText)
+                    } else {
+                        Text("No model selected", bundle: .module)
+                            .font(.system(size: 12, weight: .medium))
+                            .foregroundColor(theme.tertiaryText)
+                            .italic()
+                    }
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 8)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(theme.inputBackground)
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 6)
+                                .stroke(theme.inputBorder, lineWidth: 1)
+                        )
+                )
+            }
+
+            audioFileField
+
+            HStack(spacing: 8) {
+                Button(action: selectFile) {
+                    HStack(spacing: 6) {
+                        Image(systemName: "folder").font(.system(size: 10))
+                        Text("Choose File", bundle: .module).font(.system(size: 11, weight: .medium))
+                    }
+                    .foregroundColor(theme.secondaryText)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6).fill(theme.tertiaryBackground)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+
+                Button(action: { if let data = audioData { onTest(data) } }) {
+                    HStack(spacing: 6) {
+                        if isLoading {
+                            ProgressView().scaleEffect(0.7).frame(width: 12, height: 12)
+                        } else {
+                            Image(systemName: "paperplane.fill").font(.system(size: 10))
+                        }
+                        Text(LocalizedStringKey(isLoading ? "Sending..." : "Send Request"), bundle: .module)
+                            .font(.system(size: 11, weight: .semibold))
+                    }
+                    .foregroundColor(.white)
+                    .frame(maxWidth: .infinity, minHeight: 18)
+                    .padding(.vertical, 8)
+                    .background(
+                        RoundedRectangle(cornerRadius: 6)
+                            .fill(audioData != nil && !isLoading ? theme.accentColor : theme.tertiaryText)
+                    )
+                }
+                .buttonStyle(PlainButtonStyle())
+                .disabled(audioData == nil || isLoading)
+            }
+        }
+        .frame(maxWidth: .infinity)
+    }
+
+    @ViewBuilder
+    private var audioFileField: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Text("Audio File", bundle: .module)
+                .font(.system(size: 10, weight: .medium))
+                .foregroundColor(theme.tertiaryText)
+
+            if let fileName = selectedFileName {
+                HStack(spacing: 10) {
+                    Image(systemName: "waveform")
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.accentColor)
+                    Text(fileName)
+                        .font(.system(size: 12, weight: .medium))
+                        .foregroundColor(theme.primaryText)
+                        .lineLimit(1)
+                    if let data = audioData {
+                        Text("(\(sharedByteCountFormatter.string(fromByteCount: Int64(data.count))))", bundle: .module)
+                            .font(.system(size: 11))
+                            .foregroundColor(theme.tertiaryText)
+                    }
+                    Spacer()
+                    Button(action: clearFile) {
+                        Image(systemName: "xmark")
+                            .font(.system(size: 10, weight: .medium))
+                            .foregroundColor(theme.tertiaryText)
+                    }
+                    .buttonStyle(PlainButtonStyle())
+                    .localizedHelp("Remove file")
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(theme.inputBackground)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.inputBorder, lineWidth: 1))
+                )
+            } else {
+                HStack(spacing: 8) {
+                    Image(systemName: "doc.badge.plus")
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.tertiaryText)
+                    Text("No file selected", bundle: .module)
+                        .font(.system(size: 12))
+                        .foregroundColor(theme.tertiaryText)
+                        .italic()
+                    Spacer()
+                    Text("WAV, MP3, M4A", bundle: .module)
+                        .font(.system(size: 10))
+                        .foregroundColor(theme.tertiaryText.opacity(0.7))
+                }
+                .padding(.horizontal, 12)
+                .padding(.vertical, 10)
+                .background(
+                    RoundedRectangle(cornerRadius: 6)
+                        .fill(theme.inputBackground)
+                        .overlay(RoundedRectangle(cornerRadius: 6).stroke(theme.inputBorder, lineWidth: 1))
+                )
+            }
+
+            if let error = fileError {
+                HStack(spacing: 6) {
+                    Image(systemName: "exclamationmark.triangle.fill").font(.system(size: 10))
+                    Text(error).font(.system(size: 11))
+                }
+                .foregroundColor(theme.errorColor)
+                .padding(.top, 4)
+            }
+        }
+    }
+
+    // MARK: - File Handling
+
+    private func selectFile() {
+        let panel = NSOpenPanel()
+        panel.allowsMultipleSelection = false
+        panel.canChooseDirectories = false
+        panel.canChooseFiles = true
+        panel.allowedContentTypes = [.audio, .wav, .mp3, .mpeg4Audio]
+        panel.message = L("Select an audio file to transcribe")
+        panel.prompt = L("Select")
+
+        Task { @MainActor in
+            guard await panel.beginModal() == .OK, let url = panel.url else { return }
+            loadFile(from: url)
+        }
+    }
+
+    private func loadFile(from url: URL) {
+        fileError = nil
+        do {
+            let accessing = url.startAccessingSecurityScopedResource()
+            defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+
+            let data = try Data(contentsOf: url)
+            if data.count > 25 * 1024 * 1024 {
+                fileError = "File too large (max 25MB)"
+                return
+            }
+            audioData = data
+            selectedFileURL = url
+            selectedFileName = url.lastPathComponent
+        } catch {
+            fileError = "Failed to read file: \(error.localizedDescription)"
+        }
+    }
+
+    private func clearFile() {
+        audioData = nil
+        selectedFileURL = nil
+        selectedFileName = nil
+        fileError = nil
+    }
+}
+
+// MARK: - Preview
+
+#if DEBUG && canImport(PreviewsMacros)
+    #Preview {
+        ServerView()
+            .environmentObject(ServerController())
+            .frame(width: 900, height: 700)
+    }
+#endif

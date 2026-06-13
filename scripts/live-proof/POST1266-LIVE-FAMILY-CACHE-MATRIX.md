@@ -1,12 +1,12 @@
 # Post-1266 live family cache/tool matrix
 
 This document is the live evidence ledger for PR `#1268`, the consolidated
-post-1266 Osaurus/vMLX family runtime cache/tool matrix PR. Older runtime PRs
+post-1266 Muwa/vMLX family runtime cache/tool matrix PR. Older runtime PRs
 must not be merged separately; their current replacement is PR `#1268`.
 
 ## Required proof buckets
 
-Each promoted row needs current Osaurus app/API evidence from an unsigned/no-sign app launched keychain-free:
+Each promoted row needs current Muwa app/API evidence from an unsigned/no-sign app launched keychain-free:
 
 - Model ID is present in `/v1/models`.
 - Chat payload does not inject sampler overrides unless the request explicitly asks for them.
@@ -47,13 +47,13 @@ Default family selection skips internal model IDs beginning with `_`; explicit `
 
 ## 2026-05-27 current-head boundary
 
-Current Osaurus head: `19871f5fa3d3ad1d777d02195380725a67f9fb59`.
+Current Muwa head: `19871f5fa3d3ad1d777d02195380725a67f9fb59`.
 Current vMLX pin: `bdd43452f86566574f3ea8c1a68a0993b7e25192`.
 
 This head includes the Nemotron required-tool tail/template fix and the DSV4
 multiline required-tool fix. The current-head no-sign app was built from
 `/Users/eric/osaurus-pr1268-live` with signing disabled and launched with
-`OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+`MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 
 Current no-sign build path:
 `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-19871f5f`.
@@ -134,13 +134,13 @@ Current classification boundary to preserve:
 
 ## 2026-05-27 13:04 PDT - Exact-head keychain-free app refresh
 
-Current Osaurus head: `a1ae123fa989b65063605c56b5c2ae38326ba099`.
+Current Muwa head: `a1ae123fa989b65063605c56b5c2ae38326ba099`.
 No-sign Release app:
-`/tmp/osaurus-post1266-live-family-cache-matrix/build/DerivedData-pr1268-release-nosign-a1ae123f/Build/Products/Release/osaurus.app`.
+`/tmp/osaurus-post1266-live-family-cache-matrix/build/DerivedData-pr1268-release-nosign-a1ae123f/Build/Products/Release/Muwa.app`.
 
 Launch mode:
 
-- `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`
+- `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`
 - No signing, notarization, `security`, or certificate lookup path.
 - `/health` was healthy before and after the Ling row.
 
@@ -222,7 +222,7 @@ Refresh after required-tool harness cap correction:
 - Artifact: `/tmp/osaurus-pr1268-live-dsv4-jang-20260527-111317`
 - Model: `deepseek-v4-flash-jang`
 - Classification: `error`
-- Result: Osaurus correctly refused the plain affine DSV4 JANG bundle and directed use of JANGTQ2/JANGTQ-K instead.
+- Result: Muwa correctly refused the plain affine DSV4 JANG bundle and directed use of JANGTQ2/JANGTQ-K instead.
 - Boundary: this is a production guard, not a live chat pass.
 
 ### DSV4 Flash JANGTQ2
@@ -288,8 +288,8 @@ Refresh after Gemma3n fallback prompt correction:
 
 ## 2026-05-27 11:41 PDT - MiniMax direct-rail rerun on rebuilt PR #1268 app
 
-Current Osaurus head: `2659487918aa77038efa752f3c60295016d6adab`.
-No-sign Release app: `/tmp/osaurus-post1266-live-family-cache-matrix/build/DerivedData-pr1268-release-nosign-minimax-26594879/Build/Products/Release/osaurus.app`.
+Current Muwa head: `2659487918aa77038efa752f3c60295016d6adab`.
+No-sign Release app: `/tmp/osaurus-post1266-live-family-cache-matrix/build/DerivedData-pr1268-release-nosign-minimax-26594879/Build/Products/Release/Muwa.app`.
 Launch root: `/tmp/osaurus-pr1268-release-open-minimax-20260527-114043`.
 
 Focused source guard before rebuild:
@@ -325,12 +325,12 @@ Still not fixed by this row:
 
 ## 2026-05-27 16:00 PDT - Current-head PR #1268 DSV4 rerun and dev-launch correction
 
-Current Osaurus head: `19871f5fa3d3ad1d777d02195380725a67f9fb59`.
+Current Muwa head: `19871f5fa3d3ad1d777d02195380725a67f9fb59`.
 Current vMLX pin: `f84b0dbd00a87e4722f7b3c700938a40e261c399`.
 
 ## 2026-05-27 16:15 PDT - Current-head continuation: Gemma3n and ZAYA-VL remain red
 
-Current Osaurus head at this continuation: `82ba13af4bdd6091156946d04a84796401d1adc3`.
+Current Muwa head at this continuation: `82ba13af4bdd6091156946d04a84796401d1adc3`.
 Current vMLX pin: `f84b0dbd00a87e4722f7b3c700938a40e261c399`.
 
 Gemma3n E2B required-tool isolation:
@@ -359,12 +359,12 @@ ZAYA-VL required-tool isolation:
 
 Build/launch findings:
 
-- `scripts/live-proof/build-keychain-free-osaurus.sh` built Release with Xcode signing disabled.
-- Direct binary launch through `launch-keychain-free-osaurus.sh` was blocked by macOS policy on this machine (`AppleSystemPolicy` refused the raw unsigned bundle).
+- `scripts/live-proof/build-keychain-free-muwa.sh` built Release with Xcode signing disabled.
+- Direct binary launch through `launch-keychain-free-muwa.sh` was blocked by macOS policy on this machine (`AppleSystemPolicy` refused the raw unsigned bundle).
 - The workable keychain-free UI path is:
   - build with Xcode signing disabled,
   - apply local ad-hoc bundle sealing with `/usr/bin/codesign --sign - --timestamp=none`,
-  - launch foreground UI through `open-keychain-free-osaurus.sh`, which sets `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1` and `OSAURUS_TEST_ROOT` via `launchctl setenv` before `open -n`.
+  - launch foreground UI through `open-keychain-free-muwa.sh`, which sets `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1` and `MUWA_TEST_ROOT` via `launchctl setenv` before `open -n`.
 - This uses no signing identity, certificate, notarization, `security(1)`, or login Keychain item.
 
 Focused DSV4 app row:
@@ -381,10 +381,10 @@ Focused DSV4 app row:
 
 ## 2026-05-28 04:24 PDT - Current-head ZAYA-VL media required-tool proof after vMLX main repin
 
-Current Osaurus head: `2b4f576dbe1159054677eaee3e9d2467ff396da1`.
+Current Muwa head: `2b4f576dbe1159054677eaee3e9d2467ff396da1`.
 Current vMLX pin: `d3d76b4c11c1f3e83e787f0464120087167c1609`.
-No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-2b4f576d/Build/Products/Release/osaurus.app`.
-Launch mode: `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, `OSAURUS_TEST_ROOT=/tmp/osaurus-pr1268-2b4f576d-keychain-free-open-20260528-042237`.
+No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-2b4f576d/Build/Products/Release/Muwa.app`.
+Launch mode: `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, `MUWA_TEST_ROOT=/tmp/osaurus-pr1268-2b4f576d-keychain-free-open-20260528-042237`.
 
 ZAYA-VL media required-tool row:
 
@@ -404,9 +404,9 @@ Invalid payload boundary:
 
 ## 2026-05-28 04:34 PDT - ZAYA-VL repeated media required-tool cache-hit proof
 
-Current Osaurus head: `b681ea663c511cdeb45a97a20a2b050ea51cd40f`.
+Current Muwa head: `b681ea663c511cdeb45a97a20a2b050ea51cd40f`.
 Current vMLX pin: `d3d76b4c11c1f3e83e787f0464120087167c1609`.
-Live app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-2b4f576d/Build/Products/Release/osaurus.app`.
+Live app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-2b4f576d/Build/Products/Release/Muwa.app`.
 
 Artifact:
 
@@ -423,10 +423,10 @@ Result:
 
 ## 2026-05-28 05:49 PDT - DSV4 required-tool action-rail proof after vMLX main update
 
-Current Osaurus head: `bbc4338532010adabf0fd1773ef0e66f712beabb`.
-Runtime-equivalent no-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-094bf705-nosign/Build/Products/Release/osaurus.app`.
+Current Muwa head: `bbc4338532010adabf0fd1773ef0e66f712beabb`.
+Runtime-equivalent no-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-094bf705-nosign/Build/Products/Release/Muwa.app`.
 Current vMLX main pin: `d3d76b4c11c1f3e83e787f0464120087167c1609`.
-Launch mode: `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, `OSAURUS_TEST_ROOT=/tmp/osaurus-pr1268-bbc43385-keychain-free-dsv4-20260528-054718`.
+Launch mode: `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, `MUWA_TEST_ROOT=/tmp/osaurus-pr1268-bbc43385-keychain-free-dsv4-20260528-054718`.
 
 Artifact:
 
@@ -454,10 +454,10 @@ Boundary:
 
 ## 2026-05-28 06:01 PDT - Current-head DSV4 proof after nonstreaming cancellation commit
 
-Current Osaurus head: `1503be2f096f6fa5746178c27d65f7e6d805b525`.
-No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-1503be2f-nosign/Build/Products/Release/osaurus.app`.
+Current Muwa head: `1503be2f096f6fa5746178c27d65f7e6d805b525`.
+No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-1503be2f-nosign/Build/Products/Release/Muwa.app`.
 Current vMLX main pin: `d3d76b4c11c1f3e83e787f0464120087167c1609`.
-Launch mode: `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`, `OSAURUS_TEST_ROOT=/tmp/osaurus-pr1268-1503be2f-keychain-free-dsv4-20260528-060116`.
+Launch mode: `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`, `MUWA_TEST_ROOT=/tmp/osaurus-pr1268-1503be2f-keychain-free-dsv4-20260528-060116`.
 
 Artifact:
 
@@ -486,8 +486,8 @@ Boundary:
 
 ## 2026-05-28 06:21 PDT - Current-head DSV4 repeat-cache boundary
 
-Current Osaurus head: `2a2a6d4b039e61fd9338c42287fa9b35798328cb`.
-No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-1503be2f-nosign/Build/Products/Release/osaurus.app`.
+Current Muwa head: `2a2a6d4b039e61fd9338c42287fa9b35798328cb`.
+No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-1503be2f-nosign/Build/Products/Release/Muwa.app`.
 Current vMLX main pin: `d3d76b4c11c1f3e83e787f0464120087167c1609`.
 
 Artifact:
@@ -514,16 +514,16 @@ Boundary:
 
 ## 2026-05-28 06:28 PDT - Sidecar audit boundaries for Gemma3n and ZAYA CCA
 
-Current Osaurus head before this note: `72005cef9a292adab0709f3d23a02c17a3ba79c5`.
+Current Muwa head before this note: `72005cef9a292adab0709f3d23a02c17a3ba79c5`.
 Current vMLX main pin: `d3d76b4c11c1f3e83e787f0464120087167c1609`.
 
 Gemma3n required-tool boundary:
 
 - `gemma-3n-e2b-it-4bit` still has a live required/named tool-call failure in the ledger; it emits visible prose and no structured tool call.
-- Source audit shows Osaurus passes `tool_choice` and schema through `ModelRuntime.makeTokenizerTools(...)` and `MLXBatchAdapter.additionalContext(...)`.
+- Source audit shows Muwa passes `tool_choice` and schema through `ModelRuntime.makeTokenizerTools(...)` and `MLXBatchAdapter.additionalContext(...)`.
 - Pinned vMLX maps Gemma3/Gemma3n model types to `ToolCallFormat.gemma`, whose parser expects `<start_function_call>call:name{...}<end_function_call>`.
 - The generic Gemma missing-template fallback is Gemma4/Zyphra-oriented. Therefore the next safe step is source-only render/parser verification for the exact Gemma3n E2B bundle path before any live fix.
-- Do not hide this with Osaurus-side prompt injection, output stripping, hidden sampler/repetition guards, or fake reasoning wrappers. If render and parser are correct but the model still emits prose, keep Gemma3n required-tool support partial/unsupported for this PR.
+- Do not hide this with Muwa-side prompt injection, output stripping, hidden sampler/repetition guards, or fake reasoning wrappers. If render and parser are correct but the model still emits prose, keep Gemma3n required-tool support partial/unsupported for this PR.
 
 ZAYA/ZAYA-VL CCA companion-hit boundary:
 
@@ -547,7 +547,7 @@ Gemma3n required-tool boundary correction:
 
 Current local head before commit: `319bfeb06ae082f0a77b48c992bcd93bb3e8e04a`.
 Current vMLX main pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`.
-No-sign/keychain-free app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-319bfeb0/Build/Products/Release/osaurus.app`.
+No-sign/keychain-free app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-319bfeb0/Build/Products/Release/Muwa.app`.
 
 Artifacts:
 
@@ -565,9 +565,9 @@ DSV4 result:
 
 Gemma3n result and fix:
 
-- Before the Osaurus-side guard, `gemma-3n-e2b-it-4bit` failed required-tool live proof by emitting visible `<|tool>model:model` fragments and no structured tool call.
+- Before the Muwa-side guard, `gemma-3n-e2b-it-4bit` failed required-tool live proof by emitting visible `<|tool>model:model` fragments and no structured tool call.
 - This is not a parser success case. vMLX main `cc3f5f4` correctly stops inferring Gemma3n tool support from `model_type` alone.
-- Osaurus now blocks known unsupported Gemma3n local tool requests in `MLXService.validateRuntimePolicy` before decode and prevents the SwiftTransformers tokenizer fallback from injecting Gemma required-tool declarations/instructions for Gemma3n.
+- Muwa now blocks known unsupported Gemma3n local tool requests in `MLXService.validateRuntimePolicy` before decode and prevents the SwiftTransformers tokenizer fallback from injecting Gemma required-tool declarations/instructions for Gemma3n.
 - Focused validation after source fix:
   - `MLXServiceRuntimePolicyTests`: 7/7 passed.
   - `SwiftTransformersTokenizerLoaderTests/gemma3nLocalTokenizerDoesNotInventRequiredToolContractFromFallback`: passed.
@@ -575,9 +575,9 @@ Gemma3n result and fix:
 
 ## 2026-05-28 07:21 PDT - Latest-head DSV4 and ZAYA repeat-cache probes
 
-Current Osaurus head: `13f7fd9455006d55242d77375a5c9dcf2841266c`.
+Current Muwa head: `13f7fd9455006d55242d77375a5c9dcf2841266c`.
 Current vMLX main pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`.
-No-sign/keychain-free app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/osaurus.app`.
+No-sign/keychain-free app: `/Users/eric/osaurus-pr1268-live/build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/Muwa.app`.
 
 Artifacts:
 
@@ -672,10 +672,10 @@ Artifacts:
 
 Build/runtime boundary:
 
-- Osaurus head: `10df987c5d58518a3be4d589ae5d1d942d59a9ce`.
+- Muwa head: `10df987c5d58518a3be4d589ae5d1d942d59a9ce`.
 - vMLX pin: `d83b22b3d0350aa45b5b853dd4838ea34af47497`.
-- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/osaurus.app`.
-- Launch mode: keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/Muwa.app`.
+- Launch mode: keychain-free with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 
 Result:
 
@@ -696,10 +696,10 @@ Artifacts:
 
 Build/runtime boundary:
 
-- Osaurus head: `2455c4cec48ed0d613b9741fc1ebfa91152b9711`.
+- Muwa head: `2455c4cec48ed0d613b9741fc1ebfa91152b9711`.
 - vMLX pin: `d83b22b3d0350aa45b5b853dd4838ea34af47497`.
-- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/osaurus.app`.
-- Launch mode: keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/Muwa.app`.
+- Launch mode: keychain-free with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 
 Result:
 
@@ -720,10 +720,10 @@ Artifacts:
 
 Build/runtime boundary:
 
-- Osaurus head: `d7b700caf7b0e3b2d8e7fb66e0715136744565e2`.
+- Muwa head: `d7b700caf7b0e3b2d8e7fb66e0715136744565e2`.
 - vMLX pin: `d83b22b3d0350aa45b5b853dd4838ea34af47497`.
-- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/osaurus.app`.
-- Launch mode: keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/Muwa.app`.
+- Launch mode: keychain-free with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 
 Result:
 
@@ -744,10 +744,10 @@ Artifacts:
 
 Build/runtime boundary:
 
-- Osaurus head: `04dbc2cdd011a24a61fc45d32e27fd1790b92f13`.
+- Muwa head: `04dbc2cdd011a24a61fc45d32e27fd1790b92f13`.
 - vMLX pin: `d83b22b3d0350aa45b5b853dd4838ea34af47497`.
-- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/osaurus.app`.
-- Launch mode: keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/Muwa.app`.
+- Launch mode: keychain-free with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 
 Result:
 
@@ -768,10 +768,10 @@ Artifacts:
 
 Build/runtime boundary:
 
-- Osaurus head: `722f138ff933a93fae226e6fb687c648fd3419a1`.
+- Muwa head: `722f138ff933a93fae226e6fb687c648fd3419a1`.
 - vMLX pin: `d83b22b3d0350aa45b5b853dd4838ea34af47497`.
-- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/osaurus.app`.
-- Launch mode: keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/Muwa.app`.
+- Launch mode: keychain-free with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 
 Result:
 
@@ -791,10 +791,10 @@ Artifact:
 
 Build/runtime boundary:
 
-- Osaurus head: `380e7f9641518bb4b3a5d6baa398db63bfd76746`.
+- Muwa head: `380e7f9641518bb4b3a5d6baa398db63bfd76746`.
 - vMLX pin: `d83b22b3d0350aa45b5b853dd4838ea34af47497`.
-- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/osaurus.app`.
-- Launch mode: keychain-free with `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`.
+- No-sign Release app: `/Users/eric/osaurus-pr1268-live/build/DerivedData/Build/Products/Release/Muwa.app`.
+- Launch mode: keychain-free with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 - Model: `qwen3.6-27b-mxfp4-crack`.
 
 Result:

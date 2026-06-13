@@ -1,7 +1,7 @@
-# Help Translate Osaurus
+# Help Translate Muwa
 
-Osaurus is built by the community, and so are its translations. If you speak a
-language we don't ship yet, you can make Osaurus feel native to thousands of
+Muwa is built by the community, and so are its translations. If you speak a
+language we don't ship yet, you can make Muwa feel native to thousands of
 people on your machine and theirs.
 
 We are actively looking for help with these languages:
@@ -26,8 +26,8 @@ required.
    tooling overview.
 2. Create a branch (e.g. `i18n/es` or `l10n/ko`).
 3. Add your translations in
-   `Packages/OsaurusCore/Resources/Localizable.xcstrings` (and
-   `App/osaurus/InfoPlist.xcstrings` for system permission strings) using the
+   `Packages/MuwaCore/Resources/Localizable.xcstrings` (and
+   `App/Muwa/InfoPlist.xcstrings` for system permission strings) using the
    Xcode String Catalog editor. Your locale column already exists.
 4. Validate locally:
 
@@ -67,8 +67,8 @@ _Last generated 2026-06-08 13:18 UTC by `scripts/i18n/leaderboard.py`. Coverage 
 
 | Contributor | Languages (coverage) | PRs |
 | ----------- | -------------------- | --- |
-| [@jiajun-dev](https://github.com/jiajun-dev) (zhuangjiajun) | Simplified Chinese (`zh-Hans`) 30% | [#857](https://github.com/osaurus-ai/osaurus/pull/857) |
-| [@HolliOnRoad](https://github.com/HolliOnRoad) | German (`de`) 27% | [#785](https://github.com/osaurus-ai/osaurus/pull/785) [#837](https://github.com/osaurus-ai/osaurus/pull/837) |
-| [@ftzahao](https://github.com/ftzahao) (师梦豪) | Simplified Chinese (`zh-Hans`) 26%, German (`de`) 11% | [#1354](https://github.com/osaurus-ai/osaurus/pull/1354) [#1373](https://github.com/osaurus-ai/osaurus/pull/1373) [#1380](https://github.com/osaurus-ai/osaurus/pull/1380) [#1414](https://github.com/osaurus-ai/osaurus/pull/1414) |
+| [@jiajun-dev](https://github.com/jiajun-dev) (zhuangjiajun) | Simplified Chinese (`zh-Hans`) 30% | [#857](https://github.com/muwa-ai/muwa/pull/857) |
+| [@HolliOnRoad](https://github.com/HolliOnRoad) | German (`de`) 27% | [#785](https://github.com/muwa-ai/muwa/pull/785) [#837](https://github.com/muwa-ai/muwa/pull/837) |
+| [@ftzahao](https://github.com/ftzahao) (师梦豪) | Simplified Chinese (`zh-Hans`) 26%, German (`de`) 11% | [#1354](https://github.com/muwa-ai/muwa/pull/1354) [#1373](https://github.com/muwa-ai/muwa/pull/1373) [#1380](https://github.com/muwa-ai/muwa/pull/1380) [#1414](https://github.com/muwa-ai/muwa/pull/1414) |
 
 <!-- LEADERBOARD:END -->

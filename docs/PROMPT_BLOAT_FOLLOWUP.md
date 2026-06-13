@@ -124,17 +124,17 @@ substantially riskier.
 
 ## Pointers for future prompt-budget work
 
-* `Packages/OsaurusCore/Services/Chat/SystemPromptComposer.swift` — entry
+* `Packages/MuwaCore/Services/Chat/SystemPromptComposer.swift` — entry
   point for the per-section assembly. The token-budget pre-flight already
   exists at `ContextBudgetPreview`; the disable-info path it emits can be
   reused to gate the heavier sections.
-* `Packages/OsaurusCore/Services/Tool/ToolSearchService.swift` and
+* `Packages/MuwaCore/Services/Tool/ToolSearchService.swift` and
   `ToolIndexService` — already index tools for capability search, so the
   on-demand schema fetch infrastructure is partially in place.
-* `Packages/OsaurusCore/Services/Context/PreflightCapabilitySearch.swift` —
+* `Packages/MuwaCore/Services/Context/PreflightCapabilitySearch.swift` —
   already runs ahead of generation; would be the natural place to short-circuit
   for trivial inputs.
-* `Packages/OsaurusCore/Tests/Service/PromptSectionOrderingTests.swift`,
+* `Packages/MuwaCore/Tests/Service/PromptSectionOrderingTests.swift`,
   `ContextBudgetPreviewTests.swift`,
   `SystemPromptComposerToolResolutionTests.swift` — existing coverage that
   any refactor will need to pass.

@@ -2,10 +2,10 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
-HANDLER="$ROOT/Packages/OsaurusCore/Networking/HTTPHandler.swift"
-ADAPTER="$ROOT/Packages/OsaurusCore/Services/ModelRuntime/MLXBatchAdapter.swift"
-RUNTIME="$ROOT/Packages/OsaurusCore/Services/ModelRuntime.swift"
-TESTS="$ROOT/Packages/OsaurusCore/Tests/Service/RuntimePolicySourceTests.swift"
+HANDLER="$ROOT/Packages/MuwaCore/Networking/HTTPHandler.swift"
+ADAPTER="$ROOT/Packages/MuwaCore/Services/ModelRuntime/MLXBatchAdapter.swift"
+RUNTIME="$ROOT/Packages/MuwaCore/Services/ModelRuntime.swift"
+TESTS="$ROOT/Packages/MuwaCore/Tests/Service/RuntimePolicySourceTests.swift"
 fail=0
 
 pass() { echo "PASS $*"; }
@@ -79,12 +79,12 @@ if [[ -f "$TESTS" ]]; then
   require_text "$TESTS" 'SSM hits / misses / re-derives' "source test covers SSM diagnostics surface"
 fi
 
-active="$({ ps -axo pid,ppid,rss,etime,command || true; } | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|swift-build --package-path Packages/OsaurusCore|swift-test --package-path Packages/OsaurusCore|/Users/eric/osaurus-staging/Packages/OsaurusCore/.build' | rg -v 'rg -i|assert-openresponses-cache-proof-wiring' || true)"
+active="$({ ps -axo pid,ppid,rss,etime,command || true; } | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|swift-build --package-path Packages/MuwaCore|swift-test --package-path Packages/MuwaCore|/Users/eric/muwa-staging/Packages/MuwaCore/.build' | rg -v 'rg -i|assert-openresponses-cache-proof-wiring' || true)"
 if [[ -n "$active" ]]; then
-  fail_msg "active Osaurus build/keychain-sensitive process detected"
+  fail_msg "active Muwa build/keychain-sensitive process detected"
   echo "$active" >&2
 else
-  pass "no active Osaurus build/keychain-sensitive process"
+  pass "no active Muwa build/keychain-sensitive process"
 fi
 
 if [[ "$fail" -ne 0 ]]; then

@@ -1,8 +1,8 @@
 # Global Proxy
 
 This note defines the first foundation for global proxy support tracked by
-[#1091](https://github.com/osaurus-ai/osaurus/issues/1091) and the older
-[#232](https://github.com/osaurus-ai/osaurus/issues/232). The goal is a single
+[#1091](https://github.com/muwa-ai/muwa/issues/1091) and the older
+[#232](https://github.com/muwa-ai/muwa/issues/232). The goal is a single
 validated proxy endpoint that later call-site migrations can apply to all
 outbound network traffic without weakening TLS, persistence, or plugin
 boundaries.

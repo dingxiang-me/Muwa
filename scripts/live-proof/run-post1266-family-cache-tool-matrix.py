@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Live Osaurus family tool/cache matrix probe.
+"""Live Muwa family tool/cache matrix probe.
 
 This script intentionally drives the same HTTP chat path a user hits through the
-Osaurus app server. It does not add sampler overrides. It records raw requests,
+Muwa app server. It does not add sampler overrides. It records raw requests,
 responses, health, cache stats, durations, and a compact SUMMARY.json for each
 model row.
 """

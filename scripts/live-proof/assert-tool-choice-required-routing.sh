@@ -18,13 +18,13 @@ require_text() {
   fi
 }
 
-OPENAI="$ROOT/Packages/OsaurusCore/Models/API/OpenAIAPI.swift"
-RESPONSES="$ROOT/Packages/OsaurusCore/Models/API/OpenResponsesAPI.swift"
-ANTHROPIC="$ROOT/Packages/OsaurusCore/Models/API/AnthropicAPI.swift"
-REMOTE="$ROOT/Packages/OsaurusCore/Services/Provider/RemoteProviderService.swift"
-RUNTIME="$ROOT/Packages/OsaurusCore/Services/ModelRuntime.swift"
-TESTS="$ROOT/Packages/OsaurusCore/Tests/Networking/ToolChoiceDecodingTests.swift"
-TOKENIZER_TESTS="$ROOT/Packages/OsaurusCore/Tests/Service/SwiftTransformersTokenizerLoaderTests.swift"
+OPENAI="$ROOT/Packages/MuwaCore/Models/API/OpenAIAPI.swift"
+RESPONSES="$ROOT/Packages/MuwaCore/Models/API/OpenResponsesAPI.swift"
+ANTHROPIC="$ROOT/Packages/MuwaCore/Models/API/AnthropicAPI.swift"
+REMOTE="$ROOT/Packages/MuwaCore/Services/Provider/RemoteProviderService.swift"
+RUNTIME="$ROOT/Packages/MuwaCore/Services/ModelRuntime.swift"
+TESTS="$ROOT/Packages/MuwaCore/Tests/Networking/ToolChoiceDecodingTests.swift"
+TOKENIZER_TESTS="$ROOT/Packages/MuwaCore/Tests/Service/SwiftTransformersTokenizerLoaderTests.swift"
 
 for file in "$OPENAI" "$RESPONSES" "$ANTHROPIC" "$REMOTE" "$RUNTIME" "$TESTS" "$TOKENIZER_TESTS"; do
   [[ -f "$file" ]] || { fail_msg "missing ${file#$ROOT/}"; continue; }
@@ -50,7 +50,7 @@ require_text "$RUNTIME" 'Named `tool_choice` is enforced by `makeTokenizerTools`
 require_text "$TESTS" "func decodesRequired" "tool_choice required decode regression exists"
 require_text "$TESTS" 'decode("\"required\"")' "required decode regression uses OpenAI string"
 require_text "$TESTS" 'decode("\"any\"")' "Anthropic any is not accepted as OpenAI tool_choice string"
-require_text "$ROOT/Packages/OsaurusCore/Tests/Service/MLXBatchAdapterTests.swift" \
+require_text "$ROOT/Packages/MuwaCore/Tests/Service/MLXBatchAdapterTests.swift" \
   "forcedToolChoiceUsesSchemaFilteringWithoutPromptDirective" \
   "named tool_choice no-prompt-directive regression exists"
 require_text "$TOKENIZER_TESTS" "zayaTextLocalTokenizerRendersZyphraToolsNotGemmaFallback" \

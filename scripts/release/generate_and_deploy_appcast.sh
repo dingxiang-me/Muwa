@@ -24,8 +24,8 @@ sleep 30
 mkdir -p updates/arm64
 
 echo "Downloading released DMG..."
-curl -L -f -o "updates/arm64/Osaurus-${VERSION}.dmg" \
-  "https://github.com/${PUBLIC_REPO}/releases/download/${VERSION}/Osaurus-${VERSION}.dmg"
+curl -L -f -o "updates/arm64/Muwa-${VERSION}.dmg" \
+  "https://github.com/${PUBLIC_REPO}/releases/download/${VERSION}/Muwa-${VERSION}.dmg"
 
 echo "$SPARKLE_PRIVATE_KEY" > private_key.txt
 chmod 600 private_key.txt
@@ -40,7 +40,7 @@ chmod 600 private_key.txt
 # Ensure signatures were generated; if missing, generate with sign_update and patch
 if ! grep -q 'edSignature' updates/appcast-arm64.xml; then
   echo "⚠️ No edSignature found from generate_appcast; attempting manual signing..."
-  SIG_OUTPUT=$(./sparkle_tools/bin/sign_update --ed-key-file private_key.txt "updates/arm64/Osaurus-${VERSION}.dmg" | tr -d '\n') || true
+  SIG_OUTPUT=$(./sparkle_tools/bin/sign_update --ed-key-file private_key.txt "updates/arm64/Muwa-${VERSION}.dmg" | tr -d '\n') || true
   EDSIG=$(printf "%s" "$SIG_OUTPUT" | sed -n 's/.*edSignature="\([^"]*\)".*/\1/p')
   FILELEN=$(printf "%s" "$SIG_OUTPUT" | sed -n 's/.* length="\([^"]*\)".*/\1/p')
   if [ -z "${EDSIG}" ] || [ -z "${FILELEN}" ]; then
@@ -49,7 +49,7 @@ if ! grep -q 'edSignature' updates/appcast-arm64.xml; then
   fi
   tmpfile=$(mktemp)
   awk -v ver="${VERSION}" -v ed="${EDSIG}" -v len="${FILELEN}" '
-    /<enclosure/ && $0 ~ ("Osaurus-" ver ".dmg") {
+    /<enclosure/ && $0 ~ ("Muwa-" ver ".dmg") {
       line=$0
       gsub(/length="[^"]*"/, "length=\"" len "\"", line)
       if (line ~ /sparkle:edSignature=/) {
@@ -67,7 +67,7 @@ if ! grep -q 'edSignature' updates/appcast-arm64.xml; then
   # Fallback: if still missing, inject signature attribute with sed
   if ! grep -q 'edSignature' updates/appcast-arm64.xml; then
     tmpfile=$(mktemp)
-    sed -E "s#(<enclosure[^>]*Osaurus-${VERSION}\.dmg\"[^>]*)[[:space:]]*/>#\\1 sparkle:edSignature=\"${EDSIG}\"/>#g" updates/appcast-arm64.xml > "$tmpfile"
+    sed -E "s#(<enclosure[^>]*Muwa-${VERSION}\.dmg\"[^>]*)[[:space:]]*/>#\\1 sparkle:edSignature=\"${EDSIG}\"/>#g" updates/appcast-arm64.xml > "$tmpfile"
     mv "$tmpfile" updates/appcast-arm64.xml
   fi
 
@@ -148,7 +148,7 @@ fi
   echo '<?xml version="1.0" encoding="utf-8"?>'
   echo '<rss version="2.0" xmlns:sparkle="http://www.andymatuschak.org/xml-namespaces/sparkle" xmlns:dc="http://purl.org/dc/elements/1.1/">'
   echo '  <channel>'
-  echo '    <title>Osaurus</title>'
+  echo '    <title>Muwa</title>'
   printf '%s\n' "$NEW_ITEMS"
   [ -n "$EXISTING_ITEMS" ] && printf '%s\n' "$EXISTING_ITEMS"
   echo '  </channel>'

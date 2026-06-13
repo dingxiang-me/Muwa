@@ -1,6 +1,6 @@
 # Host API Reference
 
-Reference for the **v6 host API**. Every callback your plugin can invoke is listed here, grouped by category. The canonical C declarations live in `Packages/OsaurusCore/Tools/PluginABI/osaurus_plugin.h`. Per-version evolution and the defensive-check pattern for older hosts are in [ABI_VERSIONS.md](ABI_VERSIONS.md).
+Reference for the **v6 host API**. Every callback your plugin can invoke is listed here, grouped by category. The canonical C declarations live in `Packages/MuwaCore/Tools/PluginABI/muwa_plugin.h`. Per-version evolution and the defensive-check pattern for older hosts are in [ABI_VERSIONS.md](ABI_VERSIONS.md).
 
 ## Conventions
 
@@ -14,14 +14,14 @@ Reference for the **v6 host API**. Every callback your plugin can invoke is list
   }
   ```
   **Do NOT** route host-allocated strings through the plugin's own `free_string` callback (the one on `osr_plugin_api`). That direction is reversed — it's for the host calling on plugin-allocated strings — and routing host pointers through it WILL corrupt the heap (`pointer being freed was not allocated`) if your `free_string` does anything besides plain `free()`.
-- **Threading**: callbacks are safe to call from any thread that carries the plugin context. Prefer the call frame Osaurus invoked you on (`invoke`, `handle_route`, `on_*`).
+- **Threading**: callbacks are safe to call from any thread that carries the plugin context. Prefer the call frame Muwa invoked you on (`invoke`, `handle_route`, `on_*`).
 - **`host->version`** advertises the highest documented surface the host implements. Read it as a forward-compatible monotonic field.
 
 ## Mirror Struct Audit
 
 If you mirror `osr_host_api` in a non-C language (Swift, Rust, etc.), the field order must match the host's frozen layout **exactly**. A skipped or reordered slot makes every callback past that point dispatch to the wrong host function — the production crash signature is `host->free_string(ptr)` resolving to `host->log_structured` (or another adjacent slot), which then either silently misbehaves or aborts inside `libc` on a non-malloc pointer (`pointer being freed was not allocated`).
 
-The canonical pin is [`PluginHostAPIStructLayoutTests`](../../Packages/OsaurusCore/Tests/Plugin/PluginHostAPIStructLayoutTests.swift); the offsets below MUST match what those tests assert. The most common foot-gun is jumping from a v4 mirror straight to v6 and skipping the v5 `log_structured` slot — this puts `free_string` at the v5 offset (`184`) instead of the v6 offset (`192`), with the corruption signature above.
+The canonical pin is [`PluginHostAPIStructLayoutTests`](../../Packages/MuwaCore/Tests/Plugin/PluginHostAPIStructLayoutTests.swift); the offsets below MUST match what those tests assert. The most common foot-gun is jumping from a v4 mirror straight to v6 and skipping the v5 `log_structured` slot — this puts `free_string` at the v5 offset (`184`) instead of the v6 offset (`192`), with the corruption signature above.
 
 ### Frozen field order
 
@@ -69,16 +69,16 @@ If your mirror disagrees with any of these offsets, your `host->*` calls dispatc
 
 ### Pre-flight ABI probe
 
-The host pushes a synthetic `(__osaurus_abi_probe__, <fresh UUID>)` pair through every newly-loaded plugin's `on_config_changed` BEFORE any real config delivery, while a `.currently_loading` marker is on disk. Plugins that follow the documented pattern of resolving the active agent at the top of `on_config_changed` (i.e. `host->get_active_agent_id()` → `host->free_string(ptr)`) trigger a misalignment crash here, which:
+The host pushes a synthetic `(__muwa_abi_probe__, <fresh UUID>)` pair through every newly-loaded plugin's `on_config_changed` BEFORE any real config delivery, while a `.currently_loading` marker is on disk. Plugins that follow the documented pattern of resolving the active agent at the top of `on_config_changed` (i.e. `host->get_active_agent_id()` → `host->free_string(ptr)`) trigger a misalignment crash here, which:
 
 - Quarantines the plugin on the next launch instead of crash-looping the host (`promoteStaleLoadingMarker` flips the marker into `.quarantine`).
 - Surfaces a "Plugin failed to load" tab in the agent detail view with the structured error and a Retry button.
 
-If you want to opt out of the probe (e.g. because your `on_config_changed` performs expensive work for every key), match the constant `"__osaurus_abi_probe__"` and early-return:
+If you want to opt out of the probe (e.g. because your `on_config_changed` performs expensive work for every key), match the constant `"__muwa_abi_probe__"` and early-return:
 
 ```c
 void on_config_changed(osr_plugin_ctx_t* ctx, const char* key, const char* value) {
-    if (strcmp(key, "__osaurus_abi_probe__") == 0) return;  // host's pre-flight handshake
+    if (strcmp(key, "__muwa_abi_probe__") == 0) return;  // host's pre-flight handshake
     // ... your real handler ...
 }
 ```
@@ -204,7 +204,7 @@ Executes a SELECT and returns `{"rows": [{...}, ...], "columns": [...]}`.
 
 ### `log(level, message) -> void`
 
-Levels: `0=trace`, `1=debug`, `2=info`, `3=warn`, `4=error`. Messages flow to both the macOS unified log and Osaurus Insights.
+Levels: `0=trace`, `1=debug`, `2=info`, `3=warn`, `4=error`. Messages flow to both the macOS unified log and Muwa Insights.
 
 ```c
 host->log(2, "Plugin started");
@@ -323,7 +323,7 @@ Returns `{"models": [{"id", "name", "provider", "type", "context_window", "dimen
 
 ## Dispatch
 
-Fire-and-forget background tasks. Each task runs an agentic chat with full Osaurus tooling.
+Fire-and-forget background tasks. Each task runs an agentic chat with full Muwa tooling.
 
 **Rate limit**: 10 dispatches per minute per `(plugin, agent)` pair. Two plugins running for the same agent each get their own 10/min budget — this is intentional to prevent cross-plugin starvation.
 
@@ -396,7 +396,7 @@ No-ops silently if `task_id` is invalid or does not belong to the calling plugin
 
 ### Task lifecycle events (`on_task_event`)
 
-The host fans every dispatched task's lifecycle into the originating plugin's `on_task_event` callback as `(task_id, event_type, event_json)` tuples. Event types match the `OSR_TASK_EVENT_*` constants in `osaurus_plugin.h`:
+The host fans every dispatched task's lifecycle into the originating plugin's `on_task_event` callback as `(task_id, event_type, event_json)` tuples. Event types match the `OSR_TASK_EVENT_*` constants in `muwa_plugin.h`:
 
 | Type | Constant | Payload |
 | ---- | -------- | ------- |
@@ -476,7 +476,7 @@ For binary responses, `body_encoding` will be `"base64"`.
 
 ### `file_read(request_json) -> char*`
 
-Read a file from the artifacts directory (`~/.osaurus/artifacts/`). Hard-scoped to that prefix. 50 MB cap.
+Read a file from the artifacts directory (`~/.muwa/artifacts/`). Hard-scoped to that prefix. 50 MB cap.
 
 ```json
 {"path": "/Users/.../artifacts/abc/file.png"}
@@ -532,4 +532,4 @@ Plugins should branch on the `error` code when present rather than the message.
 - [AUTHORING.md](AUTHORING.md) — overall mental model
 - [ROUTES_AND_WEB.md](ROUTES_AND_WEB.md) — HTTP routes and web UIs
 - [DEBUGGING.md](DEBUGGING.md) — when callbacks misbehave
-- [`Packages/OsaurusCore/Tools/PluginABI/osaurus_plugin.h`](../../Packages/OsaurusCore/Tools/PluginABI/osaurus_plugin.h) — canonical C declarations
+- [`Packages/MuwaCore/Tools/PluginABI/muwa_plugin.h`](../../Packages/MuwaCore/Tools/PluginABI/muwa_plugin.h) — canonical C declarations

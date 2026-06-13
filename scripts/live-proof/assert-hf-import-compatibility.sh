@@ -34,11 +34,11 @@ reject_text() {
   fi
 }
 
-MODEL_MANAGER="$ROOT/Packages/OsaurusCore/Managers/Model/ModelManager.swift"
-HF_SERVICE="$ROOT/Packages/OsaurusCore/Services/HuggingFaceService.swift"
-APP_DELEGATE="$ROOT/Packages/OsaurusCore/AppDelegate.swift"
-MODEL_DOWNLOAD_VIEW="$ROOT/Packages/OsaurusCore/Views/Model/ModelDownloadView.swift"
-TESTS="$ROOT/Packages/OsaurusCore/Tests/Model/ModelManagerResolveTests.swift"
+MODEL_MANAGER="$ROOT/Packages/MuwaCore/Managers/Model/ModelManager.swift"
+HF_SERVICE="$ROOT/Packages/MuwaCore/Services/HuggingFaceService.swift"
+APP_DELEGATE="$ROOT/Packages/MuwaCore/AppDelegate.swift"
+MODEL_DOWNLOAD_VIEW="$ROOT/Packages/MuwaCore/Views/Model/ModelDownloadView.swift"
+TESTS="$ROOT/Packages/MuwaCore/Tests/Model/ModelManagerResolveTests.swift"
 
 require_file "$MODEL_MANAGER" "ModelManager"
 require_file "$HF_SERVICE" "HuggingFaceService"
@@ -96,7 +96,7 @@ require_text "$APP_DELEGATE" 'MLX, MXFP, JANG, JANGTQ, and TurboQuant' \
 
 active="$({ ps -axo pid,ppid,rss,etime,command || true; } \
   | rg -v '/Users/eric/\.codex/computer-use/|SkyComputerUseClient' \
-  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/osaurus-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*osaurus-staging)' \
+  | rg -i 'xcodebuild|codesign( |$)|notarytool|/usr/bin/security( |$)|/Users/eric/muwa-staging.*(swift-test|xcrun swift|swift test|swift build|swift-driver|swift-frontend|PackagePlugin|\\.build/.*/Cmlx\\.build|/usr/bin/clang .*muwa-staging)' \
   | rg -v 'rg -i|assert-hf-import-compatibility' || true)"
 if [[ -n "$active" ]]; then
   echo "$active" >&2

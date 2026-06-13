@@ -6,7 +6,7 @@ MANIFEST="$ROOT/scripts/live-proof/family-runtime-chat-matrix.json"
 HARNESS="$ROOT/scripts/live-proof/run-local-family-multiturn-tool-cache-proof.py"
 CLASSIFIER="$ROOT/scripts/live-proof/classify-runtime-proof-summary.py"
 
-BASE_URL="${OSAURUS_BASE_URL:-http://127.0.0.1:1337}"
+BASE_URL="${MUWA_BASE_URL:-http://127.0.0.1:1337}"
 ARTIFACT_ROOT="${ARTIFACT_ROOT:-/tmp/osaurus-family-runtime-chat-matrix-$(date +%Y%m%d-%H%M%S)}"
 FAMILY_FILTER="${FAMILY_FILTER:-}"
 MODEL_FILTER="${MODEL_FILTER:-}"
@@ -25,7 +25,7 @@ for arg in "$@"; do
 usage: run-family-runtime-chat-matrix.sh [--dry-run] [KEY=value ...]
 
 Environment/KEY options:
-  OSAURUS_BASE_URL=http://127.0.0.1:1337
+  MUWA_BASE_URL=http://127.0.0.1:1337
   ARTIFACT_ROOT=/tmp/osaurus-family-runtime-chat-matrix-...
   FAMILY_FILTER=zaya|ling|nemotron-omni|dsv4|qwen|gemma|hy3
   MODEL_FILTER=<model id or row id>
@@ -36,7 +36,7 @@ Environment/KEY options:
 EOF
       exit 0
       ;;
-    OSAURUS_BASE_URL=*)
+    MUWA_BASE_URL=*)
       BASE_URL="${arg#*=}"
       ;;
     ARTIFACT_ROOT=*)

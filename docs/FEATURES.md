@@ -1,6 +1,6 @@
-# Osaurus Feature Inventory
+# Muwa Feature Inventory
 
-Canonical reference for all Osaurus features, their status, and documentation.
+Canonical reference for all Muwa features, their status, and documentation.
 
 **This file is the source of truth.** When adding or modifying features, update this inventory to keep documentation in sync.
 
@@ -14,7 +14,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 | Remote Providers                 | Stable    | "Key Features"     | REMOTE_PROVIDERS.md           | Managers/RemoteProviderManager.swift, Services/Provider/RemoteProviderService.swift            |
 | Secure Channel (Agent E2E Encryption) | Stable | "Key Features"   | SECURE_CHANNEL.md             | Identity/SecureChannel.swift, Identity/SecureSessionStore.swift, Networking/SecureChannelResponseEncryptor.swift, Services/Provider/SecureChannelClient.swift, Networking/HTTPHandler.swift |
 | Remote MCP Providers             | Stable    | "Key Features"     | REMOTE_MCP_PROVIDERS.md       | Managers/MCPProviderManager.swift, Tools/MCPProviderTool.swift                        |
-| MCP Server                       | Stable    | "MCP Server"       | (in README)                   | Networking/OsaurusServer.swift, Services/MCP/MCPServerManager.swift, CLI MCPCommand.swift |
+| MCP Server                       | Stable    | "MCP Server"       | (in README)                   | Networking/MuwaServer.swift, Services/MCP/MCPServerManager.swift, CLI MCPCommand.swift |
 | Structured Document IO           | Foundation | "Tools & Plugins"  | (in README)                   | Services/Documents/, Models/Documents/, Managers/Documents/DocumentAdaptersBootstrap.swift |
 | Tools & Plugins                  | Stable    | "Tools & Plugins"  | plugins/README.md             | Tools/, Managers/Plugin/PluginManager.swift, Services/Plugin/PluginHostAPI.swift, Storage/PluginDatabase.swift, Models/Plugin/PluginHTTP.swift, Views/Plugin/PluginConfigView.swift |
 | Skills                           | Stable    | "Skills"           | SKILLS.md                     | Managers/SkillManager.swift, Views/Skill/SkillsView.swift, Services/Skill/SkillSearchService.swift |
@@ -30,7 +30,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 | Agent Loop & Folder Context      | Stable    | "Agent Loop"       | AGENT_LOOP.md                 | Services/Chat/AgentToolLoop.swift, Services/Chat/AgentTaskState.swift, Folder/, Tools/AgentLoopTools.swift, Tools/FolderToolManager.swift, Models/Chat/AgentTodo.swift, Models/Chat/AgentTodoStore.swift, Models/Chat/SharedArtifact.swift |
 | Developer Tools: Insights        | Stable    | "Developer Tools"  | DEVELOPER_TOOLS.md            | Views/Insights/InsightsView.swift, Managers/InsightsService.swift                              |
 | Developer Tools: Server Explorer | Stable    | "Developer Tools"  | DEVELOPER_TOOLS.md            | Views/Settings/ServerView.swift                                                                |
-| Apple Foundation Models          | macOS 26+ | "What is Osaurus?" | (in README)                   | Services/Inference/FoundationModelService.swift                                                 |
+| Apple Foundation Models          | macOS 26+ | "What is Muwa?" | (in README)                   | Services/Inference/FoundationModelService.swift                                                 |
 | Menu Bar Chat                    | Stable    | "Highlights"       | (in README)                   | Views/Chat/ChatView.swift, Views/ChatOverlayView.swift                                     |
 | Chat Session Management          | Stable    | "Highlights"       | (in README)                   | Managers/Chat/ChatSessionsManager.swift, Models/Chat/ChatSessionData.swift                      |
 | Custom Themes                    | Stable    | "Highlights"       | (in README)                   | Views/Theme/ThemesView.swift, Views/Theme/ThemeEditorView.swift                        |
@@ -45,7 +45,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 | Transcription Mode               | Stable    | "Voice Input"      | VOICE_INPUT.md                | Services/Voice/TranscriptionModeService.swift, Views/Voice/TranscriptionOverlayView.swift         |
 | Sandbox                          | macOS 26+ | "Sandbox"          | SANDBOX.md                    | Services/Sandbox/SandboxManager.swift, Tools/BuiltinSandboxTools.swift, Managers/Plugin/SandboxPluginManager.swift, Views/Sandbox/SandboxView.swift |
 | Storage Encryption               | Stable    | -                  | STORAGE.md                    | Identity/StorageKeyManager.swift, Storage/EncryptedSQLiteOpener.swift, Storage/StorageDatabaseCatalog.swift, Storage/StorageMutationGate.swift, Storage/StorageExportService.swift, Storage/EncryptedFileStore.swift, Storage/AttachmentBlobStore.swift, Storage/StorageMaintenance.swift, Views/Settings/StorageSettingsView.swift, SQLCipher/ |
-| CLI                              | Stable    | "CLI Reference"    | (in README)                   | Packages/OsaurusCLI/                                                                  |
+| CLI                              | Stable    | "CLI Reference"    | (in README)                   | Packages/MuwaCLI/                                                                  |
 
 ---
 
@@ -53,7 +53,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│                              Osaurus App                                 │
+│                              Muwa App                                 │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  Views Layer                                                             │
 │  ├── ContentView (Menu Bar)                                              │
@@ -83,7 +83,7 @@ Canonical reference for all Osaurus features, their status, and documentation.
 │  │   ├── RemoteProviderManager (Remote OpenAI-compatible APIs)           │
 │  │   └── RemoteProviderService (Per-provider connection handling)        │
 │  ├── MCP                                                                 │
-│  │   ├── MCPServerManager (Osaurus as MCP server)                        │
+│  │   ├── MCPServerManager (Muwa as MCP server)                        │
 │  │   └── MCPProviderManager (HTTP/SSE remote MCP client connections)     │
 │  ├── Documents                                                           │
 │  │   ├── DocumentAdaptersBootstrap (built-in adapter registration)        │
@@ -158,11 +158,11 @@ Canonical reference for all Osaurus features, their status, and documentation.
 │      └── SharedConfigurationService                                      │
 ├─────────────────────────────────────────────────────────────────────────┤
 │  Networking Layer                                                        │
-│  ├── OsaurusServer (HTTP + MCP server)                                   │
+│  ├── MuwaServer (HTTP + MCP server)                                   │
 │  ├── Router (Request routing)                                            │
 │  └── HTTPHandler (OpenAI/Anthropic/Ollama API handlers)                  │
 ├─────────────────────────────────────────────────────────────────────────┤
-│  CLI (OsaurusCLI Package)                                                │
+│  CLI (MuwaCLI Package)                                                │
 │  └── Commands: serve, stop, status, ui, list, show, run, mcp, tools (install, dev, ...), version │
 └─────────────────────────────────────────────────────────────────────────┘
 ```
@@ -188,17 +188,17 @@ Canonical reference for all Osaurus features, their status, and documentation.
 
 - **Window-scoped warm-up** — Models are loaded and prefix-cached when a chat window opens, not at app launch. Each window warms its own model independently, using the window's agent context (system prompt, memory, tools) for the prefix cache.
 - **Smart unloading** — The "Keep model loaded after use" setting controls whether a local model unloads immediately after use, stays warm for 5/15/30/60 minutes, or stays resident until an explicit unload/cleanup. Strict single-model switches still unload the replaced model immediately, and idle unload never deletes downloaded models or disk KV cache entries. The warm-up indicator (yellow dot) signals when a model is loading.
-- **Continuous batching** — `BatchEngine` shares a single forward pass across overlapping requests for the same model. The default `mlxBatchEngineMaxBatchSize` is `1` so vmlx compiled decode stays eligible for single-user chat; tune with `defaults write ai.osaurus ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize -int 8` for server-style concurrency. Takes effect on the next inference call — the registry hot-resizes the cached engine via vmlx's `BatchEngine.updateMaxBatchSize(_:)`.
-- **Library-managed KV cache** — vmlx-swift's `CacheCoordinator` owns KV cache geometry (paged for global attention, rotating for sliding-window, SSM state for Mamba) sized per-model. Multi-turn KV reuse, mediaSalt for VLMs, and sliding-window correctness are all handled inside the engine — osaurus configures only `modelKey`, `diskCacheDir`, and a writability fallback.
+- **Continuous batching** — `BatchEngine` shares a single forward pass across overlapping requests for the same model. The default `mlxBatchEngineMaxBatchSize` is `1` so vmlx compiled decode stays eligible for single-user chat; tune with `defaults write ai.muwa ai.muwa.scheduler.mlxBatchEngineMaxBatchSize -int 8` for server-style concurrency. Takes effect on the next inference call — the registry hot-resizes the cached engine via vmlx's `BatchEngine.updateMaxBatchSize(_:)`.
+- **Library-managed KV cache** — vmlx-swift's `CacheCoordinator` owns KV cache geometry (paged for global attention, rotating for sliding-window, SSM state for Mamba) sized per-model. Multi-turn KV reuse, mediaSalt for VLMs, and sliding-window correctness are all handled inside the engine — muwa configures only `modelKey`, `diskCacheDir`, and a writability fallback.
 - **Model eviction policy** — Configurable in Settings > Local Inference > Model Management. "Strict (One Model)" keeps only one model loaded (default). "Flexible (Multi Model)" allows concurrent models for high-RAM systems. `/health` exposes additive `resident_models[]` diagnostics with in-flight counts and idle-unload timing for each loaded model.
 
 **Configuration:**
 
 - Model storage: `~/MLXModels` (override with `OSU_MODELS_DIR`)
 - Default port: `1337` (override with `OSU_PORT`)
-- KV cache disk storage: `~/.osaurus/cache/kv/`
+- KV cache disk storage: `~/.muwa/cache/kv/`
 - Settings: Top P, eviction policy, model idle residency, allowed origins.
-- One advanced tunable, exposed via `defaults` only: `ai.osaurus.scheduler.mlxBatchEngineMaxBatchSize` (default `1`, clamped to `[1, 32]`; hot-resized via `BatchEngine.updateMaxBatchSize(_:)` on the next inference call).
+- One advanced tunable, exposed via `defaults` only: `ai.muwa.scheduler.mlxBatchEngineMaxBatchSize` (default `1`, clamped to `[1, 32]`; hot-resized via `BatchEngine.updateMaxBatchSize(_:)` on the next inference call).
 
 See [INFERENCE_RUNTIME.md](./INFERENCE_RUNTIME.md) for the full runtime architecture.
 
@@ -209,11 +209,11 @@ Research notes for the next local-runtime compatibility wave live in
 
 | Request | User-visible status | Next implementation step | Runtime owner |
 | --- | --- | --- | --- |
-| Hugging Face cache import | Implemented as read-only discovery for verified MLX snapshots; Settings now shows skipped candidate reasons. | Add manifest/digest verification before load if cache mutation protection becomes required. | Osaurus host discovery/storage. |
-| Hunyuan `hunyuan_v1_dense` | Blocked with an explicit unsupported-family diagnostic until vmlx has a native Hunyuan Dense factory. | Enable only after real-model validation lands upstream. | vmlx model factory and Osaurus diagnostics. |
+| Hugging Face cache import | Implemented as read-only discovery for verified MLX snapshots; Settings now shows skipped candidate reasons. | Add manifest/digest verification before load if cache mutation protection becomes required. | Muwa host discovery/storage. |
+| Hunyuan `hunyuan_v1_dense` | Blocked with an explicit unsupported-family diagnostic until vmlx has a native Hunyuan Dense factory. | Enable only after real-model validation lands upstream. | vmlx model factory and Muwa diagnostics. |
 | DFlash speculative decoding | Research-only; no draft/target local generation contract exists today. | Define a feature-flagged draft-model API and benchmark harness. | vmlx or dedicated MLX speculative adapter. |
 | LongCat Flash/Next | Blocked with an explicit unsupported-family diagnostic; current public repos require custom LongCat code paths and large multimodal runtimes. | Wait for native runtime support and multimodal proof before local picker enablement. | vmlx model family support. |
-| Tensor parallelism | Future hook only; local runtime remains single-host. | Design authenticated cluster policy before any peer execution code. | Distributed runtime plus Osaurus identity/network policy. |
+| Tensor parallelism | Future hook only; local runtime remains single-host. | Design authenticated cluster policy before any peer execution code. | Distributed runtime plus Muwa identity/network policy. |
 
 ---
 
@@ -281,13 +281,13 @@ Research notes for the next local-runtime compatibility wave live in
 
 ### MCP Server
 
-**Purpose:** Expose Osaurus tools to AI agents via Model Context Protocol, either through local HTTP endpoints or through the `osaurus mcp` stdio command bridge.
+**Purpose:** Expose Muwa tools to AI agents via Model Context Protocol, either through local HTTP endpoints or through the `muwa mcp` stdio command bridge.
 
 **Components:**
 
 - `Services/MCP/MCPServerManager.swift` — MCP server lifecycle
-- `Networking/OsaurusServer.swift` — HTTP MCP endpoints
-- `Packages/OsaurusCLI/Sources/OsaurusCLICore/Commands/MCPCommand.swift` — stdio MCP bridge for command-based clients
+- `Networking/MuwaServer.swift` — HTTP MCP endpoints
+- `Packages/MuwaCLI/Sources/MuwaCLICore/Commands/MCPCommand.swift` — stdio MCP bridge for command-based clients
 - `Tools/ToolRegistry.swift` — Tool registration and lookup
 - `Tools/ToolEnvelope.swift` — Canonical success/failure envelope every tool returns (see [Tool Contract](TOOL_CONTRACT.md))
 - `Tools/SchemaValidator.swift` — Argument validator with `additionalProperties` enforcement
@@ -302,10 +302,10 @@ Research notes for the next local-runtime compatibility wave live in
 **Command bridge:**
 
 ```json
-{"command": "osaurus", "args": ["mcp"]}
+{"command": "muwa", "args": ["mcp"]}
 ```
 
-This command bridge is for external clients connecting to Osaurus. It is separate from Remote MCP Providers, which only connect from Osaurus to URL-based HTTP/SSE MCP servers.
+This command bridge is for external clients connecting to Muwa. It is separate from Remote MCP Providers, which only connect from Muwa to URL-based HTTP/SSE MCP servers.
 
 ---
 
@@ -475,7 +475,7 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 - **Import/Export** — Share agents as JSON files for backup or sharing
 - **Live Switching** — Click to activate a agent, theme updates automatically
 
-**Feature Gates (Configure → Features):** stored on `Agent.settings`; [`SystemPromptComposer.resolveTools`](../Packages/OsaurusCore/Services/Chat/SystemPromptComposer.swift) strips the matching tools when a gate is off (auto mode). Capabilities are grouped by purpose; extra ones default **off** to reduce token cost.
+**Feature Gates (Configure → Features):** stored on `Agent.settings`; [`SystemPromptComposer.resolveTools`](../Packages/MuwaCore/Services/Chat/SystemPromptComposer.swift) strips the matching tools when a gate is off (auto mode). Capabilities are grouped by purpose; extra ones default **off** to reduce token cost.
 
 | Group | Setting | Toggle | Default | Gates |
 |---|---|---|---|---|
@@ -611,7 +611,7 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 | `processing`| Agent task is running                           |
 | `settling`  | Waiting for self-caused FSEvents to flush       |
 
-**Storage:** `~/.osaurus/watchers/{uuid}.json`
+**Storage:** `~/.muwa/watchers/{uuid}.json`
 
 ---
 
@@ -624,7 +624,7 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 - `Services/Chat/AgentToolLoop.swift` — The canonical loop driver shared by chat, HTTP, plugin, and eval surfaces: `AgentLoopPolicy` knobs, exit taxonomy, two-phase parallel batch execution, driver-staged `[System Notice]` lines, and the shared `AgentLoopBudget` window/budget math
 - `Services/Chat/AgentTaskState.swift` — Per-task harness state: result classification, fresh-read dedupe, reactive next-step bias
 - `Services/Chat/ContextBudgetManager.swift` + `Services/Chat/CompactionWatermark.swift` — Budget reservations and sticky, KV-prefix-stable history compaction (monotonic summarize→drop decisions, byte-stable trim note, `overBudget` signal)
-- `Services/Context/AgentLoopEvaluator.swift` — Drives the same loop end-to-end for the OsaurusEvals `agent_loop` proof suite
+- `Services/Context/AgentLoopEvaluator.swift` — Drives the same loop end-to-end for the MuwaEvals `agent_loop` proof suite
 - `Tools/AgentLoopTools.swift` — The three chat-layer-intercepted loop tools (`todo`, `complete`, `clarify`); registered as global built-ins
 - `Tools/FolderToolManager.swift` — Registers folder tools when a working folder is selected; unregisters on clear. `share_artifact` is no longer registered here — it lives as a global built-in alongside the loop tools.
 - `Folder/FolderContext.swift` — Project type, file tree, manifest, git status, optional `AGENTS.md`/`CLAUDE.md`/`.cursorrules`
@@ -670,7 +670,7 @@ This command bridge is for external clients connecting to Osaurus. It is separat
 | `git_diff`        | Git      | Show diffs                                                        |
 | `git_commit`      | Git      | Stage + commit (requires approval)                                |
 
-The previously-discrete `file_move`, `file_copy`, `file_delete`, `dir_create`, and `batch` tools were dropped — the same operations go through `shell_run` (`mv`, `cp`, `rm`, `mkdir`) so the model has fewer near-identical tool names to differentiate. The standalone `file_tree` listing tool was likewise folded into `file_read`: pass a directory path and `file_read` returns a listing (the path carries the file-vs-directory decision, so there is no separate tool for the model to mis-select). That listing is a **structured `entries[]` object**, not a prose tree — the model descends by copying an entry's `path` field, and the agent loop's [`AgentTaskState`](../Packages/OsaurusCore/Services/Chat/AgentTaskState.swift) harness classifies the result to de-dupe re-reads and, only if the model is observed wandering (two listings without a read), reactively nudge the next step — so capable models are never backseat-driven. See [Agent Loop — Harness Task State](AGENT_LOOP.md#harness-task-state-agenttaskstate).
+The previously-discrete `file_move`, `file_copy`, `file_delete`, `dir_create`, and `batch` tools were dropped — the same operations go through `shell_run` (`mv`, `cp`, `rm`, `mkdir`) so the model has fewer near-identical tool names to differentiate. The standalone `file_tree` listing tool was likewise folded into `file_read`: pass a directory path and `file_read` returns a listing (the path carries the file-vs-directory decision, so there is no separate tool for the model to mis-select). That listing is a **structured `entries[]` object**, not a prose tree — the model descends by copying an entry's `path` field, and the agent loop's [`AgentTaskState`](../Packages/MuwaCore/Services/Chat/AgentTaskState.swift) harness classifies the result to de-dupe re-reads and, only if the model is observed wandering (two listings without a read), reactively nudge the next step — so capable models are never backseat-driven. See [Agent Loop — Harness Task State](AGENT_LOOP.md#harness-task-state-agenttaskstate).
 
 **Workflow:**
 
@@ -683,7 +683,7 @@ The previously-discrete `file_move`, `file_copy`, `file_delete`, `dir_create`, a
 **Storage:**
 
 - Folder bookmark — UserDefaults (`FolderContextBookmark`)
-- Artifacts — `~/.osaurus/artifacts/<sessionId>/`
+- Artifacts — `~/.muwa/artifacts/<sessionId>/`
 - Per-session todo and file-op log — in-memory keyed by chat session ID
 
 See [AGENT_LOOP.md](AGENT_LOOP.md) for the full guide.
@@ -702,7 +702,7 @@ See [AGENT_LOOP.md](AGENT_LOOP.md) for the full guide.
 - **Per-agent SOUL.md** — Each sandboxed agent gets a self-editable `~/SOUL.md` for stable preferences and patterns, persisted across sessions. Seeded on first provision; rendered into the system prompt as a `## SOUL` section between persona and operational directives. See [SANDBOX.md](SANDBOX.md).
 - **Lightweight plugins** — JSON recipe plugins require no compilation, no Xcode, no code signing
 - **Local-first** — Apple Virtualization framework with native Apple Silicon performance; no Docker or cloud VMs
-- **Seamless host bridge** — Agents in the VM access Osaurus inference, memory, secrets, and events via vsock
+- **Seamless host bridge** — Agents in the VM access Muwa inference, memory, secrets, and events via vsock
 
 **Components:**
 
@@ -713,7 +713,7 @@ See [AGENT_LOOP.md](AGENT_LOOP.md) for the full guide.
 - `Managers/Plugin/SandboxPluginManager.swift` — Per-agent plugin install, uninstall, and update tracking
 - `Managers/Plugin/SandboxPluginLibrary.swift` — Plugin library storage and discovery
 - `Tools/BuiltinSandboxTools.swift` — Built-in tools for file ops, shell, package management, secrets, and plugin creation
-- `Tools/SandboxPluginTool.swift` — Wraps plugin tool specs as OsaurusTool instances
+- `Tools/SandboxPluginTool.swift` — Wraps plugin tool specs as MuwaTool instances
 - `Tools/SandboxSecretTools.swift` — Secret check and set tools with direct-value and secure-prompt paths
 - `Tools/SandboxPluginRegisterTool.swift` — Hot-registers agent-created plugins with file auto-packaging
 - `Tools/ToolRegistry.swift` — Sandbox tool registration and namespace management
@@ -786,15 +786,15 @@ Read-only tools are always available. Write/exec/package/secret tools require `a
 
 | Path | Purpose |
 |------|---------|
-| `~/.osaurus/container/` | Container root |
-| `~/.osaurus/container/kernel/vmlinux` | Linux kernel |
-| `~/.osaurus/container/workspace/` | Mounted as `/workspace` |
-| `~/.osaurus/container/workspace/agents/{name}/` | Per-agent home |
-| `~/.osaurus/container/workspace/agents/{name}/SOUL.md` | Per-agent SOUL identity layer (seeded on first provision) |
-| `~/.osaurus/container/output/` | Mounted as `/output` |
-| `~/.osaurus/sandbox-plugins/` | Plugin library |
-| `~/.osaurus/config/sandbox.json` | Configuration |
-| `~/.osaurus/config/sandbox-agent-map.json` | Agent map |
+| `~/.muwa/container/` | Container root |
+| `~/.muwa/container/kernel/vmlinux` | Linux kernel |
+| `~/.muwa/container/workspace/` | Mounted as `/workspace` |
+| `~/.muwa/container/workspace/agents/{name}/` | Per-agent home |
+| `~/.muwa/container/workspace/agents/{name}/SOUL.md` | Per-agent SOUL identity layer (seeded on first provision) |
+| `~/.muwa/container/output/` | Mounted as `/output` |
+| `~/.muwa/sandbox-plugins/` | Plugin library |
+| `~/.muwa/config/sandbox.json` | Configuration |
+| `~/.muwa/config/sandbox-agent-map.json` | Agent map |
 
 ---
 
@@ -826,11 +826,11 @@ Read-only tools are always available. Write/exec/package/secret tools require `a
 
 ### Tools & Plugins
 
-**Purpose:** Extend Osaurus with custom functionality including tools, HTTP routes, storage, configuration UI, and web apps.
+**Purpose:** Extend Muwa with custom functionality including tools, HTTP routes, storage, configuration UI, and web apps.
 
 **Components:**
 
-- `Tools/OsaurusTool.swift` — Tool protocol
+- `Tools/MuwaTool.swift` — Tool protocol
 - `Tools/ExternalTool.swift` — External plugin wrapper
 - `Tools/ToolRegistry.swift` — Tool registration
 - `Tools/SchemaValidator.swift` — JSON schema validation
@@ -844,8 +844,8 @@ Read-only tools are always available. Write/exec/package/secret tools require `a
 
 **Plugin Types:**
 
-- **v1 plugins** — Tools only, via `osaurus_plugin_entry`
-- **v2 plugins** — Tools + routes + storage + config, via `osaurus_plugin_entry_v2`
+- **v1 plugins** — Tools only, via `muwa_plugin_entry`
+- **v2 plugins** — Tools + routes + storage + config, via `muwa_plugin_entry_v2`
 - **System plugins** — Built-in tools (filesystem, browser, git, etc.)
 - **MCP provider tools** — Tools from URL-based remote MCP servers
 
@@ -899,19 +899,19 @@ See [docs/plugins/README.md](plugins/README.md) for the full reference.
 | `references/`  | Text files loaded into context     |
 | `assets/`      | Supporting files                   |
 
-**Storage:** `~/.osaurus/skills/{skill-name}/SKILL.md`
+**Storage:** `~/.muwa/skills/{skill-name}/SKILL.md`
 
 ---
 
 ### Claude Plugin Import
 
-**Purpose:** Import full Claude plugins from GitHub — skills, scheduled agents, slash commands, MCP providers, and shared `CLAUDE.md` context — as a single managed bundle, surfaced as cards in the **Plugins** tab alongside native Osaurus plugins.
+**Purpose:** Import full Claude plugins from GitHub — skills, scheduled agents, slash commands, MCP providers, and shared `CLAUDE.md` context — as a single managed bundle, surfaced as cards in the **Plugins** tab alongside native Muwa plugins.
 
 **Components:**
 
 - `Services/GitHubSkillService.swift` — Repository discovery, `marketplace.json` parsing, directory-based artifact probing, `.claude-plugin/plugin.json` decoding, version resolver, GitHub rate-limit detection
 - `Services/Skill/ClaudePluginInstaller.swift` — Per-plugin install/uninstall orchestrator, idempotent re-install, MCP placeholder-token detection, cron inference, manifest snapshot write + userConfig hookup, `${CLAUDE_PLUGIN_*}` substitution into MCP entries and skill bodies
-- `Services/Skill/ClaudePluginManifestStore.swift` — Per-plugin manifest + userConfig persistence under `~/.osaurus/claude-plugins/`; per-plugin data dir lifecycle
+- `Services/Skill/ClaudePluginManifestStore.swift` — Per-plugin manifest + userConfig persistence under `~/.muwa/claude-plugins/`; per-plugin data dir lifecycle
 - `Services/Skill/ClaudePluginVariableExpander.swift` — `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` / `${user_config.KEY}` / allow-listed `${ENV}` substitution; `CLAUDE_PLUGIN_OPTION_*` subprocess env overlay
 - `Services/Plugin/InstalledClaudePluginsAggregator.swift` — Card-friendly aggregator that joins manifest snapshots with live manager counts and runs the update probe
 - `Views/Plugin/PluginsView.swift` — Plugins tab hosting both native and Claude plugin cards in a single Installed grid
@@ -924,11 +924,11 @@ See [docs/plugins/README.md](plugins/README.md) for the full reference.
 - **Unified Plugins tab** — Claude plugins render as cards mixed into the same `Installed` grid as native `PluginCard`s, distinguished by an `Imported` badge; **Skills** tab is now only for user-authored and built-in skills
 - **Marketplace + per-plugin manifest** — Reads both `.claude-plugin/marketplace.json` (legacy flat skill arrays, directory-based, external `url` / `git-subdir` shapes) and `<source>/.claude-plugin/plugin.json` (displayName, version, author, homepage, repository, license, keywords, userConfig)
 - **Five artifact families** — `SKILL.md`, `agents/*.md`, `commands/*.md`, `CLAUDE.md`, `.mcp.json` (HTTP/SSE)
-- **Plugin id grouping** — Every artifact tagged `github:<owner>/<repo>/<plugin>` so the bundle reinstalls / uninstalls atomically; manifest snapshot persisted at `~/.osaurus/claude-plugins/manifests/<safe-id>.json`
+- **Plugin id grouping** — Every artifact tagged `github:<owner>/<repo>/<plugin>` so the bundle reinstalls / uninstalls atomically; manifest snapshot persisted at `~/.muwa/claude-plugins/manifests/<safe-id>.json`
 - **Idempotent re-install + Update flow** — Card and detail view both show an Update capsule when the source's `plugin.json.version` (or marketplace / source SHA) is newer than what's installed; clicking Update calls `ClaudePluginInstaller.install(replaceExisting: true)` to re-fetch and replace the artifact set
-- **`userConfig` prompt sheet** — When `plugin.json` declares `userConfig`, an in-app sheet collects values at install. Non-sensitive values land in `~/.osaurus/claude-plugins/userconfig/<safe-id>.json`; sensitive values go to the macOS Keychain (skipped under `OSAURUS_DISABLE_KEYCHAIN_FOR_TESTS=1`)
+- **`userConfig` prompt sheet** — When `plugin.json` declares `userConfig`, an in-app sheet collects values at install. Non-sensitive values land in `~/.muwa/claude-plugins/userconfig/<safe-id>.json`; sensitive values go to the macOS Keychain (skipped under `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`)
 - **Variable substitution** — `${CLAUDE_PLUGIN_ROOT}` / `${CLAUDE_PLUGIN_DATA}` / `${user_config.KEY}` / allow-listed `${ENV}` resolve in MCP command/args/cwd/env and in skill bodies (sensitive values are env-only per spec)
-- **Persistent data dir** — `~/.osaurus/claude-plugins/data/<safe-id>/` is created lazily on first `${CLAUDE_PLUGIN_DATA}` reference and removed on uninstall
+- **Persistent data dir** — `~/.muwa/claude-plugins/data/<safe-id>/` is created lazily on first `${CLAUDE_PLUGIN_DATA}` reference and removed on uninstall
 - **Parallel discovery & fetch** — `withThrowingTaskGroup` + `async let` across plugins and artifact probes
 - **Cron inference** — Natural-language frequency text in agent frontmatter is mapped to cron; unmatched schedules land disabled with a deep-link to the editor
 - **Placeholder token handling** — MCP env references like `${VAR}`, `$VAR`, `<token>` are detected and the provider is created without a token (surfaced in the install summary)
@@ -940,7 +940,7 @@ See [docs/plugins/README.md](plugins/README.md) for the full reference.
 github:<owner>/<repo>/<plugin-name>
 ```
 
-Stored on each artifact as `Skill.pluginId`, `Schedule.parameters["pluginId"]`, `SlashCommand.pluginId`, and `MCPProvider.pluginId`. Snapshot persisted under the same id (sanitised via `OsaurusPaths.claudePluginSafeId`).
+Stored on each artifact as `Skill.pluginId`, `Schedule.parameters["pluginId"]`, `SlashCommand.pluginId`, and `MCPProvider.pluginId`. Snapshot persisted under the same id (sanitised via `MuwaPaths.claudePluginSafeId`).
 
 **Not yet honored:** hooks, lspServers, outputStyles, themes/monitors (experimental), channels, bin/ PATH exports, install scopes. The detail view surfaces a "declared but not yet honored" notice so plugin authors aren't blindsided.
 
@@ -996,7 +996,7 @@ Each time a method is used, a `MethodEvent` is recorded (`loaded`, `succeeded`, 
 
 **Agent Tools:** Methods are loaded by the agent indirectly via `capabilities_discover` / `capabilities_load` (loading a method auto-loads its referenced tools and skills). The dedicated `methods_save` / `methods_report` tools were removed from the schema — recording method outcomes is now an internal observation, not an agent-facing concern.
 
-**Storage:** `~/.osaurus/methods/methods.db` (SQLite with WAL mode)
+**Storage:** `~/.muwa/methods/methods.db` (SQLite with WAL mode)
 
 ---
 
@@ -1091,7 +1091,7 @@ All three search services use VecturaKit (hybrid BM25 + vector search):
 **Features:**
 
 - **Wake-word activation** — Say a agent's name to open chat
-- **Custom wake phrase** — Set a phrase like "Hey Osaurus"
+- **Custom wake phrase** — Set a phrase like "Hey Muwa"
 - **Per-agent enablement** — Choose which agents respond to voice
 - **Menu bar indicator** — Shows listening status with audio level
 - **Auto-start voice input** — Begin recording after activation
@@ -1104,7 +1104,7 @@ All three search services use VecturaKit (hybrid BM25 + vector search):
 | ----------------------- | -------------------------------------------- |
 | `vadModeEnabled`        | Master toggle for VAD mode                   |
 | `enabledAgentIds`     | UUIDs of agents that respond to wake-words |
-| `customWakePhrase`      | Optional phrase like "Hey Osaurus"           |
+| `customWakePhrase`      | Optional phrase like "Hey Muwa"           |
 | `wakeWordSensitivity`   | Detection sensitivity level                  |
 | `autoStartVoiceInput`   | Start recording after activation             |
 | `silenceTimeoutSeconds` | Auto-close timeout (0 = disabled)            |
@@ -1255,7 +1255,7 @@ Eight settings total, down from v1's 18. The per-section budget knobs, MMR tunin
 
 **HTTP API:** `POST /memory/ingest` writes transcripts and triggers an immediate distillation flush after the batch (no need to wait for the writer's debounce). Strict `/chat/completions` requests do not inject read-side memory; app chat, `POST /agents/{id}/run`, and plugin host inference own composed agent context.
 
-**Storage:** `~/.osaurus/memory/memory.sqlite` (SQLite with WAL mode), `~/.osaurus/memory/vectura/` (vector index)
+**Storage:** `~/.muwa/memory/memory.sqlite` (SQLite with WAL mode), `~/.muwa/memory/vectura/` (vector index)
 
 ---
 
@@ -1326,8 +1326,8 @@ The post-scrub invariant only re-scans categories whose built-in regex toggle is
 
 **Storage:**
 
-- `~/.osaurus/config/privacy-filter.json` — User configuration (plaintext, atomic write)
-- `~/.osaurus/aux-models/openai-privacy-filter-bf16-v1/` — Model bundle + locally-generated `osaurus-manifest.json` for SHA-256 re-verify
+- `~/.muwa/config/privacy-filter.json` — User configuration (plaintext, atomic write)
+- `~/.muwa/aux-models/openai-privacy-filter-bf16-v1/` — Model bundle + locally-generated `muwa-manifest.json` for SHA-256 re-verify
 
 **Verification surface:** Open **Insights** (`⌘ Shift I`) → pick a request → **Request** / **Response** tabs. The **Server Request** / **Server Response** sub-sections show the exact bytes captured by `WireTransportProbe` (post-scrub on the way out, pre-unscrub on the way in) so users can confirm at a glance that placeholders actually made it onto the wire.
 

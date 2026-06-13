@@ -1,7 +1,7 @@
 # Telemetry & KPIs
 
 This document is the complete, authoritative description of the anonymous
-usage analytics Osaurus can collect. It exists so anyone — user, contributor,
+usage analytics Muwa can collect. It exists so anyone — user, contributor,
 or auditor — can see *exactly* what is captured, why, and what is deliberately
 left out. If the code and this document ever disagree, that is a bug; please
 open an issue.
@@ -27,9 +27,9 @@ Analytics are on by default and opt-out, with one switch to turn them off.
 - **Silent in source builds.** With no Aptabase key (the contributor default),
   the SDK never initializes and every event is a no-op.
 
-See [`TelemetryService`](../Packages/OsaurusCore/Services/TelemetryService.swift)
+See [`TelemetryService`](../Packages/MuwaCore/Services/TelemetryService.swift)
 for the consent gate and buffering, and
-[`FeatureTelemetry`](../Packages/OsaurusCore/Services/FeatureTelemetry.swift)
+[`FeatureTelemetry`](../Packages/MuwaCore/Services/FeatureTelemetry.swift)
 for the event definitions below.
 
 ## What we never collect
@@ -59,7 +59,7 @@ The events are organized around three product questions.
 
 Retention, session counts, new-vs-returning users, app version, OS version,
 and locale are derived by Aptabase from its **anonymous** session model plus
-the events below. No persistent per-user identifier is added by Osaurus to
+the events below. No persistent per-user identifier is added by Muwa to
 make this work.
 
 ## Event catalog
@@ -159,7 +159,7 @@ excluded. No properties — count only, with no name or configuration.
 The onboarding funnel events — `onboarding_started`, `onboarding_step_viewed`,
 `onboarding_step_skipped`, `onboarding_completed` — carry only a stable step
 name/index and a completion reason. They are defined in
-[`OnboardingTelemetry`](../Packages/OsaurusCore/Views/Onboarding/OnboardingTelemetry.swift).
+[`OnboardingTelemetry`](../Packages/MuwaCore/Views/Onboarding/OnboardingTelemetry.swift).
 
 ## Remote identifiers
 

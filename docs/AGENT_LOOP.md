@@ -1,6 +1,6 @@
 # Agent Loop & Folder Context
 
-Every chat in Osaurus is an agent loop. The agent picks a model, decides what to do next, calls tools, and either finishes (`complete`), pauses for input (`clarify`), or keeps iterating until its task list is empty.
+Every chat in Muwa is an agent loop. The agent picks a model, decides what to do next, calls tools, and either finishes (`complete`), pauses for input (`clarify`), or keeps iterating until its task list is empty.
 
 There is no separate "Agent" or "Work" tab — the same chat window handles a one-line question and a multi-step refactor. What changes between the two is the tool kit: pick a working folder to give the agent file tools, or toggle the Linux Sandbox to give it shell access. The four "always-on" loop tools (`todo`, `complete`, `clarify`, `share_artifact`) are global built-ins and present in every chat regardless of mode.
 
@@ -38,7 +38,7 @@ See [Tool Contract](TOOL_CONTRACT.md) for the canonical success/failure envelope
 
 ## The Three Loop Tools
 
-These live in [`Tools/AgentLoopTools.swift`](../Packages/OsaurusCore/Tools/AgentLoopTools.swift). Each one has a single required field — the smallest schema we can give a small local model and still get the right behavior — but they're called identically by frontier models too. They're registered as global built-ins in [`ToolRegistry`](../Packages/OsaurusCore/Tools/ToolRegistry.swift) so the model sees them in every chat (folder, sandbox, plain Q&A) and the system prompt's "Agent Loop" guidance block reinforces when to call which.
+These live in [`Tools/AgentLoopTools.swift`](../Packages/MuwaCore/Tools/AgentLoopTools.swift). Each one has a single required field — the smallest schema we can give a small local model and still get the right behavior — but they're called identically by frontier models too. They're registered as global built-ins in [`ToolRegistry`](../Packages/MuwaCore/Tools/ToolRegistry.swift) so the model sees them in every chat (folder, sandbox, plain Q&A) and the system prompt's "Agent Loop" guidance block reinforces when to call which.
 
 > **Agents get more.** DB-enabled agents also see the `db_*` persistence tools, and agents with the per-agent **Self-scheduling** toggle on (default off) see the `schedule_next_run` / `cancel_next_run` / `notify` tools — independent of the schedule-mode picker, which only sets the host-enforced run bounds. See [Agent DB & Self-Scheduling](AGENT_DB.md).
 
@@ -76,7 +76,7 @@ For minor preferences and recoverable choices the agent picks a sensible default
 
 #### Inline UI
 
-The clarify card is rendered through the shared [`PromptCard`](../Packages/OsaurusCore/Views/Chat/PromptCard.swift) chrome (the same chrome the secret prompt uses) and routed through the single-slot [`PromptQueue`](../Packages/OsaurusCore/Views/Chat/PromptQueue.swift) so it cannot stack on top of a pending secret prompt — whichever arrived first stays mounted, and the second is shown after the first resolves. While the card is mounted, the message thread blurs slightly and the main chat input dims so the user's attention lands on the embedded answer affordance. Reduced-motion settings are respected.
+The clarify card is rendered through the shared [`PromptCard`](../Packages/MuwaCore/Views/Chat/PromptCard.swift) chrome (the same chrome the secret prompt uses) and routed through the single-slot [`PromptQueue`](../Packages/MuwaCore/Views/Chat/PromptQueue.swift) so it cannot stack on top of a pending secret prompt — whichever arrived first stays mounted, and the second is shown after the first resolves. While the card is mounted, the message thread blurs slightly and the main chat input dims so the user's attention lands on the embedded answer affordance. Reduced-motion settings are respected.
 
 The `clarify` (along with `todo` and `complete`) tool call is filtered out of the generic tool-chip group in the message thread, so the question only renders once — as the inline overlay — instead of also showing up as a chip with truncated arguments.
 
@@ -84,16 +84,16 @@ The `clarify` (along with `todo` and `complete`) tool call is filtered out of th
 
 ## Working Folder (Folder Context)
 
-Selecting a working folder transforms the chat into a code-aware agent. The selector lives on the chat input bar; you can also point any chat at a folder programmatically via [`FolderContextService`](../Packages/OsaurusCore/Folder/FolderContextService.swift).
+Selecting a working folder transforms the chat into a code-aware agent. The selector lives on the chat input bar; you can also point any chat at a folder programmatically via [`FolderContextService`](../Packages/MuwaCore/Folder/FolderContextService.swift).
 
 ### What happens when you pick a folder
 
 1. macOS issues a security-scoped bookmark that persists across launches.
-2. [`FolderContextService`](../Packages/OsaurusCore/Folder/FolderContextService.swift) builds a `FolderContext` with project-type detection, file tree summary, manifest contents, and git status.
-3. [`FolderToolManager`](../Packages/OsaurusCore/Tools/FolderToolManager.swift) registers the folder tools listed below into [`ToolRegistry`](../Packages/OsaurusCore/Tools/ToolRegistry.swift).
+2. [`FolderContextService`](../Packages/MuwaCore/Folder/FolderContextService.swift) builds a `FolderContext` with project-type detection, file tree summary, manifest contents, and git status.
+3. [`FolderToolManager`](../Packages/MuwaCore/Tools/FolderToolManager.swift) registers the folder tools listed below into [`ToolRegistry`](../Packages/MuwaCore/Tools/ToolRegistry.swift).
 4. The system prompt composer injects the folder context (tree, manifest, git status, optional `AGENTS.md` / `CLAUDE.md` / `.cursorrules`) for the model.
 
-Project type is auto-detected from manifests (defined in [`FolderContext.swift`](../Packages/OsaurusCore/Folder/FolderContext.swift)):
+Project type is auto-detected from manifests (defined in [`FolderContext.swift`](../Packages/MuwaCore/Folder/FolderContext.swift)):
 
 | Project | Manifests Detected                               | Default Ignores                                        |
 | ------- | ------------------------------------------------ | ------------------------------------------------------ |
@@ -108,7 +108,7 @@ Project type is auto-detected from manifests (defined in [`FolderContext.swift`]
 
 ### Folder tool inventory
 
-Built by [`FolderToolFactory`](../Packages/OsaurusCore/Folder/FolderTools.swift) when the folder is selected. Tools that operate on the filesystem all enforce the same path contract: a path is taken relative to the working folder, but an absolute path is also accepted as long as it resolves (after `..`/`.` standardisation) to the working folder or somewhere strictly under it; paths outside it are rejected. `share_artifact` is NOT in this table — it lives as a global built-in (see below) so it's available in every chat.
+Built by [`FolderToolFactory`](../Packages/MuwaCore/Folder/FolderTools.swift) when the folder is selected. Tools that operate on the filesystem all enforce the same path contract: a path is taken relative to the working folder, but an absolute path is also accepted as long as it resolves (after `..`/`.` standardisation) to the working folder or somewhere strictly under it; paths outside it are rejected. `share_artifact` is NOT in this table — it lives as a global built-in (see below) so it's available in every chat.
 
 **Core (always registered):**
 
@@ -134,9 +134,9 @@ The previously-discrete `file_move`, `file_copy`, `file_delete`, `dir_create`, a
 | `git_diff`   | Show diffs                                        |
 | `git_commit` | Stage and commit (requires approval)              |
 
-Every applied `file_write` / `file_edit` call is logged in [`FileOperationLog`](../Packages/OsaurusCore/Folder/FileOperationLog.swift) so the user — or the agent, via `file_undo` — can review and revert individual file operations. Dry-run write/edit previews do not log because they do not change the filesystem.
+Every applied `file_write` / `file_edit` call is logged in [`FileOperationLog`](../Packages/MuwaCore/Folder/FileOperationLog.swift) so the user — or the agent, via `file_undo` — can review and revert individual file operations. Dry-run write/edit previews do not log because they do not change the filesystem.
 
-Common-case `shell_run` mutations join the same log: [`ShellMutationLog`](../Packages/OsaurusCore/Folder/ShellMutationLog.swift) plans simple `mv` / `cp` / `rm` / `mkdir` commands **before** execution (an `rm` undo needs the pre-exec file content) and logs the planned operations when the command exits 0. The capture is all-or-nothing per command: anything it can't parse faithfully (pipes, globs, redirects, directories, paths outside the root) is classified *unloggable* and the tool result carries an explicit "not covered by the undo log" warning instead of a half-logged entry. Each history entry reports an honest per-entry `can_undo`, and operations within one parallel batch share a batch id so related changes group together in history.
+Common-case `shell_run` mutations join the same log: [`ShellMutationLog`](../Packages/MuwaCore/Folder/ShellMutationLog.swift) plans simple `mv` / `cp` / `rm` / `mkdir` commands **before** execution (an `rm` undo needs the pre-exec file content) and logs the planned operations when the command exits 0. The capture is all-or-nothing per command: anything it can't parse faithfully (pipes, globs, redirects, directories, paths outside the root) is classified *unloggable* and the tool result carries an explicit "not covered by the undo log" warning instead of a half-logged entry. Each history entry reports an honest per-entry `can_undo`, and operations within one parallel batch share a batch id so related changes group together in history.
 
 ---
 
@@ -144,7 +144,7 @@ Common-case `shell_run` mutations join the same log: [`ShellMutationLog`](../Pac
 
 On macOS 26+, the chat input bar also has a Sandbox toggle. The Sandbox **composes** with the working-folder backend rather than excluding it — turning sandbox on while a folder is selected yields **combined mode**: the host workspace is exposed **read-only** while all execution happens in the sandbox VM. See the [Sandbox Guide](SANDBOX.md) for the full sandbox tool inventory.
 
-The execution mode is captured as a first-class enum in [`ExecutionMode.swift`](../Packages/OsaurusCore/Folder/ExecutionMode.swift):
+The execution mode is captured as a first-class enum in [`ExecutionMode.swift`](../Packages/MuwaCore/Folder/ExecutionMode.swift):
 
 ```swift
 public enum ExecutionMode: Sendable {
@@ -154,7 +154,7 @@ public enum ExecutionMode: Sendable {
 }
 ```
 
-`ExecutionMode` is what the system prompt composer, tool registry, and memory layer all key off when deciding which tools and instructions to surface. The single resolver is [`ToolRegistry.resolveExecutionMode(folderContext:autonomousEnabled:)`](../Packages/OsaurusCore/Tools/ToolRegistry.swift) and its priority is **sandbox > host folder > none**: if the user has both an open folder and the autonomous-exec toggle on (with `sandbox_exec` registered), the sandbox wins — but the folder now rides along as `.sandbox(hostRead: ctx)` instead of being dropped. Plugin and HTTP entry points use the same resolver so the same agent gets the same mode regardless of how it's invoked.
+`ExecutionMode` is what the system prompt composer, tool registry, and memory layer all key off when deciding which tools and instructions to surface. The single resolver is [`ToolRegistry.resolveExecutionMode(folderContext:autonomousEnabled:)`](../Packages/MuwaCore/Tools/ToolRegistry.swift) and its priority is **sandbox > host folder > none**: if the user has both an open folder and the autonomous-exec toggle on (with `sandbox_exec` registered), the sandbox wins — but the folder now rides along as `.sandbox(hostRead: ctx)` instead of being dropped. Plugin and HTTP entry points use the same resolver so the same agent gets the same mode regardless of how it's invoked.
 
 **Combined mode (`.sandbox(hostRead: ctx)`).** The agent gets the host workspace tree/manifest/git status in context plus the read-only host read tools (`file_read` / `file_search`, scoped to the folder root; `file_read` also lists directories). Host write/edit/shell/git stay hidden; all execution runs in the sandbox VM, which has **no mount** of the host workspace (asserted in `SandboxManager.validatedWorkspaceMountSource`). The system prompt emits a read-only workspace section and a two-filesystem block that tells the agent to `file_read` host content and carry it into the sandbox rather than expecting `sandbox_exec` to see the workspace. Security: the no-mount invariant fully contains untrusted *code*, but the trusted agent is the read→exec bridge by design, so three residual risks remain — agent-as-bridge exfiltration, prompt injection from read content, and in-scope secrets. Scope enforcement + secret-file refusal (`.env`/keys/credentials, overridable per session) mitigate the latter two; v1 keeps sandbox **network-on**, so the exfiltration residual is documented rather than closed.
 
@@ -164,7 +164,7 @@ In sandbox mode, the composer also reads the agent's `~/SOUL.md` and emits it as
 
 ## `share_artifact` — Handing Files Back to the User
 
-`share_artifact` is a **global built-in** registered in [`ToolRegistry.registerBuiltInTools()`](../Packages/OsaurusCore/Tools/ToolRegistry.swift) — it's available in plain chat, folder, and sandbox alike. If the agent generates an image, chart, website, report, or any file, it **must** call this tool. The user does not see arbitrary files the agent writes to disk or to the sandbox; the artifact tool is what surfaces them as cards in chat.
+`share_artifact` is a **global built-in** registered in [`ToolRegistry.registerBuiltInTools()`](../Packages/MuwaCore/Tools/ToolRegistry.swift) — it's available in plain chat, folder, and sandbox alike. If the agent generates an image, chart, website, report, or any file, it **must** call this tool. The user does not see arbitrary files the agent writes to disk or to the sandbox; the artifact tool is what surfaces them as cards in chat.
 
 | Field         | Type   | Description                                                                                       |
 | ------------- | ------ | ------------------------------------------------------------------------------------------------- |
@@ -173,7 +173,7 @@ In sandbox mode, the composer also reads the agent's `~/SOUL.md` and emits it as
 | `filename`    | string | Required with `content`. Defaults to the basename of `path` otherwise. Omit entirely when not used. |
 | `description` | string | Brief human-readable description.                                                                 |
 
-Artifacts are persisted under `~/.osaurus/artifacts/<sessionId>/` and rendered inline in the chat thread. See [`SharedArtifact.swift`](../Packages/OsaurusCore/Models/Chat/SharedArtifact.swift).
+Artifacts are persisted under `~/.muwa/artifacts/<sessionId>/` and rendered inline in the chat thread. See [`SharedArtifact.swift`](../Packages/MuwaCore/Models/Chat/SharedArtifact.swift).
 
 #### `share_artifact` and sandbox scripts
 
@@ -199,25 +199,25 @@ The chat-layer wrapper surfaces a differentiated error envelope per failure mode
 
 ## Headless / HTTP / Plugin Use
 
-Plugins and HTTP API callers reach the same loop through [`TaskDispatcher`](../Packages/OsaurusCore/Managers/TaskDispatcher.swift) and [`BackgroundTaskManager`](../Packages/OsaurusCore/Managers/BackgroundTaskManager.swift). Each dispatched task runs as a background chat session — same engine, same loop tools, same intercepts. See [`docs/plugins/HOST_API.md`](plugins/HOST_API.md#dispatch) for the dispatch JSON schema and event types.
+Plugins and HTTP API callers reach the same loop through [`TaskDispatcher`](../Packages/MuwaCore/Managers/TaskDispatcher.swift) and [`BackgroundTaskManager`](../Packages/MuwaCore/Managers/BackgroundTaskManager.swift). Each dispatched task runs as a background chat session — same engine, same loop tools, same intercepts. See [`docs/plugins/HOST_API.md`](plugins/HOST_API.md#dispatch) for the dispatch JSON schema and event types.
 
 When a plugin-dispatched run pauses on `clarify`, the chat-layer intercept publishes the parsed payload onto the session and `BackgroundTaskManager` fires `OSR_TASK_EVENT_CLARIFICATION` (type 3) carrying `{question, allow_multiple, options?}`. The same observer **suppresses** the COMPLETED event that would otherwise fire when `isStreaming` flips false on the intercept — without that suppression the plugin would see a "completion" carrying the literal `clarify` tool envelope as `output`, with the actual question text trapped inside the JSON. The next event the plugin sees is either an ACTIVITY tick after the user answers (the loop resumed inside the same task) or a fresh terminal event after the resumed loop runs to completion. See [HOST_API.md — Task lifecycle events](plugins/HOST_API.md#task-lifecycle-events-on_task_event) for the full payload schema and the COMPLETED-suppression contract.
 
 ### Session Audit Dimension
 
-Every persisted [`ChatSessionData`](../Packages/OsaurusCore/Models/Chat/ChatSessionData.swift) carries a [`SessionSource`](../Packages/OsaurusCore/Models/Chat/SessionSource.swift) tag — `chat`, `plugin`, `http`, `schedule`, or `watcher` — plus the originating `sourcePluginId`, `externalSessionKey`, and `dispatchTaskId`. The chat sidebar surfaces this as a per-row badge and a source filter rail so users can audit what spawned each conversation. Telegram-style plugins that pass `session_id` get one growing session per external thread instead of a new row per inbound message. The dispatch task id and the persisted session id are intentionally the same UUID so HTTP pollers, plugins, and the sidebar deep-link to the same row.
+Every persisted [`ChatSessionData`](../Packages/MuwaCore/Models/Chat/ChatSessionData.swift) carries a [`SessionSource`](../Packages/MuwaCore/Models/Chat/SessionSource.swift) tag — `chat`, `plugin`, `http`, `schedule`, or `watcher` — plus the originating `sourcePluginId`, `externalSessionKey`, and `dispatchTaskId`. The chat sidebar surfaces this as a per-row badge and a source filter rail so users can audit what spawned each conversation. Telegram-style plugins that pass `session_id` get one growing session per external thread instead of a new row per inbound message. The dispatch task id and the persisted session id are intentionally the same UUID so HTTP pollers, plugins, and the sidebar deep-link to the same row.
 
 ### HTTP API divergence (intentional)
 
-The OpenAI-compatible HTTP endpoint is **stateless** — there's no Osaurus session id on the request, so it cannot reuse `SessionToolStateStore.loadedToolNames` or freeze a per-session schema snapshot. To keep the schema predictable for HTTP callers, the HTTP path deliberately bypasses [`SystemPromptComposer.resolveTools`](../Packages/OsaurusCore/Services/Chat/SystemPromptComposer.swift) and uses bare `ToolRegistry.alwaysLoadedSpecs(mode:)`. Manual-mode user picks, mid-session `capabilities_load` additions, and the inline `clarify` UI are chat-only. This is **by design** — see the comment block in [`HTTPHandler.swift`](../Packages/OsaurusCore/Networking/HTTPHandler.swift) before "fixing" it.
+The OpenAI-compatible HTTP endpoint is **stateless** — there's no Muwa session id on the request, so it cannot reuse `SessionToolStateStore.loadedToolNames` or freeze a per-session schema snapshot. To keep the schema predictable for HTTP callers, the HTTP path deliberately bypasses [`SystemPromptComposer.resolveTools`](../Packages/MuwaCore/Services/Chat/SystemPromptComposer.swift) and uses bare `ToolRegistry.alwaysLoadedSpecs(mode:)`. Manual-mode user picks, mid-session `capabilities_load` additions, and the inline `clarify` UI are chat-only. This is **by design** — see the comment block in [`HTTPHandler.swift`](../Packages/MuwaCore/Networking/HTTPHandler.swift) before "fixing" it.
 
 ---
 
 ## The Canonical Loop Driver (`AgentToolLoop`)
 
-All agent loops in Osaurus run on **one driver**: [`AgentToolLoop`](../Packages/OsaurusCore/Services/Chat/AgentToolLoop.swift). The chat UI, the HTTP `/v1/chat/completions` agent path, the plugin completion loop, the `sandbox_reduce` nested reduction subagent (see [REDUCTION_SUBAGENT.md](REDUCTION_SUBAGENT.md)), and the eval harness each supply surface-specific hooks (`buildMessages`, `modelStep`, `executeTool` / `executeBatch`, …) but share the iteration loop itself: budget bookkeeping, dedupe, next-step bias, notice staging, batch ordering, and the exit taxonomy live in exactly one place.
+All agent loops in Muwa run on **one driver**: [`AgentToolLoop`](../Packages/MuwaCore/Services/Chat/AgentToolLoop.swift). The chat UI, the HTTP `/v1/chat/completions` agent path, the plugin completion loop, the `sandbox_reduce` nested reduction subagent (see [REDUCTION_SUBAGENT.md](REDUCTION_SUBAGENT.md)), and the eval harness each supply surface-specific hooks (`buildMessages`, `modelStep`, `executeTool` / `executeBatch`, …) but share the iteration loop itself: budget bookkeeping, dedupe, next-step bias, notice staging, batch ordering, and the exit taxonomy live in exactly one place.
 
-Where the surfaces deliberately diverge, the difference is a named [`AgentLoopPolicy`](../Packages/OsaurusCore/Services/Chat/AgentToolLoop.swift) knob rather than a forked loop:
+Where the surfaces deliberately diverge, the difference is a named [`AgentLoopPolicy`](../Packages/MuwaCore/Services/Chat/AgentToolLoop.swift) knob rather than a forked loop:
 
 | Knob | Chat | HTTP / Plugin |
 | --- | --- | --- |
@@ -230,7 +230,7 @@ Every run ends with one of six exits: `finalResponse`, `iterationCapReached` (th
 
 ### Driver-staged system notices
 
-The driver stages three kinds of `[System Notice]` lines for the *next* model step: the iteration-budget warning ("Tool call budget: N of M remaining…", staged when the remaining budget drops to the policy threshold), the dedupe notice ("You already retrieved this exact result…"), and the `AgentTaskState` next-step bias (see below). The notice contract is uniform across surfaces via [`AgentLoopBudget.composeIterationMessages`](../Packages/OsaurusCore/Services/Chat/AgentToolLoop.swift): history is trimmed **first** (so compaction decisions are notice-independent and KV-stable), then notices are appended as **transient** user messages — they ride exactly one iteration and are never persisted into the surface's history store.
+The driver stages three kinds of `[System Notice]` lines for the *next* model step: the iteration-budget warning ("Tool call budget: N of M remaining…", staged when the remaining budget drops to the policy threshold), the dedupe notice ("You already retrieved this exact result…"), and the `AgentTaskState` next-step bias (see below). The notice contract is uniform across surfaces via [`AgentLoopBudget.composeIterationMessages`](../Packages/MuwaCore/Services/Chat/AgentToolLoop.swift): history is trimmed **first** (so compaction decisions are notice-independent and KV-stable), then notices are appended as **transient** user messages — they ride exactly one iteration and are never persisted into the surface's history store.
 
 ### Parallel tool batches
 
@@ -247,9 +247,9 @@ Loading a capability mid-run does **not** rewrite the rendered `<tools>` block. 
 
 ### Context budget & KV-stable compaction
 
-Window math lives in one place — [`AgentLoopBudget`](../Packages/OsaurusCore/Services/Chat/AgentToolLoop.swift): window resolution (Foundation ids → 4,096; model bundle `contextLength`; configured fallback → 128k), the canonical reservations (system prompt, request toolset, `max_tokens` response), and `assess(...)`, which the chat input's context chip and send gate use so **UI and runtime never disagree** about fullness or hard overflow. All budgets are computed against the *effective* budget (window × 0.85 safety margin), and the hard-overflow gate excludes compactable history — only a non-compactable prefix that can't possibly fit blocks a send.
+Window math lives in one place — [`AgentLoopBudget`](../Packages/MuwaCore/Services/Chat/AgentToolLoop.swift): window resolution (Foundation ids → 4,096; model bundle `contextLength`; configured fallback → 128k), the canonical reservations (system prompt, request toolset, `max_tokens` response), and `assess(...)`, which the chat input's context chip and send gate use so **UI and runtime never disagree** about fullness or hard overflow. All budgets are computed against the *effective* budget (window × 0.85 safety margin), and the hard-overflow gate excludes compactable history — only a non-compactable prefix that can't possibly fit blocks a send.
 
-When history exceeds the budget, [`ContextBudgetManager`](../Packages/OsaurusCore/Services/Chat/ContextBudgetManager.swift) trims with a sticky [`CompactionWatermark`](../Packages/OsaurusCore/Services/Chat/CompactionWatermark.swift) so the rendered prefix is **monotonic and byte-stable** across iterations — what the paged-KV prefix cache needs to keep reusing the prompt:
+When history exceeds the budget, [`ContextBudgetManager`](../Packages/MuwaCore/Services/Chat/ContextBudgetManager.swift) trims with a sticky [`CompactionWatermark`](../Packages/MuwaCore/Services/Chat/CompactionWatermark.swift) so the rendered prefix is **monotonic and byte-stable** across iterations — what the paged-KV prefix cache needs to keep reusing the prompt:
 
 - Once a tool result is summarized, the summary replays **byte-identically** forever; once a message is dropped, it stays dropped.
 - Messages already sent verbatim are never *newly* summarized when they age out of the protected tail (a mid-transcript rewrite the KV cache can't reuse past) — they're dropped instead, a pure truncation.
@@ -260,7 +260,7 @@ The protected regions are the first message (original task) and the most recent 
 
 ### Proof lane: end-to-end agentic evals
 
-[`AgentLoopEvaluator`](../Packages/OsaurusCore/Services/Context/AgentLoopEvaluator.swift) drives this same driver against a fixture-seeded temp workspace for the OsaurusEvals `agent_loop` domain — streaming model steps, a stable `session_id` for KV reuse, the parallel batch executor, and config-resolved `max_tokens`, so the eval exercises the production shape rather than a simplified one. Cases assert **outcomes** (file contents, command exit codes) plus harness behaviors: dedupe replays firing, the repeated-call nudge landing, and compaction actually occurring. The evaluator refuses to run while a user folder session is active in-process and snapshots/restores any prior folder-tool registration. See [`Packages/OsaurusEvals/README.md`](../Packages/OsaurusEvals/README.md#agent_loop-domain) for the case schema and the suite inventory.
+[`AgentLoopEvaluator`](../Packages/MuwaCore/Services/Context/AgentLoopEvaluator.swift) drives this same driver against a fixture-seeded temp workspace for the MuwaEvals `agent_loop` domain — streaming model steps, a stable `session_id` for KV reuse, the parallel batch executor, and config-resolved `max_tokens`, so the eval exercises the production shape rather than a simplified one. Cases assert **outcomes** (file contents, command exit codes) plus harness behaviors: dedupe replays firing, the repeated-call nudge landing, and compaction actually occurring. The evaluator refuses to run while a user folder session is active in-process and snapshots/restores any prior folder-tool registration. See [`Packages/MuwaEvals/README.md`](../Packages/MuwaEvals/README.md#agent_loop-domain) for the case schema and the suite inventory.
 
 ---
 
@@ -281,7 +281,7 @@ Two changes, one component:
    "file"`; missing paths return the `not_found` kind. See
    [Tool Contract — structured result kinds](TOOL_CONTRACT.md#structured-actionable-result-kinds).
 
-2. **A task-state machine in the harness.** [`AgentTaskState`](../Packages/OsaurusCore/Services/Chat/AgentTaskState.swift)
+2. **A task-state machine in the harness.** [`AgentTaskState`](../Packages/MuwaCore/Services/Chat/AgentTaskState.swift)
    classifies each result (`classify(_:)` → empty/partial/populated listing,
    file content, not-found, error, other) and:
    - **De-dupes still-fresh re-reads.** A read whose `(name, canonical args)`

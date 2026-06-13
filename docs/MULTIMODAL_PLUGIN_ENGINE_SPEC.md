@@ -1,10 +1,10 @@
 # Multimodal plugin and engine integration spec
 
-This is the working spec for an Osaurus council or multimodal chat plugin.
+This is the working spec for an Muwa council or multimodal chat plugin.
 The expected product shape is:
 
 - Users bring their own provider keys.
-- The plugin can call local Osaurus/vmlx models and remote OpenAI-compatible
+- The plugin can call local Muwa/vmlx models and remote OpenAI-compatible
   providers.
 - Image, video, audio, reasoning, and tool calls use the same structured chat
   contracts that the main app uses.
@@ -45,7 +45,7 @@ future evidence explicit.
 
 | Area | Required behavior | Evidence |
 |---|---|---|
-| Input contract | Plugins call `host->complete`, `host->complete_stream`, or the Osaurus HTTP API with ordered OpenAI-compatible content parts. `text`, `image_url`, `input_audio`, and `video_url` survive decode/re-encode without lossy string prompt flattening. | Codable tests for mixed content parts plus a plugin-host completion test that observes the mapped `ChatMessage` parts. |
+| Input contract | Plugins call `host->complete`, `host->complete_stream`, or the Muwa HTTP API with ordered OpenAI-compatible content parts. `text`, `image_url`, `input_audio`, and `video_url` survive decode/re-encode without lossy string prompt flattening. | Codable tests for mixed content parts plus a plugin-host completion test that observes the mapped `ChatMessage` parts. |
 | Local media mapping | Local execution maps images to `Chat.Message.images`, videos to `Chat.Message.videos`, and audio to `Chat.Message.audios`; valid WAV audio maps to samples where supported and mp4 video remains video mp4. | `MultimodalContentPartTests`, `MaterializeMediaDataUrlMCDCTests`, and one plugin-host fixture that exercises the same path through `complete_stream`. |
 | Capability gating | A text-only local model never receives image/audio/video content. Unsupported media fails closed with a structured error or an explicit downgrade record. | Model-capability tests for text-only, image, video, and Nemotron-Omni-style audio cases. |
 | Remote consent | Media bytes, local file contents, memory, folder context, tool output, and reasoning are not sent to remote members unless the user explicitly enabled that member and configured its BYO key. | Unit tests for member routing plus redacted log snapshots for denied and allowed remote routes. |
@@ -58,7 +58,7 @@ future evidence explicit.
 
 There are two supported ways to call multimodal generation.
 
-### Path A: Osaurus OpenAI-compatible HTTP API
+### Path A: Muwa OpenAI-compatible HTTP API
 
 Use this for most plugins. It is stable, provider-like, and naturally works
 with BYO keys and remote/local routing.
@@ -70,7 +70,7 @@ POST /v1/chat/completions
 POST /chat/completions
 ```
 
-Message content parts supported by Osaurus:
+Message content parts supported by Muwa:
 
 | Part type | Shape | Local mapping |
 |---|---|---|
@@ -157,7 +157,7 @@ available, and redacted usage/tool/artifact metadata.
 
 ### Path B: In-process vmlx Swift
 
-Use this only for core Osaurus code or a trusted local plugin host that links
+Use this only for core Muwa code or a trusted local plugin host that links
 against vmlx. This path gives direct access to `ModelContainer`, but it also
 means the plugin owns load policy, memory policy, cancellation, and event
 routing.
@@ -385,7 +385,7 @@ Execution flow:
 
 ## BYO key rules
 
-- Store provider keys in Keychain or the approved Osaurus secret store. Config
+- Store provider keys in Keychain or the approved Muwa secret store. Config
   files should contain only `api_key_ref`, never raw key bytes.
 - Do not send local files, media bytes, memory entries, folder context, or tool
   outputs to a remote provider unless the user explicitly enabled that member.
@@ -397,7 +397,7 @@ Execution flow:
 
 ## Capability and model checks
 
-Before submitting to a local Osaurus model:
+Before submitting to a local Muwa model:
 
 - Use `ModelMediaCapabilities.from(modelId:)` or
   `ModelMediaCapabilities.from(directory:modelId:)` to validate media support.
@@ -422,7 +422,7 @@ The plugin should expose three modes:
 |---|---|
 | Off | Ask local models to disable thinking when supported; do not render reasoning |
 | On | Pass model-specific thinking context and render `.reasoning` separately |
-| Auto | Follow Osaurus model defaults and family policy |
+| Auto | Follow Muwa model defaults and family policy |
 
 Rules:
 
@@ -431,7 +431,7 @@ Rules:
 - Do not force fake close tags in plugin code.
 - Preserve `reasoning_content` only for model families that need it on
   follow-up turns and only if the user setting allows it.
-- Ling-family models are non-reasoning in current Osaurus policy.
+- Ling-family models are non-reasoning in current Muwa policy.
 
 ## Tool policy
 
@@ -449,7 +449,7 @@ execution policy.
 
 ## Cache/session policy
 
-For local Osaurus members:
+For local Muwa members:
 
 - One council member should map to one stable chat session key.
 - Do not rebuild the system prefix differently on every turn unless the member
@@ -516,7 +516,7 @@ Before shipping a council/multimodal plugin, run:
 | Same media, turn 2 | local member cache can hit where topology supports it |
 | Changed media, turn 2 | local member cache does not false-hit across media |
 
-## Osaurus-side gaps worth adding before large plugin work
+## Muwa-side gaps worth adding before large plugin work
 
 These are not required to start a plugin, but they will make future debugging
 much cleaner:

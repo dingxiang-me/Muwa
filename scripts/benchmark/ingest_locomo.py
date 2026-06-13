@@ -1,12 +1,12 @@
 #!/usr/bin/env python3
 """
-Ingest LoCoMo conversation data into the Osaurus memory system.
+Ingest LoCoMo conversation data into the Muwa memory system.
 
 For each sample in locomo10.json, this script:
   1. Creates a deterministic agent UUID from the sample_id
   2. Iterates through conversation sessions in chronological order
   3. Pairs adjacent speaker turns as user/assistant exchanges
-  4. POSTs them to the Osaurus /memory/ingest endpoint
+  4. POSTs them to the Muwa /memory/ingest endpoint
 
 Usage:
     python scripts/benchmark/ingest_locomo.py [--data path/to/locomo10.json] [--base-url http://localhost:1337]
@@ -125,7 +125,7 @@ def ingest_sample(client: httpx.Client, base_url: str, sample: dict, chunks_only
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Ingest LoCoMo data into Osaurus memory")
+    parser = argparse.ArgumentParser(description="Ingest LoCoMo data into Muwa memory")
     parser.add_argument(
         "--data",
         default="benchmarks/EasyLocomo/data/locomo10.json",
@@ -134,7 +134,7 @@ def main():
     parser.add_argument(
         "--base-url",
         default="http://localhost:1337",
-        help="Osaurus server base URL",
+        help="Muwa server base URL",
     )
     parser.add_argument(
         "--samples",
@@ -166,7 +166,7 @@ def main():
         samples = samples[: args.samples]
 
     mode = "chunks only (no LLM)" if args.chunks_only else "full extraction"
-    print(f"Ingesting {len(samples)} samples into Osaurus memory at {args.base_url} [{mode}]")
+    print(f"Ingesting {len(samples)} samples into Muwa memory at {args.base_url} [{mode}]")
     print()
 
     print("Agent ID mapping:")

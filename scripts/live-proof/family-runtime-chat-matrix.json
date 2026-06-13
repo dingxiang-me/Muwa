@@ -105,7 +105,7 @@
     "topology": "swa-rotating",
     "required_cache_evidence": ["rotating_kv_layer_count", "disk_l2_hits", "cache_topology"],
     "priority": "required",
-    "notes": "Gemma parser/template row must prove no thought/header leak through Osaurus chat."
+    "notes": "Gemma parser/template row must prove no thought/header leak through Muwa chat."
   },
   {
     "id": "minimax-m27-small-jangtq",

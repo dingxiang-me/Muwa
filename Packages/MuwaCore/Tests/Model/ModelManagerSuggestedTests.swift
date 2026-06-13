@@ -1,0 +1,213 @@
+//
+//  ModelManagerSuggestedTests.swift
+//  MuwaTests
+//
+//  Covers the curated suggested-models catalog and the OsaurusAI HF org
+//  auto-discovery merge that powers the Recommended tab.
+//
+
+import Foundation
+import Testing
+
+@testable import MuwaCore
+
+@Suite(.serialized)
+struct ModelManagerSuggestedTests {
+
+    /// Suppress the background OsaurusAI HF org fetch that `ModelManager.init()`
+    /// kicks off — without this knob, the async network response can land
+    /// between a test's `applyMuwaOrgFetch(...)` call and its assertion,
+    /// replacing the injected entries with whatever HF currently lists and
+    /// flaking the suite (CI > local because CI consistently has network).
+    init() {
+        ModelManager.skipBackgroundOrgFetchForTests = true
+    }
+
+    /// `ModelManager.loadAvailableModels()` intentionally overlays cached
+    /// download sizes onto curated entries. Keep this suite on a throwaway
+    /// root so catalog metadata assertions do not depend on a developer or CI
+    /// machine's persisted `ModelSizeCache`.
+    private func withIsolatedModelSizeCache<T>(_ body: () -> T) -> T {
+        MuwaTestGlobals.withPathsLock {
+            let previous = MuwaPaths.overrideRoot
+            let root = FileManager.default.temporaryDirectory
+                .appendingPathComponent("muwa-suggested-models-\(UUID().uuidString)", isDirectory: true)
+            MuwaPaths.overrideRoot = root
+            ModelSizeCache.invalidateInMemory()
+            defer {
+                MuwaPaths.overrideRoot = previous
+                ModelSizeCache.invalidateInMemory()
+                try? FileManager.default.removeItem(at: root)
+            }
+            return body()
+        }
+    }
+
+    // MARK: - Curated catalog
+
+    @Test func curatedSuggestedIds_includesNewMiniMaxEntries() {
+        let ids = ModelManager.curatedSuggestedIds
+        #expect(ids.contains("osaurusai/minimax-m2.7-jangtq4"))
+        #expect(ids.contains("osaurusai/minimax-m2.7-jangtq"))
+    }
+
+    @Test func curatedSuggestedIds_includesLingEntries() {
+        let ids = ModelManager.curatedSuggestedIds
+        #expect(ids.contains("osaurusai/ling-2.6-flash-mxfp4"))
+        #expect(ids.contains("osaurusai/ling-2.6-flash-jangtq"))
+    }
+
+    @Test @MainActor func curatedSuggestedIds_matchInitialSuggestedModels() {
+        let suggested = withIsolatedModelSizeCache { ModelManager().suggestedModels }
+        let curatedIds = ModelManager.curatedSuggestedIds
+        let suggestedIds = Set(suggested.map { $0.id.lowercased() })
+        // On a fresh manager (before any HF fetch resolves), `suggestedModels`
+        // is exactly the curated catalog.
+        #expect(suggestedIds == curatedIds)
+    }
+
+    @Test @MainActor func curatedMuwaEntries_haveValidReleaseDates() {
+        let suggested = withIsolatedModelSizeCache { ModelManager().suggestedModels }
+        let muwaEntries = suggested.filter { $0.id.hasPrefix("OsaurusAI/") }
+
+        // All curated OsaurusAI entries should carry a release date and it
+        // should be after the project's epoch (2025-01-01) — guards against
+        // the date helper silently falling back to `Date(timeIntervalSince1970: 0)`.
+        let projectEpoch = Date(timeIntervalSince1970: 1_735_689_600)  // 2025-01-01
+        for model in muwaEntries {
+            #expect(model.releasedAt != nil, "Missing releasedAt for \(model.id)")
+            if let d = model.releasedAt {
+                #expect(d > projectEpoch, "Suspicious releasedAt for \(model.id): \(d)")
+            }
+        }
+    }
+
+    @Test @MainActor func miniMaxEntries_haveExpectedMetadata() {
+        let suggested = withIsolatedModelSizeCache { ModelManager().suggestedModels }
+        let jangtq4 = suggested.first { $0.id == "OsaurusAI/MiniMax-M2.7-JANGTQ4" }
+        let jangtq = suggested.first { $0.id == "OsaurusAI/MiniMax-M2.7-JANGTQ" }
+
+        #expect(jangtq4 != nil)
+        #expect(jangtq != nil)
+
+        // Download sizes are no longer hand-coded; they're sourced from the
+        // revision-gated `ModelSizeCache` (empty in a fresh test run), so the
+        // curated entry carries no size until the org refresh fills it in.
+        #expect(jangtq4?.downloadSizeBytes == nil)
+        #expect(jangtq?.downloadSizeBytes == nil)
+
+        // model_type drives pre-download routing through the JANGTQ loader.
+        #expect(jangtq4?.modelType == "minimax_m2")
+        #expect(jangtq?.modelType == "minimax_m2")
+
+        #expect(jangtq4?.releasedAt != nil)
+        #expect(jangtq?.releasedAt != nil)
+    }
+
+    @Test @MainActor func lingEntries_haveExpectedMetadata() {
+        let suggested = withIsolatedModelSizeCache { ModelManager().suggestedModels }
+        let mxfp4 = suggested.first { $0.id == "OsaurusAI/Ling-2.6-flash-MXFP4" }
+        let jangtq = suggested.first { $0.id == "OsaurusAI/Ling-2.6-flash-JANGTQ" }
+
+        #expect(mxfp4 != nil)
+        #expect(jangtq != nil)
+        #expect(mxfp4?.modelType == "bailing_hybrid")
+        #expect(jangtq?.modelType == "bailing_hybrid")
+        #expect(mxfp4?.releasedAt != nil)
+        #expect(jangtq?.releasedAt != nil)
+    }
+
+    @Test @MainActor func lfm25Entry_haveExpectedMetadata() {
+        let suggested = withIsolatedModelSizeCache { ModelManager().suggestedModels }
+        let mxfp8 = suggested.first { $0.id == "OsaurusAI/LFM2.5-8B-A1B-MXFP8" }
+
+        #expect(mxfp8 != nil)
+        #expect(mxfp8?.modelType == "lfm2_moe")
+        #expect(mxfp8?.isTopSuggestion == true)
+        // Sizes now come from `ModelSizeCache` (empty here), not literals.
+        #expect(mxfp8?.downloadSizeBytes == nil)
+        #expect(mxfp8?.releasedAt != nil)
+    }
+
+    // MARK: - OsaurusAI org auto-discovery merge
+
+    @Test @MainActor func applyMuwaOrgFetch_addsNewEntriesAfterCurated() {
+        let manager = withIsolatedModelSizeCache { ModelManager() }
+        let curatedCount = ModelManager.curatedSuggestedIds.count
+
+        let fresh = MLXModel(
+            id: "OsaurusAI/Brand-New-Repo-XYZ",
+            name: "Brand New Repo XYZ",
+            description: "From OsaurusAI on Hugging Face.",
+            downloadURL: "https://huggingface.co/OsaurusAI/Brand-New-Repo-XYZ",
+            releasedAt: Date()
+        )
+
+        manager.applyMuwaOrgFetch(autoFetched: [fresh])
+
+        let after = manager.suggestedModels
+        #expect(after.count == curatedCount + 1)
+        #expect(after.contains { $0.id == fresh.id })
+    }
+
+    @Test @MainActor func applyMuwaOrgFetch_curatedEntryWinsOnDuplicateId() {
+        let manager = withIsolatedModelSizeCache { ModelManager() }
+
+        // Try to clobber a curated entry with auto-fetched metadata.
+        let imposter = MLXModel(
+            id: "OsaurusAI/MiniMax-M2.7-JANGTQ4",
+            name: "Should Not Replace",
+            description: "from auto-fetch",
+            downloadURL: "https://huggingface.co/OsaurusAI/MiniMax-M2.7-JANGTQ4"
+        )
+
+        manager.applyMuwaOrgFetch(autoFetched: [imposter])
+
+        let curated = manager.suggestedModels.first { $0.id == "OsaurusAI/MiniMax-M2.7-JANGTQ4" }
+        #expect(curated != nil)
+        // Curated metadata should be intact.
+        #expect(curated?.modelType == "minimax_m2")
+        #expect(curated?.description.contains("MiniMax M2.7") == true)
+    }
+
+    @Test @MainActor func applyMuwaOrgFetch_dropsStaleAutoFetchedOnReapply() {
+        let stale = MLXModel(
+            id: "OsaurusAI/Stale-Repo",
+            name: "Stale Repo",
+            description: "From OsaurusAI on Hugging Face.",
+            downloadURL: "https://huggingface.co/OsaurusAI/Stale-Repo"
+        )
+        let kept = MLXModel(
+            id: "OsaurusAI/Kept-Repo",
+            name: "Kept Repo",
+            description: "From OsaurusAI on Hugging Face.",
+            downloadURL: "https://huggingface.co/OsaurusAI/Kept-Repo"
+        )
+
+        let after = withIsolatedModelSizeCache { () -> [MLXModel] in
+            let manager = ModelManager()
+            manager.applyMuwaOrgFetch(autoFetched: [stale])
+            manager.applyMuwaOrgFetch(autoFetched: [kept])
+            return manager.suggestedModels
+        }
+        #expect(after.contains { $0.id == kept.id })
+        #expect(!after.contains { $0.id == stale.id })
+    }
+
+    @Test @MainActor func applyMuwaOrgFetch_preservesNonMuwaInjectedEntries() {
+        let manager = withIsolatedModelSizeCache { ModelManager() }
+
+        let foreign = MLXModel(
+            id: "some-org/unrelated-model",
+            name: "Unrelated",
+            description: "manual",
+            downloadURL: "https://huggingface.co/some-org/unrelated-model"
+        )
+
+        manager.suggestedModels.append(foreign)
+        manager.applyMuwaOrgFetch(autoFetched: [])
+
+        let after = manager.suggestedModels
+        #expect(after.contains { $0.id == foreign.id })
+    }
+}
