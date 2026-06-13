@@ -97,7 +97,7 @@ public struct ToolsCreate {
 
             jobs:
               release:
-                uses: muwa-ai/muwa-tools/.github/workflows/build-plugin.yml@master
+                uses: dingxiang-me/muwa-tools/.github/workflows/build-plugin.yml@master
                 secrets: inherit
             """
         try? releaseYml.write(
@@ -2033,7 +2033,7 @@ public struct ToolsCreate {
 
             ### Registry Submission
 
-            1. Fork the [muwa-tools](https://github.com/muwa-ai/muwa-tools) repository
+            1. Fork the [muwa-tools](https://github.com/dingxiang-me/muwa-tools) repository
             2. Add `plugins/<your-plugin-id>.json` with metadata
             3. Submit a pull request
 

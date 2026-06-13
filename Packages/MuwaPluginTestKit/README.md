@@ -22,7 +22,7 @@ The kit ships:
 In your plugin's `Package.swift`:
 
 ```swift
-.package(url: "https://github.com/muwa-ai/muwa", from: "0.18.0"),
+.package(url: "https://github.com/dingxiang-me/Muwa", from: "0.18.0"),
 
 .testTarget(
     name: "MyPluginTests",

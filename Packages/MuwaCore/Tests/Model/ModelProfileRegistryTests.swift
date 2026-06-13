@@ -32,7 +32,7 @@ struct ModelProfileRegistryTests {
         // segfaults on the GitHub Actions `Apple Virtual Machine 1`
         // macOS 15.7.4 ARM64e runner (worked locally on dev Macs).
         // Reproducer:
-        // https://github.com/muwa-ai/muwa/actions/runs/24576426664/job/71862829833
+        // https://github.com/dingxiang-me/Muwa/actions/runs/24576426664/job/71862829833
         // Binding to `Bool` first makes the macro reflect on `Bool`, which
         // is safe.
         let hasProfile = profile != nil

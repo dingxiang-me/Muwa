@@ -34,7 +34,7 @@ struct RuntimePolicySourceTests {
     }
 
     private static func vmlxPinRevision(in source: String) throws -> String {
-        let location = try #require(source.range(of: "https://github.com/osaurus-ai/vmlx-swift"))
+        let location = try #require(source.range(of: "https://github.com/dingxiang-me/vmlx-swift"))
         let end = source.index(location.lowerBound, offsetBy: 800, limitedBy: source.endIndex) ?? source.endIndex
         let block = String(source[location.lowerBound ..< end])
         let regex = try NSRegularExpression(pattern: #""?revision"?\s*:\s*"([0-9a-f]{40})""#)
@@ -588,11 +588,11 @@ struct RuntimePolicySourceTests {
             manifestRevision == expectedRuntimeHardenedRevision,
             "Muwa must consume the pushed vmlx-swift runtime-hardening revision proven by the Qwen/Gemma/DSV4/Step matrix, Gemma4 proportional RoPE live rows, Gemma4 quoted tool-key parser coverage, Gemma4 file-backed required-tool template grounding, Nemotron Ultra JANGTQ streaming plus BF16/weighted-MoE fast-path guards plus native XML required-tool metadata, the Nemotron Ultra resident/mmap cache-proof harness, mmap graph-breakdown documentation, the Nemotron Ultra mamba_projection role alias, mmap quantized-matmul trace, README resident-vs-mmap speed-boundary guard, hybrid SSM rederive boundary clarification, exact-boundary hybrid SSM snapshot rederive avoidance, Ultra no-load speed-gate boundary, Nemotron-H JANGTQ mmap auto-BF16 load proof, Muwa MLXPress cold-tier opt-in policy, streamed DSV4 request-tool prefix buffering, Gemma4 native tool-call parser regression pin, hybrid SSM companion rederive boundary pin, Nemotron-H Mamba cache-offset and dtype parity, the stacked Nemotron JANGTQ scored down-projection kernel kept opt-in after live Ultra rows showed it regresses the default decode path, default-off Nemotron Mamba subprofile diagnostics, the Nemotron Omni activation BF16 default-off fix, LFM2 exact required-tool text grounding for preserving-newlines prompts, schema-checked LFM bracket-array tool parsing, LFM2.5 MXFP8 required-tool warm disk-restore bypass, LFM2 Pythonic parser schema validation, LFM2 OpenAI tool_call JSON envelope parsing, LFM2 required-tool prompt preface ordering, DSV4 required-tool reminder placement before the current tail user turn, the Gemma4 audio/media/cache Swift Testing crash fix, and the Gemma4 required-tool template ordering fix that preserves multiline user arguments; an internally-consistent older pin is still not wired"
         )
-        #expect(manifest.contains("https://github.com/osaurus-ai/vmlx-swift"))
-        #expect(!manifest.contains("https://github.com/osaurus-ai/vmlx-swift-lm"))
-        #expect(!manifest.contains("https://github.com/osaurus-ai/mlx-swift"))
-        #expect(!manifest.contains("https://github.com/osaurus-ai/swift-transformers"))
-        #expect(!manifest.contains("https://github.com/osaurus-ai/Jinja.git"))
+        #expect(manifest.contains("https://github.com/dingxiang-me/vmlx-swift"))
+        #expect(!manifest.contains("https://github.com/dingxiang-me/vmlx-swift-lm"))
+        #expect(!manifest.contains("https://github.com/dingxiang-me/mlx-swift"))
+        #expect(!manifest.contains("https://github.com/dingxiang-me/swift-transformers"))
+        #expect(!manifest.contains("https://github.com/dingxiang-me/Jinja.git"))
         #expect(manifest.contains(".product(name: \"MLX\", package: \"vmlx-swift\")"))
         #expect(manifest.contains(".product(name: \"MLXLLM\", package: \"vmlx-swift\")"))
         #expect(manifest.contains(".product(name: \"MLXVLM\", package: \"vmlx-swift\")"))
@@ -746,10 +746,10 @@ struct RuntimePolicySourceTests {
         for mirrors in [workspaceMirrors, appProjectMirrors] {
             #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-transformers\""))
             #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-transformers.git\""))
-            #expect(mirrors.contains("\"mirror\" : \"https://github.com/osaurus-ai/swift-transformers\""))
+            #expect(mirrors.contains("\"mirror\" : \"https://github.com/dingxiang-me/swift-transformers\""))
             #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-jinja\""))
             #expect(mirrors.contains("\"original\" : \"https://github.com/huggingface/swift-jinja.git\""))
-            #expect(mirrors.contains("\"mirror\" : \"https://github.com/osaurus-ai/Jinja.git\""))
+            #expect(mirrors.contains("\"mirror\" : \"https://github.com/dingxiang-me/Jinja.git\""))
             #expect(!mirrors.contains("vmlx-swift"))
             #expect(!mirrors.contains("/Users/eric/vmlx-swift"))
         }

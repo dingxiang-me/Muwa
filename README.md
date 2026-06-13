@@ -10,10 +10,10 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/muwa-ai/muwa/releases/latest"><img src="https://img.shields.io/github/v/release/muwa-ai/muwa?sort=semver" alt="Release"></a>
-  <a href="https://github.com/muwa-ai/muwa/releases"><img src="https://img.shields.io/github/downloads/muwa-ai/muwa/total" alt="Downloads"></a>
-  <a href="https://github.com/muwa-ai/muwa/blob/main/LICENSE"><img src="https://img.shields.io/github/license/muwa-ai/muwa" alt="License"></a>
-  <a href="https://github.com/muwa-ai/muwa/stargazers"><img src="https://img.shields.io/github/stars/muwa-ai/muwa?style=social" alt="Stars"></a>
+  <a href="https://github.com/dingxiang-me/Muwa/releases/latest"><img src="https://img.shields.io/github/v/release/dingxiang-me/Muwa?sort=semver" alt="Release"></a>
+  <a href="https://github.com/dingxiang-me/Muwa/releases"><img src="https://img.shields.io/github/downloads/dingxiang-me/Muwa/total" alt="Downloads"></a>
+  <a href="https://github.com/dingxiang-me/Muwa/blob/main/LICENSE"><img src="https://img.shields.io/github/license/dingxiang-me/Muwa" alt="License"></a>
+  <a href="https://github.com/dingxiang-me/Muwa/stargazers"><img src="https://img.shields.io/github/stars/dingxiang-me/Muwa?style=social" alt="Stars"></a>
 </p>
 
 <p align="center">
@@ -28,12 +28,12 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/muwa-ai/muwa/releases/latest/download/Muwa.dmg">Download for Mac</a> ·
+  <a href="https://github.com/dingxiang-me/Muwa/releases/latest/download/Muwa.dmg">Download for Mac</a> ·
   <a href="https://docs.muwa.ai">Docs</a> ·
   <a href="https://huggingface.co/MuwaAI">Models</a> ·
   <a href="https://discord.gg/muwa">Discord</a> ·
   <a href="https://x.com/MuwaAI">Twitter</a> ·
-  <a href="https://github.com/muwa-ai/muwa-tools">Plugin Registry</a>
+  <a href="https://github.com/dingxiang-me/muwa-tools">Plugin Registry</a>
 </p>
 
 ---
@@ -54,7 +54,7 @@ Native Swift on Apple Silicon. No Electron. No compromises. MIT licensed.
 brew install --cask muwa
 ```
 
-Or download the latest `.dmg` from [Releases](https://github.com/muwa-ai/muwa/releases/latest). After installing, launch from Spotlight (`⌘ Space` → "Muwa") or the CLI:
+Or download the latest `.dmg` from [Releases](https://github.com/dingxiang-me/Muwa/releases/latest). After installing, launch from Spotlight (`⌘ Space` → "Muwa") or the CLI:
 
 ```bash
 muwa-cli ui       # Open the chat UI
@@ -259,7 +259,7 @@ Most features are accessible through the Management window (`⌘ ⇧ M`).
 ## Build from Source
 
 ```bash
-git clone https://github.com/muwa-ai/muwa.git
+git clone https://github.com/dingxiang-me/Muwa.git
 cd muwa
 open Muwa.xcworkspace
 ```
@@ -309,7 +309,7 @@ See [CONTRIBUTING.md](docs/CONTRIBUTING.md) for the architecture guide and layer
 
 Muwa is actively developed and we welcome contributions: bug fixes, new plugins, documentation, UI/UX improvements, and testing.
 
-Check out [Good First Issues](https://github.com/muwa-ai/muwa/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), read the [Contributing Guide](CONTRIBUTING.md), or join [Discord](https://discord.gg/muwa). See [docs/FEATURES.md](docs/FEATURES.md) for the full feature inventory.
+Check out [Good First Issues](https://github.com/dingxiang-me/Muwa/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22), read the [Contributing Guide](CONTRIBUTING.md), or join [Discord](https://discord.gg/muwa). See [docs/FEATURES.md](docs/FEATURES.md) for the full feature inventory.
 
 > [!NOTE]
 > **🌐 Help translate Muwa.** We're looking for contributors to localize the app into **Spanish**, **Korean**, **Japanese**, and **Traditional Chinese** -- these locales are already wired up in Xcode, so you can start translating right away. See [docs/TRANSLATORS.md](docs/TRANSLATORS.md) for how to contribute and the contributor leaderboard.
@@ -322,7 +322,7 @@ Check out [Good First Issues](https://github.com/muwa-ai/muwa/issues?q=is%3Aissu
 - [Community Calls](https://lu.ma/muwa) -- bi-weekly, open to everyone
 - [Blog](https://muwa.ai/blog) -- long-form thinking on personal AI
 - [Docs](https://docs.muwa.ai) -- guides and tutorials
-- [Plugin Registry](https://github.com/muwa-ai/muwa-tools) -- browse and contribute tools
+- [Plugin Registry](https://github.com/dingxiang-me/muwa-tools) -- browse and contribute tools
 
 ## License
 

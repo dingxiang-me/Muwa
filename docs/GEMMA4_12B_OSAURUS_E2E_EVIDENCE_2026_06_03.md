@@ -5,7 +5,7 @@ Muwa PR branch `codex/gemma4-12b-vmlx-pin`.
 
 ## Source Boundary
 
-- Muwa pins `muwa-ai/vmlx-swift` at
+- Muwa pins `dingxiang-me/vmlx-swift` at
   `43e0e82d515eb3de480fcb18bc0a6f2430d18389`.
 - The vMLX change is a Gemma4 required-tool prompt-contract hardening:
   the latest required-tool user turn no longer exposes raw multiline user

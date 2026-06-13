@@ -5,7 +5,7 @@
 //  Pure transport for the themes.muwa.ai sharing API. Handles nonce
 //  challenges, signed POST uploads, and public GETs for theme JSON.
 //
-//  See muwa-ai/muwa-themes for the reference server.
+//  See dingxiang-me/Muwa-themes for the reference server.
 //
 
 import Foundation

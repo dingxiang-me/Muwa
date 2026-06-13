@@ -1,6 +1,6 @@
 # Open PR and Bug Development Plan
 
-Snapshot update: 2026-05-16 07:33 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-16 07:33 UTC, repo `dingxiang-me/Muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -298,7 +298,7 @@ Acceptance gates for the foundation PR:
 | #232 | enhancement, good first issue | HTTP/Socks5 proxy support for downloading models and accessing online providers |
 | #22 | enhancement | Benchmarks for current models, more sizes |
 
-Snapshot update: 2026-05-15 08:02 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-15 08:02 UTC, repo `dingxiang-me/Muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -362,7 +362,7 @@ Reasons:
    boundaries: Lane F (#1091/#232) first, then Lane B (#823/#789/#995), then
    Lane C (#615/#828/#1059).
 
-Snapshot update: 2026-05-15 04:05 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-15 04:05 UTC, repo `dingxiang-me/Muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -409,7 +409,7 @@ Reasons:
    history only; do not rebase or push it unless the newer lane proves
    insufficient.
 
-Snapshot update: 2026-05-15 00:50 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-15 00:50 UTC, repo `dingxiang-me/Muwa`.
 
 This section is the current consolidated automation plan. It supersedes every
 older dated section below; keep the older sections only as history.
@@ -589,7 +589,7 @@ Every unsupervised tick should:
 
 ---
 
-Snapshot update: 2026-05-14 19:05 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-14 19:05 UTC, repo `dingxiang-me/Muwa`.
 
 This update supersedes the 16:30 UTC section below. Live GitHub state is
 authoritative; the older sections remain as history for why the queue moved.
@@ -730,7 +730,7 @@ Each heartbeat should now:
 
 ---
 
-Snapshot update: 2026-05-14 16:30 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-14 16:30 UTC, repo `dingxiang-me/Muwa`.
 
 This update supersedes the 2026-05-13 queue state below while preserving it as
 history. Live GitHub state is authoritative; older notes are useful only for
@@ -757,7 +757,7 @@ Posted one maintainer nudge, and only one:
 - #1086: posted `@tpae` review/merge nudge because the PR is non-draft,
   `CLEAN`, fixes fresh bug #1085, and local plus remote gates passed on the
   exact same head SHA `df183c2b785960050e729d0e991fc2952599a147`.
-  Comment: https://github.com/muwa-ai/muwa/pull/1086#issuecomment-4452597924
+  Comment: https://github.com/dingxiang-me/Muwa/pull/1086#issuecomment-4452597924
 
 Do not post another #1048 nudge now. #1048 was already nudged on
 2026-05-10 and is currently `DIRTY` with broad non-mechanical conflicts.
@@ -874,7 +874,7 @@ Each heartbeat should now:
 
 ---
 
-Snapshot update: 2026-05-13 19:36 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-13 19:36 UTC, repo `dingxiang-me/Muwa`.
 
 This update supersedes the 13:24 UTC queue state below. It is based on all 31
 currently open PRs, current PR bodies/comments/reviews, check rollups, and the
@@ -900,7 +900,7 @@ latest heartbeat evidence from `/tmp/muwa-coord`.
 The only live `@tpae` nudge required right now is #1064, because it is approved,
 directly addresses the current local-main build blocker, and remains `BEHIND`
 with red `test-core`. A focused comment was posted:
-`https://github.com/muwa-ai/muwa/pull/1064#issuecomment-4444593151`.
+`https://github.com/dingxiang-me/Muwa/pull/1064#issuecomment-4444593151`.
 
 Do not post a fresh #1048 nudge yet. #1048 is still the A0 parent, but asking
 for it to merge before the Signal API fix lands would keep downstream work
@@ -984,7 +984,7 @@ the shared main release build is red. Each tick should now:
 7. Never merge, close, delete branches, mark ready, or mutate PR bodies without
    exact local and remote gates.
 
-Snapshot update: 2026-05-13 13:24 UTC, repo `muwa-ai/muwa`.
+Snapshot update: 2026-05-13 13:24 UTC, repo `dingxiang-me/Muwa`.
 
 This update supersedes the queue state below while preserving the older
 2026-05-07 snapshot for historical context.
@@ -1068,7 +1068,7 @@ This update supersedes the queue state below while preserving the older
 
 ---
 
-Snapshot: 2026-05-07 01:45 UTC, repo `muwa-ai/muwa`.
+Snapshot: 2026-05-07 01:45 UTC, repo `dingxiang-me/Muwa`.
 
 This is a triage and execution plan for Claude to expand and revise. It is based on GitHub open PRs, open issues labeled `bug`, PR check status, issue comments, and the local checkout state. The local checkout was on `main`, behind `origin/main` by 17 commits when this was written.
 
@@ -1347,7 +1347,7 @@ For each PR Claude touches:
 3. Rebase onto `origin/main` unless the PR is intentionally stacked on another open PR.
 4. Resolve conflicts by preserving the narrower PR scope and dropping duplicated stale commits already merged through newer PRs.
 5. Run the smallest relevant local tests first, then the package-level checks used by the PR body.
-6. Push and recheck `gh pr checks <number> -R muwa-ai/muwa`.
+6. Push and recheck `gh pr checks <number> -R dingxiang-me/Muwa`.
 7. Update the PR body with current validation and dependency notes.
 8. Comment on linked issues with the PR number, expected release/build, and exact verification prompt or API request.
 9. Close only after the fix is merged, released if necessary, and the issue is not still reporting a separate failure mode.

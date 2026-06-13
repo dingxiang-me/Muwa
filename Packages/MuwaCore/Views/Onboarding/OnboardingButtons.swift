@@ -150,7 +150,7 @@ struct OnboardingStatefulButton: View {
                             .offset(x: state == .idle && isHovered ? 2 : 0)
                     }
 
-                    Text(currentTitle)
+                    Text(currentTitle, bundle: .module)
                         .font(theme.font(size: 15, weight: .semibold))
                 }
                 .foregroundColor(labelColor)

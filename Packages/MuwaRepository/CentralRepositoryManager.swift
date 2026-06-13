@@ -22,7 +22,7 @@ public final class CentralRepositoryManager: @unchecked Sendable {
     private init() {}
 
     public var central: CentralRepository = .init(
-        url: "https://github.com/muwa-ai/muwa-tools.git",
+        url: "https://github.com/dingxiang-me/muwa-tools.git",
         branch: nil
     )
 
@@ -122,25 +122,29 @@ public final class CentralRepositoryManager: @unchecked Sendable {
     /// has historically been `master` but could be either, and there's no cheap
     /// unauthenticated way to ask GitHub for it
     private func archiveZipURLs() throws -> [URL] {
-        guard let comps = URLComponents(string: central.url),
+        try archiveZipURLs(for: central)
+    }
+
+    private func archiveZipURLs(for repository: CentralRepository) throws -> [URL] {
+        guard let comps = URLComponents(string: repository.url),
             let host = comps.host?.lowercased(),
             host == "github.com" || host.hasSuffix(".github.com")
-        else { throw RefreshError.unsupportedURL(central.url) }
+        else { throw RefreshError.unsupportedURL(repository.url) }
 
         var path = comps.path
         if path.hasSuffix(".git") { path = String(path.dropLast(4)) }
         let segments = path.split(separator: "/", omittingEmptySubsequences: true)
-        guard segments.count >= 2 else { throw RefreshError.unsupportedURL(central.url) }
+        guard segments.count >= 2 else { throw RefreshError.unsupportedURL(repository.url) }
 
         let owner = String(segments[0])
         let repo = String(segments[1])
-        let branches: [String] = central.branch.map { [$0] } ?? ["main", "master"]
+        let branches: [String] = repository.branch.map { [$0] } ?? ["main", "master"]
 
         let urls: [URL] = branches.compactMap { branch in
             let encoded = branch.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? branch
             return URL(string: "https://github.com/\(owner)/\(repo)/archive/refs/heads/\(encoded).zip")
         }
-        guard !urls.isEmpty else { throw RefreshError.unsupportedURL(central.url) }
+        guard !urls.isEmpty else { throw RefreshError.unsupportedURL(repository.url) }
         return urls
     }
 

@@ -33,11 +33,11 @@
         ///   ripgrep, sqlite, build-base. Stdio MCP servers shipped as
         ///   `uvx <server>` or `npx -y <server>` work out of the box.
         ///
-        /// To rotate: `crane digest ghcr.io/osaurus-ai/sandbox:latest`
-        /// or `docker buildx imagetools inspect ghcr.io/osaurus-ai/sandbox:latest`
+        /// To rotate: `crane digest ghcr.io/dingxiang-me/sandbox:latest`
+        /// or `docker buildx imagetools inspect ghcr.io/dingxiang-me/sandbox:latest`
         /// and paste the multi-arch index digest here.
         private static let containerImage =
-            "ghcr.io/osaurus-ai/sandbox@sha256:f4216228d7f2d26b1a0e2a99501f6812f1298ee06a0477c508b3e75db74b8a2f"
+            "ghcr.io/dingxiang-me/sandbox@sha256:f4216228d7f2d26b1a0e2a99501f6812f1298ee06a0477c508b3e75db74b8a2f"
 
         /// Expected SHA-256 of the Kata kernel tarball. Verified after
         /// download, mismatch is fail-closed (the file is deleted and
@@ -57,7 +57,7 @@
         /// attacker-chosen guest filesystem. Update this constant when the
         /// blob is intentionally rotated.
         private static let initfsDownloadURLs: [DownloadSource] = [
-            // "https://github.com/muwa-ai/muwa/releases/latest/download/init.ext4"
+            // "https://github.com/dingxiang-me/Muwa/releases/latest/download/init.ext4"
             DownloadSource(
                 url: "https://pub-5f3c2bf70e93411790bbcd6419d2f8fa.r2.dev/init.ext4",
                 expectedSHA256: "fa08b6993e3682d88bfb964e02bdf4ca234df616bac047f24cec6a4548a42aea"

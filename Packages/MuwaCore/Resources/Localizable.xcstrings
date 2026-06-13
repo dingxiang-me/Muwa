@@ -15518,6 +15518,29 @@
         }
       }
     },
+    "Download & Install": {
+      "comment": "Primary CTA for downloading and installing a local model during onboarding.",
+      "localizations": {
+        "de": {
+          "stringUnit": {
+            "state": "needs_review",
+            "value": "Herunterladen und installieren"
+          }
+        },
+        "en": {
+          "stringUnit": {
+            "state": "new",
+            "value": "Download & Install"
+          }
+        },
+        "zh-Hans": {
+          "stringUnit": {
+            "state": "translated",
+            "value": "下载并安装"
+          }
+        }
+      }
+    },
     "Download a model": {
       "localizations": {
         "de": {

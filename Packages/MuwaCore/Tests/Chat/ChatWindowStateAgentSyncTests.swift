@@ -3,7 +3,7 @@
 //  MuwaTests
 //
 //  Pin the contract introduced to fix
-//  https://github.com/muwa-ai/muwa/issues/1004 - namely that a
+//  https://github.com/dingxiang-me/Muwa/issues/1004 - namely that a
 //  `ChatWindowState`'s `agents` snapshot, `cachedActiveAgent`,
 //  `cachedAgentDisplayName`, and `cachedSystemPrompt` reflect mutations
 //  to `AgentManager.shared.agents` (and `ChatConfiguration` for the
@@ -264,7 +264,7 @@ struct ChatWindowStateAgentSyncTests {
 
     // MARK: - 6. Issue #1005 end-to-end repro
 
-    /// End-to-end pin for https://github.com/muwa-ai/muwa/issues/1005.
+    /// End-to-end pin for https://github.com/dingxiang-me/Muwa/issues/1005.
     ///
     /// Reproduces the user's exact sequence:
     ///   1. Window opens on Default agent.

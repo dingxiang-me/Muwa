@@ -35,7 +35,7 @@ import sys
 from datetime import datetime, timezone
 from pathlib import Path
 
-REPO = "osaurus-ai/osaurus"
+REPO = "dingxiang-me/Muwa"
 
 CATALOG_BASENAMES = ("Localizable.xcstrings", "InfoPlist.xcstrings")
 

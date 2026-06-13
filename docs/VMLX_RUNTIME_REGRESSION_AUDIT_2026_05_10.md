@@ -234,7 +234,7 @@ xcodebuild test \
 Full PR gate:
 
 ```sh
-gh pr checks 1057 --repo muwa-ai/muwa
+gh pr checks 1057 --repo dingxiang-me/Muwa
 ```
 
 ## Non-Goals For This PR

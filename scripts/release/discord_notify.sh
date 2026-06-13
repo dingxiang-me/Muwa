@@ -24,8 +24,8 @@ jq -n \
   --arg content  "🚀 **New Muwa Release!**" \
   --arg version  "${VERSION}" \
   --arg desc     "$TRUNCATED" \
-  --arg download "[Download Muwa.dmg](https://github.com/muwa-ai/muwa/releases/latest/download/Muwa.dmg)" \
-  --arg page     "[View on GitHub](https://github.com/muwa-ai/muwa/releases/tag/${VERSION})" \
+  --arg download "[Download Muwa.dmg](https://github.com/dingxiang-me/Muwa/releases/latest/download/Muwa.dmg)" \
+  --arg page     "[View on GitHub](https://github.com/dingxiang-me/Muwa/releases/tag/${VERSION})" \
   '{
     content: $content,
     embeds: [

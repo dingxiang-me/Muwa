@@ -32,10 +32,27 @@ import SwiftUI
 /// so the picker reads visually distinct.
 struct OnboardingPluginPick {
     let pluginId: String
+    let legacyPluginIds: [String]
     let displayName: String
     let blurb: String
     let icon: String
     let isDefaultOn: Bool
+
+    init(
+        pluginId: String,
+        legacyPluginIds: [String] = [],
+        displayName: String,
+        blurb: String,
+        icon: String,
+        isDefaultOn: Bool
+    ) {
+        self.pluginId = pluginId
+        self.legacyPluginIds = legacyPluginIds
+        self.displayName = displayName
+        self.blurb = blurb
+        self.icon = icon
+        self.isDefaultOn = isDefaultOn
+    }
 }
 
 // MARK: - State
@@ -57,6 +74,7 @@ final class ChoosePluginsState: ObservableObject {
     static let curated: [OnboardingPluginPick] = [
         OnboardingPluginPick(
             pluginId: "muwa.browser",
+            legacyPluginIds: ["osaurus.browser"],
             displayName: "Browser",
             blurb: "Open pages and pull text from the web.",
             icon: "safari.fill",
@@ -64,6 +82,7 @@ final class ChoosePluginsState: ObservableObject {
         ),
         OnboardingPluginPick(
             pluginId: "muwa.macos-use",
+            legacyPluginIds: ["osaurus.macos-use"],
             displayName: "macOS Use",
             blurb: "Control Mac apps by clicking and typing.",
             icon: "macwindow",
@@ -71,6 +90,7 @@ final class ChoosePluginsState: ObservableObject {
         ),
         OnboardingPluginPick(
             pluginId: "muwa.files",
+            legacyPluginIds: ["osaurus.files"],
             displayName: "Files",
             blurb: "Read and write files in your projects.",
             icon: "folder.fill",
@@ -78,6 +98,7 @@ final class ChoosePluginsState: ObservableObject {
         ),
         OnboardingPluginPick(
             pluginId: "muwa.shell",
+            legacyPluginIds: ["osaurus.shell"],
             displayName: "Shell",
             blurb: "Run terminal commands inside the safety net.",
             icon: "terminal.fill",
@@ -85,6 +106,7 @@ final class ChoosePluginsState: ObservableObject {
         ),
         OnboardingPluginPick(
             pluginId: "muwa.calendar",
+            legacyPluginIds: ["osaurus.calendar"],
             displayName: "Calendar",
             blurb: "See and create events on your Mac.",
             icon: "calendar",
@@ -92,6 +114,7 @@ final class ChoosePluginsState: ObservableObject {
         ),
         OnboardingPluginPick(
             pluginId: "muwa.reminders",
+            legacyPluginIds: ["osaurus.reminders"],
             displayName: "Reminders",
             blurb: "Make and check off your Reminders.",
             icon: "checklist",
@@ -99,6 +122,7 @@ final class ChoosePluginsState: ObservableObject {
         ),
         OnboardingPluginPick(
             pluginId: "muwa.messages",
+            legacyPluginIds: ["osaurus.messages"],
             displayName: "Messages",
             blurb: "Send iMessages from your Mac.",
             icon: "message.fill",
@@ -111,7 +135,8 @@ final class ChoosePluginsState: ObservableObject {
     var visiblePicks: [VisiblePick] {
         let live = PluginRepositoryService.shared.plugins
         return Self.curated.compactMap { pick in
-            guard let state = live.first(where: { $0.pluginId == pick.pluginId }) else {
+            let candidateIds = [pick.pluginId] + pick.legacyPluginIds
+            guard let state = live.first(where: { candidateIds.contains($0.pluginId) }) else {
                 return nil
             }
             return VisiblePick(pick: pick, state: state)
@@ -121,7 +146,7 @@ final class ChoosePluginsState: ObservableObject {
     struct VisiblePick: Identifiable {
         let pick: OnboardingPluginPick
         let state: PluginState
-        var id: String { pick.pluginId }
+        var id: String { state.pluginId }
     }
 
     /// Refreshes the catalog if it hasn't been loaded yet and seeds the
@@ -249,7 +274,7 @@ struct ChoosePluginsBody: View {
     }
 
     private func pluginRow(_ entry: ChoosePluginsState.VisiblePick) -> some View {
-        let pluginId = entry.pick.pluginId
+        let pluginId = entry.id
         let installed = entry.state.isInstalled
         let installing = entry.state.isInstalling
         let selected = state.isSelected(pluginId)

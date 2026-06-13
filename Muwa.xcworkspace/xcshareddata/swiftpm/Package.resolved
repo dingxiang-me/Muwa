@@ -426,7 +426,7 @@
     {
       "identity" : "vmlx-swift",
       "kind" : "remoteSourceControl",
-      "location" : "https://github.com/osaurus-ai/vmlx-swift",
+      "location" : "https://github.com/dingxiang-me/vmlx-swift",
       "state" : {
         "revision" : "76047f3b4492d4fae316267a30fba55163b1c5cd"
       }

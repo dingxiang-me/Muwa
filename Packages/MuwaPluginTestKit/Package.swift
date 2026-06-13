@@ -12,7 +12,7 @@ import PackageDescription
 // Authors add this as a test-target dependency in their plugin's own
 // `Package.swift`:
 //
-//     .package(url: "https://github.com/muwa-ai/muwa", from: "0.18.0"),
+//     .package(url: "https://github.com/dingxiang-me/Muwa", from: "0.18.0"),
 //
 //     .testTarget(
 //         name: "MyPluginTests",

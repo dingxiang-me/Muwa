@@ -8,7 +8,7 @@
 //  Muwa-local rewires:
 //    • `import Tokenizers` → `import VMLXTokenizers` (the
 //      vendored swift-transformers Tokenizers module shipped
-//      by muwa-ai/vmlx-swift). Avoids dragging a second
+//      by dingxiang-me/vmlx-swift). Avoids dragging a second
 //      copy of huggingface/swift-transformers into the graph
 //      next to vmlx-swift's vendored fork. The public Tokenizer
 //      protocol surface is identical.

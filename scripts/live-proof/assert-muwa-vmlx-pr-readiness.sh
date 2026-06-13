@@ -98,10 +98,10 @@ else
 fi
 
 echo "--- vMLX pin surfaces ---"
-require_text "$PKG" 'url: "https://github.com/osaurus-ai/vmlx-swift"' \
-  "Package.swift uses osaurus-ai/vmlx-swift"
+require_text "$PKG" 'url: "https://github.com/dingxiang-me/vmlx-swift"' \
+  "Package.swift uses dingxiang-me/vmlx-swift"
 
-pkg_pin="$(perl -0ne 'if (/osaurus-ai\/vmlx-swift[\s\S]{0,500}?revision:\s*"([0-9a-f]{40})"/) { print $1 }' "$PKG" || true)"
+pkg_pin="$(perl -0ne 'if (/dingxiang-me\/vmlx-swift[\s\S]{0,500}?revision:\s*"([0-9a-f]{40})"/) { print $1 }' "$PKG" || true)"
 core_pin="$(pin_from_file "$CORE_RESOLVED")"
 workspace_pin="$(pin_from_file "$WORKSPACE_RESOLVED")"
 app_pin="$(pin_from_file "$APP_RESOLVED")"

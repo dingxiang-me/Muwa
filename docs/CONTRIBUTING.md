@@ -267,6 +267,6 @@ This project follows the Contributor Covenant. By participating, you agree to up
 ## Join the community
 
 - **[Discord](https://discord.gg/muwa)** — Chat with contributors and maintainers
-- **[Good First Issues](https://github.com/muwa-ai/muwa/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — Great starting points
+- **[Good First Issues](https://github.com/dingxiang-me/Muwa/issues?q=is%3Aissue+is%3Aopen+label%3A%22good+first+issue%22)** — Great starting points
 
 Thank you for helping make Muwa better!

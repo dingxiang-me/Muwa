@@ -6,7 +6,7 @@ Pinned commit: `2bb396cce542155e1923fff1e08520348f1af1c5`
 We vendor instead of adding a SwiftPM dependency because upstream pulls
 `ml-explore/mlx-swift` and `huggingface/swift-transformers` directly,
 while MuwaCore already brings both surfaces in through
-`muwa-ai/vmlx-swift` (which vendors the same fork). Two copies in the
+`dingxiang-me/vmlx-swift` (which vendors the same fork). Two copies in the
 same Swift graph would conflict on the `Tokenizers` module name and on
 MLX target wiring. Vendoring also lets us pin to a specific commit
 without waiting on upstream tagging.

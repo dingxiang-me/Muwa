@@ -10,7 +10,7 @@
             <sparkle:shortVersionString>0.19.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.18/Muwa-0.19.18.dmg" length="52397730" type="application/octet-stream" sparkle:edSignature="+r5PqOh4HIhy2pwo61IPwgeDkWQ+42U0kp2kozzk35L49lt5Zv3yWArwHAl30aOg8iFjthkSxrz2b+Ux8adHCg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.18/Muwa-0.19.18.dmg" length="52397730" type="application/octet-stream" sparkle:edSignature="+r5PqOh4HIhy2pwo61IPwgeDkWQ+42U0kp2kozzk35L49lt5Zv3yWArwHAl30aOg8iFjthkSxrz2b+Ux8adHCg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -35,7 +35,7 @@
 
 - added frontier evals and improved harness stability (#1464) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.17...0.19.18
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.17...0.19.18
 ]]></description>
         </item>
         <item>
@@ -46,7 +46,7 @@
             <sparkle:shortVersionString>0.19.17</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.17/Muwa-0.19.17.dmg" length="52283033" type="application/octet-stream" sparkle:edSignature="9Xn9DdsHacTLEWxtF7w2RO+9SmtY5Z3wUTOcX0d7S6k5bt4oBq3g/gBFfb/yqfC2xweh6V//+XP/VKoQAVh5Cg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.17/Muwa-0.19.17.dmg" length="52283033" type="application/octet-stream" sparkle:edSignature="9Xn9DdsHacTLEWxtF7w2RO+9SmtY5Z3wUTOcX0d7S6k5bt4oBq3g/gBFfb/yqfC2xweh6V//+XP/VKoQAVh5Cg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -73,7 +73,7 @@
 - harness hardening with tools and evals (#1438) by @tpae
 - harness improvements (#1433) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.16...0.19.17
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.16...0.19.17
 ]]></description>
         </item>
         <item>
@@ -84,7 +84,7 @@
             <sparkle:shortVersionString>0.19.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.16/Muwa-0.19.16.dmg" length="52019803" type="application/octet-stream" sparkle:edSignature="FEzin7oJgzZ2r/6U+7w8Eq8cmOP0R0pQiIBe2TESdgvWiYiSTA3gkGwonC2Z70Lvl2+vpg3H6TQTAQTz92SoDg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.16/Muwa-0.19.16.dmg" length="52019803" type="application/octet-stream" sparkle:edSignature="FEzin7oJgzZ2r/6U+7w8Eq8cmOP0R0pQiIBe2TESdgvWiYiSTA3gkGwonC2Z70Lvl2+vpg3H6TQTAQTz92SoDg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -108,7 +108,7 @@
 - improved external model management (reveal in Finder, prune deleted) (#1420) by @RaajeevChandran
 - doc updates (#1419) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.15...0.19.16
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.15...0.19.16
 ]]></description>
         </item>
         <item>
@@ -119,7 +119,7 @@
             <sparkle:shortVersionString>0.19.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.15/Muwa-0.19.15.dmg" length="51961044" type="application/octet-stream" sparkle:edSignature="ZQGH+gIzO+9xCbCJdOjhYxXejH+capVUrvk8K54O4kthdCNr670EJtX7Tu5/tdx9oeRWPpOpd5njj2yWS2M4CA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.15/Muwa-0.19.15.dmg" length="51961044" type="application/octet-stream" sparkle:edSignature="ZQGH+gIzO+9xCbCJdOjhYxXejH+capVUrvk8K54O4kthdCNr670EJtX7Tu5/tdx9oeRWPpOpd5njj2yWS2M4CA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -139,7 +139,7 @@
 
 - minor changes to onboarding welcome screen (#1416) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.14...0.19.15
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.14...0.19.15
 ]]></description>
         </item>
         <item>
@@ -150,7 +150,7 @@
             <sparkle:shortVersionString>0.19.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.14/Muwa-0.19.14.dmg" length="51839146" type="application/octet-stream" sparkle:edSignature="LK9u5Jt15hsfUJmAZ3xmnBzbJpTrGiGUHz+PRf+EdNFzcllkDGirzMlalI6MjSdQ+db7fqJOthqbgSSsXsLNBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.14/Muwa-0.19.14.dmg" length="51839146" type="application/octet-stream" sparkle:edSignature="LK9u5Jt15hsfUJmAZ3xmnBzbJpTrGiGUHz+PRf+EdNFzcllkDGirzMlalI6MjSdQ+db7fqJOthqbgSSsXsLNBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -179,7 +179,7 @@
 - fixed bug with capabilities selection not persisting (#1407) by @tpae
 - Capabilities refactor - remove preflight tool selection (#1406) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.13...0.19.14
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.13...0.19.14
 ]]></description>
         </item>
         <item>
@@ -190,7 +190,7 @@
             <sparkle:shortVersionString>0.19.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.13/Muwa-0.19.13.dmg" length="51692444" type="application/octet-stream" sparkle:edSignature="F9LPrT0FRh+iueaXb4VawcH04cXcuVjMcTaclfg8+V3loObTDNu/VG2/Lw/+L2uyGrupDzUVm4Iwfeq5b25qBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.13/Muwa-0.19.13.dmg" length="51692444" type="application/octet-stream" sparkle:edSignature="F9LPrT0FRh+iueaXb4VawcH04cXcuVjMcTaclfg8+V3loObTDNu/VG2/Lw/+L2uyGrupDzUVm4Iwfeq5b25qBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -230,7 +230,7 @@
 - updated remote provider cards for improved UX (#1389) by @tpae
 - fixed hangs (#1374) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.11...0.19.12
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.11...0.19.12
 ]]></description>
         </item>
         <item>
@@ -241,7 +241,7 @@
             <sparkle:shortVersionString>0.19.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.11/Muwa-0.19.11.dmg" length="51621054" type="application/octet-stream" sparkle:edSignature="yrujLdGL7EYA2FHrIJEv2iaxEfrhpcgQj05SxW+OfsDiWxfH30Y57OwHjoj6Fm6TzODIzHpNglR5Gntj5vL0Bg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.11/Muwa-0.19.11.dmg" length="51621054" type="application/octet-stream" sparkle:edSignature="yrujLdGL7EYA2FHrIJEv2iaxEfrhpcgQj05SxW+OfsDiWxfH30Y57OwHjoj6Fm6TzODIzHpNglR5Gntj5vL0Bg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -257,7 +257,7 @@
 - fixed fatal crashes \& freezes (#1359) by @RaajeevChandran
 - updated models details view, discover models from hugging face and LM studio (#1355) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.10...0.19.11
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.10...0.19.11
 ]]></description>
         </item>
         <item>
@@ -268,7 +268,7 @@
             <sparkle:shortVersionString>0.19.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.10/Muwa-0.19.10.dmg" length="51571282" type="application/octet-stream" sparkle:edSignature="VHy5OMEkCzjW9zs36M9jgvBQVLNnxXmz7sLQWiXBVXQzpN/baxFx9b8eLCX9H72Zcm7ezEhbQ0aw1Y4E4gnyCQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.10/Muwa-0.19.10.dmg" length="51571282" type="application/octet-stream" sparkle:edSignature="VHy5OMEkCzjW9zs36M9jgvBQVLNnxXmz7sLQWiXBVXQzpN/baxFx9b8eLCX9H72Zcm7ezEhbQ0aw1Y4E4gnyCQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -290,7 +290,7 @@
 - fixed app hangs across permissions, model browsing, audio and chat launch (#1353) by @RaajeevChandran
 - updated feature flag logic and moved more features behind feature flags (#1344) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.9...0.19.10
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.9...0.19.10
 ]]></description>
         </item>
         <item>
@@ -301,7 +301,7 @@
             <sparkle:shortVersionString>0.19.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.9/Muwa-0.19.9.dmg" length="51486509" type="application/octet-stream" sparkle:edSignature="XSnILg+X5GbA6p+id+MqcjagF6LDr2IZxlq9mwXENKp4w9+kZYXgdbFB+Xn/dat8xmNDZDMEyaMo2fATMKW2Bw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.9/Muwa-0.19.9.dmg" length="51486509" type="application/octet-stream" sparkle:edSignature="XSnILg+X5GbA6p+id+MqcjagF6LDr2IZxlq9mwXENKp4w9+kZYXgdbFB+Xn/dat8xmNDZDMEyaMo2fATMKW2Bw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -323,7 +323,7 @@
 - remove unused sandbox features (#1340) by @tpae
 - remove old migrations and deprecated code (#1339) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.8...0.19.9
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.8...0.19.9
 ]]></description>
         </item>
         <item>
@@ -334,7 +334,7 @@
             <sparkle:shortVersionString>0.19.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.8/Muwa-0.19.8.dmg" length="51425241" type="application/octet-stream" sparkle:edSignature="4dGyJXEX2co1o2XU9SW4V+irGeBTbwtJMZP3sZ4FGRjjPRxto6maoJxYauDbYfPN/PVZ/lxXNOzIGtM0qanoAg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.8/Muwa-0.19.8.dmg" length="51425241" type="application/octet-stream" sparkle:edSignature="4dGyJXEX2co1o2XU9SW4V+irGeBTbwtJMZP3sZ4FGRjjPRxto6maoJxYauDbYfPN/PVZ/lxXNOzIGtM0qanoAg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -354,7 +354,7 @@
 - fixed onboarding issues (#1330) by @tpae
 - updated chinese and german translations (#1328) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.7...0.19.8
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.7...0.19.8
 ]]></description>
         </item>
         <item>
@@ -365,7 +365,7 @@
             <sparkle:shortVersionString>0.19.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.7/Muwa-0.19.7.dmg" length="50504147" type="application/octet-stream" sparkle:edSignature="ZgbcvP25DxsCQoFbCKERDsSql1wvWwPSMLHYDyRwKrEQmGgSpinR6izkPBzJl6wCOCrKBAm+xKIEJx36iwvpBA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.7/Muwa-0.19.7.dmg" length="50504147" type="application/octet-stream" sparkle:edSignature="ZgbcvP25DxsCQoFbCKERDsSql1wvWwPSMLHYDyRwKrEQmGgSpinR6izkPBzJl6wCOCrKBAm+xKIEJx36iwvpBA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -383,7 +383,7 @@
 - moved default tools behind a feature gate (#1318) by @tpae
 - improve prompt for better guidance (#1317) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.6...0.19.7
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.6...0.19.7
 ]]></description>
         </item>
         <item>
@@ -394,7 +394,7 @@
             <sparkle:shortVersionString>0.19.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.6/Muwa-0.19.6.dmg" length="50442649" type="application/octet-stream" sparkle:edSignature="YEJdBjnykQVnmf36/jqRvMkvyEcvdBpkJ003pc1XWBCL5UTk8u0nIvZRgDknRqJfNrF2QPIQZFjLwIXEgOoiDQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.6/Muwa-0.19.6.dmg" length="50442649" type="application/octet-stream" sparkle:edSignature="YEJdBjnykQVnmf36/jqRvMkvyEcvdBpkJ003pc1XWBCL5UTk8u0nIvZRgDknRqJfNrF2QPIQZFjLwIXEgOoiDQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -402,7 +402,7 @@
 
 - added MiniMax provider (#1316) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.5...0.19.6
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.5...0.19.6
 ]]></description>
         </item>
         <item>
@@ -413,7 +413,7 @@
             <sparkle:shortVersionString>0.19.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.5/Muwa-0.19.5.dmg" length="50431167" type="application/octet-stream" sparkle:edSignature="Bg0oS1MoQZ8yFmEl9mXHo8PzY998K+u4AoaLN7FKxg50JtcGlxr0uWo2O7AMyMrQHKA2isoDR5ttTnUaN81rBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.5/Muwa-0.19.5.dmg" length="50431167" type="application/octet-stream" sparkle:edSignature="Bg0oS1MoQZ8yFmEl9mXHo8PzY998K+u4AoaLN7FKxg50JtcGlxr0uWo2O7AMyMrQHKA2isoDR5ttTnUaN81rBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -434,7 +434,7 @@
 - minor UI improvements (#1315) by @tpae
 - combined sandbox file operations into unified file operations (#1311) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.4...0.19.5
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.4...0.19.5
 ]]></description>
         </item>
         <item>
@@ -445,7 +445,7 @@
             <sparkle:shortVersionString>0.19.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.4/Muwa-0.19.4.dmg" length="50318795" type="application/octet-stream" sparkle:edSignature="ec+9YauqSzprOnqOjQWip9aT7t1TEqa2rftmR+idVAvvGxZae6YN7JmeQomZkTvDYgAi6ze7s/p+YXay3yYBCA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.4/Muwa-0.19.4.dmg" length="50318795" type="application/octet-stream" sparkle:edSignature="ec+9YauqSzprOnqOjQWip9aT7t1TEqa2rftmR+idVAvvGxZae6YN7JmeQomZkTvDYgAi6ze7s/p+YXay3yYBCA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -468,7 +468,7 @@
 - minor improvements (#1297) by @RaajeevChandran
 - crash fix: reverted breaking change, added failsafe check (#1296) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.2...0.19.3
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.2...0.19.3
 ]]></description>
         </item>
         <item>
@@ -479,7 +479,7 @@
             <sparkle:shortVersionString>0.19.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.2/Muwa-0.19.2.dmg" length="50194198" type="application/octet-stream" sparkle:edSignature="Cs5+YSXuskmo/hIB4XP+RuqcJyKVp5cO+Gk6VQbMTktlzUCldiNjg1ZP74nqucLFdgu7XION1420xrTOrJoSCw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.2/Muwa-0.19.2.dmg" length="50194198" type="application/octet-stream" sparkle:edSignature="Cs5+YSXuskmo/hIB4XP+RuqcJyKVp5cO+Gk6VQbMTktlzUCldiNjg1ZP74nqucLFdgu7XION1420xrTOrJoSCw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -503,7 +503,7 @@
 - update hubspot oauth to use client id and secret (#1284) by @tpae
 - remove restrictive instructions on AGENTS.md (#1281) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.1...0.19.2
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.1...0.19.2
 ]]></description>
         </item>
         <item>
@@ -514,7 +514,7 @@
             <sparkle:shortVersionString>0.19.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.1/Muwa-0.19.1.dmg" length="50150094" type="application/octet-stream" sparkle:edSignature="UTugGnGJy59OE+I+NFI1xzfUwpQsxX12se4MFuTuOENkLD0SdOjihqni0DXpbCTYxHvPr1fCiWGKulKsA1g3CQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.1/Muwa-0.19.1.dmg" length="50150094" type="application/octet-stream" sparkle:edSignature="UTugGnGJy59OE+I+NFI1xzfUwpQsxX12se4MFuTuOENkLD0SdOjihqni0DXpbCTYxHvPr1fCiWGKulKsA1g3CQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -527,7 +527,7 @@
 
 - Default Agent is now Onboarding Agent (#1271) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.19.0...0.19.1
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.19.0...0.19.1
 ]]></description>
         </item>
         <item>
@@ -538,7 +538,7 @@
             <sparkle:shortVersionString>0.19.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.19.0/Muwa-0.19.0.dmg" length="49915703" type="application/octet-stream" sparkle:edSignature="p/FZGpYzLGIsCCwHbrVsxZIaghKd+q3QCHfoYZCEEY4WJOsW1IyUCx4JM0Bkhb2hZt0bQeiI/4rZGHE+2Z1WBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.0/Muwa-0.19.0.dmg" length="49915703" type="application/octet-stream" sparkle:edSignature="p/FZGpYzLGIsCCwHbrVsxZIaghKd+q3QCHfoYZCEEY4WJOsW1IyUCx4JM0Bkhb2hZt0bQeiI/4rZGHE+2Z1WBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -557,7 +557,7 @@
 - moved claude plugins to plugins section (#1250) by @tpae
 - improved skills page in settings (#1245) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.38...0.18.39
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.38...0.18.39
 ]]></description>
         </item>
         <item>
@@ -568,7 +568,7 @@
             <sparkle:shortVersionString>0.18.38</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.38/Muwa-0.18.38.dmg" length="49162612" type="application/octet-stream" sparkle:edSignature="PApOmvCzy4TR+pJkDCK7zbfz48qyJHkf2afHZ2bOjk9VlDwX4R+CLbVQgqNDTjo2vyxdneWCuN9sW3MZtK3DDQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.38/Muwa-0.18.38.dmg" length="49162612" type="application/octet-stream" sparkle:edSignature="PApOmvCzy4TR+pJkDCK7zbfz48qyJHkf2afHZ2bOjk9VlDwX4R+CLbVQgqNDTjo2vyxdneWCuN9sW3MZtK3DDQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -592,7 +592,7 @@
 - add chat rename guard (#1238) by @RaajeevChandran
 - onboarding screen language changes (#1229) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.37...0.18.38
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.37...0.18.38
 ]]></description>
         </item>
         <item>
@@ -603,7 +603,7 @@
             <sparkle:shortVersionString>0.18.37</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.37/Muwa-0.18.37.dmg" length="49051889" type="application/octet-stream" sparkle:edSignature="mU2u/QzWeUuxB6kDPOVBbRwDCWSwTM81UGp3NDCaqgX+Bfzd3Ej64iTrZpkpvVrdEI4c3ECvH0Q6ivP7W706AQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.37/Muwa-0.18.37.dmg" length="49051889" type="application/octet-stream" sparkle:edSignature="mU2u/QzWeUuxB6kDPOVBbRwDCWSwTM81UGp3NDCaqgX+Bfzd3Ej64iTrZpkpvVrdEI4c3ECvH0Q6ivP7W706AQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -615,7 +615,7 @@
 - Harden provider discovery diagnostics (#1211) by @mimeding
 - chat sidebar improvements (#1219) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.36...0.18.37
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.36...0.18.37
 ]]></description>
         </item>
         <item>
@@ -626,7 +626,7 @@
             <sparkle:shortVersionString>0.18.36</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.36/Muwa-0.18.36.dmg" length="48988486" type="application/octet-stream" sparkle:edSignature="Kn/B4wW8fKOuJOUfVG++1owHwdH0RIm40h3/rLbpEdh7DI04ezp9Ro93mEHtuLcLIQxcCavZEovxdrVNSq+rCA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.36/Muwa-0.18.36.dmg" length="48988486" type="application/octet-stream" sparkle:edSignature="Kn/B4wW8fKOuJOUfVG++1owHwdH0RIm40h3/rLbpEdh7DI04ezp9Ro93mEHtuLcLIQxcCavZEovxdrVNSq+rCA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -645,7 +645,7 @@
 - reduce avatar size on empty chat view (#1209) by @tpae
 - sped up sandbox launch (#1207) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.35...0.18.36
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.35...0.18.36
 ]]></description>
         </item>
         <item>
@@ -656,7 +656,7 @@
             <sparkle:shortVersionString>0.18.35</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.35/Muwa-0.18.35.dmg" length="48842747" type="application/octet-stream" sparkle:edSignature="utjOOzd0R8P9zJlyVQqug1CdHLDMLxARaUQR+8yWx+NBFozZpVyJHp1lDcalwbdFZ9E62lwQPGUcAxjkvmzrAQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.35/Muwa-0.18.35.dmg" length="48842747" type="application/octet-stream" sparkle:edSignature="utjOOzd0R8P9zJlyVQqug1CdHLDMLxARaUQR+8yWx+NBFozZpVyJHp1lDcalwbdFZ9E62lwQPGUcAxjkvmzrAQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -671,7 +671,7 @@
 
 - restore auto connect for remote providers at launch (#1199) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.34...0.18.35
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.34...0.18.35
 ]]></description>
         </item>
         <item>
@@ -682,7 +682,7 @@
             <sparkle:shortVersionString>0.18.34</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.34/Muwa-0.18.34.dmg" length="48837110" type="application/octet-stream" sparkle:edSignature="GHUX92lMsMh9Oxj/XtjfGskIDtXDviEgd6YEbmLALOxysIrkLsfbwiZV+xocpkFukSjibHWW8aCIGUkiNuqbBg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.34/Muwa-0.18.34.dmg" length="48837110" type="application/octet-stream" sparkle:edSignature="GHUX92lMsMh9Oxj/XtjfGskIDtXDviEgd6YEbmLALOxysIrkLsfbwiZV+xocpkFukSjibHWW8aCIGUkiNuqbBg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -697,7 +697,7 @@
 - improved user onboarding flow (#1195) by @tpae
 - show unformatted model name in model card  (#1194) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.33...0.18.34
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.33...0.18.34
 ]]></description>
         </item>
         <item>
@@ -708,7 +708,7 @@
             <sparkle:shortVersionString>0.18.33</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.33/Muwa-0.18.33.dmg" length="48723941" type="application/octet-stream" sparkle:edSignature="5+wWTw/40QhbjbrlOFKZPGMEf+iVMlQHiLL1LVaAGKs4qlkAeg4HDhlsovQpHe4p6XfVY+w2igg7eg3gystWBg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.33/Muwa-0.18.33.dmg" length="48723941" type="application/octet-stream" sparkle:edSignature="5+wWTw/40QhbjbrlOFKZPGMEf+iVMlQHiLL1LVaAGKs4qlkAeg4HDhlsovQpHe4p6XfVY+w2igg7eg3gystWBg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -719,7 +719,7 @@
 
 - hide migration overlay for fresh installs (#1191) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.32...0.18.33
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.32...0.18.33
 ]]></description>
         </item>
         <item>
@@ -730,7 +730,7 @@
             <sparkle:shortVersionString>0.18.32</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.32/Muwa-0.18.32.dmg" length="48586411" type="application/octet-stream" sparkle:edSignature="e71oYLR8CNi5gdKXM5XkTpYqnzvX7Rf6GPZuPQrRkTtO+uo1W/y/CxfDWluEMbs//eif7+fBhlhgo+R2xvQPCA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.32/Muwa-0.18.32.dmg" length="48586411" type="application/octet-stream" sparkle:edSignature="e71oYLR8CNi5gdKXM5XkTpYqnzvX7Rf6GPZuPQrRkTtO+uo1W/y/CxfDWluEMbs//eif7+fBhlhgo+R2xvQPCA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -740,7 +740,7 @@
 - updated remote provider for deepseek kv cache (#1189) by @tpae
 - improved read\_file tool (#1187) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.31...0.18.32
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.31...0.18.32
 ]]></description>
         </item>
         <item>
@@ -751,7 +751,7 @@
             <sparkle:shortVersionString>0.18.31</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.31/Muwa-0.18.31.dmg" length="48583678" type="application/octet-stream" sparkle:edSignature="hk7GvdCKu/l3a6UtR/Mh3yuxqq7wJixLj6uMz/Fj/9swTSdcOxXQRmrc6cuNo9gghI8EahwN4eU36XvfwpBoCw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.31/Muwa-0.18.31.dmg" length="48583678" type="application/octet-stream" sparkle:edSignature="hk7GvdCKu/l3a6UtR/Mh3yuxqq7wJixLj6uMz/Fj/9swTSdcOxXQRmrc6cuNo9gghI8EahwN4eU36XvfwpBoCw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -771,7 +771,7 @@
 - add Ollama template to onboarding (#1184) by @RaajeevChandran
 - localization cleanup for xcode (#1174) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.30...0.18.31
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.30...0.18.31
 ]]></description>
         </item>
         <item>
@@ -782,7 +782,7 @@
             <sparkle:shortVersionString>0.18.30</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.30/Muwa-0.18.30.dmg" length="48425043" type="application/octet-stream" sparkle:edSignature="0piKBV0OJBiwAWsBg467zLyG4fMlhACVsO/t/iYLwVRvF8Eh0KlDTOnW+UGX7YDGOn61TghgxNE0uDDQjiPWBg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.30/Muwa-0.18.30.dmg" length="48425043" type="application/octet-stream" sparkle:edSignature="0piKBV0OJBiwAWsBg467zLyG4fMlhACVsO/t/iYLwVRvF8Eh0KlDTOnW+UGX7YDGOn61TghgxNE0uDDQjiPWBg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -798,7 +798,7 @@
 - fix localization (#1169) by @tpae
 - updated localization (#1165) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.29...0.18.30
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.29...0.18.30
 ]]></description>
         </item>
         <item>
@@ -809,7 +809,7 @@
             <sparkle:shortVersionString>0.18.29</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.29/Muwa-0.18.29.dmg" length="48384923" type="application/octet-stream" sparkle:edSignature="rOtNqjabfgstOQFQhMolBFygWgsHfaOEM5b6UyvWGiCyHN0BDlg4/BHasdAZ1+cYG9MXlcvVkbtSBgE+xca8Ag=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.29/Muwa-0.18.29.dmg" length="48384923" type="application/octet-stream" sparkle:edSignature="rOtNqjabfgstOQFQhMolBFygWgsHfaOEM5b6UyvWGiCyHN0BDlg4/BHasdAZ1+cYG9MXlcvVkbtSBgE+xca8Ag=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -824,7 +824,7 @@
 
 - optimizations for settings views (#1160) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.28...0.18.29
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.28...0.18.29
 ]]></description>
         </item>
         <item>
@@ -835,7 +835,7 @@
             <sparkle:shortVersionString>0.18.28</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.28/Muwa-0.18.28.dmg" length="42520619" type="application/octet-stream" sparkle:edSignature="99xM//QPS5bfv2/HrLtq7jyeY2zIeXFmZWcK5TvrYsNKYU9Ec+urXh11hIBT9TSQi15J/yZ9Wf3/vcpDaZ6SAA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.28/Muwa-0.18.28.dmg" length="42520619" type="application/octet-stream" sparkle:edSignature="99xM//QPS5bfv2/HrLtq7jyeY2zIeXFmZWcK5TvrYsNKYU9Ec+urXh11hIBT9TSQi15J/yZ9Wf3/vcpDaZ6SAA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -853,7 +853,7 @@
 - fix latex dollars (#1158) by @tpae
 - fixed scrolling jank in messages (#1157) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.27...0.18.28
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.27...0.18.28
 ]]></description>
         </item>
         <item>
@@ -864,7 +864,7 @@
             <sparkle:shortVersionString>0.18.27</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.27/Muwa-0.18.27.dmg" length="42493291" type="application/octet-stream" sparkle:edSignature="Foi+1YX5J/ZgE1L1W0CFPjKzJN39cfEdGXm5gvImXCDiOEPmpfUocpmBdo/+CO6hLdFLvlbtsy2njxfkjm7LBg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.27/Muwa-0.18.27.dmg" length="42493291" type="application/octet-stream" sparkle:edSignature="Foi+1YX5J/ZgE1L1W0CFPjKzJN39cfEdGXm5gvImXCDiOEPmpfUocpmBdo/+CO6hLdFLvlbtsy2njxfkjm7LBg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -877,7 +877,7 @@
 - fixed minor onboarding issues (#1152) by @tpae
 - improved model download error handling (#1148) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.26...0.18.27
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.26...0.18.27
 ]]></description>
         </item>
         <item>
@@ -888,7 +888,7 @@
             <sparkle:shortVersionString>0.18.26</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.26/Muwa-0.18.26.dmg" length="42464594" type="application/octet-stream" sparkle:edSignature="zcwvmmmzj4UePgh5khQcQATqotOb2P9ygwAPkezSL9v5d9G8SwHtA3g0JyXb6xIgYD0nk90UJjJqEjJW+rnyBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.26/Muwa-0.18.26.dmg" length="42464594" type="application/octet-stream" sparkle:edSignature="zcwvmmmzj4UePgh5khQcQATqotOb2P9ygwAPkezSL9v5d9G8SwHtA3g0JyXb6xIgYD0nk90UJjJqEjJW+rnyBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -898,7 +898,7 @@
 
 - added agent settings shortcut and minor UX updates (#1145) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.25...0.18.26
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.25...0.18.26
 ]]></description>
         </item>
         <item>
@@ -909,7 +909,7 @@
             <sparkle:shortVersionString>0.18.25</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.25/Muwa-0.18.25.dmg" length="42439933" type="application/octet-stream" sparkle:edSignature="tX3EsaOKwiGWuKS7VsmSn9w82yFcW3hwNG+NqKY79n3tkZkLaA+kBbdfO78H0ChyNBrQqx0kIMzZHTKn5BYmBg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.25/Muwa-0.18.25.dmg" length="42439933" type="application/octet-stream" sparkle:edSignature="tX3EsaOKwiGWuKS7VsmSn9w82yFcW3hwNG+NqKY79n3tkZkLaA+kBbdfO78H0ChyNBrQqx0kIMzZHTKn5BYmBg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -920,7 +920,7 @@
 
 - auto-queue messages and send immediately feature (#1144) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.24...0.18.25
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.24...0.18.25
 ]]></description>
         </item>
         <item>
@@ -931,7 +931,7 @@
             <sparkle:shortVersionString>0.18.24</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.24/Muwa-0.18.24.dmg" length="42344935" type="application/octet-stream" sparkle:edSignature="0he7mZtga0MBm60YjXGDPcZb+32CUCu3r6IEvTcFyMpC+ZyHXBhEtxGlQbKot3fXQ1/48HVcqi1azOgxlnf+Aw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.24/Muwa-0.18.24.dmg" length="42344935" type="application/octet-stream" sparkle:edSignature="0he7mZtga0MBm60YjXGDPcZb+32CUCu3r6IEvTcFyMpC+ZyHXBhEtxGlQbKot3fXQ1/48HVcqi1azOgxlnf+Aw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -943,7 +943,7 @@
 - [codex] Scope capability search to agent grants (#1134) by @mimeding
 - [codex] Document model compatibility research plan (#1124) by @mimeding
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.23...0.18.24
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.23...0.18.24
 ]]></description>
         </item>
         <item>
@@ -954,7 +954,7 @@
             <sparkle:shortVersionString>0.18.23</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.23/Muwa-0.18.23.dmg" length="42157774" type="application/octet-stream" sparkle:edSignature="lK0nobZGZkJZJetMRWmYXioaE2xyCsKWNqANWnxOD8piJbgTHcepYFyG1vjBICI2zujOHJFJIPJBcUjGaTmGAQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.23/Muwa-0.18.23.dmg" length="42157774" type="application/octet-stream" sparkle:edSignature="lK0nobZGZkJZJetMRWmYXioaE2xyCsKWNqANWnxOD8piJbgTHcepYFyG1vjBICI2zujOHJFJIPJBcUjGaTmGAQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -977,7 +977,7 @@
 
 - improved claude plugin import and claude plugin management interface (#1125) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.22...0.18.23
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.22...0.18.23
 ]]></description>
         </item>
         <item>
@@ -988,7 +988,7 @@
             <sparkle:shortVersionString>0.18.22</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.22/Muwa-0.18.22.dmg" length="41911427" type="application/octet-stream" sparkle:edSignature="xIOQ/kdx4AJFLCHVGqQtmSQXVqaZaLKbBygvB7IsIN07vtFlJiLqhaCoyq2pijujZJOHooSB0tUhplExVSe1CQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.22/Muwa-0.18.22.dmg" length="41911427" type="application/octet-stream" sparkle:edSignature="xIOQ/kdx4AJFLCHVGqQtmSQXVqaZaLKbBygvB7IsIN07vtFlJiLqhaCoyq2pijujZJOHooSB0tUhplExVSe1CQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -996,7 +996,7 @@
 
 - added generative greetings (#1115) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.21...0.18.22
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.21...0.18.22
 ]]></description>
         </item>
         <item>
@@ -1007,7 +1007,7 @@
             <sparkle:shortVersionString>0.18.21</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.21/Muwa-0.18.21.dmg" length="41843643" type="application/octet-stream" sparkle:edSignature="Jv4iVz1ST3BeoXSoK4/Na3CRhkpeoEdHz7qZopYNiL6t2Q+K/W6p5EJy4D0XYq1Rza/sS9mbJCfiM4X0cA6iDQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.21/Muwa-0.18.21.dmg" length="41843643" type="application/octet-stream" sparkle:edSignature="Jv4iVz1ST3BeoXSoK4/Na3CRhkpeoEdHz7qZopYNiL6t2Q+K/W6p5EJy4D0XYq1Rza/sS9mbJCfiM4X0cA6iDQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1019,7 +1019,7 @@
 
 - resolve plugin registry 404 on fresh installs by trying master branch (#1114) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.20...0.18.21
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.20...0.18.21
 ]]></description>
         </item>
         <item>
@@ -1030,7 +1030,7 @@
             <sparkle:shortVersionString>0.18.20</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.20/Muwa-0.18.20.dmg" length="41837161" type="application/octet-stream" sparkle:edSignature="aUdcyILeRPSgr1jhfudk7KKIV8KWwv+Zz5Sgmy14SWPc75FVLWKIqhRQ7opqs0LidjPvp3fGm5baY6trTeXSAQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.20/Muwa-0.18.20.dmg" length="41837161" type="application/octet-stream" sparkle:edSignature="aUdcyILeRPSgr1jhfudk7KKIV8KWwv+Zz5Sgmy14SWPc75FVLWKIqhRQ7opqs0LidjPvp3fGm5baY6trTeXSAQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1049,7 +1049,7 @@
 - fix freeze when opening import skills dialog (#1107) by @tpae
 - fixed unresponsive Update Available button (#1105) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.19...0.18.20
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.19...0.18.20
 ]]></description>
         </item>
         <item>
@@ -1060,7 +1060,7 @@
             <sparkle:shortVersionString>0.18.19</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.19/Muwa-0.18.19.dmg" length="41642601" type="application/octet-stream" sparkle:edSignature="EIYgWy8OGvjH++zhwbqRypiTYWGkFJLy2X1zsa3kkEKJYO6170UQBZddjQkDCtXUvhoF7GU3n36x3lW8Vmb6CA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.19/Muwa-0.18.19.dmg" length="41642601" type="application/octet-stream" sparkle:edSignature="EIYgWy8OGvjH++zhwbqRypiTYWGkFJLy2X1zsa3kkEKJYO6170UQBZddjQkDCtXUvhoF7GU3n36x3lW8Vmb6CA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1072,7 +1072,7 @@
 - prevent switching active theme when saving a theme edit (#1096) by @RaajeevChandran
 - improved theme edit sync in chat (#1095) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.18...0.18.19
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.18...0.18.19
 ]]></description>
         </item>
         <item>
@@ -1083,7 +1083,7 @@
             <sparkle:shortVersionString>0.18.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.18/Muwa-0.18.18.dmg" length="41642853" type="application/octet-stream" sparkle:edSignature="loUNbNiO3zNl5vgW+YbuTdJMGEmIFa/NLV0Sxi8jf0YCuj8OL3Za1ml+pJDT/64BfzP3qprg7RRqhxSbANnHCg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.18/Muwa-0.18.18.dmg" length="41642853" type="application/octet-stream" sparkle:edSignature="loUNbNiO3zNl5vgW+YbuTdJMGEmIFa/NLV0Sxi8jf0YCuj8OL3Za1ml+pJDT/64BfzP3qprg7RRqhxSbANnHCg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1102,7 +1102,7 @@
 
 - agent avatar customization in theme editor (#1084) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.17...0.18.18
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.17...0.18.18
 ]]></description>
         </item>
         <item>
@@ -1113,7 +1113,7 @@
             <sparkle:shortVersionString>0.18.17</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.17/Muwa-0.18.17.dmg" length="41037277" type="application/octet-stream" sparkle:edSignature="u2S8X5Vr0SQTjRObXcjDZ8PTxcwQgS2FKZJWPvsJXhGb5RXwFzLrGhYQCtG3VRHDJt8NUa6wz1zhb1t0gr6ABA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.17/Muwa-0.18.17.dmg" length="41037277" type="application/octet-stream" sparkle:edSignature="u2S8X5Vr0SQTjRObXcjDZ8PTxcwQgS2FKZJWPvsJXhGb5RXwFzLrGhYQCtG3VRHDJt8NUa6wz1zhb1t0gr6ABA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1124,7 +1124,7 @@
 
 - various cosmetic changes (#1079) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.16...0.18.17
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.16...0.18.17
 ]]></description>
         </item>
         <item>
@@ -1135,7 +1135,7 @@
             <sparkle:shortVersionString>0.18.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.16/Muwa-0.18.16.dmg" length="40977285" type="application/octet-stream" sparkle:edSignature="Y4wjNdggmTyDWsrYPQARhDOs/sovj7d5HavV5JucKafvEz8qIgzAXjF065TI63u2X2uMq727Y4DT3qV/yW55Bg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.16/Muwa-0.18.16.dmg" length="40977285" type="application/octet-stream" sparkle:edSignature="Y4wjNdggmTyDWsrYPQARhDOs/sovj7d5HavV5JucKafvEz8qIgzAXjF065TI63u2X2uMq727Y4DT3qV/yW55Bg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1146,7 +1146,7 @@
 - updated visual design for done and to do (#1078) by @tpae
 - added background task hook (#1077) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.15...0.18.16
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.15...0.18.16
 ]]></description>
         </item>
         <item>
@@ -1157,7 +1157,7 @@
             <sparkle:shortVersionString>0.18.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.15/Muwa-0.18.15.dmg" length="40954932" type="application/octet-stream" sparkle:edSignature="k4K7srOaOC7zt/v5ZdAJhCQFdQ/n0LWYyVsbltLyC/dBiL0h5VjpJFmr6uhtql/z7AvEiG6gslxSAchaJmWPCA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.15/Muwa-0.18.15.dmg" length="40954932" type="application/octet-stream" sparkle:edSignature="k4K7srOaOC7zt/v5ZdAJhCQFdQ/n0LWYyVsbltLyC/dBiL0h5VjpJFmr6uhtql/z7AvEiG6gslxSAchaJmWPCA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1171,7 +1171,7 @@
 
 - fixed deepseek api requests (#1074) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.14...0.18.15
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.14...0.18.15
 ]]></description>
         </item>
         <item>
@@ -1182,7 +1182,7 @@
             <sparkle:shortVersionString>0.18.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.14/Muwa-0.18.14.dmg" length="40777273" type="application/octet-stream" sparkle:edSignature="L1CduDwbh7EXKL5iaDMf2vsuoTQMxRy2xPtEyiXV4TyUVp/0yOuMunuSqFtztHWXziIrPtk9qWzCouu8gKk4Bg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.14/Muwa-0.18.14.dmg" length="40777273" type="application/octet-stream" sparkle:edSignature="L1CduDwbh7EXKL5iaDMf2vsuoTQMxRy2xPtEyiXV4TyUVp/0yOuMunuSqFtztHWXziIrPtk9qWzCouu8gKk4Bg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1205,7 +1205,7 @@
 - added memory diagnostics and hardened pipeline (#1056) by @tpae
 - updated plugins architecture (#1054) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.13...0.18.14
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.13...0.18.14
 ]]></description>
         </item>
         <item>
@@ -1216,7 +1216,7 @@
             <sparkle:shortVersionString>0.18.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.13/Muwa-0.18.13.dmg" length="40388069" type="application/octet-stream" sparkle:edSignature="xAYAjIxBvqTwroMvZjtnhTeJSF9e/3sBWEYkNtyXJs6Umep+V+jQMqYoSgitCl7NZlz9YTgHGo9WBBVWIRbqAQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.13/Muwa-0.18.13.dmg" length="40388069" type="application/octet-stream" sparkle:edSignature="xAYAjIxBvqTwroMvZjtnhTeJSF9e/3sBWEYkNtyXJs6Umep+V+jQMqYoSgitCl7NZlz9YTgHGo9WBBVWIRbqAQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1227,7 +1227,7 @@
 - moved sandbox secrets to agent details view (#1053) by @tpae
 - improve accessibility in light themes (#1052) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.12...0.18.13
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.12...0.18.13
 ]]></description>
         </item>
         <item>
@@ -1238,7 +1238,7 @@
             <sparkle:shortVersionString>0.18.12</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.12/Muwa-0.18.12.dmg" length="40388049" type="application/octet-stream" sparkle:edSignature="IIMQ1ZlSIGaqDNMwUTGspys0AtuEb96wxU5r3/r3r9xImTR6kDVWeB60cW7SEQSZOGLoxWfgu6DajgBs9wQSCw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.12/Muwa-0.18.12.dmg" length="40388049" type="application/octet-stream" sparkle:edSignature="IIMQ1ZlSIGaqDNMwUTGspys0AtuEb96wxU5r3/r3r9xImTR6kDVWeB60cW7SEQSZOGLoxWfgu6DajgBs9wQSCw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1253,7 +1253,7 @@
 
 - shell exec terminal ux improvements (#1047) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.11...0.18.12
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.11...0.18.12
 ]]></description>
         </item>
         <item>
@@ -1264,7 +1264,7 @@
             <sparkle:shortVersionString>0.18.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.11/Muwa-0.18.11.dmg" length="39871046" type="application/octet-stream" sparkle:edSignature="JIH6j5keTPW10PWn4I4Gnrw8i7GSSt3WMpwgeZWhNY4rxaMK8C5db6T8LOckZpBz+UgcepzSFbZKGs62p97nDQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.11/Muwa-0.18.11.dmg" length="39871046" type="application/octet-stream" sparkle:edSignature="JIH6j5keTPW10PWn4I4Gnrw8i7GSSt3WMpwgeZWhNY4rxaMK8C5db6T8LOckZpBz+UgcepzSFbZKGs62p97nDQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1280,7 +1280,7 @@
 - exposed thinking capability in API (#1041) by @RaajeevChandran
 - improved preflight capability search (#1038) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.10...0.18.11
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.10...0.18.11
 ]]></description>
         </item>
         <item>
@@ -1291,7 +1291,7 @@
             <sparkle:shortVersionString>0.18.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.10/Muwa-0.18.10.dmg" length="39688329" type="application/octet-stream" sparkle:edSignature="nVk7n0vp0uhj9w2OyVQ3H89qTAhs0CKJs0vXQM1aPxGdz0EJeuG07SvttoYg0nT8Wc+UUCtZXBe4k98mkJqVAg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.10/Muwa-0.18.10.dmg" length="39688329" type="application/octet-stream" sparkle:edSignature="nVk7n0vp0uhj9w2OyVQ3H89qTAhs0CKJs0vXQM1aPxGdz0EJeuG07SvttoYg0nT8Wc+UUCtZXBe4k98mkJqVAg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1303,7 +1303,7 @@
 
 - Prompt updates (#1035) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.9...0.18.10
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.9...0.18.10
 ]]></description>
         </item>
         <item>
@@ -1314,7 +1314,7 @@
             <sparkle:shortVersionString>0.18.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.9/Muwa-0.18.9.dmg" length="39687898" type="application/octet-stream" sparkle:edSignature="5r0xgXgKsf7QZPbcdaMF3KIFXYN26+wF5zFxjBT7uzq2EQB22cmGLSr+1cwvVZn6rWDhQULt14zcxVkSioqeDg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.9/Muwa-0.18.9.dmg" length="39687898" type="application/octet-stream" sparkle:edSignature="5r0xgXgKsf7QZPbcdaMF3KIFXYN26+wF5zFxjBT7uzq2EQB22cmGLSr+1cwvVZn6rWDhQULt14zcxVkSioqeDg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1333,7 +1333,7 @@
 
 - reverted system prompt changes (#1029) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.8...0.18.9
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.8...0.18.9
 ]]></description>
         </item>
         <item>
@@ -1344,7 +1344,7 @@
             <sparkle:shortVersionString>0.18.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.8/Muwa-0.18.8.dmg" length="39650467" type="application/octet-stream" sparkle:edSignature="6wiRA4dXwpEIWJmvKPTcF5yw3+2T6iAarkbrNj/ushiqF0a+8E8hzcuRTt3LjlaH+3ErYEvsxmptztz/GaIGDw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.8/Muwa-0.18.8.dmg" length="39650467" type="application/octet-stream" sparkle:edSignature="6wiRA4dXwpEIWJmvKPTcF5yw3+2T6iAarkbrNj/ushiqF0a+8E8hzcuRTt3LjlaH+3ErYEvsxmptztz/GaIGDw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1361,7 +1361,7 @@
 
 - fixed pie chart labelling mismatch (#1016) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.7...0.18.8
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.7...0.18.8
 ]]></description>
         </item>
         <item>
@@ -1372,7 +1372,7 @@
             <sparkle:shortVersionString>0.18.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.7/Muwa-0.18.7.dmg" length="39643392" type="application/octet-stream" sparkle:edSignature="/L1lKbx95brn3O4r5RKUigA4RUiG1A1Iwn4LdTNWJurBdmHgK62E/KHKQCnHkMW05romcXr/u4C88p18H7Q3AA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.7/Muwa-0.18.7.dmg" length="39643392" type="application/octet-stream" sparkle:edSignature="/L1lKbx95brn3O4r5RKUigA4RUiG1A1Iwn4LdTNWJurBdmHgK62E/KHKQCnHkMW05romcXr/u4C88p18H7Q3AA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1384,7 +1384,7 @@
 
 - added deepseek as official provider (#1012) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.6...0.18.7
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.6...0.18.7
 ]]></description>
         </item>
         <item>
@@ -1395,7 +1395,7 @@
             <sparkle:shortVersionString>0.18.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.6/Muwa-0.18.6.dmg" length="39635533" type="application/octet-stream" sparkle:edSignature="d9aqnfZh7pqQPdQZLfvb45XBlJlbUeFg8SoARkUBt4/8oMgeHn7XUk2A11HfK2DRIFP65JXzmeCmTnZSozSLBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.6/Muwa-0.18.6.dmg" length="39635533" type="application/octet-stream" sparkle:edSignature="d9aqnfZh7pqQPdQZLfvb45XBlJlbUeFg8SoARkUBt4/8oMgeHn7XUk2A11HfK2DRIFP65JXzmeCmTnZSozSLBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1404,7 +1404,7 @@
 - updated agent refresh (#1008) by @tpae
 - fix(quality): revert default KV mode .turboQuant(4,4) → .none — fixes degenerate-repetition looping (#998) by @jjang-ai
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.5...0.18.6
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.5...0.18.6
 ]]></description>
         </item>
         <item>
@@ -1415,7 +1415,7 @@
             <sparkle:shortVersionString>0.18.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.5/Muwa-0.18.5.dmg" length="39620303" type="application/octet-stream" sparkle:edSignature="QSNp7krwkDBjfyuMN5+fnsE2QJGr+A4qyPySMJF87pVTbtNajcK6jvE5e/QGVpOj+xmoxa/jr0UwVmNrVVK8Aw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.5/Muwa-0.18.5.dmg" length="39620303" type="application/octet-stream" sparkle:edSignature="QSNp7krwkDBjfyuMN5+fnsE2QJGr+A4qyPySMJF87pVTbtNajcK6jvE5e/QGVpOj+xmoxa/jr0UwVmNrVVK8Aw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1427,7 +1427,7 @@
 
 - harden sandbox package installations (#999) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.4...0.18.5
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.4...0.18.5
 ]]></description>
         </item>
         <item>
@@ -1438,7 +1438,7 @@
             <sparkle:shortVersionString>0.18.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.4/Muwa-0.18.4.dmg" length="39610018" type="application/octet-stream" sparkle:edSignature="1lFGr2aDASm77zRIWz7D3B9xvaQUtsjSrRH8PDwcEbCtW9r8FJPL721ZvxUg4BbWzLELBuyiA4b8V7XvPzOiAQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.4/Muwa-0.18.4.dmg" length="39610018" type="application/octet-stream" sparkle:edSignature="1lFGr2aDASm77zRIWz7D3B9xvaQUtsjSrRH8PDwcEbCtW9r8FJPL721ZvxUg4BbWzLELBuyiA4b8V7XvPzOiAQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1453,7 +1453,7 @@
 
 - sandbox + files tools simplification for better functionality (#997) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.3...0.18.4
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.3...0.18.4
 ]]></description>
         </item>
         <item>
@@ -1464,7 +1464,7 @@
             <sparkle:shortVersionString>0.18.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.3/Muwa-0.18.3.dmg" length="37305647" type="application/octet-stream" sparkle:edSignature="RCpqh7H3+5DV6LS0eh1uDQvFf6vU8qKas4efGXatTaT3pBMBmYJpgMhWmbinqB0i+JB4o6bIw4bHlFsg1ylMAA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.3/Muwa-0.18.3.dmg" length="37305647" type="application/octet-stream" sparkle:edSignature="RCpqh7H3+5DV6LS0eh1uDQvFf6vU8qKas4efGXatTaT3pBMBmYJpgMhWmbinqB0i+JB4o6bIw4bHlFsg1ylMAA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1478,7 +1478,7 @@
 - fix flaky tests (#982) by @tpae
 - added loopback to CORS and simplified controls (#981) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.2...0.18.3
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.2...0.18.3
 ]]></description>
         </item>
         <item>
@@ -1489,7 +1489,7 @@
             <sparkle:shortVersionString>0.18.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.2/Muwa-0.18.2.dmg" length="35723084" type="application/octet-stream" sparkle:edSignature="4uLMMe59cpkFYOn6Lh5prGiMnlowf0N3F6fS91AMJRvnVSuE69JDZtr0GFjHTDdYcBNW05uuq7NNdsj1YHNfAA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.2/Muwa-0.18.2.dmg" length="35723084" type="application/octet-stream" sparkle:edSignature="4uLMMe59cpkFYOn6Lh5prGiMnlowf0N3F6fS91AMJRvnVSuE69JDZtr0GFjHTDdYcBNW05uuq7NNdsj1YHNfAA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1505,7 +1505,7 @@
 - minor changes (#972) by @RaajeevChandran
 - added core model fallback if missing (#971) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.1...0.18.2
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.1...0.18.2
 ]]></description>
         </item>
         <item>
@@ -1516,7 +1516,7 @@
             <sparkle:shortVersionString>0.18.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.1/Muwa-0.18.1.dmg" length="35644819" type="application/octet-stream" sparkle:edSignature="zJtBsEFCh930OFc3abtzsRTQsXtExM7FMkm+iwNS2RqAaLr0sgx441Na0WfkMIT8G+/5V1WOWhRakXNPgAp0DQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.1/Muwa-0.18.1.dmg" length="35644819" type="application/octet-stream" sparkle:edSignature="zJtBsEFCh930OFc3abtzsRTQsXtExM7FMkm+iwNS2RqAaLr0sgx441Na0WfkMIT8G+/5V1WOWhRakXNPgAp0DQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1527,7 +1527,7 @@
 - added additional responsiveness to watchers (#968) by @tpae
 - Agent View Updates - added Share Agent feature (#966) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.18.0...0.18.1
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.18.0...0.18.1
 ]]></description>
         </item>
         <item>
@@ -1538,7 +1538,7 @@
             <sparkle:shortVersionString>0.18.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.18.0/Muwa-0.18.0.dmg" length="35354685" type="application/octet-stream" sparkle:edSignature="qMo8u68DL2lJZo4g2CEjSFVMVXfXw3UBmtLgWAfqa3catxsPo4P6YPxg8HqsMn3hwGDSA9/qysH8+m8TByKMDg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.18.0/Muwa-0.18.0.dmg" length="35354685" type="application/octet-stream" sparkle:edSignature="qMo8u68DL2lJZo4g2CEjSFVMVXfXw3UBmtLgWAfqa3catxsPo4P6YPxg8HqsMn3hwGDSA9/qysH8+m8TByKMDg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1555,7 +1555,7 @@
 - fix flaky tests and updated headers for sqlite collision prevention (#956) by @tpae
 - improved security with full storage encryption and sandbox hardening (#951) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.6...0.17.7
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.6...0.17.7
 ]]></description>
         </item>
         <item>
@@ -1566,7 +1566,7 @@
             <sparkle:shortVersionString>0.17.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.6/Muwa-0.17.6.dmg" length="34972114" type="application/octet-stream" sparkle:edSignature="uK2JpMVubTNDv6ByXfBwQS2c/u7fPPtUfoL9i3Li5yL9PvoirgoVQ16h+yihKO/Rarc1PCjuCR0N7u/+DeQ5BQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.6/Muwa-0.17.6.dmg" length="34972114" type="application/octet-stream" sparkle:edSignature="uK2JpMVubTNDv6ByXfBwQS2c/u7fPPtUfoL9i3Li5yL9PvoirgoVQ16h+yihKO/Rarc1PCjuCR0N7u/+DeQ5BQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1583,7 +1583,7 @@
 
 - reinforced with more unit tests, fixed kv caching calls, tighten up code. Enabled TurboQuant by default (#938) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.5...0.17.6
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.5...0.17.6
 ]]></description>
         </item>
         <item>
@@ -1594,7 +1594,7 @@
             <sparkle:shortVersionString>0.17.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.5/Muwa-0.17.5.dmg" length="34811400" type="application/octet-stream" sparkle:edSignature="raeoogCYf7MvV9InIce55zu6LO0vhD4xIbuctrWaSGN/a+Ze6xexPrAyzHTDCRpwlvTbUfDN/IstOma1euA4Dw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.5/Muwa-0.17.5.dmg" length="34811400" type="application/octet-stream" sparkle:edSignature="raeoogCYf7MvV9InIce55zu6LO0vhD4xIbuctrWaSGN/a+Ze6xexPrAyzHTDCRpwlvTbUfDN/IstOma1euA4Dw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1610,7 +1610,7 @@
 
 - Preflight Search Optimization + Evals Framework (#935) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.4...0.17.5
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.4...0.17.5
 ]]></description>
         </item>
         <item>
@@ -1621,7 +1621,7 @@
             <sparkle:shortVersionString>0.17.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.4/Muwa-0.17.4.dmg" length="34793963" type="application/octet-stream" sparkle:edSignature="awHxk1fRron++sM85TlvJ5MG6h7Cy5XbdYtNFptmWNri0vYtsGbKnC6JtttBx3rqNU4YGZ10rPfzGP4PTHlHAw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.4/Muwa-0.17.4.dmg" length="34793963" type="application/octet-stream" sparkle:edSignature="awHxk1fRron++sM85TlvJ5MG6h7Cy5XbdYtNFptmWNri0vYtsGbKnC6JtttBx3rqNU4YGZ10rPfzGP4PTHlHAw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1636,7 +1636,7 @@
 
 - attach dsyms for better crash debugging (#920) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.3...0.17.4
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.3...0.17.4
 ]]></description>
         </item>
         <item>
@@ -1647,7 +1647,7 @@
             <sparkle:shortVersionString>0.17.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.3/Muwa-0.17.3.dmg" length="34793028" type="application/octet-stream" sparkle:edSignature="3OZZ5o1uJW83L7A2mU+T+RE5l1XEpIUOu+eTn+DHYfpqdFhKG3TNB5LHEVadK20VsEcvjICfN8HKlmHdLb61CQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.3/Muwa-0.17.3.dmg" length="34793028" type="application/octet-stream" sparkle:edSignature="3OZZ5o1uJW83L7A2mU+T+RE5l1XEpIUOu+eTn+DHYfpqdFhKG3TNB5LHEVadK20VsEcvjICfN8HKlmHdLb61CQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1661,7 +1661,7 @@
 
 - updated to new discord url (#919) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.2...0.17.3
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.2...0.17.3
 ]]></description>
         </item>
         <item>
@@ -1672,7 +1672,7 @@
             <sparkle:shortVersionString>0.17.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.2/Muwa-0.17.2.dmg" length="34788914" type="application/octet-stream" sparkle:edSignature="pJiHYFcmNmfoDM5Blo4mpC3NOpBqiwS31bwD5dWi48qdlOgCyIGo8I9HgIRpRXN/mXdPuPvqGomgmJthnIDTCA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.2/Muwa-0.17.2.dmg" length="34788914" type="application/octet-stream" sparkle:edSignature="pJiHYFcmNmfoDM5Blo4mpC3NOpBqiwS31bwD5dWi48qdlOgCyIGo8I9HgIRpRXN/mXdPuPvqGomgmJthnIDTCA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1685,7 +1685,7 @@
 - performance improvements (#914) by @RaajeevChandran
 - reinforce plugin installation for smooth migration (#915) by @dinoki-bot
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.1...0.17.2
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.1...0.17.2
 ]]></description>
         </item>
         <item>
@@ -1696,13 +1696,13 @@
             <sparkle:shortVersionString>0.17.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.1/Muwa-0.17.1.dmg" length="34737928" type="application/octet-stream" sparkle:edSignature="YwGgrjoLeDZ5KTXEOUHvdVIIQza1YSeBZ0zH8gmAA67N8YTnbuEEwAl6MQ4c+Fm7TzF3p924O+66lwlef8//Aw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.1/Muwa-0.17.1.dmg" length="34737928" type="application/octet-stream" sparkle:edSignature="YwGgrjoLeDZ5KTXEOUHvdVIIQza1YSeBZ0zH8gmAA67N8YTnbuEEwAl6MQ4c+Fm7TzF3p924O+66lwlef8//Aw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
 * No changes
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.17.0...0.17.1
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.17.0...0.17.1
 ]]></description>
         </item>
         <item>
@@ -1713,7 +1713,7 @@
             <sparkle:shortVersionString>0.17.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.17.0/Muwa-0.17.0.dmg" length="34779120" type="application/octet-stream" sparkle:edSignature="4DQI0PHT3Bs03nwSo7WKG2e8ebcj+/36BHeqG/ZyIhQrbqoLQXC6YCOi1Ux+hdkf1s1oiZKQdEXaKKjMQFBsCw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.17.0/Muwa-0.17.0.dmg" length="34779120" type="application/octet-stream" sparkle:edSignature="4DQI0PHT3Bs03nwSo7WKG2e8ebcj+/36BHeqG/ZyIhQrbqoLQXC6YCOi1Ux+hdkf1s1oiZKQdEXaKKjMQFBsCw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1731,7 +1731,7 @@
 - address gaps in host API + background tasks management (#905) by @tpae
 - Deprecate Work Mode (migrate into single Chat / Agent system) (#893) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.16...0.16.17
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.16...0.16.17
 ]]></description>
         </item>
         <item>
@@ -1742,7 +1742,7 @@
             <sparkle:shortVersionString>0.16.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.16/Muwa-0.16.16.dmg" length="35164034" type="application/octet-stream" sparkle:edSignature="afG93rCtXbj6MN//hqyHwe4Uo3RawQ8cEkVklsHTF9oX0LomQih4XUVKTE197c0lObqZ6g8ik1+xjwi9T9UpBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.16/Muwa-0.16.16.dmg" length="35164034" type="application/octet-stream" sparkle:edSignature="afG93rCtXbj6MN//hqyHwe4Uo3RawQ8cEkVklsHTF9oX0LomQih4XUVKTE197c0lObqZ6g8ik1+xjwi9T9UpBw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1763,7 +1763,7 @@
 
 - improved inference runtime and fixed background task issues (#881) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.15...0.16.16
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.15...0.16.16
 ]]></description>
         </item>
         <item>
@@ -1774,7 +1774,7 @@
             <sparkle:shortVersionString>0.16.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.15/Muwa-0.16.15.dmg" length="35058652" type="application/octet-stream" sparkle:edSignature="0oAc7A12XsebsSFMB+yJoAtZwd8K4ZMVExAHr4SdiqPq3B75AVlv/5Vkh2+iAKtbUcOJzr03uFYhPAqLiSe9CQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.15/Muwa-0.16.15.dmg" length="35058652" type="application/octet-stream" sparkle:edSignature="0oAc7A12XsebsSFMB+yJoAtZwd8K4ZMVExAHr4SdiqPq3B75AVlv/5Vkh2+iAKtbUcOJzr03uFYhPAqLiSe9CQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1786,7 +1786,7 @@
 
 - Template-driven reasoning detection + streaming/retroactive thinking fixes (#867) by @jjang-ai
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.14...0.16.15
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.14...0.16.15
 ]]></description>
         </item>
         <item>
@@ -1797,7 +1797,7 @@
             <sparkle:shortVersionString>0.16.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.14/Muwa-0.16.14.dmg" length="34946888" type="application/octet-stream" sparkle:edSignature="MqsVn9ZSFMeJZ6ZUP3xeP+4QoVpI4Uh32g8RCOPJGYKdEdb3Ai+KpgtjBN2OhtQLilSoV5ECLvsMP1jTtRrAAw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.14/Muwa-0.16.14.dmg" length="34946888" type="application/octet-stream" sparkle:edSignature="MqsVn9ZSFMeJZ6ZUP3xeP+4QoVpI4Uh32g8RCOPJGYKdEdb3Ai+KpgtjBN2OhtQLilSoV5ECLvsMP1jTtRrAAw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1807,7 +1807,7 @@
 
 - Fix stuck loading, #856 stats leak, #858 error classifier, #860 NIO crash + bump vmlx-swift-lm (#863) by @jjang-ai
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.13...0.16.14
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.13...0.16.14
 ]]></description>
         </item>
         <item>
@@ -1818,7 +1818,7 @@
             <sparkle:shortVersionString>0.16.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.13/Muwa-0.16.13.dmg" length="34926846" type="application/octet-stream" sparkle:edSignature="MuZR1rkIy4tA8LH5EaPDXbqGM4UAjHumQfbe5OB2tf1gLvBaZarmCeOqWe6eYRlttFEpuOfyfC99o5i9h91CCQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.13/Muwa-0.16.13.dmg" length="34926846" type="application/octet-stream" sparkle:edSignature="MuZR1rkIy4tA8LH5EaPDXbqGM4UAjHumQfbe5OB2tf1gLvBaZarmCeOqWe6eYRlttFEpuOfyfC99o5i9h91CCQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1828,7 +1828,7 @@
 
 - fixed artifact sharing on plugin (#859) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.12...0.16.13
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.12...0.16.13
 ]]></description>
         </item>
         <item>
@@ -1839,7 +1839,7 @@
             <sparkle:shortVersionString>0.16.12</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.12/Muwa-0.16.12.dmg" length="34908474" type="application/octet-stream" sparkle:edSignature="qvg0hORnHyJ3FaKXcoCAAgcmgfeItJwbCRZutejb2cQBE4P4omw6dFxiwYHDJqmyzO2iOftWeoYQEtXX0On1Cw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.12/Muwa-0.16.12.dmg" length="34908474" type="application/octet-stream" sparkle:edSignature="qvg0hORnHyJ3FaKXcoCAAgcmgfeItJwbCRZutejb2cQBE4P4omw6dFxiwYHDJqmyzO2iOftWeoYQEtXX0On1Cw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1847,7 +1847,7 @@
 
 - bump vmlx version and added repair models function (#855) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.11...0.16.12
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.11...0.16.12
 ]]></description>
         </item>
         <item>
@@ -1858,7 +1858,7 @@
             <sparkle:shortVersionString>0.16.11</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.11/Muwa-0.16.11.dmg" length="34872218" type="application/octet-stream" sparkle:edSignature="f8Au1fJ0MAWPpxluWc8JkwPCcfbIdX6A4KA+zGgcpgTN1Y57pyIu8gPE9UwWeerDl0DlHfRd3zhg+x2hlDh8AQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.11/Muwa-0.16.11.dmg" length="34872218" type="application/octet-stream" sparkle:edSignature="f8Au1fJ0MAWPpxluWc8JkwPCcfbIdX6A4KA+zGgcpgTN1Y57pyIu8gPE9UwWeerDl0DlHfRd3zhg+x2hlDh8AQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1866,7 +1866,7 @@
 
 - sandbox fixes and other updates (#853) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.10...0.16.11
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.10...0.16.11
 ]]></description>
         </item>
         <item>
@@ -1877,7 +1877,7 @@
             <sparkle:shortVersionString>0.16.10</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.10/Muwa-0.16.10.dmg" length="34828885" type="application/octet-stream" sparkle:edSignature="yWJO5cLJ53VksQHZlRR+A8zQh/hsDz7an91zSOGpJpBRitjjBVsK/RdxQFV2HJuxxLPIEcDD+lquiLd4EKunAg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.10/Muwa-0.16.10.dmg" length="34828885" type="application/octet-stream" sparkle:edSignature="yWJO5cLJ53VksQHZlRR+A8zQh/hsDz7an91zSOGpJpBRitjjBVsK/RdxQFV2HJuxxLPIEcDD+lquiLd4EKunAg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1890,7 +1890,7 @@
 
 - added missing jang config (#845) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.9...0.16.10
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.9...0.16.10
 ]]></description>
         </item>
         <item>
@@ -1901,7 +1901,7 @@
             <sparkle:shortVersionString>0.16.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.9/Muwa-0.16.9.dmg" length="33523059" type="application/octet-stream" sparkle:edSignature="FUQCgXbqNgRteKOpDFt7mr383G62qTW8kZP2H2wVkVmcX5ufDts2hG617B4agjoeQQj8UlvICrgDKsyrsXyWDw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.9/Muwa-0.16.9.dmg" length="33523059" type="application/octet-stream" sparkle:edSignature="FUQCgXbqNgRteKOpDFt7mr383G62qTW8kZP2H2wVkVmcX5ufDts2hG617B4agjoeQQj8UlvICrgDKsyrsXyWDw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1916,7 +1916,7 @@
 
 - updated acknowledgements (#826) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.8...0.16.9
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.8...0.16.9
 ]]></description>
         </item>
         <item>
@@ -1927,7 +1927,7 @@
             <sparkle:shortVersionString>0.16.8</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.8/Muwa-0.16.8.dmg" length="33427781" type="application/octet-stream" sparkle:edSignature="c82mFPdd7gks71LcKT4M5japKgJGyERFRQJAdg16p4bcj7ahbMYwjPE5ErJIJikIcZtU4CfpchQ1iqVbOr0FDg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.8/Muwa-0.16.8.dmg" length="33427781" type="application/octet-stream" sparkle:edSignature="c82mFPdd7gks71LcKT4M5japKgJGyERFRQJAdg16p4bcj7ahbMYwjPE5ErJIJikIcZtU4CfpchQ1iqVbOr0FDg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1935,7 +1935,7 @@
 - Performance \& Visual improvements (#820) by @RaajeevChandran
 - feat: German localization (821 strings) (#785) by @HolliOnRoad
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.7...0.16.8
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.7...0.16.8
 ]]></description>
         </item>
         <item>
@@ -1946,7 +1946,7 @@
             <sparkle:shortVersionString>0.16.7</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.7/Muwa-0.16.7.dmg" length="32875914" type="application/octet-stream" sparkle:edSignature="c7OFmOlMSSsXcDW4kTiSfcPCDD1DCoXIRfhHYDJbys5B8mze4loPRpZLElHQY1fbybHo9wuEVSxIXU2jvhXnAg=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.7/Muwa-0.16.7.dmg" length="32875914" type="application/octet-stream" sparkle:edSignature="c7OFmOlMSSsXcDW4kTiSfcPCDD1DCoXIRfhHYDJbys5B8mze4loPRpZLElHQY1fbybHo9wuEVSxIXU2jvhXnAg=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1957,7 +1957,7 @@
 
 - updated preflight (auto) tool selection to be more reliable (#818) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.6...0.16.7
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.6...0.16.7
 ]]></description>
         </item>
         <item>
@@ -1968,7 +1968,7 @@
             <sparkle:shortVersionString>0.16.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.6/Muwa-0.16.6.dmg" length="32874778" type="application/octet-stream" sparkle:edSignature="3IKx4ZXQVR30qY4S1yP6PuPhG1guYTUgShouaaYpievIE6N8+Dse72JqRRmlM+e3FsDUcKA4Qc4KEi0cqNAvBQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.6/Muwa-0.16.6.dmg" length="32874778" type="application/octet-stream" sparkle:edSignature="3IKx4ZXQVR30qY4S1yP6PuPhG1guYTUgShouaaYpievIE6N8+Dse72JqRRmlM+e3FsDUcKA4Qc4KEi0cqNAvBQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -1985,7 +1985,7 @@
 - context management cleanup (#807) by @tpae
 - chore: bump mlx-swift-lm to 7d9a6ab (#809) by @jjang-ai
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.5...0.16.6
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.5...0.16.6
 ]]></description>
         </item>
         <item>
@@ -1996,7 +1996,7 @@
             <sparkle:shortVersionString>0.16.5</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.5/Muwa-0.16.5.dmg" length="32851734" type="application/octet-stream" sparkle:edSignature="kNztijA8o3NHRM5tIS2Ok5hGrekBKOyEgPJ/KRwr90T3XLKla3F9uH6Kwbc9SeC0rOGTPdMo1J7QF33vS5wWCA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.5/Muwa-0.16.5.dmg" length="32851734" type="application/octet-stream" sparkle:edSignature="kNztijA8o3NHRM5tIS2Ok5hGrekBKOyEgPJ/KRwr90T3XLKla3F9uH6Kwbc9SeC0rOGTPdMo1J7QF33vS5wWCA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2006,7 +2006,7 @@
 
 - cleaned up model manager (#805) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.4...0.16.5
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.4...0.16.5
 ]]></description>
         </item>
         <item>
@@ -2017,7 +2017,7 @@
             <sparkle:shortVersionString>0.16.4</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.4/Muwa-0.16.4.dmg" length="32821641" type="application/octet-stream" sparkle:edSignature="mMyZNqgah9K2tzmrNEnWmLc2pgyQejO1LUaL8vwjIdshzik9R5za0A42PCT5b9myZ8zO61w79BeVvU5cELtmDw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.4/Muwa-0.16.4.dmg" length="32821641" type="application/octet-stream" sparkle:edSignature="mMyZNqgah9K2tzmrNEnWmLc2pgyQejO1LUaL8vwjIdshzik9R5za0A42PCT5b9myZ8zO61w79BeVvU5cELtmDw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2033,7 +2033,7 @@
 - bumped versions on mlx lm library (#797) by @tpae
 - added metal gate to prevent crashes (#796) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.3...0.16.4
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.3...0.16.4
 ]]></description>
         </item>
         <item>
@@ -2044,7 +2044,7 @@
             <sparkle:shortVersionString>0.16.3</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.3/Muwa-0.16.3.dmg" length="32793218" type="application/octet-stream" sparkle:edSignature="U3u/YuvpaKPp/mrevZE2ZUakXbZZJf0d3vfjEptTfVXicQwINb3ojRgg91ElDFRIEKoZns3WBMo80Qcnt+1aAA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.3/Muwa-0.16.3.dmg" length="32793218" type="application/octet-stream" sparkle:edSignature="U3u/YuvpaKPp/mrevZE2ZUakXbZZJf0d3vfjEptTfVXicQwINb3ojRgg91ElDFRIEKoZns3WBMo80Qcnt+1aAA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2052,7 +2052,7 @@
 
 - added stats and fixed minor crash issues (#792) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.2...0.16.3
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.2...0.16.3
 ]]></description>
         </item>
         <item>
@@ -2063,7 +2063,7 @@
             <sparkle:shortVersionString>0.16.2</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.2/Muwa-0.16.2.dmg" length="32793105" type="application/octet-stream" sparkle:edSignature="qYpTRllHq395y4ISJREwL4mu7L/NnFNuw/5U74ksR5FJgT1SzTIoWFjQzb42tOyDMcjN3PGZz5MKSmcYA8CFCw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.2/Muwa-0.16.2.dmg" length="32793105" type="application/octet-stream" sparkle:edSignature="qYpTRllHq395y4ISJREwL4mu7L/NnFNuw/5U74ksR5FJgT1SzTIoWFjQzb42tOyDMcjN3PGZz5MKSmcYA8CFCw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2071,7 +2071,7 @@
 
 - fix: built-in tool discovery and chat view crash (#791) by @jjang-ai
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.1...0.16.2
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.1...0.16.2
 ]]></description>
         </item>
         <item>
@@ -2082,7 +2082,7 @@
             <sparkle:shortVersionString>0.16.1</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.1/Muwa-0.16.1.dmg" length="32778261" type="application/octet-stream" sparkle:edSignature="vbO/kqiklATuDUdLv/4/X7wtyqBNeiuVc++IhTbtzAAiNn6Xb5XZuOqyto7CtztbRY26M+48o9Ja25YnfQMUCQ=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.1/Muwa-0.16.1.dmg" length="32778261" type="application/octet-stream" sparkle:edSignature="vbO/kqiklATuDUdLv/4/X7wtyqBNeiuVc++IhTbtzAAiNn6Xb5XZuOqyto7CtztbRY26M+48o9Ja25YnfQMUCQ=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2094,7 +2094,7 @@
 
 - fix crashes, extend gemma support (#786) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.16.0...0.16.1
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.16.0...0.16.1
 ]]></description>
         </item>
         <item>
@@ -2105,7 +2105,7 @@
             <sparkle:shortVersionString>0.16.0</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.16.0/Muwa-0.16.0.dmg" length="32785409" type="application/octet-stream" sparkle:edSignature="jMdvjZMZgoSwhruYjEsCdJRgUyPuhwwyPQ+83GOsBVv6gsc2PJULZdCrNyb+AY+ve8Q5a+uF0WAzxGOAL6oGAw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.16.0/Muwa-0.16.0.dmg" length="32785409" type="application/octet-stream" sparkle:edSignature="jMdvjZMZgoSwhruYjEsCdJRgUyPuhwwyPQ+83GOsBVv6gsc2PJULZdCrNyb+AY+ve8Q5a+uF0WAzxGOAL6oGAw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2130,7 +2130,7 @@
 - added gemma4 support (#770) by @tpae
 - switch to Muwa mlx fork (#769) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.15.18...0.15.19
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.15.18...0.15.19
 ]]></description>
         </item>
         <item>
@@ -2141,7 +2141,7 @@
             <sparkle:shortVersionString>0.15.18</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.15.18/Muwa-0.15.18.dmg" length="33333236" type="application/octet-stream" sparkle:edSignature="FzVWHGJ7xbWC37N+7wupBLCbDr9SZ/xrlt730g+rkR1NIe7+AEjvpzNNE4I9IfuCGs8cXXkrIhBAXAPtZJXGDw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.15.18/Muwa-0.15.18.dmg" length="33333236" type="application/octet-stream" sparkle:edSignature="FzVWHGJ7xbWC37N+7wupBLCbDr9SZ/xrlt730g+rkR1NIe7+AEjvpzNNE4I9IfuCGs8cXXkrIhBAXAPtZJXGDw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2159,7 +2159,7 @@
 
 - minor UI improvements in chat view (#766) by @RaajeevChandran
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.15.16...0.15.17
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.15.16...0.15.17
 ]]></description>
         </item>
         <item>
@@ -2170,7 +2170,7 @@
             <sparkle:shortVersionString>0.15.16</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.15.16/Muwa-0.15.16.dmg" length="33219122" type="application/octet-stream" sparkle:edSignature="XaVCEdl5BUADaPyJhBuOgBM+UT/cD7gei5O9uP102v9qVPvvSwBTSKewKMysdhjBCBtwu9cZU5dkpSk2S3v3Cw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.15.16/Muwa-0.15.16.dmg" length="33219122" type="application/octet-stream" sparkle:edSignature="XaVCEdl5BUADaPyJhBuOgBM+UT/cD7gei5O9uP102v9qVPvvSwBTSKewKMysdhjBCBtwu9cZU5dkpSk2S3v3Cw=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2187,7 +2187,7 @@
 - fix team id (#762) by @tpae
 - fixed embedding / skills related potential crashes, extended unit tests (#760) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.15.15...0.15.16
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.15.15...0.15.16
 ]]></description>
         </item>
         <item>
@@ -2198,7 +2198,7 @@
             <sparkle:shortVersionString>0.15.15</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.15.15/Muwa-0.15.15.dmg" length="33179270" type="application/octet-stream" sparkle:edSignature="PkikDzMVxR82l1X+QhespbHiUxJZjdhQ4BcXKfS2yMD8i12+CMftvTwWbApUtgJbyaLR8/zQTwQqaXVht85MBA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.15.15/Muwa-0.15.15.dmg" length="33179270" type="application/octet-stream" sparkle:edSignature="PkikDzMVxR82l1X+QhespbHiUxJZjdhQ4BcXKfS2yMD8i12+CMftvTwWbApUtgJbyaLR8/zQTwQqaXVht85MBA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2206,7 +2206,7 @@
 
 - fixed issues with skills import (#757) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.15.14...0.15.15
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.15.14...0.15.15
 ]]></description>
         </item>
         <item>
@@ -2217,7 +2217,7 @@
             <sparkle:shortVersionString>0.15.14</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.15.14/Muwa-0.15.14.dmg" length="33177450" type="application/octet-stream" sparkle:edSignature="HM3i7rSy59Doc/Iz7RyK/W9Ho+mxQeQcjjJnK5HBgTo3IrFcrKprm3f3EdJYmcxOgiyLJY1WmCNRT3KeQIu7DA=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.15.14/Muwa-0.15.14.dmg" length="33177450" type="application/octet-stream" sparkle:edSignature="HM3i7rSy59Doc/Iz7RyK/W9Ho+mxQeQcjjJnK5HBgTo3IrFcrKprm3f3EdJYmcxOgiyLJY1WmCNRT3KeQIu7DA=="/>
             <description sparkle:format="markdown"><![CDATA[
 ## What's Changed
 
@@ -2225,7 +2225,7 @@
 
 - release process updates (#756) by @tpae
 
-**Full Changelog**: https://github.com/muwa-ai/muwa/compare/0.15.13...0.15.14
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/0.15.13...0.15.14
 ]]></description>
         </item>
         <item>
@@ -2236,7 +2236,7 @@
             <sparkle:shortVersionString>0.15.13</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
             <sparkle:releaseNotesLink>https://dingxiang-me.github.io/Muwa/Muwa-latest.html</sparkle:releaseNotesLink>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.15.13/Muwa-0.15.13.dmg" length="33086316" type="application/octet-stream" sparkle:edSignature="TSHh/J0zlugix8m7wIstEf+u2HG2opp8dafnpFCNpz0Ypq/0RJVYbR8Q7jwN7wxpkZzifeW0I0ph+t7EcKpIBw=="/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.15.13/Muwa-0.15.13.dmg" length="33086316" type="application/octet-stream" sparkle:edSignature="TSHh/J0zlugix8m7wIstEf+u2HG2opp8dafnpFCNpz0Ypq/0RJVYbR8Q7jwN7wxpkZzifeW0I0ph+t7EcKpIBw=="/>
         </item>
         <item>
             <title>0.0.9</title>
@@ -2245,7 +2245,7 @@
             <sparkle:version>0.0.9</sparkle:version>
             <sparkle:shortVersionString>0.0.9</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>15.5</sparkle:minimumSystemVersion>
-            <enclosure url="https://github.com/muwa-ai/muwa/releases/download/0.15.13/Muwa-0.0.9.dmg" length="7520848" type="application/octet-stream"/>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.15.13/Muwa-0.0.9.dmg" length="7520848" type="application/octet-stream"/>
         </item>
   </channel>
 </rss>

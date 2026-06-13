@@ -49,7 +49,7 @@ or surface.
 |---|---|---|---|
 | One Muwa consolidation PR | Green | `#1268` is the only open PR in the `#1247`-`#1268` consolidation range; older PRs are merged or closed/superseded. | Keep future fixes in `#1268` until merge; do not reopen duplicate family PRs. |
 | Do not merge Muwa by agent | Green | `#1268` remains open, not draft, mergeable, and unmerged. | Human merge only. |
-| vMLX main fully updated with current fixes | Green for current pin | `osaurus-ai/vmlx-swift` main and Muwa pin are `84c8bb653a50cd48b4af7f5cdce04d3f16e6ed95`. | Any new vMLX fix must land on vMLX main first, then #1268 must repin. |
+| vMLX main fully updated with current fixes | Green for current pin | `dingxiang-me/vmlx-swift` main and Muwa pin are `84c8bb653a50cd48b4af7f5cdce04d3f16e6ed95`. | Any new vMLX fix must land on vMLX main first, then #1268 must repin. |
 | No fake runtime guards or prompt coercion | Green for source policy | Source guards preserve no forced reasoning tags, no hidden sampler clamps, no parser output repair, no DSV4 forced repetition guard, and no required-tool prompt coercion. | Keep investigating runtime causes instead of adding decode/template disguises. |
 | Model generation config considered | Partial | Source policy requires omitted sampler fields to come from bundle config rather than synthetic Muwa defaults. | DSV4 lacks `max_new_tokens` in bundle config; omitted max-token behavior remains not green. |
 | Max output token behavior | Partial | DSV4 required-tool proof passes with explicit `max_tokens: 256`. | Decide/fix omitted DSV4 max-token behavior without inventing model-incorrect defaults. |

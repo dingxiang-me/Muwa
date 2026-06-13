@@ -534,7 +534,7 @@ Every external artifact the sandbox depends on is pinned to an immutable digest,
 
 | Artifact | Pin |
 |----------|-----|
-| GHCR image (`ghcr.io/osaurus-ai/sandbox`) | Multi-arch index digest (`@sha256:...`); the `:latest` tag is never used at runtime |
+| GHCR image (`ghcr.io/dingxiang-me/sandbox`) | Multi-arch index digest (`@sha256:...`); the `:latest` tag is never used at runtime |
 | Kata kernel tarball | SHA-256 verified after download against an in-source constant |
 | Initfs blob | SHA-256 verified after download against an in-source constant |
 

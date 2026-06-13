@@ -56,7 +56,7 @@ The `host` pointer gives the plugin everything it needs to call back into Muwa.
 
 ## Repository
 
-The plugin registry lives at [github.com/muwa-ai/muwa-tools](https://github.com/muwa-ai/muwa-tools). Approved plugins are mirrored to the in-app marketplace. See [PACKAGING.md](PACKAGING.md) to publish.
+The plugin registry lives at [github.com/dingxiang-me/muwa-tools](https://github.com/dingxiang-me/muwa-tools). Approved plugins are mirrored to the in-app marketplace. See [PACKAGING.md](PACKAGING.md) to publish.
 
 ## Quick links
 

@@ -220,7 +220,7 @@ struct AcknowledgementsView: View {
 
             HStack(spacing: 16) {
                 Button {
-                    if let url = URL(string: "https://github.com/muwa-ai/muwa") {
+                    if let url = URL(string: "https://github.com/dingxiang-me/Muwa") {
                         NSWorkspace.shared.open(url)
                     }
                 } label: {
@@ -280,9 +280,9 @@ struct AcknowledgementsView: View {
             name: "vMLX Swift",
             identity: "vmlx-swift",
             version: "0b85cad0",
-            repository: "https://github.com/osaurus-ai/vmlx-swift",
+            repository: "https://github.com/dingxiang-me/vmlx-swift",
             license: "MIT",
-            licenseUrl: "https://github.com/osaurus-ai/vmlx-swift/blob/main/LICENSE"
+            licenseUrl: "https://github.com/dingxiang-me/vmlx-swift/blob/main/LICENSE"
         ),
         Acknowledgement(
             name: "FluidAudio",

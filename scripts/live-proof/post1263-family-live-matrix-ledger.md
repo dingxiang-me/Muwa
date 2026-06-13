@@ -147,7 +147,7 @@ Each promoted row needs current-head evidence for:
 ### 2026-05-28 10:09 PDT current coordination boundary
 
 - Current Muwa PR: `#1268`, head `80e8749144d50b9783c5cc37a84b1cb03b8fdfa4`, open, not draft, mergeable, not merged by agent.
-- Current vMLX main and Muwa pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified local vMLX worktree and `osaurus-ai/vmlx-swift` main match.
+- Current vMLX main and Muwa pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified local vMLX worktree and `dingxiang-me/vmlx-swift` main match.
 - GitHub checks on `80e87491`: `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` all passed.
 - Only `#1268` remains open from the `#1247` through `#1268` runtime stack. Keep Muwa fixes in this one PR until the user manually merges it.
 - Source cache policy remains `engineSelected` with topology gating: prefix cache, paged KV, block-disk L2, and SSM rederive default on; proven simple full-KV rows may use TurboQuant KV by default, while DSV4, ZAYA/ZAYA-VL, Gemma rotating, Qwen/Ling/Nemotron/HY3-style hybrid and CCA/SSM/path-dependent rows stay native/fp16 unless exact topology proof promotes them.
@@ -159,7 +159,7 @@ Each promoted row needs current-head evidence for:
 ### 2026-05-28 09:03 PDT checked proof boundary
 
 - Current Muwa PR: `#1268`, open, not draft, mergeable, not merged by agent. The checked code/proof boundary is Muwa app build `695d5869ea9821732649bffb3789469568e6db55` plus documentation correction `8d3ce5d15156e5c6a5dc3f04601b02442dfd2c3a`; verify the live GitHub PR head and CI before merge because documentation-only commits can advance after this line.
-- Current vMLX main and Muwa pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified present on `osaurus-ai/vmlx-swift` main.
+- Current vMLX main and Muwa pin: `76e55f59935f22c3bb2f28055ae8ecebd2e7a355`; verified present on `dingxiang-me/vmlx-swift` main.
 - Current CI must be checked on the live PR head; do not reuse older green-status lines after another documentation-only head commit.
 - Code-equivalent no-sign/keychain-free app from `695d5869` launched at `build/DerivedData-pr1268-release-nosign-695d5869/Build/Products/Release/Muwa.app` and `/health` returned healthy with `MUWA_DISABLE_KEYCHAIN_FOR_TESTS=1`.
 - Final source guard on `695d5869` passed: migrated cache defaults use `liveKVCodec: .engineSelected`, `ModelRuntime.shouldUseTurboQuantByDefault` remains the topology gate, and DSV4/ZAYA/ZAYA-VL/hybrid topologies are not defaulted into generic TurboQuant KV.
@@ -178,7 +178,7 @@ Each promoted row needs current-head evidence for:
 ### 2026-05-28 07:20 PDT final PR merge boundary
 
 - Current Muwa PR: `#1268`, head `13f7fd9455006d55242d77375a5c9dcf2841266c`, open, not draft, mergeable, not merged by agent.
-- Current vMLX main and Muwa pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `osaurus-ai/vmlx-swift` main.
+- Current vMLX main and Muwa pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `dingxiang-me/vmlx-swift` main.
 - GitHub checks on `13f7fd94`: `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` all passed.
 - Final local source/hygiene guard on `13f7fd94` passed: keychain-free proof path, no hidden sampler defaults, no forced behavior, OpenResponses/cache wiring, server-settings runtime wiring, reasoning routing, HTTP cancellation, required tool-choice routing, model tool/capability surfaces, vMLX pin/checkout readiness, and PR artifact hygiene.
 - Final no-sign/keychain-free app from `13f7fd94` launched at `build/DerivedData-pr1268-release-nosign-13f7fd94/Build/Products/Release/Muwa.app` and `/health` returned healthy.
@@ -189,7 +189,7 @@ Each promoted row needs current-head evidence for:
 ### 2026-05-28 06:16 PDT runtime-proof boundary
 
 - Current Muwa PR: `#1268`, open, not draft, mergeable, not merged by agent.
-- Current vMLX main and Muwa pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `osaurus-ai/vmlx-swift` main.
+- Current vMLX main and Muwa pin: `cc3f5f4dc1317ffa09c46050ba0847f495887747`; verified present on `dingxiang-me/vmlx-swift` main.
 - Runtime-proof head `2a2a6d4b039e61fd9338c42287fa9b35798328cb`: `shellcheck`, `swiftlint`, `test-cli`, `test-core`, and `update_release_draft` all passed.
 - Only `#1268` remains open from the `#1247` through `#1268` runtime stack; older related PRs are consolidated/superseded rather than separate merge targets.
 - No-sign/keychain-free DSV4 app proof is recorded in `POST1266-LIVE-FAMILY-CACHE-MATRIX.md` for the `1503be2f` runtime commit that sits directly below the documentation-only proof boundary.

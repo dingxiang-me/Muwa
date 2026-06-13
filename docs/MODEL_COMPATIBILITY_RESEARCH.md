@@ -3,15 +3,15 @@
 This note covers the research-first lane for local model compatibility
 requests:
 
-- [#443](https://github.com/muwa-ai/muwa/issues/443) - Hugging Face
+- [#443](https://github.com/dingxiang-me/Muwa/issues/443) - Hugging Face
   cache import
-- [#358](https://github.com/muwa-ai/muwa/issues/358) - Hunyuan
+- [#358](https://github.com/dingxiang-me/Muwa/issues/358) - Hunyuan
   `hunyuan_v1_dense`
-- [#1065](https://github.com/muwa-ai/muwa/issues/1065) - DFlash
+- [#1065](https://github.com/dingxiang-me/Muwa/issues/1065) - DFlash
   speculative decoding
-- [#886](https://github.com/muwa-ai/muwa/issues/886) - LongCat
+- [#886](https://github.com/dingxiang-me/Muwa/issues/886) - LongCat
   families
-- [#833](https://github.com/muwa-ai/muwa/issues/833) - tensor
+- [#833](https://github.com/dingxiang-me/Muwa/issues/833) - tensor
   parallelism
 
 The current deliverable is host-side discovery and diagnostics only. Runtime

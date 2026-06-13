@@ -96,7 +96,7 @@ Fail if any of these are true:
 - The workspace and app resolved files disagree on vmlx-swift-lm, mlx-swift,
   swift-jinja, or swift-transformers.
 - A required org fork resolves to an upstream URL when Muwa expects the
-  muwa-ai fork.
+  dingxiang-me fork.
 - vmlx, mlx-swift, or Jinja code needed by Muwa is uncommitted while
   Muwa pins an older SHA.
 
@@ -202,8 +202,8 @@ follow-up after assistant reasoning/tool state. Record `runs.jsonl`.
 Use these as explicit release blockers when they touch the current branch:
 
 - Stale resolver URLs: the app project, workspace, and package resolver records
-  must not disagree on `muwa-ai/Jinja`, `muwa-ai/swift-transformers`,
-  `muwa-ai/vmlx-swift-lm`, or `muwa-ai/mlx-swift`.
+  must not disagree on `dingxiang-me/Jinja`, `dingxiang-me/swift-transformers`,
+  `dingxiang-me/vmlx-swift-lm`, or `dingxiang-me/mlx-swift`.
 - Parakeet live streaming: independently encoded chunks are not safe to
   concatenate. Use retained PCM snapshots or fresh `.preEncoded` embeddings until
   a stateful/incremental Parakeet path has its own proof.

@@ -33,7 +33,7 @@ let package = Package(
         // Keep this revision pinned until the package-switch gate has
         // live model, cache, parser, API, and UI evidence.
         .package(
-            url: "https://github.com/osaurus-ai/vmlx-swift",
+            url: "https://github.com/dingxiang-me/vmlx-swift",
             revision: "76047f3b4492d4fae316267a30fba55163b1c5cd"
         ),
         // FluidAudio 0.14.3 added a breaking `language:` parameter to TTS

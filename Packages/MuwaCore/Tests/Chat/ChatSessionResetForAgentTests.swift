@@ -3,7 +3,7 @@
 //  MuwaTests
 //
 //  Pin the contract for `ChatSession.reset(for:)` introduced to fix
-//  https://github.com/muwa-ai/muwa/issues/1005 - namely that
+//  https://github.com/dingxiang-me/Muwa/issues/1005 - namely that
 //  resetting a session to a NEW agent must not silently re-tag the
 //  previously-loaded conversation under the new agent.
 //

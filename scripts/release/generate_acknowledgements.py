@@ -34,7 +34,7 @@ KNOWN_LICENSES: Dict[str, tuple] = {
     "swift-jinja": ("Apache 2.0", "https://github.com/huggingface/swift-jinja/blob/main/LICENSE", "https://github.com/huggingface/swift-jinja"),
     
     # Consolidated vMLX package (MIT)
-    "vmlx-swift": ("MIT", "https://github.com/osaurus-ai/vmlx-swift/blob/main/LICENSE", "https://github.com/osaurus-ai/vmlx-swift"),
+    "vmlx-swift": ("MIT", "https://github.com/dingxiang-me/vmlx-swift/blob/main/LICENSE", "https://github.com/dingxiang-me/vmlx-swift"),
     
     # Other packages
     "sparkle": ("MIT", "https://github.com/sparkle-project/Sparkle/blob/2.x/LICENSE", "https://github.com/sparkle-project/Sparkle"),

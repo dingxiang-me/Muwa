@@ -158,7 +158,7 @@ For release builds, yes. The host verifies signatures and refuses to load unsign
 
 ### Can I host my own plugin registry?
 
-Today plugins are distributed via the [muwa-tools](https://github.com/muwa-ai/muwa-tools) registry. Sideloading from arbitrary directories works for development and private distributions but is not user-facing in the marketplace.
+Today plugins are distributed via the [muwa-tools](https://github.com/dingxiang-me/muwa-tools) registry. Sideloading from arbitrary directories works for development and private distributions but is not user-facing in the marketplace.
 
 ### How do I update an installed plugin?
 

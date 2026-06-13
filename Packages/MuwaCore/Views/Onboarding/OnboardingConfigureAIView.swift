@@ -1033,7 +1033,7 @@ struct ConfigureAIBody: View {
     /// Pause / Resume + Cancel inline controls — keep the Continue CTA below
     /// for "Continue when done", but give the user immediate, visible
     /// control over the in-flight download so they're never stuck (issue
-    /// [#1071](https://github.com/muwa-ai/muwa/issues/1071)).
+    /// [#1071](https://github.com/dingxiang-me/Muwa/issues/1071)).
     @ViewBuilder
     private var inlineDownloadControls: some View {
         HStack(spacing: 6) {
@@ -1597,7 +1597,7 @@ struct ConfigureAICTA: View {
     /// downloading view: while the download is in flight or paused, the
     /// CTA is disabled and the inline Pause/Resume/Cancel controls own the
     /// action surface. On failure the CTA flips to a "Try Again" button so
-    /// the user always has a path forward — issue [#1071](https://github.com/muwa-ai/muwa/issues/1071).
+    /// the user always has a path forward — issue [#1071](https://github.com/dingxiang-me/Muwa/issues/1071).
     @ViewBuilder
     private var localDownloadingCTA: some View {
         if state.isLocalFailed {

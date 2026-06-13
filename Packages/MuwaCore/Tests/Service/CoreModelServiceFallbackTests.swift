@@ -3,7 +3,7 @@
 //  MuwaCoreTests
 //
 //  Pins the chat-model fallback contract added in response to GitHub
-//  issue #823 (https://github.com/muwa-ai/muwa/issues/823).
+//  issue #823 (https://github.com/dingxiang-me/Muwa/issues/823).
 //
 //  Before the fix, `CoreModelService.generate` short-circuited with
 //  `modelUnavailable("none")` whenever the user had no working core

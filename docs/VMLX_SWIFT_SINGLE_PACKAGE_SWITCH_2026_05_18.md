@@ -7,7 +7,7 @@ consolidated `vmlx-swift` package.
 
 MuwaCore now has one direct inference dependency:
 
-- `https://github.com/osaurus-ai/vmlx-swift`
+- `https://github.com/dingxiang-me/vmlx-swift`
 - revision `0218591ed6ae02bf998a6ec6f8d204a89c26a7f7`
 
 That package is expected to export the runtime modules Muwa previously pulled

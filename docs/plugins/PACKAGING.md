@@ -162,13 +162,13 @@ For an even tighter dev loop, use `muwa-cli tools dev` — it builds, installs, 
 
 ## Marketplace submission
 
-The Muwa plugin registry is [github.com/muwa-ai/muwa-tools](https://github.com/muwa-ai/muwa-tools).
+The Muwa plugin registry is [github.com/dingxiang-me/muwa-tools](https://github.com/dingxiang-me/muwa-tools).
 
 Steps:
 
 1. Tag a release in your plugin repo (`git tag v0.1.0 && git push --tags`)
 2. The CI workflow `.github/workflows/release.yml` (included in the scaffold) builds, signs, notarizes, and attaches the bundle to the GitHub Release
-3. Open a PR against `muwa-ai/muwa-tools` adding your plugin's metadata to `registry.json`
+3. Open a PR against `dingxiang-me/muwa-tools` adding your plugin's metadata to `registry.json`
 4. The Muwa team reviews for security and DX, then merges
 
 Once merged, your plugin appears in the in-app marketplace within ~24 hours.

@@ -30,10 +30,10 @@ else
 fi
 
 if [[ -f "$PKG" ]]; then
-  if rg -q 'url: "https://github.com/osaurus-ai/vmlx-swift"' "$PKG"; then
-    pass "Package.swift uses consolidated osaurus-ai/vmlx-swift dependency"
+  if rg -q 'url: "https://github.com/dingxiang-me/vmlx-swift"' "$PKG"; then
+    pass "Package.swift uses consolidated dingxiang-me/vmlx-swift dependency"
   else
-    fail_msg "Package.swift does not reference osaurus-ai/vmlx-swift"
+    fail_msg "Package.swift does not reference dingxiang-me/vmlx-swift"
   fi
   if rg -q 'revision: "57e346b58e1286ab2f7bc458014d125c9bded095"' "$PKG"; then
     warn "Package.swift is still pinned to pre-fix vmlx revision 57e346b58e1286ab2f7bc458014d125c9bded095"
