@@ -3,6 +3,23 @@
   <channel>
     <title>Muwa</title>
         <item>
+            <title>0.19.19</title>
+            <pubDate>Sat, 13 Jun 2026 09:42:52 +0000</pubDate>
+            <sparkle:channel>release</sparkle:channel>
+            <sparkle:version>0.19.19</sparkle:version>
+            <sparkle:shortVersionString>0.19.19</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>15.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <enclosure url="https://github.com/dingxiang-me/Muwa/releases/download/0.19.19/Muwa-0.19.19.dmg" length="108433168" type="application/octet-stream" sparkle:edSignature="sA1PH/qxRk3Y3DIXSQfk8pfebF76OznVIfgBZO+S/tddpV+jXJVu1TKuuyxd6kwUApVgz2uaTf5ezw/yteiTCQ=="/>
+            <description sparkle:format="markdown"><![CDATA[
+## What's Changed
+
+* No changes
+
+**Full Changelog**: https://github.com/dingxiang-me/Muwa/compare/...0.1.0
+]]></description>
+        </item>
+        <item>
             <title>0.19.18</title>
             <pubDate>Thu, 11 Jun 2026 17:03:01 +0000</pubDate>
             <sparkle:channel>release</sparkle:channel>
