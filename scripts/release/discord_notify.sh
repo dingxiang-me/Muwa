@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-: "${DISCORD_WEBHOOK:?DISCORD_WEBHOOK is required}"
+if [ -z "${DISCORD_WEBHOOK:-}" ]; then
+  echo "::warning::DISCORD_WEBHOOK is not configured; skipping Discord notification."
+  exit 0
+fi
 
 RAW_CHANGELOG="${RAW_CHANGELOG:-}"
 if [ -z "$RAW_CHANGELOG" ] && [ -f RELEASE_NOTES.md ]; then
@@ -46,4 +49,3 @@ jq -n \
 curl -f -X POST -H "Content-Type: application/json" --data @payload.json "$DISCORD_WEBHOOK"
 
 echo "✅ Discord notification sent"
-
