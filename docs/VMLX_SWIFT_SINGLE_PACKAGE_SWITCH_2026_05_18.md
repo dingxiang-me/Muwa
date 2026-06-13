@@ -104,7 +104,7 @@ local models and record artifacts for:
 - API surfaces used by Muwa and OpenAI-compatible clients.
 
 The full Muwa-facing UI/API/cache/media checklist is tracked in
-[`VMLX_SWIFT_OSAURUS_LIVE_MATRIX_2026_05_18.md`](VMLX_SWIFT_OSAURUS_LIVE_MATRIX_2026_05_18.md).
+[`VMLX_SWIFT_MUWA_LIVE_MATRIX_2026_05_18.md`](VMLX_SWIFT_MUWA_LIVE_MATRIX_2026_05_18.md).
 That matrix is the merge gate for user-facing confidence: it requires real chat
 app and API rows for Qwen-VL, Gemma VLM/Gemma3n, ZAYA-VL, Nemotron Omni,
 DSV4, MiniMax, Ling, Hy3, saved reasoning settings, media salt, prefix/paged/L2
